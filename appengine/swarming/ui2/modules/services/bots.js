@@ -43,6 +43,9 @@ class PrpcService {
   }
 }
 
+const QUERY_START_TS = 4;
+const QUERY_ALL = 10;
+
 /**
  * Service to communicate with swarming.v2.Bots prpc service.
  */
@@ -54,12 +57,32 @@ export class BotsService extends PrpcService {
   /**
    * Calls the GetBot route.
    *
-   *  @param {String} bot_id - Identifier of the bot to retrieve.
+   *  @param {String} bot_id - identifier of the bot to retrieve.
    *
    *  @returns {Object} object with information about the bot in question.
    */
   getBot(botId) {
     return this._call('GetBot', {bot_id: botId});
+  }
+
+  /**
+   * Calls the ListBotTasks route
+   *
+   *  @param {String} bot_id - identifier of the bot to retrieve.
+   *  @param {String} cursor - cursor retrieved from previous request to ListBotTasks.
+   *
+   *  @returns {Object} object containing both items and cursor fields. `items` contains a list of tasks associated with the Bot and `cursor` is a db cursor from the previous request.
+   */
+  getTasks(botId, cursor) {
+    const request = {
+      sort: QUERY_START_TS,
+      state: QUERY_ALL,
+      bot_id: botId,
+      cursor: cursor,
+      limit: 30,
+      include_performance_stats: true,
+    };
+    return this._call('ListBotTasks', request);
   }
 }
 

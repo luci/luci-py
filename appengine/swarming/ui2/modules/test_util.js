@@ -231,6 +231,9 @@ export function getChildItemWithText(ele, value) {
 
 export const MATCHED = true;
 
+const stringify = function(data) {
+  return `)]}'${JSON.stringify(data)}`;
+};
 /**
  * Mocks out prpc GetBot request with the given data.
  * Will setup pRPC headers and prefix strings.
@@ -240,8 +243,19 @@ export const MATCHED = true;
  *
  */
 export function mockGetBot(fetchMock, data) {
-  const stringify = (data) => `)]}'${JSON.stringify(data)}`;
   fetchMock.post('path:/prpc/swarming.v2.Bots/GetBot',
+      new Response(stringify(data), {
+        status: 200,
+        headers: {
+          'x-prpc-grpc-code': '0',
+          'content-type': 'application/json',
+        },
+      }),
+  );
+}
+
+export function mockListBotTasks(fetchMock, data) {
+  fetchMock.post('path:/prpc/swarming.v2.Bots/ListBotTasks',
       new Response(stringify(data), {
         status: 200,
         headers: {

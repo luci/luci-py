@@ -72,6 +72,23 @@ export function parseEvents(events) {
   return events;
 }
 
+const getField = (obj, options, def) => {
+  for (const opt in options) {
+    if (obj[opt]) {
+      return obj[opt];
+    }
+  }
+  return def;
+};
+
+const getStart = (task) => {
+  return getField(task, ['startedTs']);
+};
+
+const getEnd = (task) => {
+  return getField(task, ['completedTs', 'abandonedTs', 'modifiedTs'], new Date());
+};
+
 /** parseTasks pre-processes the tasks to get them ready to display.
  *  @param {Array<Object>} tasks - The raw task objects
  */
@@ -87,12 +104,12 @@ export function parseTasks(tasks) {
       // Task is finished
       task.human_duration = humanDuration(task.duration);
     } else {
-      const end = task.completed_ts || task.abandoned_ts || task.modified_ts || new Date();
-      task.human_duration = timeDiffExact(task.started_ts, end);
-      task.duration = (end.getTime() - task.started_ts) / 1000;
+      const end = getEnd(task);
+      task.human_duration = timeDiffExact(task.startedTs, end);
+      task.duration = (end.getTime() - task.startedTs) / 1000;
     }
-    const total_overhead = (task.performance_stats &&
-                            task.performance_stats.bot_overhead) || 0;
+    const total_overhead = (task.performanceStats &&
+                            task.performanceStats.botOverhead) || 0;
     // total_duration includes overhead, to give a better sense of the bot
     // being 'busy', e.g. when uploading isolated outputs.
     task.total_duration = task.duration + total_overhead;
@@ -110,7 +127,7 @@ export function parseTasks(tasks) {
     }
   }
   tasks.sort((a, b) => {
-    return b.started_ts - a.started_ts;
+    return getStart(a) - getStart(b);
   });
   return tasks;
 }
@@ -160,7 +177,7 @@ export function siblingBotsLink(dimensions) {
 }
 
 const BOT_TIMES = ['firstSeenTs', 'lastSeenTs', 'leaseExpirationTs'];
-const TASK_TIMES = ['started_ts', 'completed_ts', 'abandoned_ts', 'modified_ts'];
+const TASK_TIMES = ['startedTs', 'completedTs', 'abandonedTs', 'modifiedTs'];
 
 // These field filters trim down the data we get per task, which
 // may speed up the server time and should speed up the network time.

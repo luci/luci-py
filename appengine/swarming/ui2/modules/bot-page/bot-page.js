@@ -241,12 +241,12 @@ const taskRow = (task) => html`
 <tr class=${taskClass(task)}>
   <td class=break-all>
     <a target=_blank rel=noopener
-        href=${taskPageLink(task.task_id)}>
+        href=${taskPageLink(task.taskId)}>
       ${task.name}
     </a>
   </td>
-  <td>${task.human_started_ts}</td>
-  <td title=${task.human_completed_ts}>${task.human_total_duration}</td>
+  <td>${task.human_startedTs}</td>
+  <td title=${task.human_completedTs}>${task.human_total_duration}</td>
   <td>${task.human_state}</td>
 </tr>
 `;
@@ -505,15 +505,14 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
         });
     if (!this._taskCursor) {
       this.app.addBusyTasks(1);
-      fetch(`/_ah/api/swarming/v1/bot/${this._botId}/tasks?${TASKS_QUERY_PARAMS}`, extra)
-          .then(jsonOrThrow)
-          .then((json) => {
-            this._taskCursor = json.cursor;
-            this._tasks = parseTasks(json.items);
+      botService.getTasks(this._botId, this._taskCursor)
+          .then((resp) => {
+            this._taskCursor = resp.cursor;
+            this._tasks = parseTasks(resp.items);
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, 'bot/tasks'));
+          .catch((e) => this.prpcError(e, 'bot/tasks'));
     }
 
     if (!this._eventsCursor) {
@@ -581,21 +580,17 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     if (!this._taskCursor) {
       return;
     }
-    const extra = {
-      headers: {'authorization': this.auth_header},
-      signal: this._fetchController.signal,
-    };
+    const botService =
+      new BotsService(this.auth_header, this._fetchController.signal);
     this.app.addBusyTasks(1);
-    fetch(`/_ah/api/swarming/v1/bot/${this._botId}/tasks?cursor=${this._taskCursor}&` +
-      TASKS_QUERY_PARAMS, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._taskCursor = json.cursor;
-          this._tasks.push(...parseTasks(json.items));
+    botService.getTasks(this._botId, this._taskCursor)
+        .then((resp) => {
+          this._taskCursor = resp.cursor;
+          this._tasks.push(...parseTasks(resp.items));
           this.render();
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, 'bot/more_tasks'));
+        .catch((e) => this.prpcError(e, 'bot/more_tasks'));
   }
 
   _promptDelete() {

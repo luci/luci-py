@@ -363,8 +363,6804 @@ export const botDataMap = {
 // These lists are really long, and likely will not have the data modified,
 // so it doesn't make much to pretty-print them.
 export const tasksMap = {
-  // Came from a Skia GPU bot (build16-a9)
-  'SkiaGPU': [{'created_ts': '2019-02-12T15:30:35.877627', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'task_id': '43004cb4fca98111', 'internal_failure': false, 'server_versions': ['4085-c81638b'], 'state': 'RUNNING', 'failure': false, 'modified_ts': '2019-02-12T15:38:08.596496', 'started_ts': '2019-02-12T15:30:48.002729', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-ANGLE'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9617', 'total_bytes_items_hot': '33290179', 'initial_size': '53680871378', 'total_bytes_items_cold': '35770139', 'num_items_hot': '802', 'num_items_cold': '7', 'duration': 1.8910000324249268}, 'isolated_upload': {'total_bytes_items_hot': '0', 'total_bytes_items_cold': '376860', 'num_items_hot': '1', 'num_items_cold': '3', 'duration': 0.7660000324249268}, 'bot_overhead': 11.122000217437744}, 'duration': 220.84799981117249, 'completed_ts': '2019-02-12T15:29:55.164571', 'started_ts': '2019-02-12T15:26:00.163259', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T15:29:55.164571', 'created_ts': '2019-02-12T15:25:50.970002', 'name': 'Test-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan', 'task_id': '4300485c081fdf11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9623', 'total_bytes_items_hot': '27001283', 'initial_size': '53685046412', 'total_bytes_items_cold': '61701458', 'num_items_hot': '801', 'num_items_cold': '10', 'duration': 2.062999963760376}, 'isolated_upload': {'num_items_cold': '2', 'duration': 0.9559998512268066, 'total_bytes_items_cold': '8989'}, 'bot_overhead': 11.557999849319458}, 'duration': 997.4630000591278, 'completed_ts': '2019-02-12T15:25:58.129464', 'started_ts': '2019-02-12T15:09:06.290899', 'internal_failure': false, 'exit_code': '117', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': true, 'modified_ts': '2019-02-12T15:25:58.129464', 'created_ts': '2019-02-12T15:08:56.355535', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-ANGLE', 'task_id': '430038e0c10e3511'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9638', 'total_bytes_items_hot': '27000735', 'initial_size': '53686307648', 'total_bytes_items_cold': '110246182', 'num_items_hot': '800', 'num_items_cold': '8', 'duration': 2.3339998722076416}, 'isolated_upload': {'num_items_cold': '2', 'duration': 0.8899998664855957, 'total_bytes_items_cold': '8969'}, 'bot_overhead': 11.775000095367432}, 'duration': 707.4429998397827, 'completed_ts': '2019-02-12T15:08:13.877435', 'started_ts': '2019-02-12T14:56:11.925137', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T15:08:13.877435', 'created_ts': '2019-02-12T14:55:38.788960', 'name': 'Test-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Debug-All-MSRTC_Vulkan', 'task_id': '43002cb535ff9c11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9634', 'total_bytes_items_hot': '27001283', 'initial_size': '53680338837', 'total_bytes_items_cold': '41368752', 'num_items_hot': '801', 'num_items_cold': '8', 'duration': 1.937999963760376}, 'isolated_upload': {'total_bytes_items_hot': '0', 'total_bytes_items_cold': '1228920', 'num_items_hot': '1', 'num_items_cold': '3', 'duration': 0.8289999961853027}, 'bot_overhead': 11.430000066757202}, 'duration': 200.5699999332428, 'completed_ts': '2019-02-12T14:54:25.461265', 'started_ts': '2019-02-12T14:50:50.645785', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T14:54:25.461265', 'created_ts': '2019-02-12T14:50:31.584453', 'name': 'Test-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-ReleaseAndAbandonGpuContextReallyLongTaskNameLikeWowHowLongCanItBe', 'task_id': '430028052d2d7511'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9629', 'total_bytes_items_hot': '27001283', 'initial_size': '53685657133', 'total_bytes_items_cold': '46848848', 'num_items_hot': '801', 'num_items_cold': '10', 'duration': 2.1569998264312744}, 'isolated_upload': {'num_items_cold': '3', 'duration': 1.3429999351501465, 'total_bytes_items_cold': '6326501'}, 'bot_overhead': 12.039999723434448}, 'duration': 1587.574000120163, 'completed_ts': '2019-02-12T13:55:35.235389', 'started_ts': '2019-02-12T13:28:52.601959', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T13:55:35.235389', 'created_ts': '2019-02-12T13:28:45.497111', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-ANGLE', 'task_id': '42ffdd28c2e72711'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9630', 'total_bytes_items_hot': '23138226', 'initial_size': '53672210121', 'total_bytes_items_cold': '57160886', 'num_items_hot': '800', 'num_items_cold': '9', 'duration': 2.2190001010894775}, 'isolated_upload': {'num_items_cold': '2', 'duration': 0.8900001049041748, 'total_bytes_items_cold': '8992'}, 'bot_overhead': 11.515000104904175}, 'duration': 498.52999997138977, 'completed_ts': '2019-02-12T13:28:28.981371', 'started_ts': '2019-02-12T13:19:56.231215', 'internal_failure': false, 'exit_code': '0', 'state': 'TIMED_OUT', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T13:28:28.981371', 'created_ts': '2019-02-12T13:19:47.942258', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All', 'task_id': '42ffd4f4f19a3f11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9624', 'total_bytes_items_hot': '27001283', 'initial_size': '53670792891', 'total_bytes_items_cold': '61697362', 'num_items_hot': '801', 'num_items_cold': '10', 'duration': 2.4100000858306885}, 'isolated_upload': {'num_items_cold': '2', 'duration': 1.0160000324249268, 'total_bytes_items_cold': '8986'}, 'bot_overhead': 12.148000240325928}, 'duration': 1013.4649999141693, 'completed_ts': '2019-02-12T13:17:00.993434', 'started_ts': '2019-02-12T12:59:52.489832', 'internal_failure': true, 'exit_code': '0', 'state': 'BOT_DIED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T13:17:00.993434', 'created_ts': '2019-02-12T12:57:44.010485', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-ANGLE', 'task_id': '42ffc0c1539fad11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9623', 'total_bytes_items_hot': '165156628', 'initial_size': '53683738339', 'total_bytes_items_cold': '40000650', 'num_items_hot': '880', 'num_items_cold': '8', 'duration': 1.9230000972747803}, 'isolated_upload': {'num_items_cold': '4', 'duration': 0.9529998302459717, 'total_bytes_items_cold': '36921'}, 'bot_overhead': 8.297999858856201}, 'duration': 557.0270001888275, 'completed_ts': '2019-02-12T12:59:50.412738', 'started_ts': '2019-02-12T12:50:22.324874', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T12:59:50.412738', 'created_ts': '2019-02-12T12:50:12.157759', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan_Skpbench', 'task_id': '42ffb9dc4764d111'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9619', 'total_bytes_items_hot': '27001283', 'initial_size': '53673870879', 'total_bytes_items_cold': '41364138', 'num_items_hot': '801', 'num_items_cold': '8', 'duration': 2.171999931335449}, 'isolated_upload': {'total_bytes_items_hot': '0', 'total_bytes_items_cold': '1228923', 'num_items_hot': '1', 'num_items_cold': '3', 'duration': 1.0160000324249268}, 'bot_overhead': 11.491000175476074}, 'duration': 239.79499983787537, 'completed_ts': '2019-02-12T12:49:49.267475', 'started_ts': '2019-02-12T12:45:35.148432', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T12:49:49.267475', 'created_ts': '2019-02-12T12:45:29.680463', 'name': 'Test-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-ReleaseAndAbandonGpuContext', 'task_id': '42ffb58cd869f711'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9617', 'total_bytes_items_hot': '23138226', 'initial_size': '53686677193', 'total_bytes_items_cold': '45919036', 'num_items_hot': '800', 'num_items_cold': '9', 'duration': 2.11299991607666}, 'isolated_upload': {'num_items_cold': '3', 'duration': 1.2660000324249268, 'total_bytes_items_cold': '1243948'}, 'bot_overhead': 11.824999809265137}, 'duration': 287.85000014305115, 'completed_ts': '2019-02-12T12:45:00.200618', 'started_ts': '2019-02-12T12:39:57.726944', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T12:45:00.200618', 'created_ts': '2019-02-12T12:39:38.295857', 'name': 'Perf-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan', 'task_id': '42ffb0304975ee11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9616', 'total_bytes_items_hot': '68062081', 'initial_size': '53686675205', 'total_bytes_items_cold': '1988', 'num_items_hot': '803', 'num_items_cold': '1', 'duration': 2.126000165939331}, 'isolated_upload': {'num_items_cold': '3', 'duration': 1.0780000686645508, 'total_bytes_items_cold': '5806171'}, 'bot_overhead': 11.628999710083008}, 'duration': 965.1070001125336, 'completed_ts': '2019-02-12T10:43:30.772993', 'started_ts': '2019-02-12T10:27:11.188149', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T10:43:30.772993', 'created_ts': '2019-02-12T10:27:08.285232', 'name': 'Perf-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Release-All', 'task_id': '42ff36e1b849b611'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9616', 'total_bytes_items_hot': '33162783', 'initial_size': '53682983155', 'total_bytes_items_cold': '35761454', 'num_items_hot': '797', 'num_items_cold': '7', 'duration': 2.3439998626708984}, 'isolated_upload': {'num_items_cold': '3', 'duration': 1.0169999599456787, 'total_bytes_items_cold': '1243990'}, 'bot_overhead': 11.843999862670898}, 'duration': 282.4739999771118, 'completed_ts': '2019-02-12T10:27:03.724610', 'started_ts': '2019-02-12T10:22:06.698642', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T10:27:03.724610', 'created_ts': '2019-02-12T10:22:04.365694', 'name': 'Perf-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan', 'task_id': '42ff323e65b21211'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9608', 'total_bytes_items_hot': '33162783', 'initial_size': '53671603618', 'total_bytes_items_cold': '40559441', 'num_items_hot': '797', 'num_items_cold': '9', 'duration': 2.2200000286102295}, 'isolated_upload': {'num_items_cold': '3', 'duration': 1.4540002346038818, 'total_bytes_items_cold': '6326365'}, 'bot_overhead': 12.007999897003174}, 'duration': 1579.9739999771118, 'completed_ts': '2019-02-12T10:21:42.679129', 'started_ts': '2019-02-12T09:55:07.764185', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T10:21:42.679129', 'created_ts': '2019-02-12T09:54:59.494006', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-ANGLE', 'task_id': '42ff19732eee9b11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9603', 'total_bytes_items_hot': '33162783', 'initial_size': '53674047110', 'total_bytes_items_cold': '35761436', 'num_items_hot': '797', 'num_items_cold': '7', 'duration': 2.1089999675750732}, 'isolated_upload': {'num_items_cold': '3', 'duration': 1.2029998302459717, 'total_bytes_items_cold': '1243965'}, 'bot_overhead': 12.569999933242798}, 'duration': 281.83899998664856, 'completed_ts': '2019-02-12T09:54:32.547245', 'started_ts': '2019-02-12T09:49:35.161567', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T09:54:32.547245', 'created_ts': '2019-02-12T09:49:30.439016', 'name': 'Perf-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan', 'task_id': '42ff146dea117011'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9605', 'total_bytes_items_hot': '201074773', 'initial_size': '53683978775', 'total_bytes_items_cold': '4012442', 'num_items_hot': '881', 'num_items_cold': '2', 'duration': 1.9240000247955322}, 'isolated_upload': {'num_items_cold': '4', 'duration': 1.194000005722046, 'total_bytes_items_cold': '36946'}, 'bot_overhead': 8.634000062942505}, 'duration': 573.4800000190735, 'completed_ts': '2019-02-12T09:49:10.858093', 'started_ts': '2019-02-12T09:39:26.080905', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T09:49:10.858093', 'created_ts': '2019-02-12T09:39:16.186182', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan_Skpbench', 'task_id': '42ff0b0e79c7e011'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9605', 'total_bytes_items_hot': '169111920', 'initial_size': '53682313025', 'total_bytes_items_cold': '35975295', 'num_items_hot': '876', 'num_items_cold': '7', 'duration': 2.375}, 'isolated_upload': {'num_items_cold': '4', 'duration': 1.1570000648498535, 'total_bytes_items_cold': '36951'}, 'bot_overhead': 9.185999870300293}, 'duration': 639.8840000629425, 'completed_ts': '2019-02-12T09:38:54.897999', 'started_ts': '2019-02-12T09:28:03.482624', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T09:38:54.897999', 'created_ts': '2019-02-12T09:27:29.620566', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan_Skpbench_DDLRecord_9x9', 'task_id': '42ff00468bda1111'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9606', 'total_bytes_items_hot': '33162783', 'initial_size': '53683301666', 'total_bytes_items_cold': '35965608', 'num_items_hot': '797', 'num_items_cold': '7', 'duration': 2.2350001335144043}, 'isolated_upload': {'num_items_cold': '3', 'duration': 1.1400001049041748, 'total_bytes_items_cold': '1244282'}, 'bot_overhead': 11.920000076293945}, 'duration': 282.98999977111816, 'completed_ts': '2019-02-12T09:25:42.269087', 'started_ts': '2019-02-12T09:20:44.597603', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T09:25:42.269087', 'created_ts': '2019-02-12T09:19:39.280890', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan', 'task_id': '42fef9191a7f8a11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9602', 'total_bytes_items_hot': '33162783', 'initial_size': '53683742198', 'total_bytes_items_cold': '34892588', 'num_items_hot': '797', 'num_items_cold': '7', 'duration': 2.625}, 'isolated_upload': {'num_items_cold': '3', 'duration': 1.9070000648498535, 'total_bytes_items_cold': '5805528'}, 'bot_overhead': 12.948999881744385}, 'duration': 978.2510001659393, 'completed_ts': '2019-02-12T09:20:42.579770', 'started_ts': '2019-02-12T09:04:08.358740', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T09:20:42.579770', 'created_ts': '2019-02-12T09:03:59.664762', 'name': 'Perf-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Release-All', 'task_id': '42feeac2c987ea11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9605', 'total_bytes_items_hot': '33162783', 'initial_size': '53683938954', 'total_bytes_items_cold': '47939246', 'num_items_hot': '797', 'num_items_cold': '7', 'duration': 2.562999963760376}, 'isolated_upload': {'num_items_cold': '2', 'duration': 0.6410000324249268, 'total_bytes_items_cold': '8983'}, 'bot_overhead': 11.83299994468689}, 'duration': 177.01900005340576, 'completed_ts': '2019-02-12T09:03:33.049419', 'started_ts': '2019-02-12T09:00:21.171165', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T09:03:33.049419', 'created_ts': '2019-02-12T09:00:00.462518', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-Vulkan', 'task_id': '42fee71c62c98711'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9615', 'total_bytes_items_hot': '33162235', 'initial_size': '53685362684', 'total_bytes_items_cold': '85782826', 'num_items_hot': '796', 'num_items_cold': '7', 'duration': 2.2660000324249268}, 'isolated_upload': {'num_items_cold': '2', 'duration': 0.9529998302459717, 'total_bytes_items_cold': '8989'}, 'bot_overhead': 11.559000015258789}, 'duration': 343.0149998664856, 'completed_ts': '2019-02-12T08:59:02.846407', 'started_ts': '2019-02-12T08:53:04.476996', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T08:59:02.846407', 'created_ts': '2019-02-12T08:52:59.961787', 'name': 'Perf-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Debug-All-Vulkan', 'task_id': '42fee0b1c5fb6511'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9624', 'total_bytes_items_hot': '33162235', 'initial_size': '53685475533', 'total_bytes_items_cold': '85800743', 'num_items_hot': '796', 'num_items_cold': '7', 'duration': 2.2660000324249268}, 'isolated_upload': {'total_bytes_items_hot': '0', 'total_bytes_items_cold': '337603', 'num_items_hot': '1', 'num_items_cold': '3', 'duration': 0.9530000686645508}, 'bot_overhead': 11.81499981880188}, 'duration': 499.9810001850128, 'completed_ts': '2019-02-12T08:52:27.789685', 'started_ts': '2019-02-12T08:43:53.091785', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T08:52:27.789685', 'created_ts': '2019-02-12T08:43:47.890509', 'name': 'Test-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Debug-All-Vulkan', 'task_id': '42fed84542ceed11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9624', 'total_bytes_items_hot': '165099888', 'initial_size': '53668282075', 'total_bytes_items_cold': '39976062', 'num_items_hot': '875', 'num_items_cold': '8', 'duration': 1.9060001373291016}, 'isolated_upload': {'num_items_cold': '4', 'duration': 0.9530000686645508, 'total_bytes_items_cold': '36930'}, 'bot_overhead': 8.210000038146973}, 'duration': 551.2039999961853, 'completed_ts': '2019-02-12T08:43:51.154274', 'started_ts': '2019-02-12T08:34:28.867532', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T08:43:51.154274', 'created_ts': '2019-02-12T08:34:18.822554', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan_Skpbench', 'task_id': '42fecf965ddcb911'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9619', 'total_bytes_items_hot': '33162783', 'initial_size': '53670602818', 'total_bytes_items_cold': '47939225', 'num_items_hot': '797', 'num_items_cold': '7', 'duration': 1.9689998626708984}, 'isolated_upload': {'num_items_cold': '2', 'duration': 0.7030000686645508, 'total_bytes_items_cold': '8992'}, 'bot_overhead': 11.733000040054321}, 'duration': 177.55999994277954, 'completed_ts': '2019-02-12T08:33:38.298168', 'started_ts': '2019-02-12T08:30:26.184015', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T08:33:38.298168', 'created_ts': '2019-02-12T08:30:23.469833', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-Vulkan', 'task_id': '42fecbff069f5711'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9616', 'total_bytes_items_hot': '33162783', 'initial_size': '53654665601', 'total_bytes_items_cold': '46996649', 'num_items_hot': '797', 'num_items_cold': '7', 'duration': 2.882000207901001}, 'isolated_upload': {'num_items_cold': '2', 'duration': 0.9530000686645508, 'total_bytes_items_cold': '8980'}, 'bot_overhead': 12.17799997329712}, 'duration': 483.00099992752075, 'completed_ts': '2019-02-12T08:30:02.405816', 'started_ts': '2019-02-12T08:21:44.503602', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T08:30:02.405816', 'created_ts': '2019-02-12T08:21:36.455063', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All', 'task_id': '42fec3f4543a6d11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9609', 'total_bytes_items_hot': '169111920', 'initial_size': '53618701567', 'total_bytes_items_cold': '35964034', 'num_items_hot': '876', 'num_items_cold': '7', 'duration': 2.250999927520752}, 'isolated_upload': {'num_items_cold': '4', 'duration': 1.1399998664855957, 'total_bytes_items_cold': '36954'}, 'bot_overhead': 9.472999811172485}, 'duration': 593.7170000076294, 'completed_ts': '2019-02-12T08:21:21.327186', 'started_ts': '2019-02-12T08:11:15.380896', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T08:21:21.327186', 'created_ts': '2019-02-12T08:11:06.567674', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan_Skpbench_DDLRecord_9x9', 'task_id': '42feba57df5a4a11'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9602', 'total_bytes_items_hot': '33162235', 'initial_size': '53532918748', 'total_bytes_items_cold': '85782819', 'num_items_hot': '796', 'num_items_cold': '7', 'duration': 2.1570000648498535}, 'isolated_upload': {'num_items_cold': '2', 'duration': 1.0780000686645508, 'total_bytes_items_cold': '8980'}, 'bot_overhead': 11.759000062942505}, 'duration': 346.72000002861023, 'completed_ts': '2019-02-12T08:10:22.463052', 'started_ts': '2019-02-12T08:04:21.233981', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T08:10:22.463052', 'created_ts': '2019-02-12T08:04:14.780973', 'name': 'Perf-Win10-MSVC-Golo-GPU-QuadroP400-x86_64-Debug-All-Vulkan', 'task_id': '42feb40f62b87311'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9595', 'total_bytes_items_hot': '33162783', 'initial_size': '53484976433', 'total_bytes_items_cold': '47942315', 'num_items_hot': '797', 'num_items_cold': '7', 'duration': 2.4689998626708984}, 'isolated_upload': {'num_items_cold': '2', 'duration': 0.5939998626708984, 'total_bytes_items_cold': '8983'}, 'bot_overhead': 11.586000204086304}, 'duration': 182.74399995803833, 'completed_ts': '2019-02-12T08:03:34.435319', 'started_ts': '2019-02-12T08:00:17.223617', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T08:03:34.435319', 'created_ts': '2019-02-12T08:00:07.527870', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-Vulkan', 'task_id': '42feb04983e8a011'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9588', 'total_bytes_items_hot': '33162783', 'initial_size': '53437976716', 'total_bytes_items_cold': '46999717', 'num_items_hot': '797', 'num_items_cold': '7', 'duration': 3.375}, 'isolated_upload': {'num_items_cold': '2', 'duration': 1.3910000324249268, 'total_bytes_items_cold': '8977'}, 'bot_overhead': 13.366999864578247}, 'duration': 484.3910000324249, 'completed_ts': '2019-02-12T07:59:42.483992', 'started_ts': '2019-02-12T07:51:21.912338', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T07:59:42.483992', 'created_ts': '2019-02-12T07:51:17.482688', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All', 'task_id': '42fea832f46d6211'}, {'server_versions': ['4085-c81638b'], 'performance_stats': {'isolated_download': {'initial_number_items': '9580', 'total_bytes_items_hot': '165125179', 'initial_size': '53397980683', 'total_bytes_items_cold': '39996033', 'num_items_hot': '875', 'num_items_cold': '8', 'duration': 1.9530000686645508}, 'isolated_upload': {'num_items_cold': '4', 'duration': 1.0149998664855957, 'total_bytes_items_cold': '36811'}, 'bot_overhead': 8.788000106811523}, 'duration': 3228.0910000801086, 'completed_ts': '2019-02-12T07:50:51.495160', 'started_ts': '2019-02-12T06:56:51.851579', 'internal_failure': false, 'exit_code': '0', 'state': 'COMPLETED', 'bot_version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'failure': false, 'modified_ts': '2019-02-12T07:50:51.495160', 'created_ts': '2019-02-12T06:56:50.507385', 'name': 'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Release-All-Vulkan_Skpbench_DDLTotal_9x9', 'task_id': '42fe76597cf16f11'}],
+  'SkiaGPU': [
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'fRHRPnwD-QYB0Bz5h15rZPC8Lw0I4Kwq-LL3TGDj0lQC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'wtLX1NImdsT8plyqaOCZZqKsrRWFjPrjGqDoCTkPEdUC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': '0URK7JefXkIaBhfPV_cNHNLD1Pg3pjKiESFgfvizHg4C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': '-9dcmmPEPvG5lS2DmocBNzwAS4ZhdGuKtH3gNA_WcbUC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'pBBZCIJTY2AA51MGjLR06EitVyGLmKsLodv2Le2n51oC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '03FEaLHT7gyS0pLyUKkeG-3g1OoG1r6Jhy5XJBlRtdMC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'hSkTe2cH1nI82U-qCT_9dJQ9s3-VSzelZ1gQHtdujucC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'kBmfswcNsndZHYCnIK7FuRxcsn0u8RWmQE_GkbOmR-EC',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'cZftrW_HII3ma82AxdFVKu43dKPGxMboC5x6tWl3jzgC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'Ia4Fa36LF61grdNFj_GEgK0zSP6M4izt78-NB935N-IC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'VbljnL3ZZm_VvRM-MsxfMpDPQ2m2kL--haq7V0xMkfwC',
+          },
+        ],
+      },
+      'name': 'post task for flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-04-20T23:38:27.381574Z',
+      'startedTs': '2023-04-20T23:39:21.231269Z',
+      'modifiedTs': '2023-04-20T23:39:34.442609Z',
+      'runId': '61b9da1ebd045411',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0009711399,
+      ],
+      'completedTs': '2023-04-20T23:39:34.442609Z',
+      'botIdleSinceTs': '2023-04-20T23:30:49.934937Z',
+      'serverVersions': [
+        '7150-82ce7e0',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7150-82ce7e0',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '61b9da1ebd045411',
+      'duration': 0.004925251,
+      'performanceStats': {
+        'botOverhead': 5.65246,
+        'namedCachesInstall': {
+          'duration': 0.00054621696,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.07203245,
+        },
+        'cleanup': {
+          'duration': 0.3791771,
+        },
+        'cacheTrim': {
+          'duration': 0.00040721893,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 4.085696,
+        },
+      },
+      'botVersion': 'a99c78a5c7a6114cb4a4aeb818b103c587d3d5cf69aee10cc32bb76e42a85a61',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'fRHRPnwD-QYB0Bz5h15rZPC8Lw0I4Kwq-LL3TGDj0lQC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'wtLX1NImdsT8plyqaOCZZqKsrRWFjPrjGqDoCTkPEdUC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': '0URK7JefXkIaBhfPV_cNHNLD1Pg3pjKiESFgfvizHg4C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': '-9dcmmPEPvG5lS2DmocBNzwAS4ZhdGuKtH3gNA_WcbUC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'pBBZCIJTY2AA51MGjLR06EitVyGLmKsLodv2Le2n51oC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '03FEaLHT7gyS0pLyUKkeG-3g1OoG1r6Jhy5XJBlRtdMC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'hSkTe2cH1nI82U-qCT_9dJQ9s3-VSzelZ1gQHtdujucC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'kBmfswcNsndZHYCnIK7FuRxcsn0u8RWmQE_GkbOmR-EC',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'cZftrW_HII3ma82AxdFVKu43dKPGxMboC5x6tWl3jzgC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'Ia4Fa36LF61grdNFj_GEgK0zSP6M4izt78-NB935N-IC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'VbljnL3ZZm_VvRM-MsxfMpDPQ2m2kL--haq7V0xMkfwC',
+          },
+        ],
+      },
+      'name': 'flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-04-20T23:20:55.434801Z',
+      'startedTs': '2023-04-20T23:21:37.581191Z',
+      'modifiedTs': '2023-04-20T23:29:05.678339Z',
+      'runId': '61b9ca11914d5d11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.034229606,
+      ],
+      'completedTs': '2023-04-20T23:29:05.678339Z',
+      'botIdleSinceTs': '2023-04-20T21:12:29.174257Z',
+      'serverVersions': [
+        '7150-82ce7e0',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7150-82ce7e0',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '61b9ca11914d5d11',
+      'duration': 433.82755,
+      'performanceStats': {
+        'botOverhead': 9.260204,
+        'namedCachesInstall': {
+          'duration': 0.00027298927,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.07950902,
+        },
+        'cleanup': {
+          'duration': 1.2331481,
+        },
+        'cacheTrim': {
+          'duration': 0.00044369698,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 6.8957872,
+        },
+      },
+      'botVersion': 'a99c78a5c7a6114cb4a4aeb818b103c587d3d5cf69aee10cc32bb76e42a85a61',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'Eilcyxhv5aw4AmUKwgp3m9JpPGq3xlVkb4_mWf0zpcAC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'mZx_7LvYy-gsu4GKwUyBD1z_BjZ0AL8Vq09Zic3WuFsC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'qOzRW0R__BIvU9sNpSp4PyFRsV3ZLJEnoS8bkURRP-oC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'w1lf8GGQpo2pD_w8VxFX6JXRNxVcFNhg_gmYwvOgOdkC',
+          },
+        ],
+      },
+      'name': 'Flash build243-m4--device1 (bullhead) to N2G48C',
+      'createdTs': '2023-03-20T21:54:31.772009Z',
+      'startedTs': '2023-03-20T21:55:47.491289Z',
+      'modifiedTs': '2023-03-20T21:56:00.302732Z',
+      'runId': '6119d5d4ec186511',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.000953692,
+      ],
+      'completedTs': '2023-03-20T21:56:00.302732Z',
+      'botIdleSinceTs': '2023-03-20T19:08:03.254187Z',
+      'failure': true,
+      'state': 'COMPLETED',
+      'serverVersions': [
+        '7078-115fec4',
+      ],
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7078-115fec4',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '6119d5d4ec186511',
+      'duration': 0.0051431656,
+      'performanceStats': {
+        'botOverhead': 5.3218584,
+        'namedCachesInstall': {
+          'duration': 0.0005335808,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.056872845,
+        },
+        'cleanup': {
+          'duration': 0.38282394,
+        },
+        'cacheTrim': {
+          'duration': 0.00041675568,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.948864,
+        },
+      },
+      'exitCode': 127,
+      'botVersion': 'ddf0f9f11cdd69eb0e93336b2ebef48350a61a07a99b29582f7f6cde49c5274e',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'Eilcyxhv5aw4AmUKwgp3m9JpPGq3xlVkb4_mWf0zpcAC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'mZx_7LvYy-gsu4GKwUyBD1z_BjZ0AL8Vq09Zic3WuFsC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+        ],
+      },
+      'name': 'Flash build243-m4--device1 (bullhead) to N2G48C',
+      'createdTs': '2023-03-20T18:53:32.643929Z',
+      'startedTs': '2023-03-20T18:53:33.915474Z',
+      'modifiedTs': '2023-03-20T18:53:46.871580Z',
+      'runId': '611930226c10c211',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.00096181495,
+      ],
+      'completedTs': '2023-03-20T18:53:46.871580Z',
+      'botIdleSinceTs': '2023-03-20T18:11:55.050009Z',
+      'failure': true,
+      'state': 'COMPLETED',
+      'serverVersions': [
+        '7079-22bface-justin-fix-double-bot-task',
+      ],
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7079-22bface-justin-fix-double-bot-task',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '611930226c10c211',
+      'duration': 0.004949808,
+      'performanceStats': {
+        'botOverhead': 5.6221504,
+        'namedCachesInstall': {
+          'duration': 0.0005133152,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.056437492,
+        },
+        'cleanup': {
+          'duration': 0.22286868,
+        },
+        'cacheTrim': {
+          'duration': 0.00046682358,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 4.3037453,
+        },
+      },
+      'exitCode': 127,
+      'botVersion': 'c42e4f58b9d0219a1be043d318bbe7f879a6f664bc932e7801e18d643fb558b9',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'Eilcyxhv5aw4AmUKwgp3m9JpPGq3xlVkb4_mWf0zpcAC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'mZx_7LvYy-gsu4GKwUyBD1z_BjZ0AL8Vq09Zic3WuFsC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+        ],
+      },
+      'name': 'Flash build243-m4--device1 (bullhead) to N2G48C',
+      'createdTs': '2023-03-20T18:10:01.089308Z',
+      'startedTs': '2023-03-20T18:10:14.375909Z',
+      'modifiedTs': '2023-03-20T18:10:28.861009Z',
+      'runId': '611908493c8f7811',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0010734567,
+      ],
+      'completedTs': '2023-03-20T18:10:28.861009Z',
+      'botIdleSinceTs': '2023-03-20T16:11:52.416144Z',
+      'failure': true,
+      'state': 'COMPLETED',
+      'serverVersions': [
+        '7079-22bface-justin-fix-double-bot-task',
+      ],
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7079-22bface-justin-fix-double-bot-task',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '611908493c8f7811',
+      'duration': 0.0063221455,
+      'performanceStats': {
+        'botOverhead': 6.889406,
+        'namedCachesInstall': {
+          'duration': 0.014932871,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.29463148,
+        },
+        'cleanup': {
+          'duration': 0.2137618,
+        },
+        'cacheTrim': {
+          'duration': 0.0004248619,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 5.345985,
+        },
+      },
+      'exitCode': 127,
+      'botVersion': 'c42e4f58b9d0219a1be043d318bbe7f879a6f664bc932e7801e18d643fb558b9',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'Eilcyxhv5aw4AmUKwgp3m9JpPGq3xlVkb4_mWf0zpcAC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'mZx_7LvYy-gsu4GKwUyBD1z_BjZ0AL8Vq09Zic3WuFsC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+        ],
+      },
+      'name': 'Flash build243-m4--device1 (bullhead) to N2G48C',
+      'createdTs': '2023-03-18T01:11:05.210585Z',
+      'startedTs': '2023-03-18T01:11:27.030710Z',
+      'modifiedTs': '2023-03-18T01:11:38.408625Z',
+      'runId': '610b16b503ef7111',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.00084111304,
+      ],
+      'completedTs': '2023-03-18T01:11:38.408625Z',
+      'botIdleSinceTs': '2023-03-17T23:37:00.428393Z',
+      'serverVersions': [
+        '7078-115fec4',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7078-115fec4',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '610b16b503ef7111',
+      'duration': 0.0047035217,
+      'performanceStats': {
+        'botOverhead': 4.566142,
+        'namedCachesInstall': {
+          'duration': 0.00053334236,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.055940866,
+        },
+        'cleanup': {
+          'duration': 0.2115295,
+        },
+        'cacheTrim': {
+          'duration': 0.00040888786,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.2303605,
+        },
+      },
+      'botVersion': 'ddf0f9f11cdd69eb0e93336b2ebef48350a61a07a99b29582f7f6cde49c5274e',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'Eilcyxhv5aw4AmUKwgp3m9JpPGq3xlVkb4_mWf0zpcAC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'mZx_7LvYy-gsu4GKwUyBD1z_BjZ0AL8Vq09Zic3WuFsC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+        ],
+      },
+      'name': 'Flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-17T23:36:02.052170Z',
+      'startedTs': '2023-03-17T23:36:12.684292Z',
+      'modifiedTs': '2023-03-17T23:36:27.800445Z',
+      'runId': '610abfaf0c143b11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.001125602,
+      ],
+      'completedTs': '2023-03-17T23:36:27.800445Z',
+      'botIdleSinceTs': '2023-03-17T22:57:01.540430Z',
+      'serverVersions': [
+        '7078-115fec4',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7078-115fec4',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '610abfaf0c143b11',
+      'duration': 0.006629944,
+      'performanceStats': {
+        'botOverhead': 7.7490716,
+        'namedCachesInstall': {
+          'duration': 0.012924194,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.5383549,
+        },
+        'cleanup': {
+          'duration': 0.20988607,
+        },
+        'cacheTrim': {
+          'duration': 0.00064611435,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 5.992985,
+        },
+      },
+      'botVersion': 'ddf0f9f11cdd69eb0e93336b2ebef48350a61a07a99b29582f7f6cde49c5274e',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'Eilcyxhv5aw4AmUKwgp3m9JpPGq3xlVkb4_mWf0zpcAC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'mZx_7LvYy-gsu4GKwUyBD1z_BjZ0AL8Vq09Zic3WuFsC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'w1lf8GGQpo2pD_w8VxFX6JXRNxVcFNhg_gmYwvOgOdkC',
+          },
+        ],
+      },
+      'name': 'Flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-17T01:34:21.494460Z',
+      'startedTs': '2023-03-17T01:34:43.205914Z',
+      'modifiedTs': '2023-03-17T01:39:16.897252Z',
+      'runId': '610605a76664cd11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.020886749,
+      ],
+      'completedTs': '2023-03-17T01:39:16.897252Z',
+      'botIdleSinceTs': '2023-03-17T01:32:51.498120Z',
+      'serverVersions': [
+        '7078-115fec4',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7078-115fec4',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '610605a76664cd11',
+      'duration': 260.94882,
+      'performanceStats': {
+        'botOverhead': 5.514901,
+        'namedCachesInstall': {
+          'duration': 0.00054073334,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.058762312,
+        },
+        'cleanup': {
+          'duration': 0.8467729,
+        },
+        'cacheTrim': {
+          'duration': 0.0007419586,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.7180693,
+        },
+      },
+      'botVersion': 'ddf0f9f11cdd69eb0e93336b2ebef48350a61a07a99b29582f7f6cde49c5274e',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'Eilcyxhv5aw4AmUKwgp3m9JpPGq3xlVkb4_mWf0zpcAC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'mZx_7LvYy-gsu4GKwUyBD1z_BjZ0AL8Vq09Zic3WuFsC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'w1lf8GGQpo2pD_w8VxFX6JXRNxVcFNhg_gmYwvOgOdkC',
+          },
+        ],
+      },
+      'name': 'Flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-17T01:30:30.899730Z',
+      'startedTs': '2023-03-17T01:31:10.013564Z',
+      'modifiedTs': '2023-03-17T01:31:24.764774Z',
+      'runId': '61060222889a4811',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0010913812,
+      ],
+      'completedTs': '2023-03-17T01:31:24.764774Z',
+      'botIdleSinceTs': '2023-03-17T01:22:34.587944Z',
+      'failure': true,
+      'state': 'COMPLETED',
+      'serverVersions': [
+        '7078-115fec4',
+      ],
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7078-115fec4',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '61060222889a4811',
+      'duration': 2.071994,
+      'performanceStats': {
+        'botOverhead': 5.801302,
+        'namedCachesInstall': {
+          'duration': 0.00053071976,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.05954647,
+        },
+        'cleanup': {
+          'duration': 0.35815,
+        },
+        'cacheTrim': {
+          'duration': 0.0007560253,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 4.3906374,
+        },
+      },
+      'exitCode': 1,
+      'botVersion': 'ddf0f9f11cdd69eb0e93336b2ebef48350a61a07a99b29582f7f6cde49c5274e',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'Eilcyxhv5aw4AmUKwgp3m9JpPGq3xlVkb4_mWf0zpcAC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'mZx_7LvYy-gsu4GKwUyBD1z_BjZ0AL8Vq09Zic3WuFsC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'w1lf8GGQpo2pD_w8VxFX6JXRNxVcFNhg_gmYwvOgOdkC',
+          },
+        ],
+      },
+      'name': 'Flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-17T01:20:02.787732Z',
+      'startedTs': '2023-03-17T01:20:52.613916Z',
+      'modifiedTs': '2023-03-17T01:21:07.793119Z',
+      'runId': '6105f88d0051c311',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0011250825,
+      ],
+      'completedTs': '2023-03-17T01:21:07.793119Z',
+      'botIdleSinceTs': '2023-03-16T23:02:04.254651Z',
+      'failure': true,
+      'state': 'COMPLETED',
+      'serverVersions': [
+        '7078-115fec4',
+      ],
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7078-115fec4',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '6105f88d0051c311',
+      'duration': 0.005061865,
+      'performanceStats': {
+        'botOverhead': 8.272398,
+        'namedCachesInstall': {
+          'duration': 0.020037413,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.50399184,
+        },
+        'cleanup': {
+          'duration': 0.33834958,
+        },
+        'cacheTrim': {
+          'duration': 0.00074124336,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 6.435299,
+        },
+      },
+      'exitCode': 1,
+      'botVersion': 'ddf0f9f11cdd69eb0e93336b2ebef48350a61a07a99b29582f7f6cde49c5274e',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'Eilcyxhv5aw4AmUKwgp3m9JpPGq3xlVkb4_mWf0zpcAC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': 'mZx_7LvYy-gsu4GKwUyBD1z_BjZ0AL8Vq09Zic3WuFsC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'w1lf8GGQpo2pD_w8VxFX6JXRNxVcFNhg_gmYwvOgOdkC',
+          },
+        ],
+      },
+      'name': 'flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-14T18:52:09.651440Z',
+      'startedTs': '2023-03-14T18:52:43.227526Z',
+      'modifiedTs': '2023-03-14T18:59:49.606881Z',
+      'runId': '60fa48b660a3db11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0325082,
+      ],
+      'completedTs': '2023-03-14T18:59:49.606881Z',
+      'botIdleSinceTs': '2023-03-14T18:44:23.184322Z',
+      'serverVersions': [
+        '7076-0f93ee5',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7076-0f93ee5',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60fa48b660a3db11',
+      'duration': 409.87146,
+      'performanceStats': {
+        'botOverhead': 8.987192,
+        'namedCachesInstall': {
+          'duration': 0.0005800724,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.32833242,
+        },
+        'cleanup': {
+          'duration': 1.1984603,
+        },
+        'cacheTrim': {
+          'duration': 0.0008199215,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 6.299777,
+        },
+      },
+      'botVersion': 'f46540632e20edc29d4e08a07b18c6ff974af71e7ab03dc0865cd449681acd9b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post task for flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-01T01:18:58.971643Z',
+      'startedTs': '2023-03-01T01:34:19.304045Z',
+      'modifiedTs': '2023-03-01T01:34:39.660601Z',
+      'runId': '60b391d3a1346111',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0015303487,
+      ],
+      'completedTs': '2023-03-01T01:34:39.660601Z',
+      'botIdleSinceTs': '2023-03-01T01:34:19.304045Z',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b391d3a1346111',
+      'duration': 0.0051050186,
+      'performanceStats': {
+        'botOverhead': 5.667677,
+        'namedCachesInstall': {
+          'duration': 0.00054073334,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15827274,
+        },
+        'cleanup': {
+          'duration': 0.3308301,
+        },
+        'cacheTrim': {
+          'duration': 0.0007555485,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 4.21672,
+        },
+      },
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post task for flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-01T01:18:59.232924Z',
+      'startedTs': '2023-03-01T01:32:26.355266Z',
+      'modifiedTs': '2023-03-01T01:32:36.660143Z',
+      'runId': '60b391d4ad923a11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0007585545,
+      ],
+      'completedTs': '2023-03-01T01:32:36.660143Z',
+      'botIdleSinceTs': '2023-03-01T01:31:17.553838Z',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b391d4ad923a11',
+      'duration': 0.005430937,
+      'performanceStats': {
+        'botOverhead': 5.2841644,
+        'namedCachesInstall': {
+          'duration': 0.00054883957,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15985966,
+        },
+        'cleanup': {
+          'duration': 0.334625,
+        },
+        'cacheTrim': {
+          'duration': 0.0007596016,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.8170602,
+        },
+      },
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-01T01:18:58.717692Z',
+      'startedTs': '2023-03-01T01:19:46.893913Z',
+      'modifiedTs': '2023-03-01T01:24:02.415656Z',
+      'runId': '60b391d2a3fbd111',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.01949766,
+      ],
+      'completedTs': '2023-03-01T01:24:02.415656Z',
+      'botIdleSinceTs': '2023-03-01T01:13:54.038511Z',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b391d2a3fbd111',
+      'duration': 242.54158,
+      'performanceStats': {
+        'botOverhead': 5.8705587,
+        'namedCachesInstall': {
+          'duration': 0.00052571297,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.16452408,
+        },
+        'cleanup': {
+          'duration': 0.8353474,
+        },
+        'cacheTrim': {
+          'duration': 0.000756979,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.865362,
+        },
+      },
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post task for flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-01T00:57:13.823350Z',
+      'startedTs': '2023-03-01T01:12:06.334346Z',
+      'modifiedTs': '2023-03-01T01:12:27.375719Z',
+      'runId': '60b37de964696311',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0015816423,
+      ],
+      'completedTs': '2023-03-01T01:12:27.375719Z',
+      'botIdleSinceTs': '2023-03-01T01:12:06.334346Z',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b37de964696311',
+      'duration': 0.010287285,
+      'performanceStats': {
+        'botOverhead': 5.46626,
+        'namedCachesInstall': {
+          'duration': 0.015023708,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15897846,
+        },
+        'cleanup': {
+          'duration': 0.3312955,
+        },
+        'cacheTrim': {
+          'duration': 0.000800848,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.8127162,
+        },
+      },
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post task for flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-01T00:57:14.044517Z',
+      'startedTs': '2023-03-01T01:10:11.212318Z',
+      'modifiedTs': '2023-03-01T01:10:21.235924Z',
+      'runId': '60b37dea445f7311',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0007372393,
+      ],
+      'completedTs': '2023-03-01T01:10:21.235924Z',
+      'botIdleSinceTs': '2023-03-01T01:09:02.463023Z',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b37dea445f7311',
+      'duration': 0.00502491,
+      'performanceStats': {
+        'botOverhead': 5.2985206,
+        'namedCachesInstall': {
+          'duration': 0.0005297661,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15727973,
+        },
+        'cleanup': {
+          'duration': 0.33203912,
+        },
+        'cacheTrim': {
+          'duration': 0.0007405281,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.796249,
+        },
+      },
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-01T00:57:13.578810Z',
+      'startedTs': '2023-03-01T00:57:24.559444Z',
+      'modifiedTs': '2023-03-01T01:01:38.796466Z',
+      'runId': '60b37de873150f11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.019397423,
+      ],
+      'completedTs': '2023-03-01T01:01:38.796466Z',
+      'botIdleSinceTs': '2023-03-01T00:54:12.168291Z',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b37de873150f11',
+      'duration': 241.13934,
+      'performanceStats': {
+        'botOverhead': 5.8362417,
+        'namedCachesInstall': {
+          'duration': 0.0005249977,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15926003,
+        },
+        'cleanup': {
+          'duration': 0.8261883,
+        },
+        'cacheTrim': {
+          'duration': 0.00074625015,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.9014149,
+        },
+      },
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post task for flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-01T00:52:29.864858Z',
+      'startedTs': '2023-03-01T00:52:33.491240Z',
+      'modifiedTs': '2023-03-01T00:52:46.174341Z',
+      'runId': '60b3799432210111',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.000942615,
+      ],
+      'completedTs': '2023-03-01T00:52:46.174341Z',
+      'botIdleSinceTs': '2023-03-01T00:45:42.912992Z',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b3799432210111',
+      'duration': 0.0049538612,
+      'performanceStats': {
+        'botOverhead': 5.5040903,
+        'namedCachesInstall': {
+          'duration': 0.00056934357,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15741634,
+        },
+        'cleanup': {
+          'duration': 0.33227134,
+        },
+        'cacheTrim': {
+          'duration': 0.00076007843,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 4.0329924,
+        },
+      },
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post',
+      'createdTs': '2023-03-01T00:40:09.024085Z',
+      'startedTs': '2023-03-01T00:43:58.243383Z',
+      'modifiedTs': '2023-03-01T00:44:16.639940Z',
+      'runId': '60b36e465391fc11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0013738476,
+      ],
+      'completedTs': '2023-03-01T00:44:16.639940Z',
+      'botIdleSinceTs': '2023-03-01T00:43:58.243383Z',
+      'failure': true,
+      'state': 'COMPLETED',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b36e465391fc11',
+      'duration': 0.0050451756,
+      'performanceStats': {
+        'botOverhead': 5.1566525,
+        'namedCachesInstall': {
+          'duration': 0.0005199909,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15639496,
+        },
+        'cleanup': {
+          'duration': 0.32788873,
+        },
+        'cacheTrim': {
+          'duration': 0.0007379055,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.7248793,
+        },
+      },
+      'exitCode': 127,
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post',
+      'createdTs': '2023-03-01T00:40:09.474680Z',
+      'startedTs': '2023-03-01T00:42:13.185269Z',
+      'modifiedTs': '2023-03-01T00:42:31.425534Z',
+      'runId': '60b36e480a801511',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0013645361,
+      ],
+      'completedTs': '2023-03-01T00:42:31.425534Z',
+      'botIdleSinceTs': '2023-03-01T00:42:13.185269Z',
+      'failure': true,
+      'state': 'COMPLETED',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b36e480a801511',
+      'duration': 0.004832506,
+      'performanceStats': {
+        'botOverhead': 5.416087,
+        'namedCachesInstall': {
+          'duration': 0.0005199909,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15892935,
+        },
+        'cleanup': {
+          'duration': 0.33026052,
+        },
+        'cacheTrim': {
+          'duration': 0.0008201599,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.9044266,
+        },
+      },
+      'exitCode': 127,
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'flash',
+      'createdTs': '2023-03-01T00:40:08.492348Z',
+      'startedTs': '2023-03-01T00:40:34.731725Z',
+      'modifiedTs': '2023-03-01T00:40:47.437226Z',
+      'runId': '60b36e443fff8911',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.000943724,
+      ],
+      'completedTs': '2023-03-01T00:40:47.437226Z',
+      'botIdleSinceTs': '2023-03-01T00:37:43.677025Z',
+      'failure': true,
+      'state': 'COMPLETED',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b36e443fff8911',
+      'duration': 0.0052051544,
+      'performanceStats': {
+        'botOverhead': 5.4200764,
+        'namedCachesInstall': {
+          'duration': 0.00051927567,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15778422,
+        },
+        'cleanup': {
+          'duration': 0.33162522,
+        },
+        'cacheTrim': {
+          'duration': 0.0007481575,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.7816687,
+        },
+      },
+      'exitCode': 127,
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post_task_for_flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-01T00:33:47.048818Z',
+      'startedTs': '2023-03-01T00:35:58.707085Z',
+      'modifiedTs': '2023-03-01T00:36:17.068129Z',
+      'runId': '60b3687230673d11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.001377693,
+      ],
+      'completedTs': '2023-03-01T00:36:17.068129Z',
+      'botIdleSinceTs': '2023-03-01T00:35:58.707085Z',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b3687230673d11',
+      'duration': 0.00494051,
+      'performanceStats': {
+        'botOverhead': 5.199508,
+        'namedCachesInstall': {
+          'duration': 0.0005364418,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.1576066,
+        },
+        'cleanup': {
+          'duration': 0.32944846,
+        },
+        'cacheTrim': {
+          'duration': 0.0007677078,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.7608945,
+        },
+      },
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post_task_for_flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-03-01T00:33:47.334678Z',
+      'startedTs': '2023-03-01T00:34:20.169955Z',
+      'modifiedTs': '2023-03-01T00:34:32.831178Z',
+      'runId': '60b3687350d7ee11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0009418799,
+      ],
+      'completedTs': '2023-03-01T00:34:32.831178Z',
+      'botIdleSinceTs': '2023-02-28T23:59:24.078979Z',
+      'serverVersions': [
+        '7048-a10855b',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7048-a10855b',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b3687350d7ee11',
+      'duration': 0.0055499077,
+      'performanceStats': {
+        'botOverhead': 5.308359,
+        'namedCachesInstall': {
+          'duration': 0.0005400181,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15641809,
+        },
+        'cleanup': {
+          'duration': 0.33777952,
+        },
+        'cacheTrim': {
+          'duration': 0.00084137917,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.8731527,
+        },
+      },
+      'botVersion': '952572ba9c19250ca689dc8fa7fc25eac149070b1c9d62961e1d5928a3c5df6b',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+        ],
+      },
+      'name': 'post_task_for_flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-02-28T22:24:50.588016Z',
+      'startedTs': '2023-02-28T22:25:19.666036Z',
+      'modifiedTs': '2023-02-28T22:25:31.176130Z',
+      'runId': '60b2f265a2d5c811',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.00084485573,
+      ],
+      'completedTs': '2023-02-28T22:25:31.176130Z',
+      'botIdleSinceTs': '2023-02-28T22:13:01.829217Z',
+      'serverVersions': [
+        '7045-6320ccc',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7045-6320ccc',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b2f265a2d5c811',
+      'duration': 0.0051116943,
+      'performanceStats': {
+        'botOverhead': 4.4399605,
+        'namedCachesInstall': {
+          'duration': 0.0005290508,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15937233,
+        },
+        'cleanup': {
+          'duration': 0.21362948,
+        },
+        'cacheTrim': {
+          'duration': 0.0007953644,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.0129,
+        },
+      },
+      'botVersion': 'd88b79970c4cf9c44b2639b2b247ca84df740e95d0c7b398846e4ac997db3f9a',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post_task_for_flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-02-28T22:06:51.918804Z',
+      'startedTs': '2023-02-28T22:11:12.916567Z',
+      'modifiedTs': '2023-02-28T22:11:33.196533Z',
+      'runId': '60b2e1f0192f3311',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0015248092,
+      ],
+      'completedTs': '2023-02-28T22:11:33.196533Z',
+      'botIdleSinceTs': '2023-02-28T22:11:12.916567Z',
+      'serverVersions': [
+        '7045-6320ccc',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7045-6320ccc',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b2e1f0192f3311',
+      'duration': 0.0050435066,
+      'performanceStats': {
+        'botOverhead': 5.3528404,
+        'namedCachesInstall': {
+          'duration': 0.0005505085,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15840769,
+        },
+        'cleanup': {
+          'duration': 0.33495188,
+        },
+        'cacheTrim': {
+          'duration': 0.00075387955,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.8999205,
+        },
+      },
+      'botVersion': 'd88b79970c4cf9c44b2639b2b247ca84df740e95d0c7b398846e4ac997db3f9a',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post_task_for_flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-02-28T21:56:52.088259Z',
+      'startedTs': '2023-02-28T22:09:17.372317Z',
+      'modifiedTs': '2023-02-28T22:09:27.525961Z',
+      'runId': '60b2d8c8fdec9711',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0007485492,
+      ],
+      'completedTs': '2023-02-28T22:09:27.525961Z',
+      'botIdleSinceTs': '2023-02-28T22:08:08.403803Z',
+      'serverVersions': [
+        '7045-6320ccc',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7045-6320ccc',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b2d8c8fdec9711',
+      'duration': 0.004990101,
+      'performanceStats': {
+        'botOverhead': 5.822323,
+        'namedCachesInstall': {
+          'duration': 0.0005311966,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.15885687,
+        },
+        'cleanup': {
+          'duration': 0.3304472,
+        },
+        'cacheTrim': {
+          'duration': 0.0007622242,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 4.401671,
+        },
+      },
+      'botVersion': 'd88b79970c4cf9c44b2639b2b247ca84df740e95d0c7b398846e4ac997db3f9a',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'LRQEbP9Zoat2J7ZR73Sv8yN9f0Vsm_PXIWkefjzXjpsC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'KAG-xG992eP-D77rG66FiLrkIRi_wdW9wp2oOOZBPJMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-02-28T21:56:51.607248Z',
+      'startedTs': '2023-02-28T21:56:58.522534Z',
+      'modifiedTs': '2023-02-28T22:01:25.812717Z',
+      'runId': '60b2d8c71dc8ed11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.020396313,
+      ],
+      'completedTs': '2023-02-28T22:01:25.812717Z',
+      'botIdleSinceTs': '2023-02-28T21:43:32.269428Z',
+      'serverVersions': [
+        '7045-6320ccc',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7045-6320ccc',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '60b2d8c71dc8ed11',
+      'duration': 251.12593,
+      'performanceStats': {
+        'botOverhead': 9.224713,
+        'namedCachesInstall': {
+          'duration': 0.013688803,
+        },
+        'namedCachesUninstall': {
+          'duration': 1.2408979,
+        },
+        'cleanup': {
+          'duration': 0.8224199,
+        },
+        'cacheTrim': {
+          'duration': 0.0007970333,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 6.1780725,
+        },
+      },
+      'botVersion': 'd88b79970c4cf9c44b2639b2b247ca84df740e95d0c7b398846e4ac997db3f9a',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'JlGFsqGCXe6IPNlXDz7BozHuMNqLePKK02vcQPBUjwUC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+        ],
+      },
+      'name': 'hypan/id=build243-m4--device1_pool=chromium.tests',
+      'createdTs': '2023-02-24T18:19:05.402320Z',
+      'startedTs': '2023-02-24T18:19:42.664872Z',
+      'modifiedTs': '2023-02-24T18:21:19.221046Z',
+      'runId': '609d77f74083ba11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.007342564,
+      ],
+      'completedTs': '2023-02-24T18:21:19.221046Z',
+      'botIdleSinceTs': '2023-02-24T18:09:58.026152Z',
+      'serverVersions': [
+        '7028-cb1c175',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7028-cb1c175',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '609d77f74083ba11',
+      'duration': 82.92752,
+      'performanceStats': {
+        'botOverhead': 6.1913576,
+        'namedCachesInstall': {
+          'duration': 0.0007016659,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.1563406,
+        },
+        'cleanup': {
+          'duration': 0.3348112,
+        },
+        'cacheTrim': {
+          'duration': 0.000739336,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {
+          'duration': 1.6701624,
+          'totalBytesItemsHot': '1486588386',
+          'itemsHot': 'eJzsdXuwltV1/n7WWnvvd7/X7/5958I5HK6HgHJTElABjfwAFTVefjgmJk0EMeJ0aEOnyTidHkTBIxI9BwFLFCOSEyOEiIRYGfHCRamXEOkEihox2ti0iaaE0BiSSTr7/Q6k0+lf/ad/tO+cP86337XXetbzPGu96v+e/90PFBQxQaAU4H/lf/ifxvXfe4zKW1KKVPM/35IiOROA/ACQwUYVSPF/SsLIr4OgCKAERAQlJD6d8ldZFCsQee4GK9F/QRnjdJEzaIjz0zw/uHlKeVqQT0KKqVkmDx/UZDBGKSLgjwqdSXu6xB97aqbwtwjNtptH1MRF5CF4AB4SFLwDFAmTkhxkfk/In0MxA2SbgAAYAmIPhJuoBit43KejASIZvGBy4HkflAeIZ814cHn2JhGSn2MQCAFifGIPlBS0Yl/VBwUAtNfF+Sx526SI81QIYJSxWqlIgXLYOTKlRDyJRKxE/Jli7VWlJqW5Kjk1AmXCnDcIqVBpsM5ve2GUiKfN5rZQAs5fkGbSinMn+FkClG6OFJEPUYrZiaeHPXXiqQdplYcSDVpUeR/6kyYhOpdJE6ucAmiGJWpyGzA4d2fgNWavAntJoeEGZaczjjjjk6YRmsNBOdf/YSh8Md+BJYq9DWx+rpEbQFGzE+hcRgJrZj2YgHVTWJ3z790DaM1iiST/4YlG0x2+sCENsA2VUpn2tCLxCI1CnihgL7ifQGJFmohJaQ2R3GDWZ+DcHHkfJrf46V6l2Vzu8tNmyxGonFZIk1sSz5l/Z420eOS+Xj6WNh8Hvy1YcuiKAs3eJjp3PitS2u+H5gQyvGYmR8T5DeWr6ByN94Dk05FfZ9ucHitM4skOvWLGu1IAC6HQ47YUc+4UPwZMg01RpMhGHpoQNelkraACbxjxkWbwXLyVlSE4FvbqEYtlEwvDaCLj/Wh9WmsSreDrkCTEpCFVBkUQZWPPoQliZbwp86JWk2FmHZKyyjYbpwDstyIDOiLWfidocMDGiLLOOpSEoWIqIVJB6vk3SufrjY0KGDCCxHdPBVFRyecJGbEoziTWOSkBEuPpQJx7XqxvUCuyWicGua5hvolMvhWI87GnxGbMYASKKPXU0BBSSov201eAaI6sTkAhjOLIz6MVUWyJHHEc6lALtApJiZJ8jyhEEGMUQqWVpKyEvTUZyikbmFhrirThRAeBIhsExJYsZw4NSEgaBhwp4YA0cUKpZo59KutI5WwHBQs2BsqwFg4DxYGCE6+nIa1I60SHIIkoCwoRs4WIdMOYBBUqhpmfZytFNAqWKDWKAsp0EJFxRto4IujIOya2yGI4ScKRWiumelpsCwEpulgZxCqE1QUOWIgp1ZJ/6ywCqgVpi18hZc0AlyNOQGdlhuMQVEasSRBkMAap6NASWeZUBan47UdxhkbLGBZlTBrBZk64rEmh7JUzoTWtmWdxtGHDpQ5QbCRp94sx0qpUdpnzMBJVYWFdcbAKnsAsTS0HBrrNWJRi70uTBEFIDpopSMJOilGpVb2nIieBBqQMxSRGtCsnkjRM2TlJhZxITCGPiiPNVEyHUsS6RbKiVlQothhtQ51VpAqxE/MR1C4QQT1lXdMxFWODsF6BzYqu5K1RZYzSWcis2yT23wZtSzYI1Mc0qbLUAXRZM75URjAkCXWlTMhUDWVVM6lOjC3XKTaJ/7YMR9wR2JKEWpeQgCPnEl1gzYUkC+JhjThfvqHDUEmLIs52iLPdLeKsVMtwpqg8Fc6ZlpgKPrbDz6NuKeqIRkTUWskaHQ0RrhfSdEh7tzJDyPh9m7VKaxzYdpiyTisS+W+OMeGkodWUqR216SrhrNAlsXaj1eRh0KhTe1ZrtLWcAxsBQZnH1XVahrJVZUyjtayjzM0sN7psNN1OrGVRUikMTdMkdH5jJqV6ag0KsPWy/nhH0dk2CgN3vUvLlS7W3ZkkHZq7E6vTdiRhdEFnVo1cIYldNbuIk7Oj1kbVtIcjK+PcNJk3vNAonDXWOddxfrVrXnBBobTIjMhitGbBLS2oF8tXWu3mTLA1+0XbhcL8UqHSSWZ4IUzah8f0uU6yUVC0sbFVHVt1XnswpHTxnEvDZGzddXXWS9eY9nGzLAKTVQKMHDFG6mE299y0W5s2N6xrqgx3FzYaadWdmxUvd6rR6vS1enoHd3Yj6Zzn1Kdi6rDmWktxNL7StQITRqd78W3MGnE5Xzi1NKR7JvHZC4qFESOnFXk9klGLcV7xT00btfHMlpsmXnZBuOisOTqR8+bUjbq1Y+nUeEZMZ0/Rv8S00XTFNcM77LmXVaUHcXFMOqEaF9eh0TkcekFyF4otfZjcvjiYMmrJDbVFxc4lZlbhfgztKt3maq2fTCaraLhZh7SQXTDznF5sxzmb8IUonDCj3rJ4WOHmsab7ebhFi66ZQWtQ7/oGalMWtt7yqaxqA62G7sHsZbQVwQrMnWDmJ7N3YT2Ce9A2px+fOHvp1TPduaNb6//v2s7CmGHjr45exIJqYTmGlkdeL4fh9uCS9nmVWbdeegBjJk2bWu3Fwn7MCLdj5I2fv7KN9Kdrr6IST5ry9xh1GEbNrVlT24Srxtb/uk3TAEpTWsrfoLlzC1/8jCw5gnDudafQLccQjLsX8QBntU8+Q43s/1c+O30vrcTF09aiD+kA3sEHGNF5Atfd+G3qmnjF2K/hL1v+jU9hA+7HUziCBf2IPn8/rrtpftstq3FbbRt+Q9ePHfZ1HODhwUnaL7U/m37lbnoLpQHaQsGfTNnDA3jOuNqv8QSeoq+8jL/BWtyOHahsQn3pz3DLR3gM4QqtO4+ja94eTLgXSxrTHsDbdIJf4s9V/vwgrmpsksfxfR6g41Q+IbXtfNlKmfZdLF2OXrniZTyLi1+l5fpDbJZldA/to3jchuAXMvMR+kTwLfd9/NUH5uaHcBBv0HHs4Nk3zDwku+g9fo7u4h9T/CNskUP8IE/rsZ9+jXpxH5Y5/U3+Hh1F+gv8o90lO7jHVJbc9vHH9Qb9vsYlq+w6+cpOXLXgazhqZv0AT9JPw4NsthWG/Aj9wZe+hZ0YiK6+YY2+k+7TrweH9XKctKfKr9JWvQ5PRC/ipvfNq3Qyu/X3ydv2AfTi7fBdeo2fp330Iq+OjtA/xTujp+33ss1y1D0afDDkXbeZv8pr7fm/lX+2jyQ/L+IdrMMu2VLYQ7PX8JzjLd/h3aXfdGzXd9IzvCl9E0vXTO5LVjVex/ZwNe127834lX1S350sy553z5YfqB/J3iirvR3fpTeDhStK60Y/PPH9xpvVJ4duDF7puMu+3vZhtPCV8K1s29DlF239wo7KT4fsj19oeXn+xkkbJx8eszfd+uU7Jj7X8Yy+fQ0eS3/eNdDZU/3BhccL6niwatKKadvnb6hsqT1y8YbunpF/27bzyytnP1FfufChizaWj8q9ozdlKz/2y/Nf6ep/FP/gju7jA/14NNg86uS1h/4OfeG/Ln7Cbf/s4bFbs/smreaHd/Gx0hr72Gf2b8Pu6KWd6P01Vt3cvwndh248sRYb12D9euq9A68do4OP0wtTPhr//PSP1so7+2nzrH2ncPde1/9D7O6lY7/Cw4v71vADT9Lq3fyTl+irR5K1vcFv3wuendrTb088xScP1n9yp1v2HXrtD/jhW/TO76sf7sPP3pN/2d9x7Nj0b26N+7bc1LPzkreXxYdeHq1+t6q07QV6etf4Hz8VPXi4+PW7vtTTc+nv1svAPX3YcWDx7X091Pf0Xxy49/IDD0187A9nPfjoHdj25tXL7j7l3nhuy8h3e9dNOv5Cr9y3Y/ewfw8AAP//YIb1Zw==',
+          'numItemsHot': '4236',
+        },
+        'packageInstallation': {
+          'duration': 3.031407,
+        },
+      },
+      'botVersion': 'c6b66226bd8663a5f774e79155e617d48ef5622af2068153c4dc9c0a69bb2ed1',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'JlGFsqGCXe6IPNlXDz7BozHuMNqLePKK02vcQPBUjwUC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'f8qj6mQD7yFek-FON_BpqV43z3qZTDndncBNlUf30ZMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'post_task_for_flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-02-24T17:55:35.280438Z',
+      'startedTs': '2023-02-24T18:08:04.022937Z',
+      'modifiedTs': '2023-02-24T18:08:13.730463Z',
+      'runId': '609d627327a3fa11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.0007075232,
+      ],
+      'completedTs': '2023-02-24T18:08:13.730463Z',
+      'botIdleSinceTs': '2023-02-24T18:07:55.063874Z',
+      'serverVersions': [
+        '7028-cb1c175',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7028-cb1c175',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '609d627327a3fa11',
+      'duration': 0.00517416,
+      'performanceStats': {
+        'botOverhead': 5.1697197,
+        'namedCachesInstall': {
+          'duration': 0.0005259514,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.14943147,
+        },
+        'cleanup': {
+          'duration': 0.32117963,
+        },
+        'cacheTrim': {
+          'duration': 0.0007302761,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 3.7368703,
+        },
+      },
+      'botVersion': 'c6b66226bd8663a5f774e79155e617d48ef5622af2068153c4dc9c0a69bb2ed1',
+    },
+    {
+      'cipdPins': {
+        'clientPackage': {
+          'packageName': 'infra/tools/cipd/linux-amd64',
+          'version': 'JlGFsqGCXe6IPNlXDz7BozHuMNqLePKK02vcQPBUjwUC',
+        },
+        'packages': [
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci-auth/linux-amd64',
+            'version': 'eqKjEPSBoP9mXn-E1p26E8HFcthl-MysoVL3YNhdq3MC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/logdog/butler/linux-amd64',
+            'version': 'h3gC8cYK0hcjt0sctAY5vDiQAtUJV_EHkALrHmjmm4kC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython-native/linux-amd64',
+            'version': 'bPTEXkdvGpMLPG77nWXgIExbSJ1q5YCYI4uIJqdL100C',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/luci/vpython/linux-amd64',
+            'version': 'fRdGWFOP-7QaYMB4zTECXQmOzvJhhsRT86V0i_XjHUEC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/rdb/linux-amd64',
+            'version': '2nQRu8urImzYe2vp27NQ_2Zb_Vu8fCf4g_iI2l3-a0sC',
+          },
+          {
+            'path': '.task_template_packages',
+            'packageName': 'infra/tools/result_adapter/linux-amd64',
+            'version': '8-QdBU1yrb9EQv9t_PtsLZXLy1RkoGCGYzZNKlBt4YcC',
+          },
+          {
+            'path': '.task_template_packages/cpython',
+            'packageName': 'infra/3pp/tools/cpython/linux-amd64',
+            'version': 'Xcoqj3Hhx627RnXvJ6XRlqY0JHKSiWGImMYjf5sJSW0C',
+          },
+          {
+            'path': '.task_template_packages/cpython3',
+            'packageName': 'infra/3pp/tools/cpython3/linux-amd64',
+            'version': 'PBnbbyurQjsVK0F3kFfFisXJfY7NYP5k477Bzr4sRFMC',
+          },
+          {
+            'path': 'cipd_devil',
+            'packageName': 'infra/3pp/chromium/third_party/catapult/devil/linux-amd64',
+            'version': 'f8qj6mQD7yFek-FON_BpqV43z3qZTDndncBNlUf30ZMC',
+          },
+          {
+            'path': 'cipd_gsutil',
+            'packageName': 'infra/3pp/tools/gsutil',
+            'version': 'kdsM4E1ZpwSDo9HgvkaPgSGJrfywNPwhAVH_1AKsAIQC',
+          },
+        ],
+      },
+      'name': 'flash build243-m4--device1 to N2G48C',
+      'createdTs': '2023-02-24T17:55:34.864346Z',
+      'startedTs': '2023-02-24T17:56:25.590101Z',
+      'modifiedTs': '2023-02-24T18:00:51.580372Z',
+      'runId': '609d62715577ee11',
+      'botLogsCloudProject': 'chrome-infra-logs',
+      'botId': 'build243-m4--device1',
+      'costsUsd': [
+        0.02028872,
+      ],
+      'completedTs': '2023-02-24T18:00:51.580372Z',
+      'botIdleSinceTs': '2023-02-24T16:24:07.206955Z',
+      'serverVersions': [
+        '7028-cb1c175',
+      ],
+      'state': 'COMPLETED',
+      'botDimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'task_template_vpython_cache',
+          ],
+          'key': 'caches',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7028-cb1c175',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'taskId': '609d62715577ee11',
+      'duration': 251.09743,
+      'performanceStats': {
+        'botOverhead': 9.770593,
+        'namedCachesInstall': {
+          'duration': 0.0005097389,
+        },
+        'namedCachesUninstall': {
+          'duration': 0.19967628,
+        },
+        'cleanup': {
+          'duration': 0.8341539,
+        },
+        'cacheTrim': {
+          'duration': 0.00082850456,
+        },
+        'isolatedUpload': {},
+        'isolatedDownload': {},
+        'packageInstallation': {
+          'duration': 7.555723,
+        },
+      },
+      'botVersion': 'c6b66226bd8663a5f774e79155e617d48ef5622af2068153c4dc9c0a69bb2ed1',
+    },
+  ],
+  'now': '2023-05-25T16:50:21.387922Z',
 };
 
 export const eventsMap = {

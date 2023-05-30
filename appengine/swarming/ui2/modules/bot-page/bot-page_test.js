@@ -11,7 +11,7 @@ describe('bot-page', function() {
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
   const {$, $$} = require('common-sk/modules/dom');
-  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs, MATCHED, mockGetBot} = require('modules/test_util');
+  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs, MATCHED, mockGetBot, mockListBotTasks} = require('modules/test_util');
   const {botDataMap, eventsMap, tasksMap} = require('modules/bot-page/test_data');
 
   const TEST_BOT_ID = 'example-gce-001';
@@ -86,6 +86,14 @@ describe('bot-page', function() {
     fetchMock.flush();
   }
 
+  // Add an event listener which will fire after everything is done on the
+  // element. This one can be stacked on top of others.
+  function eventually(ele, callback) {
+    ele.addEventListener('busy-end', (e) => {
+      callback(ele);
+    });
+  }
+
   // convenience function to save indentation and boilerplate.
   // expects a function test that should be called with the created
   // <bot-page> after the user has logged in.
@@ -101,14 +109,14 @@ describe('bot-page', function() {
   }
 
   function serveBot(botName) {
-    const data = botDataMap[botName];
-    const tasks = {items: tasksMap['SkiaGPU']};
+    const bot = botDataMap[botName];
     const events = {items: eventsMap['SkiaGPU']};
+    const tasks = {items: tasksMap['SkiaGPU']};
 
     fetchMock.get(new RegExp('/_ah/api/swarming/v1/server/permissions\??.*'), {});
-    fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/tasks*`, tasks);
     fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/events*`, events);
-    mockGetBot(fetchMock, data);
+    mockGetBot(fetchMock, bot);
+    mockListBotTasks(fetchMock, tasks);
   }
 
 
@@ -266,13 +274,13 @@ describe('bot-page', function() {
           const cell = (r, c) => rows[r].children[c];
 
           // row 0 is the header
-          expect(cell(1, 0)).toMatchTextContent('Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Debug-All-ANGLE');
+          expect(cell(1, 0)).toMatchTextContent('post task for flash build243-m4--device1 to N2G48C');
           expect(cell(1, 0).innerHTML).toContain('<a ', 'has a link');
-          expect(cell(1, 0).innerHTML).toContain('href="/task?id=43004cb4fca98110"');
-          expect(cell(1, 2)).toMatchTextContent('7m 20s');
-          expect(cell(1, 3)).toMatchTextContent('RUNNING');
-          expect(rows[1]).toHaveClass('pending_task');
-          expect(cell(2, 2)).toMatchTextContent('3m 51s');
+          expect(cell(1, 0).innerHTML).toContain('href="/task?id=61b9da1ebd045410"');
+          expect(cell(1, 2)).toMatchTextContent('5.66s');
+          expect(cell(1, 3)).toMatchTextContent('SUCCESS');
+          expect(rows[1]).not.toHaveClass('pending_task');
+          expect(cell(2, 2)).toMatchTextContent('7m 23s');
           expect(cell(2, 3)).toMatchTextContent('SUCCESS');
           expect(rows[2]).not.toHaveClass('pending_task');
           expect(rows[2]).not.toHaveClass('failed_task)');
@@ -412,23 +420,26 @@ describe('bot-page', function() {
 
           const rows = $('tr', sTable);
           expect(rows).toBeTruthy();
-          expect(rows).toHaveSize(1 + 15 + 1, 'header, 15 tasks, footer');
+          // header, 8 unique tasks + header and footer
+          expect(rows).toHaveSize(10);
 
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
 
-          expect(cell(2, 0)).toMatchTextContent(
-              'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Rel...');
+          expect(cell(1, 0)).toMatchTextContent(
+              'post task for flash build243-m4--device1 to N2G48C');
 
           expect(cell(5, 0)).toMatchTextContent(
-              'Perf-Win10-Clang-Golo-GPU-QuadroP400-x86_64-Deb...');
-          expect(cell(5, 1)).toMatchTextContent('2'); // Total
+              'Flash build243-m4--device1 to N2G48C');
+          expect(cell(5, 1)).toMatchTextContent('4'); // Total
+          // TODO(jonahhooper) Fix these aggregates.
+          // They are not correctly set.
           expect(cell(5, 2)).toMatchTextContent('0'); // Success
-          expect(cell(5, 3)).toMatchTextContent('1'); // Failed
-          expect(cell(5, 4)).toMatchTextContent('1'); // Died
-          expect(cell(5, 5)).toMatchTextContent('16m 57s'); // duration
-          expect(cell(5, 6)).toMatchTextContent('11.85s'); // overhead
-          expect(cell(5, 7)).toMatchTextContent('10.5%'); // percent
+          expect(cell(5, 3)).toMatchTextContent('2'); // Failed
+          expect(cell(5, 4)).toMatchTextContent('0'); // Died
+          expect(cell(5, 5)).toMatchTextContent('1m 12s'); // duration
+          expect(cell(5, 6)).toMatchTextContent('6.83s'); // overhead
+          expect(cell(5, 7)).toMatchTextContent('12.3%'); // percent
 
           done();
         });
@@ -593,22 +604,40 @@ describe('bot-page', function() {
     it('makes auth\'d API calls when a logged in user views landing page', function(done) {
       serveBot('running');
       loggedInBotPage((ele) => {
-        const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
-        expect(protoRpcCalls).toHaveSize(2 + 3, '2 GETs from swarming-app, 3 from bot-page');
-        checkAuthorization(protoRpcCalls);
-        // At the moment, only GetBot is used.
-        const prpcCalls = fetchMock.calls(MATCHED, 'POST');
-        expect(prpcCalls).toHaveSize(1);
-        // calls is an array of 2-length arrays with the first element
+        // fetchMock.calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        const expectedBody = JSON.stringify({bot_id: TEST_BOT_ID});
-        const predicate = (call) => {
-          return call[0].endsWith('prpc/swarming.v2.Bots/GetBot') &&
-            call[1].body === expectedBody;
+        const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
+        expect(protoRpcCalls).toHaveSize(2 + 2, '2 GETs from swarming-app, 2 from bot-page');
+        checkAuthorization(protoRpcCalls);
+        // At the moment, only GetBot and ListBotTasks are used.
+        const prpcCalls = fetchMock.calls(MATCHED, 'POST');
+        expect(prpcCalls).toHaveSize(2);
+        // "deterministically" set the ordering of the keys in json object.
+        // Works for non-nested objects.
+        const stringify = (obj) => JSON.stringify(obj, Object.keys(obj).sort());
+        const checkFor = (prpcCall, expectedBody) => {
+          return (call) => {
+            if (call[0].endsWith(prpcCall)) {
+              return stringify(JSON.parse(call[1].body)) === stringify(expectedBody);
+            }
+            return false;
+          };
         };
-        const getBotsCall = prpcCalls.filter(predicate);
-        expect(getBotsCall).toHaveSize(1);
+
+        const getBotsReq = {bot_id: TEST_BOT_ID};
+        const getBotsCall = prpcCalls.filter(checkFor('prpc/swarming.v2.Bots/GetBot', getBotsReq));
+        expect(getBotsCall).toHaveSize(1, `Must have one GetBot request with the value: ${stringify(getBotsReq)}`);
+        const listBotTasksReq = {
+          bot_id: TEST_BOT_ID,
+          cursor: '',
+          include_performance_stats: true,
+          limit: 30,
+          sort: 4,
+          state: 10,
+        };
+        const listBotsCall = prpcCalls.filter(checkFor('prpc/swarming.v2.Bots/ListBotTasks', listBotTasksReq));
+        expect(listBotsCall).toHaveSize(1, `Must have one ListBotTasks request with the value: ${stringify(listBotTasksReq)}`);
         checkAuthorization(prpcCalls);
         done();
       });
@@ -736,8 +765,9 @@ describe('bot-page', function() {
         ele.render();
         fetchMock.reset(); // clears history and routes
 
-        fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/tasks*`, {
-          items: tasksMap['SkiaGPU'],
+        const data = tasksMap['SkiaGPU'];
+        mockListBotTasks(fetchMock, {
+          items: data,
           cursor: 'newCursor',
         });
 
@@ -750,20 +780,26 @@ describe('bot-page', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           expectNoUnmatchedCalls(fetchMock);
-          const calls = fetchMock.calls(MATCHED, 'GET');
+          const calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls).toHaveSize(1);
 
-          const url = calls[0][0];
+          const req = JSON.parse(calls[0][1].body);
           // spot check a few fields
-          expect(url).toContain('state');
-          expect(url).toContain('name');
-          expect(url).toContain('limit=30');
+          expect(req.state).toEqual(10);
+          expect(req.bot_id).toEqual(TEST_BOT_ID);
+          expect(req.limit).toEqual(30);
           // validate cursor
-          expect(url).toContain('cursor=myCursor');
-          expect(ele._taskCursor).toEqual('newCursor', 'cursor should update');
-          expect(ele._tasks).toHaveSize(30 + 30, '30 initial tasks, 30 new tasks');
-
-          done();
+          // Hack bc prpc causes the fetch to terminate early.
+          // This will cause fetchMock.flush to exit before rendering has been
+          // completed for the tBtn.click() action.
+          // Add additional event listener to wait for all rendering to complete
+          // before running tests on the final state of UI.
+          eventually(ele, (ele) => {
+            expect(req.cursor).toEqual('myCursor');
+            expect(ele._taskCursor).toEqual('newCursor', 'cursor should update');
+            expect(ele._tasks).toHaveSize(30 + 30, '30 initial tasks, 30 new tasks');
+            done();
+          });
         });
       });
     });
@@ -826,9 +862,9 @@ describe('bot-page', function() {
           // beforeEach at the top of this file.
           expectNoUnmatchedCalls(fetchMock);
           const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
-          expect(protoRpcCalls).toHaveSize(3);
+          expect(protoRpcCalls).toHaveSize(2);
           const prpcCalls = fetchMock.calls(MATCHED, 'POST');
-          expect(prpcCalls).toHaveSize(1);
+          expect(prpcCalls).toHaveSize(2);
 
           done();
         });

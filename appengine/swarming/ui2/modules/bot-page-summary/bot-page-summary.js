@@ -225,7 +225,7 @@ window.customElements.define('bot-page-summary', class extends HTMLElement {
     // to compute wall_time, we find the latest task (and assume tasks
     // come to us chronologically) and find the difference between then
     // and now.
-    totalStats.wall_time = (now - this.tasks[this.tasks.length - 1].started_ts) / 1000;
+    totalStats.wall_time = (now - this.tasks[this.tasks.length - 1].startedTs) / 1000;
 
     for (const t of this.tasks) {
       // TODO(kjlubick): maybe have this reason about one or more tags, like
@@ -240,6 +240,8 @@ window.customElements.define('bot-page-summary', class extends HTMLElement {
         taskAgg[name] = {
           full_name: name,
           total: 0,
+          // TODO(jonahhooper) Success is not incremented anywhere. Fix this
+          // at a later stage.
           success: 0,
           failed: 0,
           bot_died: 0,

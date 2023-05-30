@@ -267,6 +267,25 @@ module.exports = (env, argv) => {
     const demoType = env.demo_type === 'live' ? 'live' : 'demo';
     common = demoFinder(dirname, common, demoType);
     common.devtool = 'eval-source-map';
+    if (demoType === 'live') {
+      common.devServer.proxy = [
+        {
+          changeOrigin: true,
+          context: ['/auth'],
+          target: 'https://chromium-swarm-dev.appspot.com/',
+          bypass: function(req, _res, _proxyOptions) {
+            /* Inject lucisid cookie into requests to auth. This allows
+             * the localhost frontend to authenticate and grab credentials.
+             * Allowing it to talk to swarming-dev.
+             * See README.md for more instructions.
+             **/
+            const sid = process.env.LUCISID;
+            req.headers.cookie = `LUCISID=${sid}`;
+            return null;
+          },
+        },
+      ];
+    }
   }
 
   // Make all CSS/JS files appear at the /newres location.
