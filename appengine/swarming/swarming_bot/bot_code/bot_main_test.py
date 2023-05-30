@@ -136,10 +136,16 @@ class TestBotBase(net_utils.TestCase):
     self.quit_bit.reset()
     self.loop_state.run(test_hook=lambda: False)
 
+  def prep_hybrid_mode(self, rbe_params, scheduler='swarming'):
+    self.loop_state.rbe_enable(rbe_params)
+    self.loop_state._next_scheduler = scheduler
+    self.loop_state._swarming_poll_timer.reset(0.0)
+
   def expected_poll_request(self,
                             response,
                             rbe_idle=None,
                             sleep_streak=None,
+                            force=False,
                             extra_headers=None):
     data = self.attributes
 
@@ -150,6 +156,7 @@ class TestBotBase(net_utils.TestCase):
         self.assertEqual(kwargs['data']['state']['rbe_idle'], rbe_idle)
       if sleep_streak is not None:
         self.assertEqual(kwargs['data']['state']['sleep_streak'], sleep_streak)
+      self.assertEqual(kwargs['data'].get('force', False), force)
       if extra_headers is not None:
         with_extra = dict(kwargs['headers'])
         with_extra.update(extra_headers)
@@ -205,7 +212,8 @@ class TestBotBase(net_utils.TestCase):
                                   status_in='OK',
                                   status_out='OK',
                                   lease_in=None,
-                                  lease_out=None):
+                                  lease_out=None,
+                                  blocking=True):
     data = {
         'status': status_in,
         'dimensions': self.attributes['dimensions'],
@@ -213,6 +221,8 @@ class TestBotBase(net_utils.TestCase):
     }
     if lease_in:
       data['lease'] = lease_in
+    if not blocking:
+      data['nonblocking'] = True
     # Shutdown requests and pings skip poll tokens.
     if poll_token:
       data['poll_token'] = poll_token
@@ -986,6 +996,7 @@ class TestBotMain(TestBotBase):
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
+                'sleep': 0.0,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1004,6 +1015,7 @@ class TestBotMain(TestBotBase):
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
+                    'sleep': 0.0,
                 },
             },
             rbe_idle=True,
@@ -1051,6 +1063,7 @@ class TestBotMain(TestBotBase):
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
+                'sleep': 0.0,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1069,6 +1082,7 @@ class TestBotMain(TestBotBase):
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
+                    'sleep': 0.0,
                 },
             },
             rbe_idle=True,
@@ -1092,6 +1106,7 @@ class TestBotMain(TestBotBase):
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
+                    'sleep': 0.0,
                 },
             },
             rbe_idle=True,
@@ -1116,6 +1131,7 @@ class TestBotMain(TestBotBase):
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
+                'sleep': 0.0,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1158,6 +1174,7 @@ class TestBotMain(TestBotBase):
                 'poll_token': 'pt1',
                 'instance': 'instance_1',
                 'hybrid_mode': False,
+                'sleep': 0.0,
             },
         }),
         self.expected_rbe_create_request('pt1', 'st1'),
@@ -1176,6 +1193,7 @@ class TestBotMain(TestBotBase):
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
+                'sleep': 0.0,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0', fail=True),
@@ -1194,6 +1212,7 @@ class TestBotMain(TestBotBase):
                 'poll_token': 'pt1',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
+                'sleep': 0.0,
             },
         }),
         self.expected_rbe_create_request('pt1', 'st1'),  # resets cons. errors
@@ -1218,6 +1237,7 @@ class TestBotMain(TestBotBase):
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
+                'sleep': 0.0,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1235,6 +1255,7 @@ class TestBotMain(TestBotBase):
                     'poll_token': 'pt1',
                     'instance': 'instance_1',
                     'hybrid_mode': False,
+                    'sleep': 0.0,
                 },
             },
             rbe_idle=True,
@@ -1259,6 +1280,7 @@ class TestBotMain(TestBotBase):
                 'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
+                'sleep': 0.0,
             },
         }),
         self.expected_rbe_create_request('pt0', 'st0'),
@@ -1318,6 +1340,7 @@ class TestBotMain(TestBotBase):
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
+                    'sleep': 0.0,
                 },
             },
             rbe_idle=False,
@@ -1366,6 +1389,7 @@ class TestBotMain(TestBotBase):
                     'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
+                    'sleep': 0.0,
                 },
             },
             rbe_idle=True,
@@ -1383,6 +1407,7 @@ class TestBotMain(TestBotBase):
                 'poll_token': poll_token,
                 'instance': 'instance',
                 'hybrid_mode': False,
+                'sleep': 0.0,
             },
         }),
         self.expected_rbe_create_request(poll_token, session_token),
@@ -1503,6 +1528,268 @@ class TestBotMain(TestBotBase):
         ),
     ])
     self.poll_once()
+
+  def test_hybrid_mode_idle(self):
+    # Starting in hybrid mode, polling Swarming next.
+    self.prep_hybrid_mode({
+        'poll_token': 'pt0',
+        'instance': 'instance_0',
+        'hybrid_mode': True,
+        'sleep': 1.0,
+    })
+
+    # Makes a forced Swarming poll, gets nothing. Opens an RBE session and makes
+    # maintenance poll.
+    self.assertEqual(self.loop_state._next_scheduler, 'swarming')
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                    'hybrid_mode': True,
+                    'sleep': 5.0,
+                },
+            },
+            force=True),
+        self.expected_rbe_create_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0',
+                                         'st0',
+                                         status_in='UNHEALTHY',
+                                         blocking=False),
+    ])
+    self.poll_once()
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
+
+    # The next poll is from RBE scheduler. Makes a non-forced Swarming poll,
+    # gets nothing. Makes a full RBE poll.
+    self.assertEqual(self.loop_state._next_scheduler, 'rbe')
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                    'hybrid_mode': True,
+                    'sleep': 10.0,
+                },
+            },
+            rbe_idle=True,
+            sleep_streak=1,
+            force=False),
+        self.expected_rbe_update_request('pt0', 'st0', blocking=False),
+    ])
+    self.poll_once()
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 2)
+
+    # Swarming's turn again.
+    self.assertEqual(self.loop_state._next_scheduler, 'swarming')
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                    'hybrid_mode': True,
+                    'sleep': 5.0,
+                },
+            },
+            rbe_idle=True,
+            sleep_streak=2,
+            force=True),
+        self.expected_rbe_update_request('pt0',
+                                         'st0',
+                                         status_in='UNHEALTHY',
+                                         blocking=False),
+    ])
+    self.poll_once()
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 3)
+
+  def test_hybrid_mode_swarming_scheduler_task(self):
+    self.mock(bot_main, '_run_manifest', lambda *args: True)
+
+    finished = []
+    self.mock(self.loop_state, 'on_task_completed', finished.append)
+
+    # Starting in hybrid mode, polling Swarming next.
+    self.prep_hybrid_mode({
+        'poll_token': 'pt0',
+        'instance': 'instance_0',
+        'hybrid_mode': True,
+        'sleep': 1.0,
+    })
+
+    # Makes a forced Swarming poll, gets a task. Nevertheless opens an RBE
+    # session and makes a maintenance poll.
+    self.assertEqual(self.loop_state._next_scheduler, 'swarming')
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'run',
+                'manifest': {
+                    'task_id': 'some-task-id',
+                },
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                    'hybrid_mode': True,
+                    'sleep': 5.0,
+                },
+            },
+            force=True),
+        self.expected_rbe_create_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0',
+                                         'st0',
+                                         status_in='UNHEALTHY',
+                                         blocking=False),
+    ])
+    self.poll_once()
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
+
+    # Ran the task.
+    self.assertEqual(len(finished), 1)
+
+    # The next poll is from RBE scheduler. Makes a non-forced Swarming poll,
+    # gets nothing. Makes a full RBE poll.
+    self.assertEqual(self.loop_state._next_scheduler, 'rbe')
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                    'hybrid_mode': True,
+                    'sleep': 10.0,
+                },
+            },
+            rbe_idle=False,
+            sleep_streak=0,
+            force=False),
+        self.expected_rbe_update_request('pt0', 'st0', blocking=False),
+    ])
+    self.poll_once()
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
+
+  def test_hybrid_mode_rbe_scheduler_task(self):
+    def run_manifest(_bot, _manifest, rbe_session):
+      rbe_session.finish_active_lease({})
+      return True
+
+    self.mock(bot_main, '_run_manifest', run_manifest)
+
+    finished = []
+    self.mock(self.loop_state, 'on_task_completed', finished.append)
+
+    # Starting in hybrid mode, polling RBE next.
+    self.prep_hybrid_mode(
+        {
+            'poll_token': 'pt0',
+            'instance': 'instance_0',
+            'hybrid_mode': True,
+            'sleep': 1.0,
+        }, 'rbe')
+
+    # Makes a maintenance Swarming poll, gets nothing. Opens an RBE session and
+    # makes a full poll getting a lease.
+    self.assertEqual(self.loop_state._next_scheduler, 'rbe')
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                    'hybrid_mode': True,
+                    'sleep': 5.0,
+                },
+            },
+            force=False),
+        self.expected_rbe_create_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0',
+                                         'st0',
+                                         lease_out={
+                                             'id': 'lease-id',
+                                             'payload': {
+                                                 'task_id': 'some-task-id',
+                                                 'task_to_run_shard': 5,
+                                                 'task_to_run_id': 6,
+                                             },
+                                             'state': 'PENDING',
+                                         },
+                                         blocking=False),
+        self.expected_claim_request('lease-id', 'some-task-id', 5, 6, {
+            'cmd': 'run',
+            'manifest': {
+                'fake': 'manifest'
+            },
+        }),
+    ])
+    self.poll_once()
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
+
+    # Ran the task.
+    self.assertEqual(len(finished), 1)
+
+    # The next poll is from Swarming scheduler. Still making a maintenance poll
+    # of RBE, reporting the result of the previously executed lease.
+    self.assertEqual(self.loop_state._next_scheduler, 'swarming')
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                    'hybrid_mode': True,
+                    'sleep': 10.0,
+                },
+            },
+            rbe_idle=False,
+            sleep_streak=0,
+            force=True),
+        self.expected_rbe_update_request('pt0',
+                                         'st0',
+                                         status_in='UNHEALTHY',
+                                         lease_in={
+                                             'id': 'lease-id',
+                                             'result': {},
+                                             'state': 'COMPLETED',
+                                         },
+                                         blocking=False),
+    ])
+    self.poll_once()
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
+
+  def test_hybrid_mode_update(self):
+    update = []
+    self.mock(bot_main, '_update_bot', lambda *args: update.append(args))
+
+    # Starting in hybrid mode, polling RBE next.
+    self.prep_hybrid_mode(
+        {
+            'poll_token': 'pt0',
+            'instance': 'instance_0',
+            'hybrid_mode': True,
+            'sleep': 1.0,
+        }, 'rbe')
+
+    # Immediately gets `update` command. Does NOT open an RBE session.
+    self.assertEqual(self.loop_state._next_scheduler, 'rbe')
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'update',
+            'version': '123',
+        },
+                                   force=False),
+    ])
+    self.poll_once()
+
+    # Updated.
+    self.assertEqual(len(update), 1)
 
   def _mock_popen(self,
                   returncode=0,
