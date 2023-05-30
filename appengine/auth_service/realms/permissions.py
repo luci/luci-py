@@ -309,15 +309,22 @@ def db():
           permission('buildbucket.builds.add'),
           permission('buildbucket.builds.cancel'),
       ])
-  role('role/buildbucket.owner', [
+  role('role/buildbucket.healthUpdater', [
       include('role/buildbucket.reader'),
-      include('role/buildbucket.triggerer'),
-      permission('buildbucket.builds.lease'),  # used by v1 API only
-      permission('buildbucket.builds.reset'),  # used by v1 API only
-      permission('buildbucket.builders.setBuildNumber'),
-      permission('buildbucket.buckets.deleteBuilds'),
-      permission('buildbucket.buckets.pause'),  # used by v1 API only
+      permission('buildbucket.builders.setHealth'),
   ])
+  role(
+      'role/buildbucket.owner',
+      [
+          include('role/buildbucket.reader'),
+          include('role/buildbucket.triggerer'),
+          include('role/buildbucket.healthUpdater'),
+          permission('buildbucket.builds.lease'),  # used by v1 API only
+          permission('buildbucket.builds.reset'),  # used by v1 API only
+          permission('buildbucket.builders.setBuildNumber'),
+          permission('buildbucket.buckets.deleteBuilds'),
+          permission('buildbucket.buckets.pause'),  # used by v1 API only
+      ])
   role('role/buildbucket.builderServiceAccount', [
       include('role/logdog.writer'),                # to create build logs
       include('role/resultdb.reader'),              # to include invocations
@@ -325,6 +332,7 @@ def db():
       include('role/swarming.taskTriggerer'),       # to trigger isolated tests
       permission('buildbucket.builds.update'),      # to update build steps
   ])
+
 
   # CQ permissions and roles. Placeholders for now.
   role('role/cq.committer', [])
