@@ -84,5 +84,20 @@ export class BotsService extends PrpcService {
     };
     return this._call('ListBotTasks', request);
   }
+
+  /**
+   * Terminates a bot given a botId.
+   *
+   * @param {String} botId - identifier of bot to terminate.
+   *
+   * @returns {Object} with the shape {taskId: "some_task_id"} if the termination operation was initiated without error
+   *
+   **/
+  terminate(botId) {
+    const request = {
+      bot_id: botId,
+    };
+    return this._call('TerminateBot', request);
+  }
 }
 

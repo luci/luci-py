@@ -234,28 +234,17 @@ export const MATCHED = true;
 const stringify = function(data) {
   return `)]}'${JSON.stringify(data)}`;
 };
-/**
- * Mocks out prpc GetBot request with the given data.
- * Will setup pRPC headers and prefix strings.
- *
- * @param {fetchMock} fetchMock module.
- * @param {data} data we wish to return from botGet.
- *
- */
-export function mockGetBot(fetchMock, data) {
-  fetchMock.post('path:/prpc/swarming.v2.Bots/GetBot',
-      new Response(stringify(data), {
-        status: 200,
-        headers: {
-          'x-prpc-grpc-code': '0',
-          'content-type': 'application/json',
-        },
-      }),
-  );
-}
 
-export function mockListBotTasks(fetchMock, data) {
-  fetchMock.post('path:/prpc/swarming.v2.Bots/ListBotTasks',
+/**
+ * Mocks out request to prpc service for a given fetchMock.
+ *
+ * @param {fetchMock} fetchMock instance to use for mocking.
+ * @param {service} service is the string prpc service we wish to call.
+ * @param {rpc} rpc string that service we want to call.
+ * @param {data} data which is mocked as the response to the prpc rpc.
+ */
+export function mockPrpc(fetchMock, service, rpc, data) {
+  fetchMock.post(`path:/prpc/${service}/${rpc}`,
       new Response(stringify(data), {
         status: 200,
         headers: {

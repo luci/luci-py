@@ -11,10 +11,24 @@ describe('bot-page', function() {
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
   const {$, $$} = require('common-sk/modules/dom');
-  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs, MATCHED, mockGetBot, mockListBotTasks} = require('modules/test_util');
+  const {customMatchers, expectNoUnmatchedCalls, mockAppGETs, MATCHED, mockPrpc} = require('modules/test_util');
   const {botDataMap, eventsMap, tasksMap} = require('modules/bot-page/test_data');
 
   const TEST_BOT_ID = 'example-gce-001';
+
+  // "deterministically" set the ordering of the keys in json object.
+  // Works for non-nested objects.
+  const stringify = (obj) => JSON.stringify(obj, Object.keys(obj).sort());
+  const checkFor = (prpcCall, expectedBody) => {
+    return (call) => {
+      if (call[0].endsWith(prpcCall)) {
+        return stringify(JSON.parse(call[1].body)) === stringify(expectedBody);
+      }
+      return false;
+    };
+  };
+  const mockGetBot = (data) => mockPrpc(fetchMock, 'swarming.v2.Bots', 'GetBot', data);
+  const mockListBotTasks = (data) => mockPrpc(fetchMock, 'swarming.v2.Bots', 'ListBotTasks', data);
 
   beforeEach(function() {
     jasmine.addMatchers(customMatchers);
@@ -115,8 +129,8 @@ describe('bot-page', function() {
 
     fetchMock.get(new RegExp('/_ah/api/swarming/v1/server/permissions\??.*'), {});
     fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/events*`, events);
-    mockGetBot(fetchMock, bot);
-    mockListBotTasks(fetchMock, tasks);
+    mockGetBot(bot);
+    mockListBotTasks(tasks);
   }
 
 
@@ -613,17 +627,6 @@ describe('bot-page', function() {
         // At the moment, only GetBot and ListBotTasks are used.
         const prpcCalls = fetchMock.calls(MATCHED, 'POST');
         expect(prpcCalls).toHaveSize(2);
-        // "deterministically" set the ordering of the keys in json object.
-        // Works for non-nested objects.
-        const stringify = (obj) => JSON.stringify(obj, Object.keys(obj).sort());
-        const checkFor = (prpcCall, expectedBody) => {
-          return (call) => {
-            if (call[0].endsWith(prpcCall)) {
-              return stringify(JSON.parse(call[1].body)) === stringify(expectedBody);
-            }
-            return false;
-          };
-        };
 
         const getBotsReq = {bot_id: TEST_BOT_ID};
         const getBotsCall = prpcCalls.filter(checkFor('prpc/swarming.v2.Bots/GetBot', getBotsReq));
@@ -690,7 +693,7 @@ describe('bot-page', function() {
         ele.render();
         fetchMock.resetHistory();
         // This is the task_id on the 'running' bot.
-        fetchMock.post(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/terminate`, {success: true});
+        mockPrpc(fetchMock, 'swarming.v2.Bots', 'TerminateBot', {taskId: 'some_task_id'});
 
         const tBtn = $$('main button.shut_down', ele);
         expect(tBtn).toBeTruthy();
@@ -712,7 +715,9 @@ describe('bot-page', function() {
           expectNoUnmatchedCalls(fetchMock);
           let calls = fetchMock.calls(MATCHED, 'GET');
           expect(calls).toHaveSize(0);
-          calls = fetchMock.calls(MATCHED, 'POST');
+          calls = fetchMock.calls(MATCHED, 'POST').filter(
+              checkFor('swarming.v2.Bots/TerminateBot', {'bot_id': TEST_BOT_ID}),
+          );
           expect(calls).toHaveSize(1);
 
           done();
@@ -766,7 +771,7 @@ describe('bot-page', function() {
         fetchMock.reset(); // clears history and routes
 
         const data = tasksMap['SkiaGPU'];
-        mockListBotTasks(fetchMock, {
+        mockListBotTasks({
           items: data,
           cursor: 'newCursor',
         });

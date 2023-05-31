@@ -647,14 +647,10 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
 
   _shutdownBot() {
     this.app.addBusyTasks(1);
-    fetch(`/_ah/api/swarming/v1/bot/${this._botId}/terminate`, {
-      method: 'POST',
-      headers: {
-        'authorization': this.auth_header,
-        'content-type': 'application/json',
-      },
-    }).then(jsonOrThrow)
-        .then((response) => {
+    const botService =
+      new BotsService(this.auth_header, this._fetchController.signal);
+    botService.terminate(this._botId)
+        .then((_resp) => {
           this._closePopup();
           errorMessage('Request to shutdown bot sent', 4000);
           this.render();
@@ -662,7 +658,7 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
         })
         .catch((e) => {
           this._closePopup();
-          this.fetchError(e, 'bot/terminate'); // calls app.finishedTask()
+          this.prpcError(e, 'bot/terminate'); // calls app.finishedTask()
           this.render();
         });
   }
