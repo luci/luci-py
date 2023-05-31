@@ -366,6 +366,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       def __init__(self):
         self.pings = 0
         self.active_lease = True
+        self.alive = True
 
       def ping_active_lease(self):
         self.pings += 1
@@ -377,6 +378,36 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.expectTask(task_details.task_id)
     # Pinged RBE as well.
     self.assertEqual(rbe_session.pings, 1)
+
+  def test_run_command_raw_with_dead_rbe_session(self):
+    task_details = get_task_details('print(\'hi\')')
+    expected = {
+        'exit_code': 0,
+        'hard_timeout': False,
+        'io_timeout': False,
+        'internal_error': None,
+        'internal_error_reported': False,
+        'version': task_runner.OUT_VERSION,
+    }
+
+    class _FakeRBESession:
+      def __init__(self):
+        self.active_lease = False
+        self.alive = False
+        self.session_id = 'session_id'
+        self.dimensions = {}
+        self.updates = 0
+
+      def recreate(self):
+        self.alive = True
+
+      def update(self, **_kwargs):
+        assert self.alive
+        self.updates += 1
+
+    rbe_session = _FakeRBESession()
+    self.assertEqual(expected, self._run_command(task_details, rbe_session))
+    self.assertEqual(rbe_session.updates, 1)
 
   def test_run_command_env_prefix_one(self):
     task_details = get_task_details(

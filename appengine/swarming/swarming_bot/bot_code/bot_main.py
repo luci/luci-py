@@ -996,8 +996,14 @@ def _run_manifest(botobj, manifest, rbe_session):
     ]
 
     # If running in RBE mode, need to propagate the session state to the task
-    # runner, it will use it to ping the RBE lease.
+    # runner, it will use it to ping the RBE lease (if there's an active lease)
+    # or just the entire RBE session (if there are no active leases). Session
+    # pinging is happening using MAINTENANCE status.
     if rbe_session:
+      if rbe_session.active_lease:
+        logging.info('RBE lease: %r', rbe_session.active_lease.to_dict())
+      else:
+        logging.info('RBE lease: none')
       rbe_session_state = os.path.join(work_dir, 'rbe_session.json')
       rbe_session.dump(rbe_session_state)
       command.extend(['--rbe-session-state', rbe_session_state])
@@ -1079,7 +1085,7 @@ def _run_manifest(botobj, manifest, rbe_session):
   finally:
     if auth_params_dumper:
       auth_params_dumper.stop()
-    if rbe_session:
+    if rbe_session and rbe_session.active_lease:
       rbe_session.finish_active_lease({})
     if internal_failure and not internal_error_reported:
       _post_error_task(botobj, msg, task_id)
@@ -1802,7 +1808,7 @@ class _BotLoopState:
       self.cmd_terminate(param)
     elif cmd == 'run':
       manifest, _rbe_params = param
-      self.cmd_run(manifest, None)
+      self.cmd_run(manifest, self._rbe_session)
     elif cmd == 'update':
       self.cmd_update(param)
     elif cmd in ('host_reboot', 'restart'):

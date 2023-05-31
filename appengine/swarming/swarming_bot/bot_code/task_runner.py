@@ -611,40 +611,62 @@ class _OutputBuffer:
 
 
 class _RBEPinger:
-  """Knows when and how to ping the RBE lease to keep it alive.
+  """Knows when and how to ping the RBE session to keep it alive.
 
   Currently ignores lease cancellation signals: cancellations still happen
   exclusively through Swarming.
+
+  If the session dies, recreates it.
   """
 
   def __init__(self, rbe_session):
-    assert rbe_session.active_lease
     self._rbe_session = rbe_session
-    self._active = True
     self._next_ping_time = monotonic_time()  # ASAP
 
   def time_until_next_ping(self):
-    """Returns how many seconds to wait until the next ping.
-
-    If pings are disabled, returns None.
-    """
-    if not self._active:
-      return None
+    """Returns how many seconds to wait until the next ping."""
     return max(0.0, self._next_ping_time - monotonic_time())
 
   def ping(self):
     """Sends a ping to RBE, keeping the lease alive, if it's time."""
-    if not self._active or monotonic_time() < self._next_ping_time:
+    if monotonic_time() < self._next_ping_time:
       return
     # TODO(vadimsh): Figure out the optimal frequency for pings. The native RBE
     # bot does something more complicated here (e.g. slows down with time).
-    self._next_ping_time = monotonic_time() + random.uniform(10.0, 15.0)
+    if self._rbe_session.alive and self._rbe_session.active_lease:
+      self._schedule_next_ping(10.0)
+      self._ping_active_lease()
+    else:
+      self._schedule_next_ping(60.0)
+      self._ping_session()
+
+  def _schedule_next_ping(self, delta):
+    self._next_ping_time = monotonic_time() + random.uniform(delta, delta * 1.5)
+
+  def _ping_active_lease(self):
     try:
-      self._active = self._rbe_session.ping_active_lease()
-      if not self._active:
-        logging.warning('RBE lease is no longer active, stopping pings')
+      if not self._rbe_session.ping_active_lease():
+        logging.warning('RBE lease is no longer active')
     except remote_client.RBEServerError as e:
       logging.error('Failed to ping RBE lease: %s', e)
+
+  def _ping_session(self):
+    if not self._rbe_session.alive:
+      logging.warning('RBE session %s has died, attempting to recreate',
+                      self._rbe_session.session_id)
+      try:
+        self._rbe_session.recreate()
+      except remote_client.RBEServerError as e:
+        logging.error('Failed to recreate RBE session: %s', e)
+        return
+      logging.info('Recreated RBE session as %s', self._rbe_session.session_id)
+    try:
+      # TODO(vadimsh): Use MAINTENANCE status when available.
+      self._rbe_session.update(status=remote_client.RBESessionStatus.UNHEALTHY,
+                               dimensions=self._rbe_session.dimensions,
+                               poll_token=None)
+    except remote_client.RBEServerError as e:
+      logging.error('Failed to ping RBE session: %s', e)
 
 
 def run_command(remote, rbe_session, task_details, work_dir, cost_usd_hour,

@@ -1961,6 +1961,8 @@ class TestBotMain(TestBotBase):
     rbe_session = remote_client.RBESession(self.bot.remote, 'rbe-instance',
                                            self.bot.dimensions, 'poll-token',
                                            'session-token', 'session-id')
+    rbe_session._active_lease = remote_client.RBELease(
+        'id', remote_client.RBELeaseState.ACTIVE)
     rbe_results = []
     self.mock(rbe_session, 'finish_active_lease', rbe_results.append)
 
