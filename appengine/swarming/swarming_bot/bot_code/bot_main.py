@@ -1700,10 +1700,9 @@ class _BotLoopState:
 
     # There's a healthy session, we can update it.
     try:
-      # TODO(vadimsh): Use MAINTENANCE status when available.
       report_status = self._rbe_intended_status
       if report_status == remote_client.RBESessionStatus.OK and maintenance:
-        report_status = remote_client.RBESessionStatus.UNHEALTHY
+        report_status = remote_client.RBESessionStatus.MAINTENANCE
       logging.info('RBE: updating %s as %s', self._rbe_session.session_id,
                    report_status)
       lease = self._rbe_session.update(report_status, self._bot.dimensions,

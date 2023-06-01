@@ -679,6 +679,7 @@ class RBESessionStatus(enum.Enum):
   HOST_REBOOTING = 3
   BOT_TERMINATING = 4
   INITIALIZING = 5
+  MAINTENANCE = 6
 
 
 class RBELeaseState(enum.Enum):
@@ -945,8 +946,7 @@ class RBESession:
     """True if this session exists and can process leases."""
     return self._last_acked_status in (
         RBESessionStatus.OK,
-        # TODO(vadimsh): Switch to MAINTENANCE when available.
-        RBESessionStatus.UNHEALTHY,
+        RBESessionStatus.MAINTENANCE,
     )
 
   @property

@@ -1556,7 +1556,7 @@ class TestBotMain(TestBotBase):
         self.expected_rbe_create_request('pt0', 'st0'),
         self.expected_rbe_update_request('pt0',
                                          'st0',
-                                         status_in='UNHEALTHY',
+                                         status_in='MAINTENANCE',
                                          blocking=False),
     ])
     self.poll_once()
@@ -1602,7 +1602,7 @@ class TestBotMain(TestBotBase):
             force=True),
         self.expected_rbe_update_request('pt0',
                                          'st0',
-                                         status_in='UNHEALTHY',
+                                         status_in='MAINTENANCE',
                                          blocking=False),
     ])
     self.poll_once()
@@ -1643,7 +1643,7 @@ class TestBotMain(TestBotBase):
         self.expected_rbe_create_request('pt0', 'st0'),
         self.expected_rbe_update_request('pt0',
                                          'st0',
-                                         status_in='UNHEALTHY',
+                                         status_in='MAINTENANCE',
                                          blocking=False),
     ])
     self.poll_once()
@@ -1753,7 +1753,7 @@ class TestBotMain(TestBotBase):
             force=True),
         self.expected_rbe_update_request('pt0',
                                          'st0',
-                                         status_in='UNHEALTHY',
+                                         status_in='MAINTENANCE',
                                          lease_in={
                                              'id': 'lease-id',
                                              'result': {},

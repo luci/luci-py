@@ -661,10 +661,10 @@ class _RBEPinger:
         return
       logging.info('Recreated RBE session as %s', self._rbe_session.session_id)
     try:
-      # TODO(vadimsh): Use MAINTENANCE status when available.
-      self._rbe_session.update(status=remote_client.RBESessionStatus.UNHEALTHY,
-                               dimensions=self._rbe_session.dimensions,
-                               poll_token=None)
+      self._rbe_session.update(
+          status=remote_client.RBESessionStatus.MAINTENANCE,
+          dimensions=self._rbe_session.dimensions,
+          poll_token=None)
     except remote_client.RBEServerError as e:
       logging.error('Failed to ping RBE session: %s', e)
 
