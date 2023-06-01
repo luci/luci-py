@@ -1676,6 +1676,17 @@ class _BotLoopState:
     if self._rbe_hybrid_mode:
       logging.debug('Hybrid mode: poll RBE, maintenance:%s', maintenance)
 
+    # An RBE session can die "between polls" while the bot was running a task
+    # via task_runner subprocess. Abandon such session to recreate it below.
+    # Note that we also check session state right after polling as well (this is
+    # where session status changes) to avoid holding on to sessions known to be
+    # dead.
+    if self._rbe_session and not self._rbe_session.alive:
+      logging.info('RBE: session %s is dead', self._rbe_session.session_id)
+      self._rbe_consecutive_errors += 1
+      self._rbe_session.abandon()
+      self._rbe_session = None
+
     if not self._rbe_session:
       # If we don't actually need a healthy session anymore, do nothing. This
       # can happen if the bot is already shutting down. To avoid potential weird
@@ -1716,6 +1727,7 @@ class _BotLoopState:
       if not self._rbe_session.alive:
         logging.info('RBE: session %s is closed', self._rbe_session.session_id)
         self._rbe_consecutive_errors += 1
+        self._rbe_session.abandon()
         self._rbe_session = None
         return None
       # The session is healthy! Return whatever was polled, if anything.

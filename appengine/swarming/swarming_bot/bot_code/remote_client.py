@@ -1153,13 +1153,8 @@ class RBESession:
     if self.alive:
       raise RBESessionException('recreate(...) with a living session')
 
-    # The session that was maintaining these leases is gone. Forget them.
-    if self._active_lease:
-      logging.error('Ignoring active lease %s', self._active_lease.id)
-      self._active_lease = None
-    if self._finished_lease:
-      logging.error('Losing results of %s', self._finished_lease.id)
-      self._finished_lease = None
+    # The previous session is gone. Log any abandoned leases.
+    self.abandon()
 
     # Try to create a replacement session using the same parameters. We need to
     # pass the previous session token to grab server-signed parameters from it
@@ -1169,6 +1164,26 @@ class RBESession:
     self._session_id = resp.session_id
     self._session_token = resp.session_token
     self._last_acked_status = RBESessionStatus.OK
+
+  def abandon(self):
+    """Abandons this dead session, logging any pending state that is lost now.
+
+    Should be called only for dead sessions (`alive` is False). Raises
+    RBESessionException otherwise.
+
+    Doesn't do any RPCs.
+
+    Raises:
+      RBESessionException if the local session is in a wrong state.
+    """
+    if self.alive:
+      raise RBESessionException('abandon() with a living session')
+    if self._active_lease:
+      logging.error('Ignoring active lease %s', self._active_lease.id)
+      self._active_lease = None
+    if self._finished_lease:
+      logging.error('Losing results of %s', self._finished_lease.id)
+      self._finished_lease = None
 
   def _update(self,
               status,

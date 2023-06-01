@@ -652,7 +652,7 @@ class _RBEPinger:
 
   def _ping_session(self):
     if not self._rbe_session.alive:
-      logging.warning('RBE session %s has died, attempting to recreate',
+      logging.warning('RBE session %s is dead, attempting to recreate',
                       self._rbe_session.session_id)
       try:
         self._rbe_session.recreate()
@@ -665,6 +665,9 @@ class _RBEPinger:
           status=remote_client.RBESessionStatus.MAINTENANCE,
           dimensions=self._rbe_session.dimensions,
           poll_token=None)
+      if not self._rbe_session.alive:
+        logging.warning('RBE session %s is dead and will be recreated later',
+                        self._rbe_session.session_id)
     except remote_client.RBEServerError as e:
       logging.error('Failed to ping RBE session: %s', e)
 
