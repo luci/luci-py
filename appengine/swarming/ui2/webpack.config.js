@@ -2,7 +2,6 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-
 // The commonBuilder function generates a common configuration for webpack.
 // You can require() it at the start of your webpack.config.js and then make
 // modifications to it from there. Users should at a minimum fill in the entry
@@ -46,14 +45,14 @@
 //     release:
 //        npx webpack --mode=production
 //
-const {glob} = require('glob');
-const path = require('path');
-const fs = require('fs');
-const {basename, join, resolve} = require('path');
-const CleanWebpackPlugin = require('clean-webpack-plugin');
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
-const CopyWebpackPlugin = require('copy-webpack-plugin');
+const { glob } = require("glob");
+const path = require("path");
+const fs = require("fs");
+const { basename, join, resolve } = require("path");
+const CleanWebpackPlugin = require("clean-webpack-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const HtmlWebpackPlugin = require("html-webpack-plugin");
+const CopyWebpackPlugin = require("copy-webpack-plugin");
 
 const minifyOptions = {
   caseSensitive: true,
@@ -77,30 +76,32 @@ function demoFinder(dir, webpackConfig, demoType) {
 
   // Find all the dirs below 'dir'.
   const isDir = (filename) => fs.lstatSync(filename).isDirectory();
-  const moduleDir = path.resolve(dir, 'modules');
-  const dirs = fs.readdirSync(moduleDir)
-      .map((name) => join(moduleDir, name)).filter(isDir);
+  const moduleDir = path.resolve(dir, "modules");
+  const dirs = fs
+    .readdirSync(moduleDir)
+    .map((name) => join(moduleDir, name))
+    .filter(isDir);
 
-  if (demoType !== 'demo' && demoType !== 'live') {
-    throw 'Only \'demo\' and \'live\' are valid values for demo type';
+  if (demoType !== "demo" && demoType !== "live") {
+    throw "Only 'demo' and 'live' are valid values for demo type";
   }
   const htmlSuffix = `-${demoType}.html`;
   const jsSuffix = `-${demoType}.js`;
   dirs.forEach((d) => {
     // Look for both a *-demo.js and *-demo.html file in the directory.
     const files = fs.readdirSync(d);
-    let demoHTML = '';
-    let demoJS = '';
+    let demoHTML = "";
+    let demoJS = "";
     files.forEach((file) => {
       if (file.endsWith(htmlSuffix)) {
         if (!!demoHTML) {
-          throw 'Only one -demo.html file is allowed per directory: ' + file;
+          throw "Only one -demo.html file is allowed per directory: " + file;
         }
         demoHTML = file;
       }
       if (file.endsWith(jsSuffix)) {
-        if (demoJS != '') {
-          throw 'Only one -demo.js file is allowed per directory: ' + file;
+        if (demoJS != "") {
+          throw "Only one -demo.js file is allowed per directory: " + file;
         }
         demoJS = file;
       }
@@ -109,21 +110,21 @@ function demoFinder(dir, webpackConfig, demoType) {
       const name = basename(d);
       webpackConfig.entry[name] = join(d, demoJS);
       webpackConfig.plugins.push(
-          new HtmlWebpackPlugin({
-            filename: name + '.html',
-            template: join(d, demoHTML),
-            chunks: [name],
-          }),
+        new HtmlWebpackPlugin({
+          filename: name + ".html",
+          template: join(d, demoHTML),
+          chunks: [name],
+        })
       );
     } else if (!!demoJS || !!demoHTML) {
       console.log(
-          'WARNING: An element needs both a *-demo.js and a *-demo.html file.');
+        "WARNING: An element needs both a *-demo.js and a *-demo.html file."
+      );
     }
   });
 
   return webpackConfig;
 }
-
 
 /* A function that will look at all subdirectories of 'dir'/pages
  * and adds entries for each page it finds there.
@@ -156,23 +157,23 @@ function pageFinder(dir, webpackConfig, minifyOutput) {
   // entry points and Html plugins to the config.
 
   // Find all the dirs below 'dir'.
-  const pagesDir = path.resolve(dir, 'pages');
+  const pagesDir = path.resolve(dir, "pages");
   // Look for all *.js files, for each one look for a matching .html file.
   // Emit into config.
   //
-  const pagesJS = glob.sync(pagesDir + '/*.js');
+  const pagesJS = glob.sync(pagesDir + "/*.js");
 
   pagesJS.forEach((pageJS) => {
     // Look for both a <filename>.js and <filename>.html file in the directory.
     // Strip off ".js" from end and replace with ".html".
-    const pageHTML = pageJS.replace(/\.js$/, '.html');
+    const pageHTML = pageJS.replace(/\.js$/, ".html");
     if (!fs.existsSync(pageHTML)) {
-      console.log('WARNING: A page needs both a *.js and a *.html file.');
+      console.log("WARNING: A page needs both a *.js and a *.html file.");
       return;
     }
 
     const baseHTML = basename(pageHTML);
-    const name = basename(pageJS, '.js');
+    const name = basename(pageJS, ".js");
     webpackConfig.entry[name] = pageJS;
     const opts = {
       filename: baseHTML,
@@ -182,9 +183,7 @@ function pageFinder(dir, webpackConfig, minifyOutput) {
     if (minifyOutput) {
       opts.minify = minifyOptions;
     }
-    webpackConfig.plugins.push(
-        new HtmlWebpackPlugin(opts),
-    );
+    webpackConfig.plugins.push(new HtmlWebpackPlugin(opts));
   });
 
   return webpackConfig;
@@ -194,20 +193,20 @@ module.exports = (env, argv) => {
   // The postcss config file must be named postcss.config.js, so we store the
   // different configs in different dirs.
   const dirname = __dirname;
-  const prefix = argv.mode === 'production' ? 'prod' : 'dev';
+  const prefix = argv.mode === "production" ? "prod" : "dev";
   // This file handles minification, auto-prefixing, etc.
-  const postCssConfig = path.resolve(__dirname, prefix, 'postcss.config.js');
+  const postCssConfig = path.resolve(__dirname, prefix, "postcss.config.js");
   let common = {
     entry: {
       // Users of webpack.common must fill in the entry point(s).
     },
     output: {
-      path: path.resolve(dirname, 'dist'),
-      filename: '[name]-bundle.js?[chunkhash]',
+      path: path.resolve(dirname, "dist"),
+      filename: "[name]-bundle.js?[chunkhash]",
     },
     devServer: {
       static: {
-        directory: path.join(__dirname, 'dist'),
+        directory: path.join(__dirname, "dist"),
       },
     },
     module: {
@@ -220,21 +219,21 @@ module.exports = (env, argv) => {
               options: {},
             },
             {
-              loader: 'css-loader',
+              loader: "css-loader",
               options: {
                 importLoaders: 2, // postcss-loader and sass-loader.
               },
             },
             {
-              loader: 'postcss-loader',
+              loader: "postcss-loader",
               options: {
                 postcssOptions: require(postCssConfig),
               },
             },
             {
-              loader: 'sass-loader',
+              loader: "sass-loader",
               options: {
-                implementation: require('sass'),
+                implementation: require("sass"),
                 sassOptions: {
                   includePaths: [__dirname],
                 },
@@ -244,36 +243,33 @@ module.exports = (env, argv) => {
         },
         {
           test: /\.html$/,
-          loader: 'html-loader',
+          loader: "html-loader",
         },
       ],
     },
     plugins: [
       new MiniCssExtractPlugin({
-        filename: '[name]-bundle.css',
+        filename: "[name]-bundle.css",
       }),
-      new CleanWebpackPlugin(
-          ['dist'],
-          {
-            root: path.resolve(dirname),
-          },
-      ),
+      new CleanWebpackPlugin(["dist"], {
+        root: path.resolve(dirname),
+      }),
       // Users of pulito can append any plugins they want, but they
       // need to make sure they installed them in their project via npm.
     ],
   };
-  common = pageFinder(dirname, common, argv.mode === 'production');
-  if (argv.mode !== 'production') {
-    const demoType = env.demo_type === 'live' ? 'live' : 'demo';
+  common = pageFinder(dirname, common, argv.mode === "production");
+  if (argv.mode !== "production") {
+    const demoType = env.demo_type === "live" ? "live" : "demo";
     common = demoFinder(dirname, common, demoType);
-    common.devtool = 'eval-source-map';
-    if (demoType === 'live') {
+    common.devtool = "eval-source-map";
+    if (demoType === "live") {
       common.devServer.proxy = [
         {
           changeOrigin: true,
-          context: ['/auth'],
-          target: 'https://chromium-swarm-dev.appspot.com/',
-          bypass: function(req, _res, _proxyOptions) {
+          context: ["/auth"],
+          target: "https://chromium-swarm-dev.appspot.com/",
+          bypass: function (req, _res, _proxyOptions) {
             /* Inject lucisid cookie into requests to auth. This allows
              * the localhost frontend to authenticate and grab credentials.
              * Allowing it to talk to swarming-dev.
@@ -289,18 +285,19 @@ module.exports = (env, argv) => {
   }
 
   // Make all CSS/JS files appear at the /newres location.
-  common.output.publicPath='/newres/';
-  if (argv.mode === 'production') {
+  common.output.publicPath = "/newres/";
+  if (argv.mode === "production") {
     common.module.rules.push({
       test: /.js$/,
-      use: 'html-template-minifier-webpack',
+      use: "html-template-minifier-webpack",
     });
   }
   common.plugins.push(
-      new CopyWebpackPlugin({
-        patterns: [
-          'node_modules/@webcomponents/custom-elements/custom-elements.min.js',
-        ]}),
+    new CopyWebpackPlugin({
+      patterns: [
+        "node_modules/@webcomponents/custom-elements/custom-elements.min.js",
+      ],
+    })
   );
 
   return common;

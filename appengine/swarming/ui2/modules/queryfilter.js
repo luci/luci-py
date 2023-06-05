@@ -11,7 +11,7 @@
  *  some of them. This is primarily used by task-list and bot-list.
  * </p>
  */
-import {applyAlias} from './alias';
+import { applyAlias } from "./alias";
 
 /** filterPossibleColumns shows only those columns that match the given query.
  *  This means, if there is a part of the query in the column (ignoring case).
@@ -34,7 +34,7 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
     return allKeys;
   }
   query = query.trim();
-  if (query.indexOf(':') === -1) {
+  if (query.indexOf(":") === -1) {
     return allKeys.filter((k) => {
       if (matchPartCaseInsensitive(k, query)) {
         return true;
@@ -50,9 +50,9 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
     });
   }
   // partial queries should only show the key that exactly matches
-  query = query.split(':')[0];
+  query = query.split(":")[0];
   // allows users to not have to type '-tag', which is non-obvious
-  const withTag = query + '-tag';
+  const withTag = query + "-tag";
   return allKeys.filter((k) => {
     if (k === query || k === withTag) {
       return true;
@@ -69,9 +69,9 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
 export function filterPossibleValues(allValues, selectedKey, query) {
   // only look for first index, since value can have colons (e.g. gpu)
   query = query.trim();
-  const colonIdx = query.indexOf(':');
+  const colonIdx = query.indexOf(":");
   if (colonIdx !== -1) {
-    query = query.substring(colonIdx+1);
+    query = query.substring(colonIdx + 1);
   }
   if (!query || matchPartCaseInsensitive(selectedKey, query)) {
     return allValues;
@@ -102,7 +102,7 @@ function matchPartCaseInsensitive(str, queries) {
   }
   queries = queries.trim().toLocaleLowerCase();
   str = str.toLocaleLowerCase();
-  const xq = queries.split(' ');
+  const xq = queries.split(" ");
   for (const query of xq) {
     const idx = str.indexOf(query);
     if (idx !== -1) {
@@ -110,4 +110,4 @@ function matchPartCaseInsensitive(str, queries) {
     }
   }
   return false;
-};
+}

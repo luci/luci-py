@@ -15,18 +15,19 @@
  * @extends module:swarming-ui/SwarmingAppBoilerplate
  */
 
-import {html, render} from 'lit-html';
-import {upgradeProperty} from 'elements-sk/upgradeProperty';
-import {jsonOrThrow} from 'common-sk/modules/jsonOrThrow';
-import {errorMessage} from 'elements-sk/errorMessage';
+import { html, render } from "lit-html";
+import { upgradeProperty } from "elements-sk/upgradeProperty";
+import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
+import { errorMessage } from "elements-sk/errorMessage";
 
-import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate';
+import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 
-import '../swarming-app';
+import "../swarming-app";
 
 // Don't use html for a straight string template, otherwise, it shows up
 // as [object Object] when used as the href attribute.
-const instancesURL = (ele) => `https://console.cloud.google.com/appengine/instances?` +
+const instancesURL = (ele) =>
+  `https://console.cloud.google.com/appengine/instances?` +
   `project=${ele._project_id}&versionId=${ele.server_details.server_version}`;
 
 const errorsURL = (project_id) =>
@@ -36,27 +37,35 @@ const logsURL = (project_id) =>
   `https://console.cloud.google.com/logs/viewer?filters=status:500..599&project=${project_id}`;
 
 const bootstrapTemplate = (ele) => html`
-<div>
-  <h2>Bootstrapping a bot</h2>
-  <div>To bootstrap a bot, run one of these (all links are valid for 1 hour):</div>
-  <ol>
-    <li>
-      <strong> TL;DR; </strong>
-<pre class=command>python3 -c "import urllib.request; exec(urllib.request.urlopen('${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}').read())"</pre>
-    </li>
-    <li>
-      Escaped version to pass as a ssh argument:
-<pre class=command>'python3 -c "import urllib.request; exec(urllib.request.urlopen('"'${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}'"').read())"'</pre>
-    </li>
-    <li>
-      Manually:
-<pre class=command>mkdir bot; cd bot
+  <div>
+    <h2>Bootstrapping a bot</h2>
+    <div>
+      To bootstrap a bot, run one of these (all links are valid for 1 hour):
+    </div>
+    <ol>
+      <li>
+        <strong> TL;DR; </strong>
+        <pre class="command">
+python3 -c "import urllib.request; exec(urllib.request.urlopen('${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}').read())"</pre
+        >
+      </li>
+      <li>
+        Escaped version to pass as a ssh argument:
+        <pre class="command">
+'python3 -c "import urllib.request; exec(urllib.request.urlopen('"'${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}'"').read())"'</pre
+        >
+      </li>
+      <li>
+        Manually:
+        <pre class="command">
+mkdir bot; cd bot
 rm -f swarming_bot.zip; curl -sSLOJ ${ele._host_url}/bot_code?tok=${ele._bootstrap_token}
-python3 swarming_bot.zip</pre>
-    </li>
-  </ol>
-  <div>Windows bot requires pywin32, Mac bot requires pyobjc</div>
-</div>
+python3 swarming_bot.zip</pre
+        >
+      </li>
+    </ol>
+    <div>Windows bot requires pywin32, Mac bot requires pyobjc</div>
+  </div>
 `;
 
 const template = (ele) => html`
@@ -81,13 +90,19 @@ const template = (ele) => html`
     <div>Bot Version: ${ele.server_details.bot_version} </div>
     <ul>
       <li>
-        <a href=${instancesURL(ele)}>View version's instances on Cloud Console</a>
+        <a href=${instancesURL(
+          ele
+        )}>View version's instances on Cloud Console</a>
       </li>
       <li>
-        <a href=${errorsURL(ele._project_id)}>View server errors on Cloud Console</a>
+        <a href=${errorsURL(
+          ele._project_id
+        )}>View server errors on Cloud Console</a>
       </li>
       <li>
-        <a href=${logsURL(ele._project_id)}>View logs for HTTP 5xx on Cloud Console</a>
+        <a href=${logsURL(
+          ele._project_id
+        )}>View logs for HTTP 5xx on Cloud Console</a>
       </li>
       <li>
         <a href="/restricted/ereporter2/report">View ereporter2 report</a>
@@ -110,50 +125,53 @@ const template = (ele) => html`
         <a href="/auth/groups">View/edit user groups</a>
       </li>
     </ul>
-    ${ele.permissions.get_bootstrap_token ? bootstrapTemplate(ele) : ''}
+    ${ele.permissions.get_bootstrap_token ? bootstrapTemplate(ele) : ""}
   </main>
   <footer></footer>
 </swarming-app>`;
 
-window.customElements.define('swarming-index', class extends SwarmingAppBoilerplate {
-  constructor() {
-    super(template);
-    this._bootstrap_token = '...';
-    const idx = location.hostname.indexOf('.appspot.com');
-    this._project_id = location.hostname.substring(0, idx) || 'not_found';
-    this._host_url = location.origin;
-  }
+window.customElements.define(
+  "swarming-index",
+  class extends SwarmingAppBoilerplate {
+    constructor() {
+      super(template);
+      this._bootstrap_token = "...";
+      const idx = location.hostname.indexOf(".appspot.com");
+      this._project_id = location.hostname.substring(0, idx) || "not_found";
+      this._host_url = location.origin;
+    }
 
-  connectedCallback() {
-    super.connectedCallback();
+    connectedCallback() {
+      super.connectedCallback();
 
-    this.addEventListener('permissions-loaded', (e) => {
-      if (this.permissions.get_bootstrap_token) {
-        this._fetchToken();
-      }
+      this.addEventListener("permissions-loaded", (e) => {
+        if (this.permissions.get_bootstrap_token) {
+          this._fetchToken();
+        }
+        this.render();
+      });
+
+      this.addEventListener("server-details-loaded", (e) => {
+        this.render();
+      });
+
       this.render();
-    });
+    }
 
-    this.addEventListener('server-details-loaded', (e) => {
-      this.render();
-    });
-
-    this.render();
-  }
-
-  _fetchToken() {
-    const post_extra = {
-      headers: {'authorization': this.auth_header},
-      method: 'POST',
-    };
-    this.app.addBusyTasks(1);
-    fetch('/_ah/api/swarming/v1/server/token', post_extra)
+    _fetchToken() {
+      const post_extra = {
+        headers: { authorization: this.auth_header },
+        method: "POST",
+      };
+      this.app.addBusyTasks(1);
+      fetch("/_ah/api/swarming/v1/server/token", post_extra)
         .then(jsonOrThrow)
         .then((json) => {
           this._bootstrap_token = json.bootstrap_token;
           this.render();
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, 'token'));
+        .catch((e) => this.fetchError(e, "token"));
+    }
   }
-});
+);

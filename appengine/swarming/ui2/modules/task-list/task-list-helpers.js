@@ -10,17 +10,22 @@
 // it should go inside the element declaration.
 
 // query.fromObject is more readable than just 'fromObject'
-import * as query from 'common-sk/modules/query';
+import * as query from "common-sk/modules/query";
 
-import {applyAlias} from '../alias';
-import {html} from 'lit-html';
-import naturalSort from 'javascript-natural-sort/naturalSort';
-import {botPageLink, compareWithFixedOrder, humanDuration, sanitizeAndHumanizeTime,
-  taskPageLink} from '../util';
-import {EXCEPTIONAL_STATES, FILTER_STATES, ONGOING_STATES} from '../task';
+import { applyAlias } from "../alias";
+import { html } from "lit-html";
+import naturalSort from "javascript-natural-sort/naturalSort";
+import {
+  botPageLink,
+  compareWithFixedOrder,
+  humanDuration,
+  sanitizeAndHumanizeTime,
+  taskPageLink,
+} from "../util";
+import { EXCEPTIONAL_STATES, FILTER_STATES, ONGOING_STATES } from "../task";
 
-const DIMENSIONS_DENYLIST = ['quarantined', 'error'];
-const EMPTY_VAL = '--';
+const DIMENSIONS_DENYLIST = ["quarantined", "error"];
+const EMPTY_VAL = "--";
 
 /** appendPossibleColumns takes the given data and derives columns
  *  that could be displayed. There are two possible data sources:
@@ -35,7 +40,7 @@ const EMPTY_VAL = '--';
  */
 export function appendPossibleColumns(possibleColumns, data) {
   // Use name as a sentinel value
-  if (!possibleColumns['name']) {
+  if (!possibleColumns["name"]) {
     for (const col of extraKeys) {
       possibleColumns[col] = true;
     }
@@ -44,13 +49,13 @@ export function appendPossibleColumns(possibleColumns, data) {
     // we have a list of dimensions, which are {key: String, value: Array}
     for (const dim of data) {
       if (DIMENSIONS_DENYLIST.indexOf(dim.key) === -1) {
-        possibleColumns[dim.key + '-tag'] = true;
+        possibleColumns[dim.key + "-tag"] = true;
       }
     }
   } else {
     // data is a map of tag -> values
     for (const tag in data) {
-      possibleColumns[tag + '-tag'] = true;
+      possibleColumns[tag + "-tag"] = true;
     }
   }
 }
@@ -68,28 +73,28 @@ export function appendPossibleColumns(possibleColumns, data) {
  *
  */
 export function appendPrimaryMap(primaryMap, data) {
-  if (!primaryMap['state']) {
-    primaryMap['state'] = FILTER_STATES;
+  if (!primaryMap["state"]) {
+    primaryMap["state"] = FILTER_STATES;
   }
   if (Array.isArray(data)) {
     // we have a list of dimensions, which are {key: String, value: Array}
     for (const dim of data) {
       if (DIMENSIONS_DENYLIST.indexOf(dim.key) === -1) {
-        let existing = primaryMap[dim.key + '-tag'];
+        let existing = primaryMap[dim.key + "-tag"];
         for (const value of dim.value) {
           existing = _insertUnique(existing, value);
         }
-        primaryMap[dim.key + '-tag'] = existing;
+        primaryMap[dim.key + "-tag"] = existing;
       }
     }
   } else {
     // data is a map of tag -> values
     for (const tag in data) {
-      let existing = primaryMap[tag + '-tag'];
+      let existing = primaryMap[tag + "-tag"];
       for (const value of data[tag]) {
         existing = _insertUnique(existing, value);
       }
-      primaryMap[tag + '-tag'] = existing;
+      primaryMap[tag + "-tag"] = existing;
     }
   }
 }
@@ -108,8 +113,8 @@ export function appendPrimaryMap(primaryMap, data) {
  */
 export function column(col, task, ele) {
   if (!task) {
-    console.warn('falsey task passed into column');
-    return '';
+    console.warn("falsey task passed into column");
+    return "";
   }
   const c = colMap[col];
   if (c) {
@@ -121,7 +126,7 @@ export function column(col, task, ele) {
   if (tags) {
     tags = tags.map((t) => applyAlias(t, col));
     if (ele._verbose) {
-      return tags.join(' | ');
+      return tags.join(" | ");
     }
     return tags[0];
   }
@@ -136,23 +141,23 @@ export function column(col, task, ele) {
  *  exported for testing.
  */
 export const specialFilters = {
-  state: function(task, s) {
+  state: function (task, s) {
     const state = task.state;
-    if (s === state || s === 'ALL') {
+    if (s === state || s === "ALL") {
       return true;
     }
-    if (s === 'PENDING_RUNNING') {
+    if (s === "PENDING_RUNNING") {
       return ONGOING_STATES.has(state);
     }
     const failure = task.failure;
-    if (s === 'COMPLETED_SUCCESS') {
-      return state === 'COMPLETED' && !failure;
+    if (s === "COMPLETED_SUCCESS") {
+      return state === "COMPLETED" && !failure;
     }
-    if (s === 'COMPLETED_FAILURE') {
-      return state === 'COMPLETED' && failure;
+    if (s === "COMPLETED_FAILURE") {
+      return state === "COMPLETED" && failure;
     }
-    if (s === 'DEDUPED') {
-      return state === 'COMPLETED' && task.deduped_from;
+    if (s === "DEDUPED") {
+      return state === "COMPLETED" && task.deduped_from;
     }
   },
 };
@@ -162,12 +167,12 @@ export const specialFilters = {
  * @param {Array<Object>} tasks: the task objects to filter.
  *
  * @returns {Array<Object>} the tasks that match the filters.
-*/
+ */
 export function filterTasks(filters, tasks) {
   const parsedFilters = [];
   // Preprocess the filters
   for (const filterString of filters) {
-    const idx = filterString.indexOf(':');
+    const idx = filterString.indexOf(":");
     const key = filterString.slice(0, idx);
     const value = filterString.slice(idx + 1);
     parsedFilters.push([key, value]);
@@ -184,7 +189,7 @@ export function filterTasks(filters, tasks) {
         key = stripTag(key);
         // it's a tag,  which is *not* aliased, so we can just
         // do an exact match (reminder, aliasing only happens in column)
-        matches = matches && ((task.tagMap[key] || []).indexOf(value) !== -1);
+        matches = matches && (task.tagMap[key] || []).indexOf(value) !== -1;
       }
     }
     return matches;
@@ -201,18 +206,18 @@ export function floorSecond(ts) {
 /** getColHeader returns the human-readable header for a given column.
  */
 export function getColHeader(col) {
-  if (col && col.endsWith('-tag')) {
+  if (col && col.endsWith("-tag")) {
     return `${stripTag(col)} (tag)`;
   }
   return colHeaderMap[col] || col;
 }
 
 export function humanizePrimaryKey(key) {
-  if (key && key.endsWith('-tag')) {
+  if (key && key.endsWith("-tag")) {
     return `${stripTag(key)} (tag)`;
   }
-  if (key === 'state') {
-    return 'state (of task)';
+  if (key === "state") {
+    return "state (of task)";
   }
   return key;
 }
@@ -248,16 +253,16 @@ function _insertUnique(arr, value) {
  */
 export function legacyTags(filters) {
   return filters.map((filter) => {
-    const idx = filter.indexOf(':');
+    const idx = filter.indexOf(":");
     if (idx < 0) {
       return filter;
     }
     const key = filter.substring(0, idx);
-    if (key.endsWith('-tag') || key === 'state') {
+    if (key.endsWith("-tag") || key === "state") {
       // this is fine
       return filter;
     }
-    return key + '-tag' + filter.substring(idx);
+    return key + "-tag" + filter.substring(idx);
   });
 }
 
@@ -271,29 +276,29 @@ export function listQueryParams(filters, extra) {
   const params = {};
   const tags = [];
   for (const f of filters) {
-    const split = f.split(':', 1);
+    const split = f.split(":", 1);
     let key = split[0];
     const rest = f.substring(key.length + 1);
     // we use the -tag as a UI thing to differentiate tags
     // from 'magic values' like name.
     key = stripTag(key);
-    if (key === 'state') {
-      params['state'] = rest;
+    if (key === "state") {
+      params["state"] = rest;
     } else {
-      tags.push(key + ':' + rest);
+      tags.push(key + ":" + rest);
     }
   }
-  params['tags'] = tags;
-  params['limit'] = extra.limit;
+  params["tags"] = tags;
+  params["limit"] = extra.limit;
   if (extra.cursor) {
-    params['cursor'] = extra.cursor;
+    params["cursor"] = extra.cursor;
   }
   // The server expects these in epoch seconds, so we trim off the last 3
   // digits representing milliseconds.
-  let ts = '' + extra.start;
-  params['start'] = ts.substring(0, ts.length - 3);
-  ts = '' + extra.end;
-  params['end'] = ts.substring(0, ts.length - 3);
+  let ts = "" + extra.start;
+  params["start"] = ts.substring(0, ts.length - 3);
+  ts = "" + extra.end;
+  params["end"] = ts.substring(0, ts.length - 3);
 
   return query.fromObject(params);
 }
@@ -317,7 +322,7 @@ export function processTasks(arr, existingTags) {
     const tagMap = {};
     task.tags = task.tags || [];
     for (const tag of task.tags) {
-      const split = tag.split(':', 1);
+      const split = tag.split(":", 1);
       const key = split[0];
       const rest = tag.substring(key.length + 1);
       // tags are free-form, and could be duplicated
@@ -333,60 +338,73 @@ export function processTasks(arr, existingTags) {
     if (!task.costs_usd || !Array.isArray(task.costs_usd)) {
       task.costs_usd = EMPTY_VAL;
     } else {
-      task.costs_usd.forEach(function(c, idx) {
-        task.costs_usd[idx] = '$' + c.toFixed(4);
-        if (task.state === 'RUNNING' && task.started_ts) {
-          task.costs_usd[idx] = task.costs_usd[idx] + '*';
+      task.costs_usd.forEach(function (c, idx) {
+        task.costs_usd[idx] = "$" + c.toFixed(4);
+        if (task.state === "RUNNING" && task.started_ts) {
+          task.costs_usd[idx] = task.costs_usd[idx] + "*";
         }
       });
     }
 
     if (task.cost_saved_usd) {
-      task.cost_saved_usd = '-$'+task.cost_saved_usd.toFixed(4);
+      task.cost_saved_usd = "-$" + task.cost_saved_usd.toFixed(4);
     }
 
     for (const time of TASK_TIMES) {
       sanitizeAndHumanizeTime(task, time);
 
       // Running tasks have no duration set, so we can figure it out.
-      if (!task.duration && task.state === 'RUNNING' && task.started_ts) {
+      if (!task.duration && task.state === "RUNNING" && task.started_ts) {
         task.duration = (now - task.started_ts) / 1000;
       }
       // Make the duration human readable
       task.human_duration = humanDuration(task.duration);
-      if (task.state === 'RUNNING' && task.started_ts) {
-        task.human_duration = task.human_duration + '*';
+      if (task.state === "RUNNING" && task.started_ts) {
+        task.human_duration = task.human_duration + "*";
       }
 
       // Deduplicated tasks usually have tasks that ended before they were
       // created, so we need to account for that.
       const et = task.started_ts || task.abandoned_ts || new Date();
-      const deduped = (task.created_ts && et < task.created_ts);
+      const deduped = task.created_ts && et < task.created_ts;
 
       task.pending_time = undefined;
       if (!deduped && task.created_ts) {
         task.pending_time = (et - task.created_ts) / 1000;
       }
       task.human_pending_time = humanDuration(task.pending_time);
-      if (!deduped && task.created_ts && !task.started_ts && !task.abandoned_ts) {
-        task.human_pending_time = task.human_pending_time + '*';
+      if (
+        !deduped &&
+        task.created_ts &&
+        !task.started_ts &&
+        !task.abandoned_ts
+      ) {
+        task.human_pending_time = task.human_pending_time + "*";
       }
-    };
+    }
   }
   return arr;
 }
 
 // This puts the times in a aesthetically pleasing order, roughly in
 // the order everything happened.
-const specialColOrder = ['name', 'created_ts', 'pending_time',
-  'started_ts', 'duration', 'completed_ts', 'abandoned_ts', 'modified_ts'];
+const specialColOrder = [
+  "name",
+  "created_ts",
+  "pending_time",
+  "started_ts",
+  "duration",
+  "completed_ts",
+  "abandoned_ts",
+  "modified_ts",
+];
 const compareColumns = compareWithFixedOrder(specialColOrder);
 
 /** sortColumns sorts the bot-list columns in mostly alphabetical order. Some
  *  columns (name) go first or are sorted in a fixed order (timestamp ones)
  *  to aid reading.
  *  @param {Array<String>} cols - The columns to sort.
-*/
+ */
 export function sortColumns(cols) {
   cols.sort(compareColumns);
 }
@@ -428,7 +446,7 @@ export function sortPossibleColumns(columns, selectedCols) {
  *  returns what remains. e.g. 'pool-tag' => 'pool'
  */
 export function stripTag(s) {
-  if (s && s.endsWith('-tag')) {
+  if (s && s.endsWith("-tag")) {
     return s.substring(0, s.length - 4);
   }
   return s;
@@ -438,7 +456,7 @@ export function stripTag(s) {
  *  returns what remains.  e.g. 'pool-tag:Chrome' => 'pool:Chrome'
  */
 export function stripTagFromFilter(s) {
-  return s.replace('-tag:', ':');
+  return s.replace("-tag:", ":");
 }
 
 /** tagsOnly takes a list of filters in the form foo:bar
@@ -448,7 +466,7 @@ export function tagsOnly(filters) {
   const nonTags = Object.keys(specialFilters);
   return filters.filter((f) => {
     for (const nt of nonTags) {
-      if (f.startsWith(nt + ':')) {
+      if (f.startsWith(nt + ":")) {
         return false;
       }
     }
@@ -460,35 +478,35 @@ export function tagsOnly(filters) {
  *  of said task.
  */
 export function taskClass(task) {
-  const state = column('state', task);
+  const state = column("state", task);
   if (EXCEPTIONAL_STATES.has(state)) {
-    return 'exception';
+    return "exception";
   }
-  if (state === 'BOT_DIED') {
-    return 'bot_died';
+  if (state === "BOT_DIED") {
+    return "bot_died";
   }
-  if (state === 'CLIENT_ERROR') {
-    return 'client_error';
+  if (state === "CLIENT_ERROR") {
+    return "client_error";
   }
-  if (state === 'COMPLETED (FAILURE)') {
-    return 'failed_task';
+  if (state === "COMPLETED (FAILURE)") {
+    return "failed_task";
   }
   if (ONGOING_STATES.has(state)) {
-    return 'pending_task';
+    return "pending_task";
   }
-  return '';
+  return "";
 }
 
 const naturalSortDims = {
-  'cores-tag': true,
-  'cpu-tag': true,
-  'gpu-tag': true,
-  'machine_type-tag': true,
-  'os-tag': true,
-  'priority-tag': true,
-  'python-tag': true,
-  'xcode_version-tag': true,
-  'zone-tag': true,
+  "cores-tag": true,
+  "cpu-tag": true,
+  "gpu-tag": true,
+  "machine_type-tag": true,
+  "os-tag": true,
+  "priority-tag": true,
+  "python-tag": true,
+  "xcode_version-tag": true,
+  "zone-tag": true,
 };
 
 /** Returns true or false if a key is "special" enough to be sorted
@@ -501,42 +519,58 @@ export function useNaturalSort(key) {
 
 /** colHeaderMap maps keys to their human readable name.*/
 const colHeaderMap = {
-  'abandoned_ts': 'Abandoned On',
-  'completed_ts': 'Completed On',
-  'bot': 'Bot Assigned',
-  'costs_usd': 'Cost (USD)',
-  'created_ts': 'Created On',
-  'duration': 'Duration',
-  'name': 'Task Name',
-  'modified_ts': 'Last Modified',
-  'started_ts': 'Started Working On',
-  'state': 'state (of task)',
-  'user': 'Requesting User',
-  'pending_time': 'Time Spent Pending',
+  abandoned_ts: "Abandoned On",
+  completed_ts: "Completed On",
+  bot: "Bot Assigned",
+  costs_usd: "Cost (USD)",
+  created_ts: "Created On",
+  duration: "Duration",
+  name: "Task Name",
+  modified_ts: "Last Modified",
+  started_ts: "Started Working On",
+  state: "state (of task)",
+  user: "Requesting User",
+  pending_time: "Time Spent Pending",
 };
 
-const TASK_TIMES = ['abandoned_ts', 'completed_ts', 'created_ts', 'modified_ts',
-  'started_ts'];
+const TASK_TIMES = [
+  "abandoned_ts",
+  "completed_ts",
+  "created_ts",
+  "modified_ts",
+  "started_ts",
+];
 
-const extraKeys = ['name', 'state', 'costs_usd', 'deduped_from', 'duration', 'pending_time',
-  'server_versions', 'bot', 'exit_code', ...TASK_TIMES];
+const extraKeys = [
+  "name",
+  "state",
+  "costs_usd",
+  "deduped_from",
+  "duration",
+  "pending_time",
+  "server_versions",
+  "bot",
+  "exit_code",
+  ...TASK_TIMES,
+];
 
-const STILL_RUNNING_MSG = 'An asterisk indicates the task is still running '+
-                          'and thus the time is dynamic.';
+const STILL_RUNNING_MSG =
+  "An asterisk indicates the task is still running " +
+  "and thus the time is dynamic.";
 
 const colMap = {
   abandoned_ts: (task) => task.human_abandoned_ts,
   bot: (task) => {
     const id = task.bot_id;
     if (id) {
-      return html`<a target=_blank
-                   rel=noopener
-                   href=${botPageLink(id)}>${id}</a>`;
+      return html`<a target="_blank" rel="noopener" href=${botPageLink(id)}
+        >${id}</a
+      >`;
     }
     return EMPTY_VAL;
   },
   completed_ts: (task) => task.human_completed_ts,
-  costs_usd: function(task) {
+  costs_usd: function (task) {
     if (task.cost_saved_usd) {
       return task.cost_saved_usd;
     }
@@ -544,26 +578,33 @@ const colMap = {
   },
   created_ts: (task) => task.human_created_ts,
   duration: (task) => {
-    if (task.human_duration.indexOf('*')) {
-      return html`<span title=${STILL_RUNNING_MSG}>${task.human_duration}</span>`;
+    if (task.human_duration.indexOf("*")) {
+      return html`<span title=${STILL_RUNNING_MSG}
+        >${task.human_duration}</span
+      >`;
     }
     return task.human_duration;
   },
-  exit_code: (task) => task.exit_code || '--',
+  exit_code: (task) => task.exit_code || "--",
   modified_ts: (task) => task.human_modified_ts,
   name: (task, ele) => {
     let name = task.name;
     if (!ele._verbose && task.name.length > 70) {
-      name = name.slice(0, 67) + '...';
+      name = name.slice(0, 67) + "...";
     }
-    return html`<a target=_blank
-                   rel=noopener
-                   title=${task.name}
-                   href=${taskPageLink(task.task_id)}>${name}</a>`;
+    return html`<a
+      target="_blank"
+      rel="noopener"
+      title=${task.name}
+      href=${taskPageLink(task.task_id)}
+      >${name}</a
+    >`;
   },
   pending_time: (task) => {
-    if (task.human_pending_time.indexOf('*')) {
-      return html`<span title=${STILL_RUNNING_MSG}>${task.human_pending_time}</span>`;
+    if (task.human_pending_time.indexOf("*")) {
+      return html`<span title=${STILL_RUNNING_MSG}
+        >${task.human_pending_time}</span
+      >`;
     }
     return task.human_pending_time;
   },
@@ -574,14 +615,14 @@ const colMap = {
   started_ts: (task) => task.human_started_ts,
   state: (task) => {
     const state = task.state;
-    if (state === 'COMPLETED') {
+    if (state === "COMPLETED") {
       if (task.failure) {
-        return 'COMPLETED (FAILURE)';
+        return "COMPLETED (FAILURE)";
       }
       if (task.deduped_from) {
-        return 'COMPLETED (DEDUPED)';
+        return "COMPLETED (DEDUPED)";
       }
-      return 'COMPLETED (SUCCESS)';
+      return "COMPLETED (SUCCESS)";
     }
     return state;
   },
@@ -592,15 +633,16 @@ const colMap = {
  *  and -1 for descending and both bots and should return a number a la compare.
  */
 export const specialSortMap = {
-  abandoned_ts: sortableTime('abandoned_ts'),
-  bot: (dir, taskA, taskB) => dir * naturalSort(taskA.bot_id || 'z', taskB.bot_id || 'z'),
-  completed_ts: sortableTime('completed_ts'),
-  created_ts: sortableTime('created_ts'),
-  duration: sortableDuration('duration'),
-  modified_ts: sortableTime('modified_ts'),
+  abandoned_ts: sortableTime("abandoned_ts"),
+  bot: (dir, taskA, taskB) =>
+    dir * naturalSort(taskA.bot_id || "z", taskB.bot_id || "z"),
+  completed_ts: sortableTime("completed_ts"),
+  created_ts: sortableTime("created_ts"),
+  duration: sortableDuration("duration"),
+  modified_ts: sortableTime("modified_ts"),
   name: (dir, taskA, taskB) => dir * naturalSort(taskA.name, taskB.name),
-  pending_time: sortableDuration('pending_time'),
-  started_ts: sortableTime('started_ts'),
+  pending_time: sortableDuration("pending_time"),
+  started_ts: sortableTime("started_ts"),
 };
 
 /** Given a time attribute like 'abandoned_ts', sortableTime returns a function
@@ -613,8 +655,8 @@ function sortableTime(attr) {
   // '2016-08-16T13:12:40.606300' which sorts correctly.  Locale time
   // (used in the columns), does not.
   return (dir, a, b) => {
-    const aCol = a[attr] || '9999';
-    const bCol = b[attr] || '9999';
+    const aCol = a[attr] || "9999";
+    const bCol = b[attr] || "9999";
 
     return dir * (aCol - bCol);
   };

@@ -2,6 +2,8 @@ export SHELL = /bin/bash
 export PATH := $(CURDIR)/nodejs/bin:$(PATH)
 export npm_config_cache := $(CURDIR)/.npm
 
+files_no_dist := $(shell git ls-files "[^dist]*.js")
+
 .ONESHELL:
 
 default: _packages-lock.json.done
@@ -37,7 +39,8 @@ continuous_test:
 	done
 
 format: _packages-lock.json.done
-	git ls-files "[^dist]*.js" | xargs npx eslint --fix --quiet
+	npx prettier --write $(files_no_dist)
+	npx eslint --fix --quiet $(files_no_dist)
 
 _packages-lock.json.done: package-lock.json
 	npm ci

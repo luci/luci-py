@@ -10,14 +10,14 @@
     "url": "https://chromium.googlesource.com/infra/luci/luci-py"
   },
   "dependencies": {
+    "@chopsui/prpc-client": "~1.1.0",
     "@webcomponents/custom-elements": "^1.2.4",
     "common-sk": "~3.1.0",
     "elements-sk": "~2.4.2",
     "flatpickr": "^4.5.7",
     "google-charts": "^2.0.0",
     "javascript-natural-sort": "~0.7.1",
-    "lit-html": "~1.0.0",
-    "@chopsui/prpc-client": "~1.1.0"
+    "lit-html": "~1.0.0"
   },
   "devDependencies": {
     "autoprefixer": "^9.6.1",
@@ -31,6 +31,8 @@
     "cssnano": "^5.1.13",
     "eslint": "^7.3.1",
     "eslint-config-google": "^0.14.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-prettier": "^4.2.1",
     "fetch-mock": "~9.11.0",
     "glob": "^7.1.4",
     "hoek": "^4.2.1",
@@ -48,6 +50,7 @@
     "karma-webpack": "^5.0.0",
     "mini-css-extract-plugin": "^2.6.1",
     "postcss-loader": "^7.0.1",
+    "prettier": "2.8.8",
     "puppeteer": "^1.20.0",
     "querystring-es3": "^0.2.1",
     "sass": "^1.54.4",

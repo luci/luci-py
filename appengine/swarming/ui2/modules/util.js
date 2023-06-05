@@ -10,16 +10,16 @@
  * </p>
  */
 
-import * as human from 'common-sk/modules/human';
-import * as query from 'common-sk/modules/query';
-import {upgradeProperty} from 'elements-sk/upgradeProperty';
+import * as human from "common-sk/modules/human";
+import * as query from "common-sk/modules/query";
+import { upgradeProperty } from "elements-sk/upgradeProperty";
 
 /** botPageLink creates a URL to a given bot */
 export function botPageLink(bot_id) {
   if (!bot_id) {
     return undefined;
   }
-  return '/bot?id=' + bot_id;
+  return "/bot?id=" + bot_id;
 }
 
 /** Create a link to a bot list with the preloaded filters and columns.
@@ -30,26 +30,26 @@ export function botPageLink(bot_id) {
  *     should be valid filters (e.g. 'foo:bar').
  * @param {Array<String>} columns - the column names that should be shown.
  */
-export function botListLink(filters=[], columns=[]) {
+export function botListLink(filters = [], columns = []) {
   const fArr = [];
   for (const f of filters) {
     if (f.key && f.value) {
       if (Array.isArray(f.value)) {
         for (const v of f.value) {
-          fArr.push(f.key + ':' + v);
+          fArr.push(f.key + ":" + v);
         }
       } else {
-        fArr.push(f.key + ':' + f.value);
+        fArr.push(f.key + ":" + f.value);
       }
     } else {
       fArr.push(f);
     }
-  };
+  }
   const obj = {
     f: fArr,
     c: columns,
   };
-  return '/botlist?' + query.fromParamSet(obj);
+  return "/botlist?" + query.fromParamSet(obj);
 }
 
 /** compareWithFixedOrder returns the sort order of 2 strings. It puts
@@ -62,14 +62,14 @@ export function compareWithFixedOrder(fixedOrder) {
   if (!fixedOrder) {
     fixedOrder = [];
   }
-  return function(a, b) {
+  return function (a, b) {
     let aSpecial = fixedOrder.indexOf(a);
     if (aSpecial === -1) {
-      aSpecial = fixedOrder.length+1;
+      aSpecial = fixedOrder.length + 1;
     }
     let bSpecial = fixedOrder.indexOf(b);
     if (bSpecial === -1) {
-      bSpecial = fixedOrder.length+1;
+      bSpecial = fixedOrder.length + 1;
     }
     if (aSpecial === bSpecial) {
       // Don't need naturalSort since elements shouldn't
@@ -88,18 +88,18 @@ export function compareWithFixedOrder(fixedOrder) {
 export function humanDuration(timeInSecs) {
   // If the timeInSecs is 0 (e.g. duration of Terminate bot tasks), we
   // still want to display 0s.
-  if (timeInSecs === 0 || timeInSecs === '0') {
-    return '0s';
+  if (timeInSecs === 0 || timeInSecs === "0") {
+    return "0s";
   }
   // Otherwise, if timeInSecs is falsey (e.g. undefined), return empty
   // string to reflect that.
   if (!timeInSecs) {
-    return '--';
+    return "--";
   }
   const ptimeInSecs = parseFloat(timeInSecs);
   // On a bad parse (shouldn't happen), show original.
   if (!ptimeInSecs) {
-    return timeInSecs + ' seconds';
+    return timeInSecs + " seconds";
   }
 
   // For times greater than a minute, make them human readable
@@ -108,7 +108,7 @@ export function humanDuration(timeInSecs) {
     return human.strDuration(ptimeInSecs);
   }
   // For times less than a minute, add 10ms resolution.
-  return ptimeInSecs.toFixed(2)+'s';
+  return ptimeInSecs.toFixed(2) + "s";
 }
 
 /** initPropertyFromAttrOrProperty looks to initialize a property from either
@@ -119,8 +119,8 @@ export function humanDuration(timeInSecs) {
  * @param {boolean} removeAttr - If the attribute is found, if it should be
  *            removed to avoid stale data.
  *
-*/
-export function initPropertyFromAttrOrProperty(ele, prop, removeAttr=true) {
+ */
+export function initPropertyFromAttrOrProperty(ele, prop, removeAttr = true) {
   upgradeProperty(ele, prop);
   if (ele[prop] === undefined && ele.hasAttribute(prop)) {
     ele[prop] = ele.getAttribute(prop);
@@ -154,11 +154,11 @@ export function parseDuration(duration) {
   const unit = duration.slice(-1);
   switch (unit) {
     // the fallthroughs here are intentional
-    case 'h':
+    case "h":
       number *= 60;
-    case 'm':
+    case "m":
       number *= 60;
-    case 's':
+    case "s":
       break;
     default:
       return null;
@@ -175,24 +175,24 @@ export function parseDuration(duration) {
  *  human.localeTime.
  */
 export function sanitizeAndHumanizeTime(obj, key) {
-  obj['human_'+key] = '--';
+  obj["human_" + key] = "--";
   if (obj[key]) {
-    if (obj[key].endsWith && !obj[key].endsWith('Z')) {
+    if (obj[key].endsWith && !obj[key].endsWith("Z")) {
       // Timestamps from the server are missing the 'Z' that specifies Zulu
       // (UTC) time. If that's not the case, add the Z. Otherwise, some
       // browsers interpret this as local time, which throws off everything.
       // TODO(kjlubick): Should the server output milliseconds since the
       // epoch?  That would be more consistent.
       // See http://crbug.com/714599
-      obj[key] += 'Z';
+      obj[key] += "Z";
     }
     obj[key] = new Date(obj[key]);
 
     // Extract the timezone.
     const str = obj[key].toString();
-    const timezone = str.substring(str.indexOf('('));
+    const timezone = str.substring(str.indexOf("("));
 
-    obj['human_'+key] = obj[key].toLocaleString() + ' ' + timezone;
+    obj["human_" + key] = obj[key].toLocaleString() + " " + timezone;
   }
 }
 
@@ -206,16 +206,16 @@ export function sanitizeAndHumanizeTime(obj, key) {
  *  @param {Date} start - start time of the list.
  *  @param {Date} end - end time of the list.
  */
-export function taskListLink(filters=[], columns=[], start, end) {
+export function taskListLink(filters = [], columns = [], start, end) {
   const fArr = [];
   for (const f of filters) {
     if (f.key && f.value) {
       if (Array.isArray(f.value)) {
         for (const v of f.value) {
-          fArr.push(f.key + ':' + v);
+          fArr.push(f.key + ":" + v);
         }
       } else {
-        fArr.push(f.key + ':' + f.value);
+        fArr.push(f.key + ":" + f.value);
       }
     } else {
       fArr.push(f);
@@ -227,14 +227,14 @@ export function taskListLink(filters=[], columns=[], start, end) {
   };
 
   if (start) {
-    obj['st'] = [start.getTime()];
+    obj["st"] = [start.getTime()];
   }
   if (end) {
-    obj['et'] = [end.getTime()];
-    obj['n'] = [false];
+    obj["et"] = [end.getTime()];
+    obj["n"] = [false];
   }
 
-  return '/tasklist?' + query.fromParamSet(obj);
+  return "/tasklist?" + query.fromParamSet(obj);
 }
 
 /** taskPageLink creates the href attribute for linking to a single task.
@@ -252,7 +252,7 @@ export function taskPageLink(taskId, disableCanonicalID) {
     return undefined;
   }
   if (!disableCanonicalID) {
-    taskId = taskId.substring(0, taskId.length - 1) + '0';
+    taskId = taskId.substring(0, taskId.length - 1) + "0";
   }
   return `/task?id=${taskId}`;
 }
@@ -262,9 +262,9 @@ export function taskPageLink(taskId, disableCanonicalID) {
  */
 export function timeDiffApprox(date) {
   if (!date) {
-    return 'eons';
+    return "eons";
   }
-  return human.diffDate(date.getTime()) || '0s';
+  return human.diffDate(date.getTime()) || "0s";
 }
 
 /** timeDiffExact returns the exact difference between the two specified
@@ -273,12 +273,12 @@ export function timeDiffApprox(date) {
  */
 export function timeDiffExact(first, second) {
   if (!first) {
-    return 'eons';
+    return "eons";
   }
   if (!second) {
     second = new Date();
   }
-  return human.strDuration((second.getTime() - first.getTime())/1000) || '0s';
+  return human.strDuration((second.getTime() - first.getTime()) / 1000) || "0s";
 }
 
 /** Rewrites fetch to point at the development instance of swarming when used
@@ -289,14 +289,14 @@ export function timeDiffExact(first, second) {
 export function pointFetchAtSwarmingDev() {
   // We set DEV_HOST so that other parts of the UI can figure out that it must
   // communicate with the development environment version of swarming.
-  const DEV_HOST = 'chromium-swarm-dev.appspot.com';
+  const DEV_HOST = "chromium-swarm-dev.appspot.com";
   window.DEV_HOST = DEV_HOST;
   const origFetch = window.fetch;
   const fetchAboslute = (url, ...params) => {
-    if (url.startsWith('/')) return origFetch(`https://${DEV_HOST}/${url}`, ...params);
-    else return origFetch(url, ...params);
+    if (url.startsWith("/")) {
+      return origFetch(`https://${DEV_HOST}/${url}`, ...params);
+    } else return origFetch(url, ...params);
   };
   window.fetch = fetchAboslute;
   return;
 }
-

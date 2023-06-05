@@ -2,8 +2,13 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import {applyAlias} from '../alias';
-import {botListLink, humanDuration, sanitizeAndHumanizeTime, timeDiffExact} from '../util';
+import { applyAlias } from "../alias";
+import {
+  botListLink,
+  humanDuration,
+  sanitizeAndHumanizeTime,
+  timeDiffExact,
+} from "../util";
 
 /** parseBotData pre-processes any data in the bot data object.
  *  @param {Object} bot - The raw bot object
@@ -12,12 +17,12 @@ export function parseBotData(bot) {
   if (!bot) {
     return {};
   }
-  bot.state = bot.state || '{}';
+  bot.state = bot.state || "{}";
   bot.state = JSON.parse(bot.state) || {};
 
   bot.dimensions = bot.dimensions || [];
   for (const dim of bot.dimensions) {
-    dim.value.forEach(function(value, i) {
+    dim.value.forEach(function (value, i) {
       dim.value[i] = applyAlias(value, dim.key);
     });
   }
@@ -39,9 +44,9 @@ export function parseBotData(bot) {
           count++;
         }
         if (count) {
-          device.averageTemp = (total/count).toFixed(1);
+          device.averageTemp = (total / count).toFixed(1);
         } else {
-          device.averageTemp = '???';
+          device.averageTemp = "???";
         }
       }
     }
@@ -61,7 +66,7 @@ export function parseEvents(events) {
     return [];
   }
   for (const event of events) {
-    sanitizeAndHumanizeTime(event, 'ts');
+    sanitizeAndHumanizeTime(event, "ts");
     event.state = event.state ? JSON.parse(event.state) : {};
   }
 
@@ -82,11 +87,15 @@ const getField = (obj, options, def) => {
 };
 
 const getStart = (task) => {
-  return getField(task, ['startedTs']);
+  return getField(task, ["startedTs"]);
 };
 
 const getEnd = (task) => {
-  return getField(task, ['completedTs', 'abandonedTs', 'modifiedTs'], new Date());
+  return getField(
+    task,
+    ["completedTs", "abandonedTs", "modifiedTs"],
+    new Date()
+  );
 };
 
 /** parseTasks pre-processes the tasks to get them ready to display.
@@ -108,21 +117,21 @@ export function parseTasks(tasks) {
       task.human_duration = timeDiffExact(task.startedTs, end);
       task.duration = (end.getTime() - task.startedTs) / 1000;
     }
-    const total_overhead = (task.performanceStats &&
-                            task.performanceStats.botOverhead) || 0;
+    const total_overhead =
+      (task.performanceStats && task.performanceStats.botOverhead) || 0;
     // total_duration includes overhead, to give a better sense of the bot
     // being 'busy', e.g. when uploading isolated outputs.
     task.total_duration = task.duration + total_overhead;
     task.human_total_duration = humanDuration(task.total_duration);
     task.total_overhead = total_overhead;
 
-    task.human_state = task.state || 'UNKNOWN';
-    if (task.state === 'COMPLETED') {
+    task.human_state = task.state || "UNKNOWN";
+    if (task.state === "COMPLETED") {
       // use SUCCESS or FAILURE in ambiguous COMPLETED case.
       if (task.failure) {
-        task.human_state = 'FAILURE';
-      } else if (task.state !== 'RUNNING') {
-        task.human_state = 'SUCCESS';
+        task.human_state = "FAILURE";
+      } else if (task.state !== "RUNNING") {
+        task.human_state = "SUCCESS";
       }
     }
   }
@@ -140,17 +149,17 @@ export function quarantineMessage(bot) {
     let msg = bot.state.quarantined;
     // Sometimes, the quarantined message is actually in 'error'.  This
     // happens when the bot code has thrown an exception.
-    if (msg === undefined || msg === 'true' || msg === true) {
+    if (msg === undefined || msg === "true" || msg === true) {
       msg = bot.state && bot.state.error;
     }
-    return msg || 'True';
+    return msg || "True";
   }
-  return '';
+  return "";
 }
 
 // Hand-picked list of dimensions that can vary a lot machine to machine,
 // that is, dimensions that can be 'too unique'.
-const dimensionsToStrip = ['id', 'caches', 'server_version'];
+const dimensionsToStrip = ["id", "caches", "server_version"];
 
 /** siblingBotsLink returns a url to a bot-list that has similar
  *  dimensions to the ones passed in
@@ -158,7 +167,7 @@ const dimensionsToStrip = ['id', 'caches', 'server_version'];
  *                         matched against.
  */
 export function siblingBotsLink(dimensions) {
-  const cols = ['id', 'os', 'task', 'status'];
+  const cols = ["id", "os", "task", "status"];
   if (!dimensions) {
     return botListLink([], cols);
   }
@@ -176,5 +185,5 @@ export function siblingBotsLink(dimensions) {
   return botListLink(dimensions, cols);
 }
 
-const BOT_TIMES = ['firstSeenTs', 'lastSeenTs', 'leaseExpirationTs'];
-const TASK_TIMES = ['startedTs', 'completedTs', 'abandonedTs', 'modifiedTs'];
+const BOT_TIMES = ["firstSeenTs", "lastSeenTs", "leaseExpirationTs"];
+const TASK_TIMES = ["startedTs", "completedTs", "abandonedTs", "modifiedTs"];

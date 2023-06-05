@@ -2,11 +2,10 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import * as human from 'common-sk/modules/human';
+import * as human from "common-sk/modules/human";
 
-import {humanDuration, sanitizeAndHumanizeTime, timeDiffExact} from '../util';
-import {EXCEPTIONAL_STATES, ONGOING_STATES} from '../task';
-
+import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from "../util";
+import { EXCEPTIONAL_STATES, ONGOING_STATES } from "../task";
 
 /** canRetry returns if the given task can be retried.
  *  See https://crbug.com/936530 for one case in which it should not.
@@ -23,7 +22,7 @@ export function cipdLink(actualVersion, server) {
   if (!actualVersion || !server) {
     return undefined;
   }
-  const splits = actualVersion.split(':');
+  const splits = actualVersion.split(":");
   if (splits.length !== 2) {
     return undefined;
   }
@@ -37,32 +36,35 @@ export function cipdLink(actualVersion, server) {
  *  overhead after. We truncate them to 1 decimal place for display.
  */
 export function durationChart(result) {
-  const oneDecimalPlace = function(a) {
+  const oneDecimalPlace = function (a) {
     if (!a) {
       return 0.0;
     }
-    return Math.round(a * 10)/10;
+    return Math.round(a * 10) / 10;
   };
   let preOverhead = 0;
   let postOverhead = 0;
   // These are only put in upon task completion.
   if (result.performance_stats) {
-    postOverhead = (result.performance_stats.isolated_upload &&
-                    result.performance_stats.isolated_upload.duration) || 0;
+    postOverhead =
+      (result.performance_stats.isolated_upload &&
+        result.performance_stats.isolated_upload.duration) ||
+      0;
     // We only know the certain timings of isolating. To get
     // close enough (tm) overhead timings, we assume CIPD is the only
     // other source of overhead and all of CIPD's overhead is done pre-task.
     preOverhead = result.performance_stats.bot_overhead - postOverhead;
   }
-  return [result.pending, preOverhead,
-    result.duration, postOverhead].map(oneDecimalPlace);
+  return [result.pending, preOverhead, result.duration, postOverhead].map(
+    oneDecimalPlace
+  );
 }
 
 /** firstDimension returns the first entry in an array of dimensions for
  *  a given key or null if the dimension array is malformed or key is not found.
  */
 export function firstDimension(dimensionArr, key) {
-  const dimensions = dimensionArr.filter(function(d) {
+  const dimensions = dimensionArr.filter(function (d) {
     return d.key === key;
   });
   if (!dimensions.length) {
@@ -83,7 +85,7 @@ export function hasRichOutput(ele) {
     return false;
   }
   const tagMap = ele._request.tagMap;
-  return tagMap['allow_milo'] || tagMap['luci_project'];
+  return tagMap["allow_milo"] || tagMap["luci_project"];
 }
 
 /** humanState returns a human readable string corresponding to
@@ -92,20 +94,23 @@ export function hasRichOutput(ele) {
  */
 export function humanState(result, currentSliceIdx) {
   if (!result || !result.state) {
-    return '';
+    return "";
   }
-  if (currentSliceIdx !== undefined && result.current_task_slice !== currentSliceIdx) {
-    return 'THIS SLICE DID NOT RUN. Select another slice above.';
+  if (
+    currentSliceIdx !== undefined &&
+    result.current_task_slice !== currentSliceIdx
+  ) {
+    return "THIS SLICE DID NOT RUN. Select another slice above.";
   }
   const state = result.state;
-  if (state === 'COMPLETED') {
+  if (state === "COMPLETED") {
     if (result.failure) {
-      return 'COMPLETED (FAILURE)';
+      return "COMPLETED (FAILURE)";
     }
     if (wasDeduped(result)) {
-      return 'COMPLETED (DEDUPED)';
+      return "COMPLETED (DEDUPED)";
     }
-    return 'COMPLETED (SUCCESS)';
+    return "COMPLETED (SUCCESS)";
   }
   return state;
 }
@@ -113,8 +118,10 @@ export function humanState(result, currentSliceIdx) {
 /** casLink constructs a URL to a CAS root directory given a CAS reference.
  */
 export function casLink(host, ref) {
-  return `${host}/${ref.cas_instance}/blobs/` +
-    `${ref.digest.hash}/${ref.digest.size_bytes}/tree`;
+  return (
+    `${host}/${ref.cas_instance}/blobs/` +
+    `${ref.digest.hash}/${ref.digest.size_bytes}/tree`
+  );
 }
 
 /** isSummaryTask returns true if this task is a summary taskID
@@ -133,11 +140,11 @@ export function parseRequest(request) {
   request.tagMap = {};
   request.tags = request.tags || [];
   for (const tag of request.tags) {
-    const split = tag.split(':', 1);
+    const split = tag.split(":", 1);
     const key = split[0];
     const rest = tag.substring(key.length + 1);
     request.tagMap[key] = rest;
-  };
+  }
 
   TASK_TIMES.forEach((time) => {
     sanitizeAndHumanizeTime(request, time);
@@ -157,29 +164,33 @@ export function parseResult(result) {
 
   const now = new Date();
   // Running and bot_died tasks have no duration set, so we can figure it out.
-  if (!result.duration && result.state === 'RUNNING' && result.started_ts) {
+  if (!result.duration && result.state === "RUNNING" && result.started_ts) {
     result.duration = (now - result.started_ts) / 1000;
-  } else if (!result.duration && result.state === 'BOT_DIED' &&
-              result.started_ts && result.abandoned_ts) {
+  } else if (
+    !result.duration &&
+    result.state === "BOT_DIED" &&
+    result.started_ts &&
+    result.abandoned_ts
+  ) {
     result.duration = (result.abandoned_ts - result.started_ts) / 1000;
   }
   // Make the duration human readable
   result.human_duration = humanDuration(result.duration);
-  if (result.state === 'RUNNING') {
-    result.human_duration += '*';
-  } else if (result.state === 'BOT_DIED') {
-    result.human_duration += ' -- died';
+  if (result.state === "RUNNING") {
+    result.human_duration += "*";
+  } else if (result.state === "BOT_DIED") {
+    result.human_duration += " -- died";
   }
 
   const end = result.started_ts || result.abandoned_ts || new Date();
   if (!result.created_ts) {
     // This should never happen
     result.pending = 0;
-    result.human_pending = '';
+    result.human_pending = "";
   } else if (end <= result.created_ts) {
     // In the case of deduplicated tasks, started_ts comes before the task.
     result.pending = 0;
-    result.human_pending = '0s';
+    result.human_pending = "0s";
   } else {
     result.pending = (end - result.created_ts) / 1000; // convert to seconds.
     result.human_pending = timeDiffExact(result.created_ts, end);
@@ -188,7 +199,7 @@ export function parseResult(result) {
   return result;
 }
 
-const TASK_ID_PLACEHOLDER = '${SWARMING_TASK_ID}';
+const TASK_ID_PLACEHOLDER = "${SWARMING_TASK_ID}";
 
 /** richLogsLink returns a URL to a rich logs representation (e.g. Milo)
  *  given information in the request/server_details of ele. If the data
@@ -199,23 +210,23 @@ export function richLogsLink(ele) {
     return undefined;
   }
   const tagMap = ele._request.tagMap;
-  const miloHost = tagMap['milo_host'];
-  let logs = tagMap['log_location'];
+  const miloHost = tagMap["milo_host"];
+  let logs = tagMap["log_location"];
   if (logs && miloHost) {
-    logs = logs.replace('logdog://', '');
+    logs = logs.replace("logdog://", "");
     if (logs.indexOf(TASK_ID_PLACEHOLDER) !== -1) {
       if (!ele._result || !ele._result.run_id) {
         return undefined;
       }
       logs = logs.replace(TASK_ID_PLACEHOLDER, ele._result.run_id);
     }
-    return miloHost.replace('%s', logs);
+    return miloHost.replace("%s", logs);
   }
   const displayTemplate = ele.server_details.display_server_url_template;
   if (!displayTemplate || !ele._taskId) {
     return undefined;
   }
-  return displayTemplate.replace('%s', ele._taskId);
+  return displayTemplate.replace("%s", ele._taskId);
 }
 
 /** sliceSchedulingDeadline returns a human readable time stamp of when a task
@@ -223,7 +234,7 @@ export function richLogsLink(ele) {
  */
 export function sliceSchedulingDeadline(slice, request) {
   if (!request.created_ts) {
-    return '';
+    return "";
   }
   const delta = slice.expiration_secs * 1000;
   return human.localeTime(new Date(request.created_ts.getTime() + delta));
@@ -233,27 +244,27 @@ export function sliceSchedulingDeadline(slice, request) {
  */
 export function stateClass(result) {
   if (!result || !result.state) {
-    return '';
+    return "";
   }
   const state = result.state;
   if (EXCEPTIONAL_STATES.has(state)) {
-    return 'exception';
+    return "exception";
   }
-  if (state === 'BOT_DIED') {
-    return 'bot_died';
+  if (state === "BOT_DIED") {
+    return "bot_died";
   }
-  if (state === 'CLIENT_ERROR') {
-    return 'client_error';
+  if (state === "CLIENT_ERROR") {
+    return "client_error";
   }
   if (ONGOING_STATES.has(state)) {
-    return 'pending_task';
+    return "pending_task";
   }
-  if (state === 'COMPLETED') {
+  if (state === "COMPLETED") {
     if (result.failure) {
-      return 'failed_task';
+      return "failed_task";
     }
   }
-  return '';
+  return "";
 }
 
 /** taskCost returns a human readable cost in USD for a task.
@@ -270,7 +281,7 @@ export function taskCost(result) {
  */
 export function taskSchedulingDeadline(request) {
   if (!request.created_ts) {
-    return '';
+    return "";
   }
   const delta = request.expiration_secs * 1000;
   return human.localeTime(new Date(request.created_ts.getTime() + delta));
@@ -279,12 +290,12 @@ export function taskSchedulingDeadline(request) {
 export function taskInfoClass(ele, result) {
   // Prevents a flash of grey while request and result load.
   if (!ele || !result || ele._currentSliceIdx === -1) {
-    return '';
+    return "";
   }
   if (ele._currentSliceIdx !== result.current_task_slice) {
-    return 'inactive';
+    return "inactive";
   }
-  return '';
+  return "";
 }
 
 /** wasDeduped returns true or false depending on if this task was de-duped.
@@ -296,9 +307,20 @@ export function wasDeduped(result) {
 /** wasPickedUp returns true iff a task was started.
  */
 export function wasPickedUp(result) {
-  return result && result.state !== 'PENDING' && result.state !== 'NO_RESOURCE' &&
-         result.state !== 'CANCELED' && result.state !== 'EXPIRED';
+  return (
+    result &&
+    result.state !== "PENDING" &&
+    result.state !== "NO_RESOURCE" &&
+    result.state !== "CANCELED" &&
+    result.state !== "EXPIRED"
+  );
 }
 
-const TASK_TIMES = ['abandoned_ts', 'bot_idle_since_ts', 'completed_ts',
-  'created_ts', 'modified_ts', 'started_ts'];
+const TASK_TIMES = [
+  "abandoned_ts",
+  "bot_idle_since_ts",
+  "completed_ts",
+  "created_ts",
+  "modified_ts",
+  "started_ts",
+];

@@ -16,9 +16,9 @@ export const UNMATCHED = false;
 export const customMatchers = {
   // see https://jasmine.github.io/tutorials/custom_matcher
   // for docs on the factory that returns a matcher.
-  'toContainRegex': function(util, customEqualityTesters) {
+  toContainRegex: function (util, customEqualityTesters) {
     return {
-      'compare': function(actual, regex) {
+      compare: function (actual, regex) {
         if (!(regex instanceof RegExp)) {
           throw `toContainRegex expects a regex, got ${JSON.stringify(regex)}`;
         }
@@ -26,7 +26,8 @@ export const customMatchers = {
 
         if (!actual || !actual.length) {
           result.pass = false;
-          result.message = `Expected ${actual} to be a non-empty array ` +
+          result.message =
+            `Expected ${actual} to be a non-empty array ` +
             `containing something matching ${regex}`;
           return result;
         }
@@ -34,7 +35,8 @@ export const customMatchers = {
           if (s.match && s.match(regex)) {
             result.pass = true;
             // craft the message for the negated version (i.e. using .not)
-            result.message = `Expected ${actual} not to have anyting ` +
+            result.message =
+              `Expected ${actual} not to have anyting ` +
               `matching ${regex}, but ${s} did`;
             return result;
           }
@@ -46,9 +48,9 @@ export const customMatchers = {
     };
   },
 
-  'toHaveAttribute': function(util, customEqualityTesters) {
+  toHaveAttribute: function (util, customEqualityTesters) {
     return {
-      'compare': function(actual, attribute) {
+      compare: function (actual, attribute) {
         if (!isElement(actual)) {
           throw `${actual} is not a DOM element`;
         }
@@ -60,29 +62,29 @@ export const customMatchers = {
   },
 
   // Trims off whitespace before comparing
-  'toMatchTextContent': function(util, customEqualityTesters) {
+  toMatchTextContent: function (util, customEqualityTesters) {
     return {
-      'compare': function(actual, text) {
+      compare: function (actual, text) {
         if (!isElement(actual)) {
           throw `${actual} is not a DOM element`;
         }
         function normalize(s) {
-          return s.trim()
-              .replace('\t', ' ')
-              .replace(/ {2,}/g, ' ');
+          return s.trim().replace("\t", " ").replace(/ {2,}/g, " ");
         }
         text = normalize(text);
         const actualText = normalize(actual.innerText);
         if (actualText === text) {
           return {
             // craft the message for the negated version
-            message: `Expected ${actualText} to not equal ${text} ` +
+            message:
+              `Expected ${actualText} to not equal ${text} ` +
               `(ignoring whitespace)`,
             pass: true,
           };
         }
         return {
-          message: `Expected ${actualText} to equal ${text} ` +
+          message:
+            `Expected ${actualText} to equal ${text} ` +
             `(ignoring whitespace)`,
           pass: false,
         };
@@ -96,46 +98,55 @@ function isElement(ele) {
   return ele instanceof Element || ele instanceof HTMLDocument;
 }
 
-export function mockAppGETs(fetchMock, permissions, serverDetails={}) {
-  fetchMock.get('/auth/openid/state', {
-    identity: 'anonymous:anonymous',
+export function mockAppGETs(fetchMock, permissions, serverDetails = {}) {
+  fetchMock.get("/auth/openid/state", {
+    identity: "anonymous:anonymous",
   });
 
-  fetchMock.get('/_ah/api/swarming/v1/server/details', {
-    server_version: serverDetails.serverVersion || '1234-abcdefg',
-    bot_version: serverDetails.botVersion || 'abcdoeraymeyouandme',
-    machine_provider_template: serverDetails.machineProviderTemplate || 'https://example.com/leases/%s',
-    display_server_url_template: serverDetails.displayServerUrlTemplate || 'https://example.com#id=%s',
+  fetchMock.get("/_ah/api/swarming/v1/server/details", {
+    server_version: serverDetails.serverVersion || "1234-abcdefg",
+    bot_version: serverDetails.botVersion || "abcdoeraymeyouandme",
+    machine_provider_template:
+      serverDetails.machineProviderTemplate || "https://example.com/leases/%s",
+    display_server_url_template:
+      serverDetails.displayServerUrlTemplate || "https://example.com#id=%s",
   });
 
-
-  fetchMock.get('/_ah/api/swarming/v1/server/permissions', permissions);
+  fetchMock.get("/_ah/api/swarming/v1/server/permissions", permissions);
 }
 
-export function mockAuthdAppGETs(fetchMock, permissions, serverDetails={}) {
-  fetchMock.get('/auth/openid/state', {
-    identity: 'user:someone@example.com',
-    email: 'someone@example.com',
-    picture: 'http://example.com/picture.jpg',
-    accessToken: '12345-zzzzzz',
+export function mockAuthdAppGETs(fetchMock, permissions, serverDetails = {}) {
+  fetchMock.get("/auth/openid/state", {
+    identity: "user:someone@example.com",
+    email: "someone@example.com",
+    picture: "http://example.com/picture.jpg",
+    accessToken: "12345-zzzzzz",
   });
 
-  fetchMock.get('/_ah/api/swarming/v1/server/details', requireLogin({
-    server_version: serverDetails.serverVersion || '1234-abcdefg',
-    bot_version: serverDetails.botVersion || 'abcdoeraymeyouandme',
-    machine_provider_template: serverDetails.machineProviderTemplate || 'https://example.com/leases/%s',
-    display_server_url_template: serverDetails.displayServerUrlTemplate || 'https://example.com#id=%s',
-    cas_viewer_server: serverDetails.casViewerServer || 'https://cas-viewer-dev.appspot.com',
-  }));
+  fetchMock.get(
+    "/_ah/api/swarming/v1/server/details",
+    requireLogin({
+      server_version: serverDetails.serverVersion || "1234-abcdefg",
+      bot_version: serverDetails.botVersion || "abcdoeraymeyouandme",
+      machine_provider_template:
+        serverDetails.machineProviderTemplate ||
+        "https://example.com/leases/%s",
+      display_server_url_template:
+        serverDetails.displayServerUrlTemplate || "https://example.com#id=%s",
+      cas_viewer_server:
+        serverDetails.casViewerServer || "https://cas-viewer-dev.appspot.com",
+    })
+  );
 
-
-  fetchMock.get('/_ah/api/swarming/v1/server/permissions',
-      requireLogin(permissions));
+  fetchMock.get(
+    "/_ah/api/swarming/v1/server/permissions",
+    requireLogin(permissions)
+  );
 }
 
 export function requireLogin(logged_in, delay = 100) {
   const original_items = logged_in.items && logged_in.items.slice();
-  return function(url, opts) {
+  return function (url, opts) {
     if (opts && opts.headers && opts.headers.authorization) {
       return new Promise((resolve) => {
         setTimeout(resolve, delay);
@@ -144,8 +155,11 @@ export function requireLogin(logged_in, delay = 100) {
           // pretend there are two pages
           if (!logged_in.cursor) {
             // first page
-            logged_in.cursor = 'fake_cursor12345';
-            logged_in.items = original_items.slice(0, original_items.length / 2);
+            logged_in.cursor = "fake_cursor12345";
+            logged_in.items = original_items.slice(
+              0,
+              original_items.length / 2
+            );
           } else {
             // second page
             logged_in.cursor = undefined;
@@ -157,20 +171,20 @@ export function requireLogin(logged_in, delay = 100) {
           if (!val) {
             return {
               status: 404,
-              body: JSON.stringify({'error': {'message': 'bot not found.'}}),
-              headers: {'content-type': 'application/json'},
+              body: JSON.stringify({ error: { message: "bot not found." } }),
+              headers: { "content-type": "application/json" },
             };
           }
           return {
             status: 200,
             body: JSON.stringify(val),
-            headers: {'content-type': 'application/json'},
+            headers: { "content-type": "application/json" },
           };
         }
         return {
           status: 200,
           body: JSON.stringify(logged_in),
-          headers: {'content-type': 'application/json'},
+          headers: { "content-type": "application/json" },
         };
       });
     } else {
@@ -179,8 +193,8 @@ export function requireLogin(logged_in, delay = 100) {
       }).then(() => {
         return {
           status: 403,
-          body: 'Try logging in',
-          headers: {'content-type': 'text/plain'},
+          body: "Try logging in",
+          headers: { "content-type": "text/plain" },
         };
       });
     }
@@ -198,15 +212,15 @@ export function childrenAsArray(ele) {
  *  unexpected (unmatched) calls to fetchMock.
  */
 export function expectNoUnmatchedCalls(fetchMock) {
-  let calls = fetchMock.calls(UNMATCHED, 'GET');
-  expect(calls).toHaveSize(0, 'no unmatched (unexpected) GETs');
+  let calls = fetchMock.calls(UNMATCHED, "GET");
+  expect(calls).toHaveSize(0, "no unmatched (unexpected) GETs");
   if (calls.length) {
-    console.warn('unmatched GETS', calls);
+    console.warn("unmatched GETS", calls);
   }
-  calls = fetchMock.calls(UNMATCHED, 'POST');
-  expect(calls).toHaveSize(0, 'no unmatched (unexpected) POSTs');
+  calls = fetchMock.calls(UNMATCHED, "POST");
+  expect(calls).toHaveSize(0, "no unmatched (unexpected) POSTs");
   if (calls.length) {
-    console.warn('unmatched POSTS', calls);
+    console.warn("unmatched POSTS", calls);
   }
 }
 
@@ -231,7 +245,7 @@ export function getChildItemWithText(ele, value) {
 
 export const MATCHED = true;
 
-const stringify = function(data) {
+const stringify = function (data) {
   return `)]}'${JSON.stringify(data)}`;
 };
 
@@ -244,13 +258,14 @@ const stringify = function(data) {
  * @param {data} data which is mocked as the response to the prpc rpc.
  */
 export function mockPrpc(fetchMock, service, rpc, data) {
-  fetchMock.post(`path:/prpc/${service}/${rpc}`,
-      new Response(stringify(data), {
-        status: 200,
-        headers: {
-          'x-prpc-grpc-code': '0',
-          'content-type': 'application/json',
-        },
-      }),
+  fetchMock.post(
+    `path:/prpc/${service}/${rpc}`,
+    new Response(stringify(data), {
+      status: 200,
+      headers: {
+        "x-prpc-grpc-code": "0",
+        "content-type": "application/json",
+      },
+    })
   );
 }

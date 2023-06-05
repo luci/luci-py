@@ -4,9 +4,9 @@
 
 /** @module swarming-ui/SwarmingAppBoilerplate */
 
-import {errorMessage} from 'elements-sk/errorMessage';
-import {html, render} from 'lit-html';
-import {upgradeProperty} from 'elements-sk/upgradeProperty';
+import { errorMessage } from "elements-sk/errorMessage";
+import { html, render } from "lit-html";
+import { upgradeProperty } from "elements-sk/upgradeProperty";
 
 /** @classdesc
  * The SwarmingAppBoilerplate class deduplicates much of the boilerplate
@@ -41,27 +41,27 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
     super();
     this._template = template;
     this._app = null;
-    this._auth_header = '';
+    this._auth_header = "";
     this._profile = null;
     // False until we see a 403 and get a call to setUserNotAuthorized();
     this._notAuthorized = false;
   }
 
   connectedCallback() {
-    upgradeProperty(this, 'testing_offline');
+    upgradeProperty(this, "testing_offline");
 
     this._authHeaderEvent = (e) => {
       this._auth_header = e.detail.auth_header;
     };
-    this.addEventListener('log-in', this._authHeaderEvent);
+    this.addEventListener("log-in", this._authHeaderEvent);
   }
 
   disconnectedCallback() {
-    this.removeEventListener('log-in', this._authHeaderEvent);
+    this.removeEventListener("log-in", this._authHeaderEvent);
   }
 
   static get observedAttributes() {
-    return ['testing_offline'];
+    return ["testing_offline"];
   }
 
   /** @prop {HTMLElement} app - A reference to the embedded &lt;swarming-app&gt
@@ -107,13 +107,13 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
 
   /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
   get testing_offline() {
-    return this.hasAttribute('testing_offline');
+    return this.hasAttribute("testing_offline");
   }
   set testing_offline(val) {
     if (val) {
-      this.setAttribute('testing_offline', true);
+      this.setAttribute("testing_offline", true);
     } else {
-      this.removeAttribute('testing_offline');
+      this.removeAttribute("testing_offline");
     }
   }
 
@@ -125,9 +125,9 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
       @param {boolean} ignoreAuthError - A flag to ignore 403 error.
    */
   prpcError(e, loadingWhat, ignoreAuthError) {
-    if (e.codeName === 'PERMISSION_DENIED') {
-      this._message = 'User unauthorized - try logging in ' +
-        'with a different account';
+    if (e.codeName === "PERMISSION_DENIED") {
+      this._message =
+        "User unauthorized - try logging in " + "with a different account";
       this._notAuthorized = true;
       this.render();
       this._app.finishedTask();
@@ -145,29 +145,31 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
    */
   fetchError(e, loadingWhat, ignoreAuthError) {
     if (e.status === 403 && !ignoreAuthError) {
-      this._message = 'User unauthorized - try logging in ' +
-        'with a different account';
+      this._message =
+        "User unauthorized - try logging in " + "with a different account";
       this._notAuthorized = true;
       this.render();
-    } else if (e.name !== 'AbortError') {
+    } else if (e.name !== "AbortError") {
       // We can ignore AbortError since they fire anytime a filter is added
       // or removed (even for fetch promises that have already been resolved).
       // Chrome and Firefox report a DOMException in this case:
       // https://developer.mozilla.org/en-US/docs/Web/API/DOMException
       console.error(e);
-      errorMessage(`Unexpected error loading ${loadingWhat}: ${e.message}`,
-          5000);
+      errorMessage(
+        `Unexpected error loading ${loadingWhat}: ${e.message}`,
+        5000
+      );
     }
     this._app.finishedTask();
   }
 
   /** Re-renders the app, starting with the top level template. */
   render() {
-    render(this._template(this), this, {eventContext: this});
+    render(this._template(this), this, { eventContext: this });
     if (!this._app) {
       this._app = this.firstElementChild;
       // render again in case anything was using attributes on this._app.
-      render(this._template(this), this, {eventContext: this});
+      render(this._template(this), this, { eventContext: this });
     }
   }
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import {PrpcClient} from '@chopsui/prpc-client';
+import { PrpcClient } from "@chopsui/prpc-client";
 
 class PrpcService {
   /**
@@ -11,9 +11,10 @@ class PrpcService {
    *  we wish to abort request
    * @param {Object} opts - @chopui/prpc-client PrpcOptions, additional options.
    */
-  constructor(accessToken, signal=null, opts={}) {
+  constructor(accessToken, signal = null, opts = {}) {
     const prpcOpts = {
-      ...opts, accessToken: undefined,
+      ...opts,
+      accessToken: undefined,
     };
     // If we are running a live_demo, this will be set so we must override
     // the PrpcClients host function.
@@ -32,7 +33,7 @@ class PrpcService {
   }
 
   get service() {
-    throw 'Subclasses must define service';
+    throw "Subclasses must define service";
   }
 
   _call(method, request) {
@@ -51,7 +52,7 @@ const QUERY_ALL = 10;
  */
 export class BotsService extends PrpcService {
   get service() {
-    return 'swarming.v2.Bots';
+    return "swarming.v2.Bots";
   }
 
   /**
@@ -62,7 +63,7 @@ export class BotsService extends PrpcService {
    *  @returns {Object} object with information about the bot in question.
    */
   getBot(botId) {
-    return this._call('GetBot', {bot_id: botId});
+    return this._call("GetBot", { bot_id: botId });
   }
 
   /**
@@ -82,7 +83,7 @@ export class BotsService extends PrpcService {
       limit: 30,
       include_performance_stats: true,
     };
-    return this._call('ListBotTasks', request);
+    return this._call("ListBotTasks", request);
   }
 
   /**
@@ -97,7 +98,7 @@ export class BotsService extends PrpcService {
     const request = {
       bot_id: botId,
     };
-    return this._call('TerminateBot', request);
+    return this._call("TerminateBot", request);
   }
 
   /**
@@ -114,6 +115,6 @@ export class BotsService extends PrpcService {
       bot_id: botId,
       cursor: cursor,
     };
-    return this._call('ListBotEvents', request);
+    return this._call("ListBotEvents", request);
   }
 }

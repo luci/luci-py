@@ -2,24 +2,24 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'modules/oauth-login';
-import fetchMock from 'fetch-mock';
+import "modules/oauth-login";
+import fetchMock from "fetch-mock";
 
-describe('oauth-login', function() {
+describe("oauth-login", function () {
   // A reusable HTML element in which we create our element under test.
-  const container = document.createElement('div');
+  const container = document.createElement("div");
   document.body.appendChild(container);
 
-  afterEach(function() {
-    container.innerHTML = '';
+  afterEach(function () {
+    container.innerHTML = "";
   });
 
   // ===============TESTS START====================================
 
-  describe('testing-offline true', function() {
+  describe("testing-offline true", function () {
     // calls the test callback with one element 'ele', a created <oauth-login>.
     function createElement(test) {
-      return window.customElements.whenDefined('oauth-login').then(() => {
+      return window.customElements.whenDefined("oauth-login").then(() => {
         container.innerHTML = `<oauth-login testing_offline=true></oauth-login>`;
         expect(container.firstElementChild).toBeTruthy();
         expect(container.firstElementChild.testing_offline).toBeTruthy();
@@ -27,38 +27,38 @@ describe('oauth-login', function() {
       });
     }
 
-    it('starts off logged out', function(done) {
+    it("starts off logged out", function (done) {
       createElement((ele) => {
-        expect(ele.auth_header).toBe('');
+        expect(ele.auth_header).toBe("");
         done();
       });
     });
 
-    it('triggers a log-in custom event on login', function(done) {
+    it("triggers a log-in custom event on login", function (done) {
       createElement((ele) => {
-        ele.addEventListener('log-in', (e) => {
+        ele.addEventListener("log-in", (e) => {
           e.stopPropagation();
           expect(e.detail).toBeDefined();
-          expect(e.detail.auth_header).toContain('Bearer ');
+          expect(e.detail.auth_header).toContain("Bearer ");
           done();
         });
         ele._logIn();
       });
     });
 
-    it('has auth_header set after log-in', function(done) {
+    it("has auth_header set after log-in", function (done) {
       createElement((ele) => {
         ele._logIn();
-        expect(ele.auth_header).toContain('Bearer ');
+        expect(ele.auth_header).toContain("Bearer ");
         done();
       });
     });
   }); // end describe('testing-offline true')
 
-  describe('testing-offline false', function() {
+  describe("testing-offline false", function () {
     // calls the test callback with one element 'ele', a created <oauth-login>.
     function createElement(test) {
-      return window.customElements.whenDefined('oauth-login').then(() => {
+      return window.customElements.whenDefined("oauth-login").then(() => {
         container.innerHTML = `<oauth-login></oauth-login>`;
         expect(container.firstElementChild).toBeTruthy();
         expect(container.firstElementChild.testing_offline).toBeFalsy();
@@ -66,25 +66,25 @@ describe('oauth-login', function() {
       });
     }
 
-    afterEach(function() {
+    afterEach(function () {
       // Completely remove the mocking which allows each test
       // to be able to mess with the mocked routes w/o impacting other tests.
       fetchMock.reset();
     });
 
-    it('fetches state and fires log-in event', function(done) {
-      fetchMock.get('/auth/openid/state', {
-        identity: 'user:someone@example.com',
-        email: 'someone@example.com',
-        picture: 'http://example.com/picture.jpg',
-        accessToken: '12345-zzzzzz',
+    it("fetches state and fires log-in event", function (done) {
+      fetchMock.get("/auth/openid/state", {
+        identity: "user:someone@example.com",
+        email: "someone@example.com",
+        picture: "http://example.com/picture.jpg",
+        accessToken: "12345-zzzzzz",
       });
       createElement((ele) => {
-        ele.addEventListener('log-in', () => {
-          expect(ele.auth_header).toEqual('Bearer 12345-zzzzzz');
+        ele.addEventListener("log-in", () => {
+          expect(ele.auth_header).toEqual("Bearer 12345-zzzzzz");
           expect(ele.profile).toEqual({
-            email: 'someone@example.com',
-            imageURL: 'http://example.com/picture.jpg',
+            email: "someone@example.com",
+            imageURL: "http://example.com/picture.jpg",
           });
           done();
         });
