@@ -96,23 +96,23 @@ function isElement(ele) {
   return ele instanceof Element || ele instanceof HTMLDocument;
 }
 
-export function mockAppGETs(fetchMock, permissions) {
+export function mockAppGETs(fetchMock, permissions, serverDetails={}) {
   fetchMock.get('/auth/openid/state', {
     identity: 'anonymous:anonymous',
   });
 
   fetchMock.get('/_ah/api/swarming/v1/server/details', {
-    server_version: '1234-abcdefg',
-    bot_version: 'abcdoeraymeyouandme',
-    machine_provider_template: 'https://example.com/leases/%s',
-    display_server_url_template: 'https://example.com#id=%s',
+    server_version: serverDetails.serverVersion || '1234-abcdefg',
+    bot_version: serverDetails.botVersion || 'abcdoeraymeyouandme',
+    machine_provider_template: serverDetails.machineProviderTemplate || 'https://example.com/leases/%s',
+    display_server_url_template: serverDetails.displayServerUrlTemplate || 'https://example.com#id=%s',
   });
 
 
   fetchMock.get('/_ah/api/swarming/v1/server/permissions', permissions);
 }
 
-export function mockAuthdAppGETs(fetchMock, permissions) {
+export function mockAuthdAppGETs(fetchMock, permissions, serverDetails={}) {
   fetchMock.get('/auth/openid/state', {
     identity: 'user:someone@example.com',
     email: 'someone@example.com',
@@ -121,11 +121,11 @@ export function mockAuthdAppGETs(fetchMock, permissions) {
   });
 
   fetchMock.get('/_ah/api/swarming/v1/server/details', requireLogin({
-    server_version: '1234-abcdefg',
-    bot_version: 'abcdoeraymeyouandme',
-    machine_provider_template: 'https://example.com/leases/%s',
-    display_server_url_template: 'https://example.com#id=%s',
-    cas_viewer_server: 'https://cas-viewer-dev.appspot.com',
+    server_version: serverDetails.serverVersion || '1234-abcdefg',
+    bot_version: serverDetails.botVersion || 'abcdoeraymeyouandme',
+    machine_provider_template: serverDetails.machineProviderTemplate || 'https://example.com/leases/%s',
+    display_server_url_template: serverDetails.displayServerUrlTemplate || 'https://example.com#id=%s',
+    cas_viewer_server: serverDetails.casViewerServer || 'https://cas-viewer-dev.appspot.com',
   }));
 
 

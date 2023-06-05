@@ -29,6 +29,7 @@ describe('bot-page', function() {
   };
   const mockGetBot = (data) => mockPrpc(fetchMock, 'swarming.v2.Bots', 'GetBot', data);
   const mockListBotTasks = (data) => mockPrpc(fetchMock, 'swarming.v2.Bots', 'ListBotTasks', data);
+  const mockListBotEvents = (data) => mockPrpc(fetchMock, 'swarming.v2.Bots', 'ListBotEvents', data);
 
   beforeEach(function() {
     jasmine.addMatchers(customMatchers);
@@ -41,6 +42,9 @@ describe('bot-page', function() {
     // They can be overridden for specific tests, if needed.
     mockAppGETs(fetchMock, {
       cancel_task: false,
+    }, {
+      serverVersion: 'e962671e3bc53f7740f1ceadd04974a3ce94f0e5624e8544770246b5ebf2c46e',
+      botVersion: 'e962671e3bc53f7740f1ceadd04974a3ce94f0e5624e8544770246b5ebf2c46e',
     });
 
     // By default, don't have any handlers mocked out - this requires
@@ -128,9 +132,9 @@ describe('bot-page', function() {
     const tasks = {items: tasksMap['SkiaGPU']};
 
     fetchMock.get(new RegExp('/_ah/api/swarming/v1/server/permissions\??.*'), {});
-    fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/events*`, events);
     mockGetBot(bot);
     mockListBotTasks(tasks);
+    mockListBotEvents(events);
   }
 
 
@@ -188,8 +192,17 @@ describe('bot-page', function() {
             {overwriteRoutes: true});
         fetchMock.get('/_ah/api/swarming/v1/server/permissions', {},
             {overwriteRoutes: true});
-        fetchMock.get('glob:/_ah/api/swarming/v1/bot/*', 403,
-            {overwriteRoutes: true});
+
+        const resp = new Response(`)]}'"403 Unauthorized"`, {
+          status: 403,
+          headers: {
+            'x-prpc-grpc-code': '7',
+            'content-type': 'application/json',
+          },
+        });
+        fetchMock.post('path:/prpc/swarming.v2.Bots/GetBot', resp.clone(), {overwriteRoutes: true});
+        fetchMock.post('path:/prpc/swarming.v2.Bots/ListBotTasks', resp.clone(), {overwriteRoutes: true});
+        fetchMock.post('path:/prpc/swarming.v2.Bots/ListBotEvents', resp.clone(), {overwriteRoutes: true});
       }
 
       beforeEach(notAuthorized);
@@ -329,16 +342,15 @@ describe('bot-page', function() {
           expect(cell(1, 0)).toMatchTextContent('');
           expect(cell(1, 1)).toMatchTextContent('request_task');
           expect(cell(1, 3).innerHTML).toContain('<a ', 'has a link');
-          expect(cell(1, 3).innerHTML).toContain('href="/task?id=4300ceb85b93e010"');
-          expect(cell(1, 4)).toMatchTextContent('abcdoeraym');
+          expect(cell(1, 3).innerHTML).toContain('href="/task?id=12340"');
+          expect(cell(1, 4)).toMatchTextContent('e962671e3b');
           expect(cell(1, 4)).not.toHaveClass('old_version');
 
-          expect(cell(15, 0)).toMatchTextContent('About to restart: ' +
-            'Updating to abcdoeraymeyouandme');
-          expect(cell(15, 1)).toMatchTextContent('bot_shutdown');
-          expect(cell(15, 3)).toMatchTextContent('');
-          expect(cell(15, 4)).toMatchTextContent('6fda8587d8');
-          expect(cell(15, 4)).toHaveClass('old_version');
+          expect(cell(5, 0)).toMatchTextContent('About to restart: Updating to e962671e3bc53f7740f1ceadd04974a3ce94f0e5624e8544770246b5ebf2c46e');
+          expect(cell(5, 1)).toMatchTextContent('bot_shutdown');
+          expect(cell(5, 3)).toMatchTextContent('');
+          expect(cell(5, 4)).toMatchTextContent('f9d34dcc2b');
+          expect(cell(5, 4)).toHaveClass('old_version');
           done();
         });
       });
@@ -353,18 +365,17 @@ describe('bot-page', function() {
 
           const rows = $('tr', eventsTable);
           expect(rows).toBeTruthy();
-          expect(rows).toHaveSize(1 + 1, '1 for header, 1 shown event');
+          expect(rows).toHaveSize(1 + 17, '1 for header, 17 shown events');
 
           // little helper for readability
           const cell = (r, c) => rows[r].children[c];
 
           // row 0 is the header
-          expect(cell(1, 0)).toMatchTextContent('About to restart: ' +
-            'Updating to abcdoeraymeyouandme');
-          expect(cell(1, 1)).toMatchTextContent('bot_shutdown');
+          expect(cell(1, 0)).toMatchTextContent('Rebooting device because max uptime exceeded during idle');
+          expect(cell(1, 1)).toMatchTextContent('bot_log');
           expect(cell(1, 3)).toMatchTextContent('');
-          expect(cell(1, 4)).toMatchTextContent('6fda8587d8');
-          expect(cell(1, 4)).toHaveClass('old_version');
+          expect(cell(1, 4)).toMatchTextContent('e962671e3b');
+          expect(cell(1, 4)).not.toHaveClass('old_version');
 
           const eBtn = $$('main button.more_events', ele);
           expect(eBtn).toBeTruthy();
@@ -622,15 +633,16 @@ describe('bot-page', function() {
         // being the string of the url and the second element being
         // the options that were passed in
         const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
-        expect(protoRpcCalls).toHaveSize(2 + 2, '2 GETs from swarming-app, 2 from bot-page');
+        expect(protoRpcCalls).toHaveSize(2 + 1, '2 GETs from swarming-app, 3 from bot-page');
         checkAuthorization(protoRpcCalls);
         // At the moment, only GetBot and ListBotTasks are used.
         const prpcCalls = fetchMock.calls(MATCHED, 'POST');
-        expect(prpcCalls).toHaveSize(2);
+        expect(prpcCalls).toHaveSize(3);
 
         const getBotsReq = {bot_id: TEST_BOT_ID};
         const getBotsCall = prpcCalls.filter(checkFor('prpc/swarming.v2.Bots/GetBot', getBotsReq));
         expect(getBotsCall).toHaveSize(1, `Must have one GetBot request with the value: ${stringify(getBotsReq)}`);
+
         const listBotTasksReq = {
           bot_id: TEST_BOT_ID,
           cursor: '',
@@ -641,7 +653,17 @@ describe('bot-page', function() {
         };
         const listBotsCall = prpcCalls.filter(checkFor('prpc/swarming.v2.Bots/ListBotTasks', listBotTasksReq));
         expect(listBotsCall).toHaveSize(1, `Must have one ListBotTasks request with the value: ${stringify(listBotTasksReq)}`);
+
+        const listBotEventsReq = {
+          bot_id: TEST_BOT_ID,
+          cursor: '',
+          limit: 50,
+        };
+        const listBotEvents = prpcCalls.filter(checkFor('prpc/swarming.v2.Bots/ListBotEvents', listBotEventsReq));
+        expect(listBotEvents).toHaveSize(1, `Must have one ListBotEvents request with the value: ${stringify(listBotEventsReq)}`);
+
         checkAuthorization(prpcCalls);
+
         done();
       });
     });
@@ -817,7 +839,7 @@ describe('bot-page', function() {
         ele.render();
         fetchMock.reset(); // clears history and routes
 
-        fetchMock.get(`glob:/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/events*`, {
+        mockListBotEvents({
           items: eventsMap['SkiaGPU'],
           cursor: 'newCursor',
         });
@@ -831,18 +853,19 @@ describe('bot-page', function() {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           expectNoUnmatchedCalls(fetchMock);
-          const calls = fetchMock.calls(MATCHED, 'GET');
+          const calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls).toHaveSize(1);
 
-          const url = calls[0][0];
+          const request = JSON.parse(calls[0][1].body);
           // spot check a few fields
-          expect(url).toContain('event_type');
-          expect(url).toContain('task_id');
-          expect(url).toContain('limit=50');
+          expect(request.bot_id).toEqual(TEST_BOT_ID);
+          expect(request.limit).toEqual(50);
           // validate cursor
-          expect(url).toContain('cursor=myCursor');
-          expect(ele._eventsCursor).toEqual('newCursor', 'cursor should update');
-          expect(ele._events).toHaveSize(50 + 50, '50 initial tasks, 50 new tasks');
+          expect(request.cursor).toEqual('myCursor');
+          eventually(ele, (ele) => {
+            expect(ele._eventsCursor).toEqual('newCursor', 'cursor should update');
+            expect(ele._events).toHaveSize(50 + 50, '50 initial tasks, 50 new tasks');
+          });
 
           done();
         });
@@ -867,9 +890,9 @@ describe('bot-page', function() {
           // beforeEach at the top of this file.
           expectNoUnmatchedCalls(fetchMock);
           const protoRpcCalls = fetchMock.calls(MATCHED, 'GET');
-          expect(protoRpcCalls).toHaveSize(2);
+          expect(protoRpcCalls).toHaveSize(1);
           const prpcCalls = fetchMock.calls(MATCHED, 'POST');
-          expect(prpcCalls).toHaveSize(2);
+          expect(prpcCalls).toHaveSize(3);
 
           done();
         });

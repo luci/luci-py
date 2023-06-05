@@ -130,6 +130,7 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
         'with a different account';
       this._notAuthorized = true;
       this.render();
+      this._app.finishedTask();
     } else {
       this.fetchError(e, loadingWhat, ignoreAuthError);
     }

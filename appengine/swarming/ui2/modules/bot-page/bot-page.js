@@ -18,8 +18,8 @@ import '../dialog-pop-over';
 import '../swarming-app';
 
 import {
-  EVENTS_QUERY_PARAMS, parseBotData, parseEvents,
-  parseTasks, quarantineMessage, siblingBotsLink, TASKS_QUERY_PARAMS,
+  parseBotData, parseEvents,
+  parseTasks, quarantineMessage, siblingBotsLink,
 } from './bot-page-helpers';
 import {stateClass as taskClass} from '../task-page/task-page-helpers';
 import {timeDiffApprox, timeDiffExact, taskPageLink} from '../util';
@@ -291,18 +291,18 @@ const eventRow = (event, showAll, serverVersion) => {
   }
   const msg = [
     event.message,
-    event.maintenance_msg,
+    event.maintenanceMsg,
     event.state.quarantined,
   ].filter(Boolean).join('\n');
   return html`
 <tr>
   <td class=message>${msg}</td>
-  <td>${event.event_type}</td>
+  <td>${event.eventType}</td>
   <td>${event.human_ts}</td>
   <td>
     <a target=_blank rel=noopener
-        href=${taskPageLink(event.task_id)}>
-      ${event.task_id}
+        href=${taskPageLink(event.taskId)}>
+      ${event.taskId}
     </a>
   </td>
   <td class=${serverVersion === event.version ? '' : 'old_version'}>
@@ -517,15 +517,14 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
 
     if (!this._eventsCursor) {
       this.app.addBusyTasks(1);
-      fetch(`/_ah/api/swarming/v1/bot/${this._botId}/events?${EVENTS_QUERY_PARAMS}`, extra)
-          .then(jsonOrThrow)
-          .then((json) => {
-            this._eventsCursor = json.cursor;
-            this._events = parseEvents(json.items);
+      botService.events(this._botId, this._eventsCursor)
+          .then((resp) => {
+            this._eventsCursor = resp.cursor;
+            this._events = parseEvents(resp.items);
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, 'bot/events'));
+          .catch((e) => this.prpcError(e, 'bot/events'));
     }
   }
 
@@ -559,17 +558,13 @@ window.customElements.define('bot-page', class extends SwarmingAppBoilerplate {
     if (!this._eventsCursor) {
       return;
     }
-    const extra = {
-      headers: {'authorization': this.auth_header},
-      signal: this._fetchController.signal,
-    };
     this.app.addBusyTasks(1);
-    fetch(`/_ah/api/swarming/v1/bot/${this._botId}/events?cursor=${this._eventsCursor}&` +
-      EVENTS_QUERY_PARAMS, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._eventsCursor = json.cursor;
-          this._events.push(...parseEvents(json.items));
+    const botService =
+      new BotsService(this.auth_header, this._fetchController.signal);
+    botService.events(this._botId, this._eventsCursor)
+        .then((resp) => {
+          this._eventsCursor = resp.cursor;
+          this._events.push(...parseEvents(resp.items));
           this.render();
           this.app.finishedTask();
         })

@@ -178,18 +178,3 @@ export function siblingBotsLink(dimensions) {
 
 const BOT_TIMES = ['firstSeenTs', 'lastSeenTs', 'leaseExpirationTs'];
 const TASK_TIMES = ['startedTs', 'completedTs', 'abandonedTs', 'modifiedTs'];
-
-// These field filters trim down the data we get per task, which
-// may speed up the server time and should speed up the network time.
-export const TASKS_QUERY_PARAMS = [
-  'include_performance_stats=true',
-  'limit=30',
-  'sort=STARTED_TS',
-  encodeURIComponent(
-      'fields=cursor,'+
-            'items(state,bot_version,completed_ts,created_ts,duration,'+
-            'exit_code,failure,internal_failure,modified_ts,name,'+
-            'server_versions,started_ts,task_id)'),
-].join('&');
-
-export const EVENTS_QUERY_PARAMS = 'limit=50&fields=cursor%2Citems(event_type%2Cmaintenance_msg%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion%2Cstate)';

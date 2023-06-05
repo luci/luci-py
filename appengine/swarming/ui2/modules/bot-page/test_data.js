@@ -7165,5 +7165,6712 @@ export const tasksMap = {
 
 export const eventsMap = {
   // Came from a Skia GPU bot (build16-a9)
-  'SkiaGPU': [{'task_id': '4300ceb85b93e011', 'ts': '2019-02-12T17:52:40.070982', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'request_task'}, {'task_id': '4300c3b09d7d1911', 'ts': '2019-02-12T17:50:43.086788', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'task_completed'}, {'task_id': '4300c3b09d7d1911', 'ts': '2019-02-12T17:40:54.772160', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'request_task'}, {'task_id': '4300adb2ad3af711', 'ts': '2019-02-12T17:39:36.083344', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'task_completed'}, {'task_id': '4300adb2ad3af711', 'ts': '2019-02-12T17:16:37.620175', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'request_task'}, {'task_id': '4300a27d716aee11', 'ts': '2019-02-12T17:15:44.896506', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'task_completed'}, {'task_id': '4300a27d716aee11', 'ts': '2019-02-12T17:04:45.428521', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'request_task'}, {'task_id': '430099cf48da0d11', 'ts': '2019-02-12T16:59:47.073509', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'task_completed'}, {'task_id': '430099cf48da0d11', 'ts': '2019-02-12T16:54:51.032905', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'request_task'}, {'task_id': '4300812ca4099a11', 'ts': '2019-02-12T16:54:44.284514', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'task_completed'}, {'task_id': '4300812ca4099a11', 'ts': '2019-02-12T16:28:00.471552', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'request_task'}, {'task_id': '43007cde1979ed11', 'ts': '2019-02-12T16:27:07.693668', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'task_completed'}, {'task_id': '43007cde1979ed11', 'ts': '2019-02-12T16:23:34.564148', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'request_task'}, {'ts': '2019-02-12T16:23:32.572685', 'quarantined': false, 'version': 'abcdoeraymeyouandme', 'event_type': 'bot_connected'}, {'ts': '2019-02-12T16:23:23.213689', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'message': 'About to restart: Updating to abcdoeraymeyouandme', 'event_type': 'bot_shutdown'}, {'ts': '2019-02-12T16:23:21.463539', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_update'}, {'task_id': '43006da394d9cf11', 'ts': '2019-02-12T16:23:19.251628', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '43006da394d9cf11', 'ts': '2019-02-12T16:06:56.101600', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '4300619aa8a7ac11', 'ts': '2019-02-12T16:05:37.140792', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '4300619aa8a7ac11', 'ts': '2019-02-12T15:53:32.837659', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '43005d3ac6777311', 'ts': '2019-02-12T15:52:40.259648', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '43005d3ac6777311', 'ts': '2019-02-12T15:48:51.611798', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '43004cb4fca98111', 'ts': '2019-02-12T15:47:58.755976', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '43004cb4fca98111', 'ts': '2019-02-12T15:30:48.387169', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '4300485c081fdf11', 'ts': '2019-02-12T15:29:55.436456', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '4300485c081fdf11', 'ts': '2019-02-12T15:26:00.676840', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '430038e0c10e3511', 'ts': '2019-02-12T15:25:58.443164', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '430038e0c10e3511', 'ts': '2019-02-12T15:09:06.646355', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '43002cb535ff9c11', 'ts': '2019-02-12T15:08:14.291897', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '43002cb535ff9c11', 'ts': '2019-02-12T14:56:12.164330', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '430028052d2d7511', 'ts': '2019-02-12T14:54:25.781920', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '430028052d2d7511', 'ts': '2019-02-12T14:50:50.858780', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '42ffdd28c2e72711', 'ts': '2019-02-12T13:55:36.014396', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '42ffdd28c2e72711', 'ts': '2019-02-12T13:28:52.998476', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '42ffd4f4f19a3f11', 'ts': '2019-02-12T13:28:29.451825', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '42ffd4f4f19a3f11', 'ts': '2019-02-12T13:19:56.420584', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '42ffc0c1539fad11', 'ts': '2019-02-12T13:17:01.570025', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '42ffc0c1539fad11', 'ts': '2019-02-12T12:59:52.823350', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '42ffb9dc4764d111', 'ts': '2019-02-12T12:59:50.681929', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '42ffb9dc4764d111', 'ts': '2019-02-12T12:50:22.571345', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '42ffb58cd869f711', 'ts': '2019-02-12T12:49:49.591261', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '42ffb58cd869f711', 'ts': '2019-02-12T12:45:35.487901', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '42ffb0304975ee11', 'ts': '2019-02-12T12:45:00.637659', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '42ffb0304975ee11', 'ts': '2019-02-12T12:39:57.993849', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '42ff36e1b849b611', 'ts': '2019-02-12T10:43:31.172260', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '42ff36e1b849b611', 'ts': '2019-02-12T10:27:11.531507', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '42ff323e65b21211', 'ts': '2019-02-12T10:27:04.375023', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '42ff323e65b21211', 'ts': '2019-02-12T10:22:06.905287', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}, {'task_id': '42ff19732eee9b11', 'ts': '2019-02-12T10:21:43.105154', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'task_completed'}, {'task_id': '42ff19732eee9b11', 'ts': '2019-02-12T09:55:08.127643', 'quarantined': false, 'version': '6fda8587d8e40cbc2d0c208ea94136c96de739ec01ce6b45c68d42a526d02316', 'event_type': 'request_task'}],
+  'SkiaGPU': [
+    {
+      'externalIp': '74.125.248.106',
+      'taskId': '12345',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7205-f6cf7ad',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_task',
+      'ts': '2023-05-31T19:06:02.375921Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27517269422743057,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":1037896,"health":2,"level":81,"power":["AC"],"status":2,"temperature":230,"voltage":4309},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1440000","governor":"interactive"},"disk":{"cache":{"free_mb":25316.8,"size_mb":25483.1},"data":{"free_mb":25316.8,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1018952,"buffers":13284,"cached":897024,"free":108644,"total":1858352,"used":839400},"other_packages":[],"port_path":"3/86","processes":411,"state":"available","temp":{"battery":23.0,"bms":23.0,"pa_therm0":29.0,"pm8994_tz":36.593,"tsens_tz_sensor0":36.0,"tsens_tz_sensor1":41.0,"tsens_tz_sensor10":47.0,"tsens_tz_sensor11":38.0,"tsens_tz_sensor12":37.0,"tsens_tz_sensor13":48.0,"tsens_tz_sensor14":44.0,"tsens_tz_sensor2":37.0,"tsens_tz_sensor3":38.0,"tsens_tz_sensor4":36.0,"tsens_tz_sensor5":38.0,"tsens_tz_sensor7":42.0,"tsens_tz_sensor9":43.0},"uptime":55.24}},"disks":{"/mmutex":{"free_mb":427081.1,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10930,"sleep_streak":149,"ssd":[],"started_ts":1685549025,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":46.0},"uptime":13107,"user":"chrome-bot"}',
+      'version': 'e962671e3bc53f7740f1ceadd04974a3ce94f0e5624e8544770246b5ebf2c46e',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7205-f6cf7ad',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_log',
+      'ts': '2023-05-31T19:04:55.100277Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27517269422743057,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-44250,"health":2,"level":80,"power":[],"status":3,"temperature":220,"voltage":4049},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25316.8,"size_mb":25483.1},"data":{"free_mb":25316.8,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1063976,"buffers":27356,"cached":941064,"free":95556,"total":1858352,"used":794376},"other_packages":[],"port_path":"3/68","processes":383,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.655,"tsens_tz_sensor0":24.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":25.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":10838.4}},"disks":{"/mmutex":{"free_mb":427083.6,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10852,"sleep_streak":148,"ssd":[],"started_ts":1685549025,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":34.0},"uptime":13029,"user":"chrome-bot"}',
+      'version': 'e962671e3bc53f7740f1ceadd04974a3ce94f0e5624e8544770246b5ebf2c46e',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Rebooting device because max uptime exceeded during idle',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7205-f6cf7ad',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-31T16:05:17.810816Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27517269422743057,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":597530,"health":2,"level":92,"power":["AC"],"status":2,"temperature":230,"voltage":4354},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.0,"size_mb":25483.1},"data":{"free_mb":25317.0,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1003572,"buffers":16568,"cached":952804,"free":34200,"total":1858352,"used":854780},"other_packages":[],"port_path":"3/68","processes":403,"state":"available","temp":{"battery":23.0,"bms":23.0,"pa_therm0":28.0,"pm8994_tz":32.522,"tsens_tz_sensor0":30.0,"tsens_tz_sensor1":32.0,"tsens_tz_sensor10":33.0,"tsens_tz_sensor11":31.0,"tsens_tz_sensor12":31.0,"tsens_tz_sensor13":32.0,"tsens_tz_sensor14":32.0,"tsens_tz_sensor2":31.0,"tsens_tz_sensor3":31.0,"tsens_tz_sensor4":30.0,"tsens_tz_sensor5":31.0,"tsens_tz_sensor7":32.0,"tsens_tz_sensor9":33.0},"uptime":61.39}},"disks":{"/mmutex":{"free_mb":427117.0,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":77,"sleep_streak":0,"ssd":[],"started_ts":1685549025,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":43.0},"uptime":2254,"user":"chrome-bot"}',
+      'version': 'e962671e3bc53f7740f1ceadd04974a3ce94f0e5624e8544770246b5ebf2c46e',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '4',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-E3-1220_v3',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            'powersave',
+          ],
+          'key': 'cpu_governor',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-highmem-4',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-18',
+            'Ubuntu-18.04',
+            'Ubuntu-18.04.6',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7205-f6cf7ad',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'ssd',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_connected',
+      'ts': '2023-05-31T16:03:45.623335Z',
+      'state': '{"audio":null,"bot_group_cfg_version":null,"cost_usd_hour":0.27517269422743057,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","disks":{"/mmutex":{"free_mb":427119.0,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["dejavu","lato"]},"gpu":null,"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":1,"sleep_streak":0,"ssd":[],"started_ts":1685549025,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":39.0},"uptime":2177,"user":"chrome-bot"}',
+      'version': 'e962671e3bc53f7740f1ceadd04974a3ce94f0e5624e8544770246b5ebf2c46e',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7204-983174a',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_shutdown',
+      'ts': '2023-05-31T16:03:41.285841Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751731228298611,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-42724,"health":2,"level":91,"power":[],"status":3,"temperature":220,"voltage":4187},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.0,"size_mb":25483.1},"data":{"free_mb":25317.0,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1045132,"buffers":18096,"cached":904596,"free":122440,"total":1858352,"used":813220},"other_packages":[],"port_path":"3/54","processes":388,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.553,"tsens_tz_sensor0":24.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":26.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":1351.93}},"disks":{"/mmutex":{"free_mb":427119.5,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":1366,"sleep_streak":22,"ssd":[],"started_ts":1685547637,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":34.0},"uptime":2154,"user":"chrome-bot"}',
+      'version': 'f9d34dcc2b6f1ae4de49581747c08b4facc400f3cd0344980ffe0add45c7983e',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'About to restart: Updating to e962671e3bc53f7740f1ceadd04974a3ce94f0e5624e8544770246b5ebf2c46e',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7204-983174a',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_update',
+      'ts': '2023-05-31T16:03:39.790993Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751731228298611,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-42724,"health":2,"level":91,"power":[],"status":3,"temperature":220,"voltage":4187},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.0,"size_mb":25483.1},"data":{"free_mb":25317.0,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1045132,"buffers":18096,"cached":904596,"free":122440,"total":1858352,"used":813220},"other_packages":[],"port_path":"3/54","processes":388,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.553,"tsens_tz_sensor0":24.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":26.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":1351.93}},"disks":{"/mmutex":{"free_mb":427119.5,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":1366,"sleep_streak":22,"ssd":[],"started_ts":1685547637,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":34.0},"uptime":2154,"user":"chrome-bot"}',
+      'version': 'f9d34dcc2b6f1ae4de49581747c08b4facc400f3cd0344980ffe0add45c7983e',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7204-983174a',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-31T15:42:12.397659Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751731228298611,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":721278,"health":2,"level":84,"power":["AC"],"status":2,"temperature":237,"voltage":4311},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25316.9,"size_mb":25483.1},"data":{"free_mb":25316.9,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1003816,"buffers":16980,"cached":950504,"free":36332,"total":1858352,"used":854536},"other_packages":[],"port_path":"3/54","processes":403,"state":"available","temp":{"battery":24.2,"bms":24.2,"pa_therm0":28.0,"pm8994_tz":33.796,"tsens_tz_sensor0":31.0,"tsens_tz_sensor1":32.0,"tsens_tz_sensor10":33.0,"tsens_tz_sensor11":31.0,"tsens_tz_sensor12":31.0,"tsens_tz_sensor13":33.0,"tsens_tz_sensor14":33.0,"tsens_tz_sensor2":31.0,"tsens_tz_sensor3":31.0,"tsens_tz_sensor4":31.0,"tsens_tz_sensor5":31.0,"tsens_tz_sensor7":33.0,"tsens_tz_sensor9":33.0},"uptime":64.24}},"disks":{"/mmutex":{"free_mb":427124.5,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":78,"sleep_streak":0,"ssd":[],"started_ts":1685547637,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":42.0},"uptime":866,"user":"chrome-bot"}',
+      'version': 'f9d34dcc2b6f1ae4de49581747c08b4facc400f3cd0344980ffe0add45c7983e',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '4',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-E3-1220_v3',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            'powersave',
+          ],
+          'key': 'cpu_governor',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-highmem-4',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-18',
+            'Ubuntu-18.04',
+            'Ubuntu-18.04.6',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7204-983174a',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'ssd',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_connected',
+      'ts': '2023-05-31T15:40:37.274838Z',
+      'state': '{"audio":null,"bot_group_cfg_version":null,"cost_usd_hour":0.2751731228298611,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","disks":{"/mmutex":{"free_mb":427127.0,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["dejavu","lato"]},"gpu":null,"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":0,"sleep_streak":0,"ssd":[],"started_ts":1685547637,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":46.0},"uptime":789,"user":"chrome-bot"}',
+      'version': 'f9d34dcc2b6f1ae4de49581747c08b4facc400f3cd0344980ffe0add45c7983e',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_shutdown',
+      'ts': '2023-05-31T15:40:32.990371Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516341688368057,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":749507,"health":2,"level":83,"power":["AC"],"status":2,"temperature":237,"voltage":4354},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.0,"size_mb":25483.1},"data":{"free_mb":25317.0,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1029496,"buffers":16988,"cached":906116,"free":106392,"total":1858352,"used":828856},"other_packages":[],"port_path":"3/31","processes":398,"state":"available","temp":{"battery":23.7,"bms":23.7,"pa_therm0":25.0,"pm8994_tz":29.183,"tsens_tz_sensor0":26.0,"tsens_tz_sensor1":27.0,"tsens_tz_sensor10":27.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":26.0,"tsens_tz_sensor13":27.0,"tsens_tz_sensor14":27.0,"tsens_tz_sensor2":26.0,"tsens_tz_sensor3":26.0,"tsens_tz_sensor4":26.0,"tsens_tz_sensor5":26.0,"tsens_tz_sensor7":27.0,"tsens_tz_sensor9":28.0},"uptime":574.16}},"disks":{"/mmutex":{"free_mb":427121.7,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":584,"sleep_streak":12,"ssd":[],"started_ts":1685547030,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":38.0},"uptime":766,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'About to restart: Updating to f9d34dcc2b6f1ae4de49581747c08b4facc400f3cd0344980ffe0add45c7983e',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_update',
+      'ts': '2023-05-31T15:40:31.585962Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516341688368057,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":749507,"health":2,"level":83,"power":["AC"],"status":2,"temperature":237,"voltage":4354},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.0,"size_mb":25483.1},"data":{"free_mb":25317.0,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1029496,"buffers":16988,"cached":906116,"free":106392,"total":1858352,"used":828856},"other_packages":[],"port_path":"3/31","processes":398,"state":"available","temp":{"battery":23.7,"bms":23.7,"pa_therm0":25.0,"pm8994_tz":29.183,"tsens_tz_sensor0":26.0,"tsens_tz_sensor1":27.0,"tsens_tz_sensor10":27.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":26.0,"tsens_tz_sensor13":27.0,"tsens_tz_sensor14":27.0,"tsens_tz_sensor2":26.0,"tsens_tz_sensor3":26.0,"tsens_tz_sensor4":26.0,"tsens_tz_sensor5":26.0,"tsens_tz_sensor7":27.0,"tsens_tz_sensor9":28.0},"uptime":574.16}},"disks":{"/mmutex":{"free_mb":427121.7,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":584,"sleep_streak":12,"ssd":[],"started_ts":1685547030,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":38.0},"uptime":766,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-31T15:32:00.916041Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516341688368057,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":778804,"health":2,"level":77,"power":["AC"],"status":2,"temperature":242,"voltage":4294},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.0,"size_mb":25483.1},"data":{"free_mb":25317.0,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1008220,"buffers":16572,"cached":951948,"free":39700,"total":1858352,"used":850132},"other_packages":[],"port_path":"3/31","processes":405,"state":"available","temp":{"battery":24.2,"bms":24.2,"pa_therm0":29.0,"pm8994_tz":33.648,"tsens_tz_sensor0":31.0,"tsens_tz_sensor1":33.0,"tsens_tz_sensor10":34.0,"tsens_tz_sensor11":32.0,"tsens_tz_sensor12":31.0,"tsens_tz_sensor13":33.0,"tsens_tz_sensor14":33.0,"tsens_tz_sensor2":32.0,"tsens_tz_sensor3":32.0,"tsens_tz_sensor4":31.0,"tsens_tz_sensor5":31.0,"tsens_tz_sensor7":33.0,"tsens_tz_sensor9":33.0},"uptime":62.9}},"disks":{"/mmutex":{"free_mb":427127.4,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":74,"sleep_streak":0,"ssd":[],"started_ts":1685547030,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":48.0},"uptime":256,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '4',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-E3-1220_v3',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            'powersave',
+          ],
+          'key': 'cpu_governor',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-highmem-4',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-18',
+            'Ubuntu-18.04',
+            'Ubuntu-18.04.6',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'ssd',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_connected',
+      'ts': '2023-05-31T15:30:31.389161Z',
+      'state': '{"audio":null,"bot_group_cfg_version":null,"cost_usd_hour":0.27516341688368057,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","disks":{"/mmutex":{"free_mb":427129.6,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["dejavu","lato"]},"gpu":null,"hostname":"build243-m4--device1","ip":"172.17.0.8","nb_files_in_temp":1,"pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":1,"sleep_streak":0,"ssd":[],"started_ts":1685547030,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":43.0},"uptime":183,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_missing',
+      'ts': '2023-05-31T13:20:10.049272Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-44097,"health":2,"level":80,"power":[],"status":3,"temperature":220,"voltage":4056},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"460800","governor":"interactive"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1070396,"buffers":25132,"cached":890904,"free":154360,"total":1858352,"used":787956},"other_packages":[],"port_path":"3/58","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.998,"tsens_tz_sensor0":25.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":30.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":25.0,"tsens_tz_sensor13":29.0,"tsens_tz_sensor14":28.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":25.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":26.0,"tsens_tz_sensor9":27.0},"uptime":10063.68}},"disks":{"/mmutex":{"free_mb":427098.4,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":42565,"sleep_streak":626,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":32.0},"uptime":86563,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_shutdown',
+      'ts': '2023-05-31T13:10:02.322630Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-44097,"health":2,"level":80,"power":[],"status":3,"temperature":220,"voltage":4056},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"460800","governor":"interactive"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1070396,"buffers":25132,"cached":890904,"free":154360,"total":1858352,"used":787956},"other_packages":[],"port_path":"3/58","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.998,"tsens_tz_sensor0":25.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":30.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":25.0,"tsens_tz_sensor13":29.0,"tsens_tz_sensor14":28.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":25.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":26.0,"tsens_tz_sensor9":27.0},"uptime":10063.68}},"disks":{"/mmutex":{"free_mb":427098.4,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":42565,"sleep_streak":626,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":32.0},"uptime":86563,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Signal was received',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-31T10:23:06.094482Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":1063378,"health":2,"level":80,"power":["AC"],"status":2,"temperature":230,"voltage":4308},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1440000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1008564,"buffers":13456,"cached":954224,"free":40884,"total":1858352,"used":849788},"other_packages":[],"port_path":"3/58","processes":410,"state":"available","temp":{"battery":23.0,"bms":23.0,"pa_therm0":29.0,"pm8994_tz":36.25,"tsens_tz_sensor0":35.0,"tsens_tz_sensor1":37.0,"tsens_tz_sensor10":45.0,"tsens_tz_sensor11":38.0,"tsens_tz_sensor12":37.0,"tsens_tz_sensor13":41.0,"tsens_tz_sensor14":40.0,"tsens_tz_sensor2":36.0,"tsens_tz_sensor3":36.0,"tsens_tz_sensor4":35.0,"tsens_tz_sensor5":35.0,"tsens_tz_sensor7":36.0,"tsens_tz_sensor9":36.0},"uptime":55.49}},"disks":{"/mmutex":{"free_mb":427110.2,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":32557,"sleep_streak":477,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":35.0},"uptime":76555,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_log',
+      'ts': '2023-05-31T10:21:58.514336Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-81328,"health":2,"level":80,"power":[],"status":3,"temperature":220,"voltage":4048},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"600000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1061740,"buffers":26488,"cached":888772,"free":146480,"total":1858352,"used":796612},"other_packages":[],"port_path":"3/39","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":26.088,"tsens_tz_sensor0":25.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":31.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":26.0,"tsens_tz_sensor13":29.0,"tsens_tz_sensor14":29.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":25.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":26.0,"tsens_tz_sensor9":27.0},"uptime":10839.39}},"disks":{"/mmutex":{"free_mb":427111.8,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":32488,"sleep_streak":476,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":36.0},"uptime":76486,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Rebooting device because max uptime exceeded during idle',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-31T07:22:13.257358Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":997918,"health":2,"level":80,"power":["AC"],"status":2,"temperature":230,"voltage":4297},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1440000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":992956,"buffers":13360,"cached":946208,"free":33388,"total":1858352,"used":865396},"other_packages":[],"port_path":"3/39","processes":412,"state":"available","temp":{"battery":23.0,"bms":23.0,"pa_therm0":29.0,"pm8994_tz":36.248,"tsens_tz_sensor0":36.0,"tsens_tz_sensor1":38.0,"tsens_tz_sensor10":48.0,"tsens_tz_sensor11":38.0,"tsens_tz_sensor12":37.0,"tsens_tz_sensor13":47.0,"tsens_tz_sensor14":43.0,"tsens_tz_sensor2":36.0,"tsens_tz_sensor3":36.0,"tsens_tz_sensor4":35.0,"tsens_tz_sensor5":36.0,"tsens_tz_sensor7":37.0,"tsens_tz_sensor9":37.0},"uptime":55.44}},"disks":{"/mmutex":{"free_mb":427092.0,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":21704,"sleep_streak":313,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":34.0},"uptime":65702,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_log',
+      'ts': '2023-05-31T07:21:05.899262Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-43487,"health":2,"level":80,"power":[],"status":3,"temperature":220,"voltage":4054},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"960000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.2,"size_mb":25483.1},"data":{"free_mb":25317.2,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1079040,"buffers":27380,"cached":922716,"free":128944,"total":1858352,"used":779312},"other_packages":[],"port_path":"3/20","processes":381,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.896,"tsens_tz_sensor0":24.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":29.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":25.0,"tsens_tz_sensor13":27.0,"tsens_tz_sensor14":27.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":26.0},"uptime":10813.62}},"disks":{"/mmutex":{"free_mb":427093.4,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":21635,"sleep_streak":312,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":31.0},"uptime":65633,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Rebooting device because max uptime exceeded during idle',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-31T04:21:25.827743Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":709987,"health":2,"level":80,"power":["AC"],"status":2,"temperature":222,"voltage":4229},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1440000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.3,"size_mb":25483.1},"data":{"free_mb":25317.3,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":991924,"buffers":20928,"cached":936824,"free":34172,"total":1858352,"used":866428},"other_packages":[],"port_path":"3/20","processes":404,"state":"available","temp":{"battery":23.0,"bms":23.0,"pa_therm0":30.0,"pm8994_tz":37.672,"tsens_tz_sensor0":39.0,"tsens_tz_sensor1":42.0,"tsens_tz_sensor10":49.0,"tsens_tz_sensor11":41.0,"tsens_tz_sensor12":39.0,"tsens_tz_sensor13":46.0,"tsens_tz_sensor14":45.0,"tsens_tz_sensor2":39.0,"tsens_tz_sensor3":40.0,"tsens_tz_sensor4":38.0,"tsens_tz_sensor5":39.0,"tsens_tz_sensor7":45.0,"tsens_tz_sensor9":45.0},"uptime":34.73}},"disks":{"/mmutex":{"free_mb":427094.6,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10857,"sleep_streak":150,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":38.0},"uptime":54855,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_log',
+      'ts': '2023-05-31T04:20:39.228482Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-43487,"health":2,"level":80,"power":[],"status":3,"temperature":220,"voltage":4050},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.3,"size_mb":25483.1},"data":{"free_mb":25317.3,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1064456,"buffers":27512,"cached":906844,"free":130100,"total":1858352,"used":793896},"other_packages":[],"port_path":"3/11","processes":383,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.356,"tsens_tz_sensor0":23.0,"tsens_tz_sensor1":24.0,"tsens_tz_sensor10":25.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":10794.88}},"disks":{"/mmutex":{"free_mb":427095.6,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10799,"sleep_streak":149,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":35.0},"uptime":54797,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Rebooting device because max uptime exceeded during idle',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-31T01:21:48.412647Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":734858,"health":2,"level":89,"power":["AC"],"status":2,"temperature":230,"voltage":4354},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1007648,"buffers":16880,"cached":954028,"free":36740,"total":1858352,"used":850704},"other_packages":[],"port_path":"3/11","processes":406,"state":"available","temp":{"battery":23.2,"bms":23.2,"pa_therm0":27.0,"pm8994_tz":32.373,"tsens_tz_sensor0":30.0,"tsens_tz_sensor1":31.0,"tsens_tz_sensor10":32.0,"tsens_tz_sensor11":30.0,"tsens_tz_sensor12":30.0,"tsens_tz_sensor13":31.0,"tsens_tz_sensor14":31.0,"tsens_tz_sensor2":30.0,"tsens_tz_sensor3":30.0,"tsens_tz_sensor4":30.0,"tsens_tz_sensor5":30.0,"tsens_tz_sensor7":31.0,"tsens_tz_sensor9":32.0},"uptime":64.2}},"disks":{"/mmutex":{"free_mb":427110.9,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":69,"sleep_streak":0,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":44.0},"uptime":44066,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '4',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-E3-1220_v3',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            'powersave',
+          ],
+          'key': 'cpu_governor',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-highmem-4',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-18',
+            'Ubuntu-18.04',
+            'Ubuntu-18.04.6',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'ssd',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_connected',
+      'ts': '2023-05-31T01:20:22.661444Z',
+      'state': '{"audio":null,"bot_group_cfg_version":null,"cost_usd_hour":0.27516557074652775,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","disks":{"/mmutex":{"free_mb":427038.7,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["dejavu","lato"]},"gpu":null,"hostname":"build243-m4--device1","ip":"172.17.0.5","nb_files_in_temp":1,"pid":51,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":1,"sleep_streak":0,"ssd":[],"started_ts":1685496022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":41.0},"uptime":43998,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_shutdown',
+      'ts': '2023-05-31T01:15:03.423400Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.275171240234375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-42724,"health":2,"level":89,"power":[],"status":3,"temperature":220,"voltage":4131},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"960000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.2,"size_mb":25483.1},"data":{"free_mb":25317.2,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1086620,"buffers":18916,"cached":876484,"free":191220,"total":1858352,"used":771732},"other_packages":[],"port_path":"3/110","processes":387,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.943,"tsens_tz_sensor0":25.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":29.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":25.0,"tsens_tz_sensor13":27.0,"tsens_tz_sensor14":27.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":25.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":26.0,"tsens_tz_sensor9":27.0},"uptime":3165.15}},"disks":{"/mmutex":{"free_mb":427087.9,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":14061,"sleep_streak":201,"ssd":[],"started_ts":1685481621,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":32.0},"uptime":43657,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Signal was received',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-31T00:22:59.300360Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.275171240234375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":1082757,"health":2,"level":82,"power":["AC"],"status":2,"temperature":230,"voltage":4324},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1440000","governor":"interactive"},"disk":{"cache":{"free_mb":25316.9,"size_mb":25483.1},"data":{"free_mb":25316.9,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":995864,"buffers":13360,"cached":949308,"free":33196,"total":1858352,"used":862488},"other_packages":[],"port_path":"3/110","processes":409,"state":"available","temp":{"battery":23.7,"bms":23.7,"pa_therm0":29.0,"pm8994_tz":36.199,"tsens_tz_sensor0":36.0,"tsens_tz_sensor1":40.0,"tsens_tz_sensor10":47.0,"tsens_tz_sensor11":38.0,"tsens_tz_sensor12":36.0,"tsens_tz_sensor13":46.0,"tsens_tz_sensor14":43.0,"tsens_tz_sensor2":37.0,"tsens_tz_sensor3":37.0,"tsens_tz_sensor4":36.0,"tsens_tz_sensor5":36.0,"tsens_tz_sensor7":39.0,"tsens_tz_sensor9":38.0},"uptime":55.42}},"disks":{"/mmutex":{"free_mb":427095.1,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10951,"sleep_streak":154,"ssd":[],"started_ts":1685481621,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":36.0},"uptime":40548,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_log',
+      'ts': '2023-05-31T00:21:51.774298Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.275171240234375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-47912,"health":2,"level":81,"power":[],"status":3,"temperature":220,"voltage":4062},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1078820,"buffers":27192,"cached":904612,"free":147016,"total":1858352,"used":779532},"other_packages":[],"port_path":"3/86","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.503,"tsens_tz_sensor0":24.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":25.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":10859.47}},"disks":{"/mmutex":{"free_mb":427096.8,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10873,"sleep_streak":153,"ssd":[],"started_ts":1685481621,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":35.0},"uptime":40470,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Rebooting device because max uptime exceeded during idle',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-30T21:21:54.479325Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.275171240234375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":1015771,"health":2,"level":84,"power":["AC"],"status":2,"temperature":230,"voltage":4329},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1000644,"buffers":17996,"cached":947520,"free":35128,"total":1858352,"used":857708},"other_packages":[],"port_path":"3/86","processes":404,"state":"available","temp":{"battery":23.7,"bms":23.7,"pa_therm0":28.0,"pm8994_tz":33.305,"tsens_tz_sensor0":30.0,"tsens_tz_sensor1":32.0,"tsens_tz_sensor10":33.0,"tsens_tz_sensor11":31.0,"tsens_tz_sensor12":31.0,"tsens_tz_sensor13":32.0,"tsens_tz_sensor14":32.0,"tsens_tz_sensor2":31.0,"tsens_tz_sensor3":31.0,"tsens_tz_sensor4":30.0,"tsens_tz_sensor5":31.0,"tsens_tz_sensor7":32.0,"tsens_tz_sensor9":33.0},"uptime":63.85}},"disks":{"/mmutex":{"free_mb":427091.2,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":78,"sleep_streak":0,"ssd":[],"started_ts":1685481621,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":36.0},"uptime":29674,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '4',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-E3-1220_v3',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            'powersave',
+          ],
+          'key': 'cpu_governor',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-highmem-4',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-18',
+            'Ubuntu-18.04',
+            'Ubuntu-18.04.6',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7203-d8cd2a3',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'ssd',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_connected',
+      'ts': '2023-05-30T21:20:21.242294Z',
+      'state': '{"audio":null,"bot_group_cfg_version":null,"cost_usd_hour":0.275171240234375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","disks":{"/mmutex":{"free_mb":427092.3,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["dejavu","lato"]},"gpu":null,"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":0,"sleep_streak":0,"ssd":[],"started_ts":1685481621,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":35.0},"uptime":29597,"user":"chrome-bot"}',
+      'version': 'e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7202-9c1fc39',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_shutdown',
+      'ts': '2023-05-30T21:20:17.006740Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751721896701389,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-43029,"health":2,"level":84,"power":[],"status":3,"temperature":220,"voltage":4089},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1076780,"buffers":23044,"cached":949508,"free":104228,"total":1858352,"used":781572},"other_packages":[],"port_path":"3/70","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.405,"tsens_tz_sensor0":23.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":25.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":6561.04}},"disks":{"/mmutex":{"free_mb":427092.6,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":6575,"sleep_streak":92,"ssd":[],"started_ts":1685475023,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":33.0},"uptime":29574,"user":"chrome-bot"}',
+      'version': '0b9c1ba08a21781d88894a5ff9eb792d15eba1712f057dcdcafab35d815558ae',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'About to restart: Updating to e7a8a06da1293c5f8f176f50fdbcf548085cc5ab1f89339ee6ec15b20afc67ab',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7202-9c1fc39',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_update',
+      'ts': '2023-05-30T21:20:15.361079Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751721896701389,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-43029,"health":2,"level":84,"power":[],"status":3,"temperature":220,"voltage":4089},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.1,"size_mb":25483.1},"data":{"free_mb":25317.1,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1076780,"buffers":23044,"cached":949508,"free":104228,"total":1858352,"used":781572},"other_packages":[],"port_path":"3/70","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.405,"tsens_tz_sensor0":23.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":25.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":6561.04}},"disks":{"/mmutex":{"free_mb":427092.6,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":6575,"sleep_streak":92,"ssd":[],"started_ts":1685475023,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":33.0},"uptime":29574,"user":"chrome-bot"}',
+      'version': '0b9c1ba08a21781d88894a5ff9eb792d15eba1712f057dcdcafab35d815558ae',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7202-9c1fc39',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-30T19:31:58.385956Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751721896701389,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":736079,"health":2,"level":90,"power":["AC"],"status":2,"temperature":230,"voltage":4354},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.3,"size_mb":25483.1},"data":{"free_mb":25317.3,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1010820,"buffers":18812,"cached":955860,"free":36148,"total":1858352,"used":847532},"other_packages":[],"port_path":"3/70","processes":405,"state":"available","temp":{"battery":23.0,"bms":23.0,"pa_therm0":28.0,"pm8994_tz":32.569,"tsens_tz_sensor0":30.0,"tsens_tz_sensor1":31.0,"tsens_tz_sensor10":32.0,"tsens_tz_sensor11":31.0,"tsens_tz_sensor12":30.0,"tsens_tz_sensor13":31.0,"tsens_tz_sensor14":31.0,"tsens_tz_sensor2":30.0,"tsens_tz_sensor3":30.0,"tsens_tz_sensor4":30.0,"tsens_tz_sensor5":30.0,"tsens_tz_sensor7":32.0,"tsens_tz_sensor9":34.0},"uptime":63.85}},"disks":{"/mmutex":{"free_mb":427108.5,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":78,"sleep_streak":0,"ssd":[],"started_ts":1685475023,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":43.0},"uptime":23077,"user":"chrome-bot"}',
+      'version': '0b9c1ba08a21781d88894a5ff9eb792d15eba1712f057dcdcafab35d815558ae',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '4',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-E3-1220_v3',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            'powersave',
+          ],
+          'key': 'cpu_governor',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-highmem-4',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-18',
+            'Ubuntu-18.04',
+            'Ubuntu-18.04.6',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7202-9c1fc39',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'ssd',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_connected',
+      'ts': '2023-05-30T19:30:23.531220Z',
+      'state': '{"audio":null,"bot_group_cfg_version":null,"cost_usd_hour":0.2751721896701389,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","disks":{"/mmutex":{"free_mb":427109.8,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["dejavu","lato"]},"gpu":null,"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":0,"sleep_streak":0,"ssd":[],"started_ts":1685475023,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":34.0},"uptime":22999,"user":"chrome-bot"}',
+      'version': '0b9c1ba08a21781d88894a5ff9eb792d15eba1712f057dcdcafab35d815558ae',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7200-07ad3da',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_shutdown',
+      'ts': '2023-05-30T19:30:19.265938Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27517320421006947,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-42724,"health":2,"level":90,"power":[],"status":3,"temperature":220,"voltage":4150},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.3,"size_mb":25483.1},"data":{"free_mb":25317.3,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1087816,"buffers":20236,"cached":898412,"free":169168,"total":1858352,"used":770536},"other_packages":[],"port_path":"3/60","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.653,"tsens_tz_sensor0":24.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":26.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":3434.2}},"disks":{"/mmutex":{"free_mb":427109.9,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":3439,"sleep_streak":49,"ssd":[],"started_ts":1685471562,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":33.0},"uptime":22976,"user":"chrome-bot"}',
+      'version': '79612a697d5737bf8b4cd2edfc28f5a5a2cba37c14ccd03549c11086b3d76dc4',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'About to restart: Updating to 0b9c1ba08a21781d88894a5ff9eb792d15eba1712f057dcdcafab35d815558ae',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7200-07ad3da',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_update',
+      'ts': '2023-05-30T19:30:17.587464Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27517320421006947,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-42724,"health":2,"level":90,"power":[],"status":3,"temperature":220,"voltage":4150},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.3,"size_mb":25483.1},"data":{"free_mb":25317.3,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1087816,"buffers":20236,"cached":898412,"free":169168,"total":1858352,"used":770536},"other_packages":[],"port_path":"3/60","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.653,"tsens_tz_sensor0":24.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":26.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":3434.2}},"disks":{"/mmutex":{"free_mb":427109.9,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":3439,"sleep_streak":49,"ssd":[],"started_ts":1685471562,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":33.0},"uptime":22976,"user":"chrome-bot"}',
+      'version': '79612a697d5737bf8b4cd2edfc28f5a5a2cba37c14ccd03549c11086b3d76dc4',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7200-07ad3da',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-30T18:34:05.472987Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.27517320421006947,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":975336,"health":2,"level":82,"power":["AC"],"status":2,"temperature":232,"voltage":4315},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.3,"size_mb":25483.1},"data":{"free_mb":25317.3,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1008388,"buffers":16608,"cached":953124,"free":38656,"total":1858352,"used":849964},"other_packages":[],"port_path":"3/60","processes":405,"state":"available","temp":{"battery":23.2,"bms":23.2,"pa_therm0":28.0,"pm8994_tz":32.619,"tsens_tz_sensor0":30.0,"tsens_tz_sensor1":32.0,"tsens_tz_sensor10":33.0,"tsens_tz_sensor11":31.0,"tsens_tz_sensor12":31.0,"tsens_tz_sensor13":32.0,"tsens_tz_sensor14":32.0,"tsens_tz_sensor2":31.0,"tsens_tz_sensor3":31.0,"tsens_tz_sensor4":30.0,"tsens_tz_sensor5":31.0,"tsens_tz_sensor7":32.0,"tsens_tz_sensor9":33.0},"uptime":61.69}},"disks":{"/mmutex":{"free_mb":427123.8,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":68,"sleep_streak":0,"ssd":[],"started_ts":1685471562,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":42.0},"uptime":19606,"user":"chrome-bot"}',
+      'version': '79612a697d5737bf8b4cd2edfc28f5a5a2cba37c14ccd03549c11086b3d76dc4',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '4',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-E3-1220_v3',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            'powersave',
+          ],
+          'key': 'cpu_governor',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-highmem-4',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-18',
+            'Ubuntu-18.04',
+            'Ubuntu-18.04.6',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7200-07ad3da',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'ssd',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_connected',
+      'ts': '2023-05-30T18:32:42.369607Z',
+      'state': '{"audio":null,"bot_group_cfg_version":null,"cost_usd_hour":0.27517320421006947,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","disks":{"/mmutex":{"free_mb":427128.4,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["dejavu","lato"]},"gpu":null,"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":1,"sleep_streak":0,"ssd":[],"started_ts":1685471562,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":35.0},"uptime":19538,"user":"chrome-bot"}',
+      'version': '79612a697d5737bf8b4cd2edfc28f5a5a2cba37c14ccd03549c11086b3d76dc4',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_shutdown',
+      'ts': '2023-05-30T18:32:38.073925Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751654079861111,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-224760,"health":2,"level":82,"power":[],"status":3,"temperature":220,"voltage":4075},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"960000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.4,"size_mb":25483.1},"data":{"free_mb":25317.4,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1074036,"buffers":24456,"cached":901300,"free":148280,"total":1858352,"used":784316},"other_packages":[],"port_path":"3/34","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":26.244,"tsens_tz_sensor0":25.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":30.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":26.0,"tsens_tz_sensor13":29.0,"tsens_tz_sensor14":29.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":25.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":27.0,"tsens_tz_sensor9":27.0},"uptime":8498.7}},"disks":{"/mmutex":{"free_mb":427133.9,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":19320,"sleep_streak":278,"ssd":[],"started_ts":1685452229,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":34.0},"uptime":19525,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'About to restart: Updating to 79612a697d5737bf8b4cd2edfc28f5a5a2cba37c14ccd03549c11086b3d76dc4',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_update',
+      'ts': '2023-05-30T18:32:36.616714Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751654079861111,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-224760,"health":2,"level":82,"power":[],"status":3,"temperature":220,"voltage":4075},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"960000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.4,"size_mb":25483.1},"data":{"free_mb":25317.4,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1074036,"buffers":24456,"cached":901300,"free":148280,"total":1858352,"used":784316},"other_packages":[],"port_path":"3/34","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":26.244,"tsens_tz_sensor0":25.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":30.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":26.0,"tsens_tz_sensor13":29.0,"tsens_tz_sensor14":29.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":25.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":27.0,"tsens_tz_sensor9":27.0},"uptime":8498.7}},"disks":{"/mmutex":{"free_mb":427133.9,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":19320,"sleep_streak":278,"ssd":[],"started_ts":1685452229,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":34.0},"uptime":19525,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-30T16:11:53.995656Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751654079861111,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":1057427,"health":2,"level":82,"power":["AC"],"status":2,"temperature":230,"voltage":4320},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1440000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.4,"size_mb":25483.1},"data":{"free_mb":25317.4,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1002340,"buffers":13456,"cached":942992,"free":45892,"total":1858352,"used":856012},"other_packages":[],"port_path":"3/34","processes":410,"state":"available","temp":{"battery":23.7,"bms":23.7,"pa_therm0":29.0,"pm8994_tz":36.201,"tsens_tz_sensor0":35.0,"tsens_tz_sensor1":37.0,"tsens_tz_sensor10":43.0,"tsens_tz_sensor11":38.0,"tsens_tz_sensor12":36.0,"tsens_tz_sensor13":40.0,"tsens_tz_sensor14":40.0,"tsens_tz_sensor2":36.0,"tsens_tz_sensor3":36.0,"tsens_tz_sensor4":35.0,"tsens_tz_sensor5":35.0,"tsens_tz_sensor7":36.0,"tsens_tz_sensor9":37.0},"uptime":55.05}},"disks":{"/mmutex":{"free_mb":427137.0,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10877,"sleep_streak":150,"ssd":[],"started_ts":1685452229,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":40.0},"uptime":11082,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_log',
+      'ts': '2023-05-30T16:10:45.451456Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751654079861111,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-44097,"health":2,"level":81,"power":[],"status":3,"temperature":220,"voltage":4065},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.5,"size_mb":25483.1},"data":{"free_mb":25317.5,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1067152,"buffers":27376,"cached":916608,"free":123168,"total":1858352,"used":791200},"other_packages":[],"port_path":"3/25","processes":382,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.751,"tsens_tz_sensor0":24.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":26.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":26.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":26.0},"uptime":10793.33}},"disks":{"/mmutex":{"free_mb":427146.3,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10799,"sleep_streak":149,"ssd":[],"started_ts":1685452229,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":33.0},"uptime":11003,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Rebooting device because max uptime exceeded during idle',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-30T13:11:56.872087Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751654079861111,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":1209099,"health":2,"level":81,"power":["AC"],"status":2,"temperature":232,"voltage":4340},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.6,"size_mb":25483.1},"data":{"free_mb":25317.6,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1009252,"buffers":16468,"cached":954800,"free":37984,"total":1858352,"used":849100},"other_packages":[],"port_path":"3/25","processes":405,"state":"available","temp":{"battery":23.2,"bms":23.2,"pa_therm0":27.0,"pm8994_tz":32.03,"tsens_tz_sensor0":29.0,"tsens_tz_sensor1":31.0,"tsens_tz_sensor10":32.0,"tsens_tz_sensor11":30.0,"tsens_tz_sensor12":30.0,"tsens_tz_sensor13":31.0,"tsens_tz_sensor14":31.0,"tsens_tz_sensor2":30.0,"tsens_tz_sensor3":30.0,"tsens_tz_sensor4":29.0,"tsens_tz_sensor5":30.0,"tsens_tz_sensor7":31.0,"tsens_tz_sensor9":32.0},"uptime":65.09}},"disks":{"/mmutex":{"free_mb":427164.5,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":70,"sleep_streak":0,"ssd":[],"started_ts":1685452229,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":48.0},"uptime":274,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '4',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-E3-1220_v3',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            'powersave',
+          ],
+          'key': 'cpu_governor',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-highmem-4',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-18',
+            'Ubuntu-18.04',
+            'Ubuntu-18.04.6',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'ssd',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_connected',
+      'ts': '2023-05-30T13:10:29.771366Z',
+      'state': '{"audio":null,"bot_group_cfg_version":null,"cost_usd_hour":0.2751654079861111,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","disks":{"/mmutex":{"free_mb":427166.3,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["dejavu","lato"]},"gpu":null,"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":1,"sleep_streak":0,"ssd":[],"started_ts":1685452229,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":43.0},"uptime":205,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_shutdown',
+      'ts': '2023-05-30T13:00:02.802537Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751943359375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-46691,"health":2,"level":81,"power":[],"status":3,"temperature":220,"voltage":4065},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"460800","governor":"interactive"},"disk":{"cache":{"free_mb":25317.6,"size_mb":25483.1},"data":{"free_mb":25317.6,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1069752,"buffers":25528,"cached":892436,"free":151788,"total":1858352,"used":788600},"other_packages":[],"port_path":"3/52","processes":385,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":26.143,"tsens_tz_sensor0":25.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":31.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":26.0,"tsens_tz_sensor13":29.0,"tsens_tz_sensor14":29.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":25.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":26.0,"tsens_tz_sensor9":27.0},"uptime":9936.04}},"disks":{"/mmutex":{"free_mb":427152.0,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":42533,"sleep_streak":629,"ssd":[],"started_ts":1685409022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":34.0},"uptime":86523,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Signal was received',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-30T10:14:41.781672Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751943359375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":1079858,"health":2,"level":80,"power":["AC"],"status":2,"temperature":232,"voltage":4313},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1440000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.5,"size_mb":25483.1},"data":{"free_mb":25317.5,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1006992,"buffers":13936,"cached":954472,"free":38584,"total":1858352,"used":851360},"other_packages":[],"port_path":"3/52","processes":409,"state":"available","temp":{"battery":23.2,"bms":23.2,"pa_therm0":29.0,"pm8994_tz":36.74,"tsens_tz_sensor0":36.0,"tsens_tz_sensor1":39.0,"tsens_tz_sensor10":48.0,"tsens_tz_sensor11":38.0,"tsens_tz_sensor12":37.0,"tsens_tz_sensor13":45.0,"tsens_tz_sensor14":43.0,"tsens_tz_sensor2":36.0,"tsens_tz_sensor3":37.0,"tsens_tz_sensor4":35.0,"tsens_tz_sensor5":36.0,"tsens_tz_sensor7":38.0,"tsens_tz_sensor9":38.0},"uptime":55.28}},"disks":{"/mmutex":{"free_mb":427154.2,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":32653,"sleep_streak":481,"ssd":[],"started_ts":1685409022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":43.0},"uptime":76642,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_log',
+      'ts': '2023-05-30T10:13:34.641558Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751943359375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-45928,"health":2,"level":80,"power":[],"status":3,"temperature":220,"voltage":4056},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1248000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.6,"size_mb":25483.1},"data":{"free_mb":25317.6,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1065688,"buffers":27248,"cached":896236,"free":142204,"total":1858352,"used":792664},"other_packages":[],"port_path":"3/34","processes":386,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":26.094,"tsens_tz_sensor0":25.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":29.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":26.0,"tsens_tz_sensor13":27.0,"tsens_tz_sensor14":27.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":26.0,"tsens_tz_sensor9":26.0},"uptime":10830.72}},"disks":{"/mmutex":{"free_mb":427153.8,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":32584,"sleep_streak":480,"ssd":[],"started_ts":1685409022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":42.0},"uptime":76573,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Rebooting device because max uptime exceeded during idle',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-30T07:13:57.792344Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751943359375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":1034387,"health":2,"level":80,"power":["AC"],"status":2,"temperature":232,"voltage":4300},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1440000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.6,"size_mb":25483.1},"data":{"free_mb":25317.6,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1004956,"buffers":13968,"cached":949032,"free":41956,"total":1858352,"used":853396},"other_packages":[],"port_path":"3/34","processes":412,"state":"available","temp":{"battery":23.2,"bms":23.2,"pa_therm0":29.0,"pm8994_tz":36.397,"tsens_tz_sensor0":36.0,"tsens_tz_sensor1":41.0,"tsens_tz_sensor10":47.0,"tsens_tz_sensor11":38.0,"tsens_tz_sensor12":37.0,"tsens_tz_sensor13":44.0,"tsens_tz_sensor14":42.0,"tsens_tz_sensor2":37.0,"tsens_tz_sensor3":37.0,"tsens_tz_sensor4":36.0,"tsens_tz_sensor5":37.0,"tsens_tz_sensor7":41.0,"tsens_tz_sensor9":41.0},"uptime":55.35}},"disks":{"/mmutex":{"free_mb":427124.0,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":21809,"sleep_streak":319,"ssd":[],"started_ts":1685409022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":36.0},"uptime":65798,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_log',
+      'ts': '2023-05-30T07:12:50.547319Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751943359375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-44402,"health":2,"level":79,"power":[],"status":3,"temperature":220,"voltage":4027},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"600000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.6,"size_mb":25483.1},"data":{"free_mb":25317.6,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1059900,"buffers":27000,"cached":903520,"free":129380,"total":1858352,"used":798452},"other_packages":[],"port_path":"3/16","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.945,"tsens_tz_sensor0":25.0,"tsens_tz_sensor1":26.0,"tsens_tz_sensor10":29.0,"tsens_tz_sensor11":26.0,"tsens_tz_sensor12":26.0,"tsens_tz_sensor13":27.0,"tsens_tz_sensor14":27.0,"tsens_tz_sensor2":25.0,"tsens_tz_sensor3":25.0,"tsens_tz_sensor4":25.0,"tsens_tz_sensor5":25.0,"tsens_tz_sensor7":26.0,"tsens_tz_sensor9":26.0},"uptime":10862.86}},"disks":{"/mmutex":{"free_mb":427125.8,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":21740,"sleep_streak":318,"ssd":[],"started_ts":1685409022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":37.0},"uptime":65730,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Rebooting device because max uptime exceeded during idle',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-30T04:12:42.397031Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751943359375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":1018670,"health":2,"level":82,"power":["AC"],"status":2,"temperature":230,"voltage":4313},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"1440000","governor":"interactive"},"disk":{"cache":{"free_mb":25317.6,"size_mb":25483.1},"data":{"free_mb":25317.6,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1000060,"buffers":13624,"cached":950104,"free":36332,"total":1858352,"used":858292},"other_packages":[],"port_path":"3/16","processes":408,"state":"available","temp":{"battery":23.0,"bms":23.0,"pa_therm0":29.0,"pm8994_tz":35.169,"tsens_tz_sensor0":34.0,"tsens_tz_sensor1":36.0,"tsens_tz_sensor10":39.0,"tsens_tz_sensor11":36.0,"tsens_tz_sensor12":35.0,"tsens_tz_sensor13":37.0,"tsens_tz_sensor14":37.0,"tsens_tz_sensor2":34.0,"tsens_tz_sensor3":35.0,"tsens_tz_sensor4":34.0,"tsens_tz_sensor5":34.0,"tsens_tz_sensor7":36.0,"tsens_tz_sensor9":36.0},"uptime":55.56}},"disks":{"/mmutex":{"free_mb":427722.0,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10933,"sleep_streak":147,"ssd":[],"started_ts":1685409022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":39.0},"uptime":54923,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_log',
+      'ts': '2023-05-30T04:11:34.704682Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751943359375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":-43487,"health":2,"level":81,"power":[],"status":3,"temperature":220,"voltage":4066},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.7,"size_mb":25483.1},"data":{"free_mb":25317.7,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1080388,"buffers":26916,"cached":915908,"free":137564,"total":1858352,"used":777964},"other_packages":[],"port_path":"3/117","processes":384,"state":"available","temp":{"battery":22.0,"bms":22.0,"pa_therm0":23.0,"pm8994_tz":25.553,"tsens_tz_sensor0":24.0,"tsens_tz_sensor1":25.0,"tsens_tz_sensor10":25.0,"tsens_tz_sensor11":24.0,"tsens_tz_sensor12":24.0,"tsens_tz_sensor13":25.0,"tsens_tz_sensor14":25.0,"tsens_tz_sensor2":24.0,"tsens_tz_sensor3":24.0,"tsens_tz_sensor4":24.0,"tsens_tz_sensor5":24.0,"tsens_tz_sensor7":25.0,"tsens_tz_sensor9":25.0},"uptime":10850.24}},"disks":{"/mmutex":{"free_mb":427724.6,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":10855,"sleep_streak":146,"ssd":[],"started_ts":1685409022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":39.0},"uptime":54845,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+      'message': 'Rebooting device because max uptime exceeded during idle',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'android_devices',
+        },
+        {
+          'value': [
+            'android.py',
+          ],
+          'key': 'bot_config',
+        },
+        {
+          'value': [
+            'arm64-v8a',
+          ],
+          'key': 'device_abi',
+        },
+        {
+          'value': [
+            '9.8.79',
+          ],
+          'key': 'device_gms_core_version',
+        },
+        {
+          'value': [
+            '<=18000',
+          ],
+          'key': 'device_max_uid',
+        },
+        {
+          'value': [
+            'N',
+            'N2G48C',
+          ],
+          'key': 'device_os',
+        },
+        {
+          'value': [
+            'google',
+          ],
+          'key': 'device_os_flavor',
+        },
+        {
+          'value': [
+            'userdebug',
+          ],
+          'key': 'device_os_type',
+        },
+        {
+          'value': [
+            '7.4.31.L-all',
+          ],
+          'key': 'device_playstore_version',
+        },
+        {
+          'value': [
+            'bullhead',
+          ],
+          'key': 'device_type',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            'Android',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '<30',
+          ],
+          'key': 'temp_band',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'request_sleep',
+      'ts': '2023-05-30T01:11:46.138685Z',
+      'state': '{"audio":null,"bot_config":{"name":"android.py","revision":""},"bot_group_cfg_version":"hash:e5b4db888ef54c","cost_usd_hour":0.2751943359375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","devices":{"01e1e815a28da48d":{"battery":{"current":744166,"health":2,"level":86,"power":["AC"],"status":2,"temperature":242,"voltage":4354},"build":{"board.platform":"msm8992","build.fingerprint":"google/bullhead/bullhead:7.1.2/N2G48C/4104010:userdebug/dev-keys","build.id":"N2G48C","build.product":"bullhead","build.type":"userdebug","build.version.sdk":"25","product.board":"bullhead","product.cpu.abi":"arm64-v8a","product.device":"bullhead"},"cpu":{"cur":"384000","governor":"powersave"},"disk":{"cache":{"free_mb":25317.5,"size_mb":25483.1},"data":{"free_mb":25317.5,"size_mb":25483.1},"system":{"free_mb":249.8,"size_mb":2929.2}},"imei":"353627078855551","ip":[],"max_uid":10096,"mem":{"avail":1011848,"buffers":16668,"cached":959880,"free":35300,"total":1858352,"used":846504},"other_packages":[],"port_path":"3/117","processes":405,"state":"available","temp":{"battery":24.2,"bms":24.2,"pa_therm0":29.0,"pm8994_tz":34.041,"tsens_tz_sensor0":31.0,"tsens_tz_sensor1":33.0,"tsens_tz_sensor10":34.0,"tsens_tz_sensor11":32.0,"tsens_tz_sensor12":32.0,"tsens_tz_sensor13":33.0,"tsens_tz_sensor14":33.0,"tsens_tz_sensor2":32.0,"tsens_tz_sensor3":32.0,"tsens_tz_sensor4":31.0,"tsens_tz_sensor5":31.0,"tsens_tz_sensor7":33.0,"tsens_tz_sensor9":34.0},"uptime":61.83}},"disks":{"/mmutex":{"free_mb":427611.5,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"gpu":null,"host_dimensions":{"cores":["4"],"cpu":["x86","x86-64","x86-64-E3-1220_v3","x86-64-avx2"],"cpu_governor":["powersave"],"gce":["0"],"gpu":["none"],"id":["build243-m4--device1"],"inside_docker":["1","stock"],"kernel":["5.4.0-99-generic"],"kvm":["1"],"machine_type":["n1-highmem-4"],"os":["Linux","Ubuntu","Ubuntu-18","Ubuntu-18.04","Ubuntu-18.04.6"],"python":["3","3.6","3.6.9"],"ssd":["0"]},"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"original_bot_id":"build243-m4--device1","pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":69,"sleep_streak":0,"ssd":[],"started_ts":1685409022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":44.0},"uptime":44058,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+    {
+      'externalIp': '74.125.248.106',
+      'dimensions': [
+        {
+          'value': [
+            '4',
+          ],
+          'key': 'cores',
+        },
+        {
+          'value': [
+            'x86',
+            'x86-64',
+            'x86-64-E3-1220_v3',
+            'x86-64-avx2',
+          ],
+          'key': 'cpu',
+        },
+        {
+          'value': [
+            'powersave',
+          ],
+          'key': 'cpu_governor',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'gce',
+        },
+        {
+          'value': [
+            'none',
+          ],
+          'key': 'gpu',
+        },
+        {
+          'value': [
+            'build243-m4--device1',
+          ],
+          'key': 'id',
+        },
+        {
+          'value': [
+            '1',
+            'stock',
+          ],
+          'key': 'inside_docker',
+        },
+        {
+          'value': [
+            '5.4.0-99-generic',
+          ],
+          'key': 'kernel',
+        },
+        {
+          'value': [
+            '1',
+          ],
+          'key': 'kvm',
+        },
+        {
+          'value': [
+            'n1-highmem-4',
+          ],
+          'key': 'machine_type',
+        },
+        {
+          'value': [
+            'Linux',
+            'Ubuntu',
+            'Ubuntu-18',
+            'Ubuntu-18.04',
+            'Ubuntu-18.04.6',
+          ],
+          'key': 'os',
+        },
+        {
+          'value': [
+            'chromium.tests',
+          ],
+          'key': 'pool',
+        },
+        {
+          'value': [
+            '3',
+            '3.6',
+            '3.6.9',
+          ],
+          'key': 'python',
+        },
+        {
+          'value': [
+            '7195-30c06ed',
+          ],
+          'key': 'server_version',
+        },
+        {
+          'value': [
+            '0',
+          ],
+          'key': 'ssd',
+        },
+        {
+          'value': [
+            'us',
+            'us-atl',
+            'us-atl-golo',
+            'us-atl-golo-m4',
+          ],
+          'key': 'zone',
+        },
+      ],
+      'eventType': 'bot_connected',
+      'ts': '2023-05-30T01:10:22.676532Z',
+      'state': '{"audio":null,"bot_group_cfg_version":null,"cost_usd_hour":0.2751943359375,"cpu_name":"Intel(R) Xeon(R) CPU E3-1220 v3 @ 3.10GHz","cwd":"/b/swarming","disks":{"/mmutex":{"free_mb":427543.9,"size_mb":467464.7}},"docker_host_hostname":"build243-m4.golo.chromium.org","env":{"PATH":"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"},"files":{"/usr/share/fonts/truetype/":["dejavu","lato"]},"gpu":null,"hostname":"build243-m4--device1","ip":"172.17.0.6","nb_files_in_temp":1,"pid":52,"python":{"executable":"/usr/bin/python3","packages":null,"version":"3.6.9 (default, Feb 28 2023, 09:55:20) \\n[GCC 8.4.0]"},"ram":23881,"rbe_instance":null,"running_time":0,"sleep_streak":0,"ssd":[],"started_ts":1685409022,"temp":{"thermal_zone0":27.8,"thermal_zone1":29.8,"thermal_zone2":44.0},"uptime":43990,"user":"chrome-bot"}',
+      'version': '8f730a2e82e73e28788df638575d4d6008dd31727a1534d4a726056d594ca412',
+      'authenticatedAs': 'bot:build243-m4.golo.chromium.org',
+    },
+  ],
 };

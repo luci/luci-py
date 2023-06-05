@@ -99,5 +99,21 @@ export class BotsService extends PrpcService {
     };
     return this._call('TerminateBot', request);
   }
-}
 
+  /**
+   * Requests a list of BotEvents for a given botId
+   *
+   * @param {String} botId - identifier of bot from which to retrieve events.
+   * @param {String} cursor - cursor from previous request.
+   *
+   * @returns {Object} with shape {cursor: "some_cursor", items: [... list of bot events ...]}
+   **/
+  events(botId, cursor) {
+    const request = {
+      limit: 50,
+      bot_id: botId,
+      cursor: cursor,
+    };
+    return this._call('ListBotEvents', request);
+  }
+}
