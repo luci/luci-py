@@ -163,6 +163,9 @@ message BotGroup {
   //
   // They are used only if all pools the bot belongs to are associated with an
   // RBE instance, and it is the same instance for all pools.
+  //
+  // TODO(vadimsh): Remove when no longer used. Replace by BotModeAllocation in
+  // Pool.RBEMigration.
   message RBEMigration {
     // Approximate percent of bots in this bot group to switch to the RBE mode.
     //
