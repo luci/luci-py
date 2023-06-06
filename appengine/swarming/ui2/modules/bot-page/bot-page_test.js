@@ -845,9 +845,7 @@ describe("bot-page", function () {
         ele.render();
         fetchMock.resetHistory();
         // This is the task_id on the 'running' bot.
-        fetchMock.post(`/_ah/api/swarming/v1/bot/${TEST_BOT_ID}/delete`, {
-          success: true,
-        });
+        mockPrpc(fetchMock, "swarming.v2.Bots", "DeleteBot", { success: true });
 
         const deleteBtn = $$("main button.delete", ele);
         expect(deleteBtn).toBeTruthy();

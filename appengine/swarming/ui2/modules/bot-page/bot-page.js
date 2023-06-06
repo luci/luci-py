@@ -484,15 +484,13 @@ window.customElements.define(
 
     _deleteBot() {
       this.app.addBusyTasks(1);
-      fetch(`/_ah/api/swarming/v1/bot/${this._botId}/delete`, {
-        method: "POST",
-        headers: {
-          authorization: this.auth_header,
-          "content-type": "application/json; charset=UTF-8",
-        },
-      })
-        .then(jsonOrThrow)
-        .then((response) => {
+      const botService = new BotsService(
+        this.auth_header,
+        this._fetchController.signal
+      );
+      botService
+        .delete(this._botId)
+        .then((_response) => {
           this._closePopup();
           errorMessage("Request to delete bot sent", 4000);
           this.render();
@@ -500,7 +498,7 @@ window.customElements.define(
         })
         .catch((e) => {
           this._closePopup();
-          this.fetchError(e, "bot/delete"); // calls app.finishedTask()
+          this.prpcError(e, "bot/delete"); // calls app.finishedTask()
           this.render();
         });
     }

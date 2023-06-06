@@ -117,4 +117,15 @@ export class BotsService extends PrpcService {
     };
     return this._call("ListBotEvents", request);
   }
+
+  /**
+   * Deletes bot with the given botId
+   *
+   * @param {String} botId - identifier of bot to delete.
+   *
+   * @returns {Object} with shape { deleted: bool } where deleted is true if the bot was actually deleted.
+   **/
+  delete(botId) {
+    return this._call("DeleteBot", { bot_id: botId });
+  }
 }
