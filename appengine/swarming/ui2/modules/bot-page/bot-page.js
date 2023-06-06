@@ -28,6 +28,7 @@ import { stateClass as taskClass } from "../task-page/task-page-helpers";
 import { timeDiffApprox, timeDiffExact, taskPageLink } from "../util";
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 import { BotsService } from "../services/bots.js";
+import { TasksService } from "../services/tasks.js";
 
 /**
  * @module swarming-ui/modules/bot-page
@@ -478,17 +479,21 @@ window.customElements.define(
       this.removeEventListener("log-in", this._loginEvent);
     }
 
+    _createBotService() {
+      return new BotsService(this.auth_header, this._fetchController.signal);
+    }
+
+    _createTasksService() {
+      return new TasksService(this.auth_header, this._fetchController.signal);
+    }
+
     _closePopup() {
       $$("dialog-pop-over", this).hide();
     }
 
     _deleteBot() {
       this.app.addBusyTasks(1);
-      const botService = new BotsService(
-        this.auth_header,
-        this._fetchController.signal
-      );
-      botService
+      this._createBotService()
         .delete(this._botId)
         .then((_response) => {
           this._closePopup();
@@ -525,10 +530,7 @@ window.customElements.define(
       // re-fetch permissions with the bot ID.
       this.app._fetchPermissions(extra, { bot_id: this._botId });
       this.app.addBusyTasks(1);
-      const botService = new BotsService(
-        this.auth_header,
-        this._fetchController.signal
-      );
+      const botService = this._createBotService();
       botService
         .getBot(this._botId)
         .then((resp) => {
@@ -573,20 +575,10 @@ window.customElements.define(
     }
 
     _killTask() {
-      const body = {
-        kill_running: true,
-      };
       this.app.addBusyTasks(1);
-      fetch(`/_ah/api/swarming/v1/task/${this._bot.taskId}/cancel`, {
-        method: "POST",
-        headers: {
-          authorization: this.auth_header,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(body),
-      })
-        .then(jsonOrThrow)
-        .then((response) => {
+      this._createTasksService()
+        .cancel(this._bot.taskId, true)
+        .then((_response) => {
           this._closePopup();
           errorMessage("Request to kill task sent", 4000);
           this.render();
@@ -594,7 +586,7 @@ window.customElements.define(
         })
         .catch((e) => {
           this._closePopup();
-          this.fetchError(e, "task/kill"); // calls app.finishedTask()
+          this.prpcError(e, "task/kill"); // calls app.finishedTask()
           this.render();
         });
     }
@@ -604,11 +596,7 @@ window.customElements.define(
         return;
       }
       this.app.addBusyTasks(1);
-      const botService = new BotsService(
-        this.auth_header,
-        this._fetchController.signal
-      );
-      botService
+      this._createBotService()
         .events(this._botId, this._eventsCursor)
         .then((resp) => {
           this._eventsCursor = resp.cursor;
@@ -623,12 +611,8 @@ window.customElements.define(
       if (!this._taskCursor) {
         return;
       }
-      const botService = new BotsService(
-        this.auth_header,
-        this._fetchController.signal
-      );
       this.app.addBusyTasks(1);
-      botService
+      this._createBotService()
         .getTasks(this._botId, this._taskCursor)
         .then((resp) => {
           this._taskCursor = resp.cursor;
@@ -693,11 +677,7 @@ window.customElements.define(
 
     _shutdownBot() {
       this.app.addBusyTasks(1);
-      const botService = new BotsService(
-        this.auth_header,
-        this._fetchController.signal
-      );
-      botService
+      this._createBotService()
         .terminate(this._botId)
         .then((_resp) => {
           this._closePopup();

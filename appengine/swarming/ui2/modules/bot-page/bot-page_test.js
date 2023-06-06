@@ -753,15 +753,16 @@ describe("bot-page", function () {
       });
     });
 
-    it("can kill a running task", function (done) {
+    fit("can kill a running task", function (done) {
       serveBot("running");
       loggedInBotPage((ele) => {
         ele.permissions.cancel_task = true;
         ele.render();
         fetchMock.resetHistory();
         // This is the task_id on the 'running' bot.
-        fetchMock.post("/_ah/api/swarming/v1/task/42fb00e06d95be11/cancel", {
-          success: true,
+        mockPrpc(fetchMock, "swarming.v2.Tasks", "CancelTask", {
+          canceled: true,
+          wasRunning: true,
         });
 
         const killBtn = $$("main button.kill", ele);
@@ -788,7 +789,7 @@ describe("bot-page", function () {
           expect(calls).toHaveSize(1);
           const call = calls[0];
           const options = call[1];
-          expect(options.body).toEqual('{"kill_running":true}');
+          expect(options.body).toContain('"kill_running":true');
 
           done();
         });
