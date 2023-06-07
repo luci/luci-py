@@ -11,7 +11,9 @@ beforeAll(() => {
   window.onbeforeunload = () => {
     expect(false).toBeTruthy();
     console.error("We should not have modified window.location.href directly.");
-    throw "We should not have modified window.location.href directly.";
+    throw new Exception(
+      "We should not have modified window.location.href directly."
+    );
   };
 });
 

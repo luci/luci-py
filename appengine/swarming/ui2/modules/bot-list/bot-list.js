@@ -15,9 +15,9 @@
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
-import { $, $$ } from "common-sk/modules/dom";
+import { $$ } from "common-sk/modules/dom";
 import { errorMessage } from "elements-sk/errorMessage";
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined";
 import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
 import naturalSort from "javascript-natural-sort/naturalSort";
@@ -38,20 +38,13 @@ import "../swarming-app";
 
 import { applyAlias, maybeApplyAlias } from "../alias";
 import {
-  aggregateTemps,
-  attribute,
-  botLink,
   column,
-  devices,
   dimensionsOnly,
   filterBots,
   forcedColumns,
-  fromDimension,
-  fromState,
   getColHeader,
   initCounts,
   listQueryParams,
-  longestOrAll,
   processBots,
   processCounts,
   makePossibleColumns,
@@ -241,7 +234,7 @@ const columnOption = (key, ele) => html` <div class="item">
   </checkbox-sk>
 </div>`;
 
-const col_selector = (ele) => {
+const colSelector = (ele) => {
   if (!ele._showColSelector) {
     return "";
   }
@@ -260,7 +253,7 @@ const col_selector = (ele) => {
 </div>`;
 };
 
-const col_options = (
+const colOptions = (
   ele
 ) => html` <!-- Put the click action here to make it bigger, especially for mobile.-->
   <th class="col_options" @click=${ele._toggleColSelector}>
@@ -278,7 +271,7 @@ const col_options = (
       .direction=${ele._dir}
     >
     </sort-toggle>
-    ${col_selector(ele)}
+    ${colSelector(ele)}
   </th>`;
 
 const template = (ele) => html`
@@ -302,7 +295,7 @@ const template = (ele) => html`
     <table class=bot-table ?hidden=${!ele.loggedInAndAuthorized}>
       <thead>
         <tr>
-          ${col_options(ele)}
+          ${colOptions(ele)}
           <!-- Slice off the first column (which is always 'id') so we can
                have a custom first box (including the widget to select columns).
             -->

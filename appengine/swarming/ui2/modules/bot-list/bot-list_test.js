@@ -31,7 +31,7 @@ describe("bot-list", function () {
     processPrimaryMap,
   } = require("modules/bot-list/bot-list-helpers");
   const {
-    bots_10,
+    bots10,
     fleetCount,
     fleetDimensions,
     queryCount,
@@ -55,7 +55,7 @@ describe("bot-list", function () {
     });
 
     fetchMock.get("glob:/_ah/api/swarming/v1/server/permissions*", {});
-    fetchMock.get("glob:/_ah/api/swarming/v1/bots/list?*", bots_10);
+    fetchMock.get("glob:/_ah/api/swarming/v1/bots/list?*", bots10);
     fetchMock.get(
       "glob:/_ah/api/swarming/v1/bots/dimensions?*",
       fleetDimensions
@@ -1182,8 +1182,8 @@ describe("bot-list", function () {
   }); // end describe('api calls')
 
   describe("data parsing", function () {
-    const LINUX_BOT = bots_10.items[0];
-    const MULTI_ANDROID_BOT = bots_10.items[2];
+    const LINUX_BOT = bots10.items[0];
+    const MULTI_ANDROID_BOT = bots10.items[2];
 
     it("inflates the state", function () {
       // Make a copy of the object because _processBots will modify it in place.
@@ -1324,7 +1324,7 @@ describe("bot-list", function () {
     });
 
     it("filters bots based on special keys", function () {
-      const bots = processBots(deepCopy(bots_10.items));
+      const bots = processBots(deepCopy(bots10.items));
 
       expect(bots).toBeTruthy();
       expect(bots).toHaveSize(10);
@@ -1347,7 +1347,7 @@ describe("bot-list", function () {
     });
 
     it("filters bots based on dimensions", function () {
-      const bots = processBots(deepCopy(bots_10.items));
+      const bots = processBots(deepCopy(bots10.items));
 
       expect(bots).toBeTruthy();
       expect(bots).toHaveSize(10);

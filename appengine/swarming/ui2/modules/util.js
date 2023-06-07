@@ -15,11 +15,11 @@ import * as query from "common-sk/modules/query";
 import { upgradeProperty } from "elements-sk/upgradeProperty";
 
 /** botPageLink creates a URL to a given bot */
-export function botPageLink(bot_id) {
-  if (!bot_id) {
+export function botPageLink(botId) {
+  if (!botId) {
     return undefined;
   }
-  return "/bot?id=" + bot_id;
+  return "/bot?id=" + botId;
 }
 
 /** Create a link to a bot list with the preloaded filters and columns.

@@ -48,7 +48,7 @@
 const { glob } = require("glob");
 const path = require("path");
 const fs = require("fs");
-const { basename, join, resolve } = require("path");
+const { basename, join } = require("path");
 const CleanWebpackPlugin = require("clean-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
@@ -83,7 +83,9 @@ function demoFinder(dir, webpackConfig, demoType) {
     .filter(isDir);
 
   if (demoType !== "demo" && demoType !== "live") {
-    throw "Only 'demo' and 'live' are valid values for demo type";
+    throw new Exception(
+      "Only 'demo' and 'live' are valid values for demo type"
+    );
   }
   const htmlSuffix = `-${demoType}.html`;
   const jsSuffix = `-${demoType}.js`;
@@ -95,13 +97,17 @@ function demoFinder(dir, webpackConfig, demoType) {
     files.forEach((file) => {
       if (file.endsWith(htmlSuffix)) {
         if (!!demoHTML) {
-          throw "Only one -demo.html file is allowed per directory: " + file;
+          throw new Exception(
+            "Only one -demo.html file is allowed per directory: " + file
+          );
         }
         demoHTML = file;
       }
       if (file.endsWith(jsSuffix)) {
         if (demoJS != "") {
-          throw "Only one -demo.js file is allowed per directory: " + file;
+          throw new Exception(
+            "Only one -demo.js file is allowed per directory: " + file
+          );
         }
         demoJS = file;
       }

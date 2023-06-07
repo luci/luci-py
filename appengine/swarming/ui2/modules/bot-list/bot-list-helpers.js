@@ -34,8 +34,10 @@ export function aggregateTemps(temps) {
   const zones = [];
   let avg = 0;
   for (const k in temps) {
-    zones.push(k + ": " + temps[k]);
-    avg += +temps[k];
+    if (temps.hasOwnProperty(k)) {
+      zones.push(k + ": " + temps[k]);
+      avg += +temps[k];
+    }
   }
   avg = avg / zones.length;
   if (avg) {
@@ -364,19 +366,21 @@ export function processBots(arr) {
     const d = (bot && bot.state && bot.state.devices) || {};
     // state.devices is like {Serial:Object}, so we need to keep the serial
     for (const key in d) {
-      const o = d[key];
-      o.serial = key;
-      o.okay = o.state === "available";
-      // It is easier to assume all devices on a bot are of the same type
-      // than to pick through the (incomplete) device state and find it.
-      // Bots that are quarantined because they have no devices
-      // still have devices in their state (the last known device attached)
-      // but don't have the device_type dimension. In that case, we punt
-      // on device type.
-      const types = fromDimension(bot, "device_type") || ["UNKNOWN"];
-      o.device_type = types[0];
-      o.temp = aggregateTemps(o.temp);
-      devices.push(o);
+      if (d.hasOwnProperty(key)) {
+        const o = d[key];
+        o.serial = key;
+        o.okay = o.state === "available";
+        // It is easier to assume all devices on a bot are of the same type
+        // than to pick through the (incomplete) device state and find it.
+        // Bots that are quarantined because they have no devices
+        // still have devices in their state (the last known device attached)
+        // but don't have the device_type dimension. In that case, we punt
+        // on device type.
+        const types = fromDimension(bot, "device_type") || ["UNKNOWN"];
+        o.device_type = types[0];
+        o.temp = aggregateTemps(o.temp);
+        devices.push(o);
+      }
     }
     // For determinism, sort by device id
     devices.sort((a, b) => {

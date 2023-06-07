@@ -65,18 +65,18 @@ import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
-const extractPrimaryHostname = (bot_id) => {
-  if (!bot_id) {
-    return bot_id;
+const extractPrimaryHostname = (botId) => {
+  if (!botId) {
+    return botId;
   }
-  const parts = bot_id.split("--");
+  const parts = botId.split("--");
   if (parts.length == 2) {
     return parts[0];
   }
   if (parts.length > 2) {
-    throw Error("Unable to parse composed bot_id: " + bot_id);
+    throw Error("Unable to parse composed bot_id: " + botId);
   }
-  return bot_id;
+  return botId;
 };
 
 const cloudLoggingURL = (project, query, start, end) => {
@@ -126,8 +126,8 @@ const serverBotLogsURL = (project, request, result) => {
 
 const botLogsURL = (botProjectID, botZone, request, result) => {
   // limit logs that we care
-  const host_name = extractPrimaryHostname(result.bot_id);
-  const query = `labels."compute.googleapis.com/resource_name":"${host_name}"`;
+  const hostName = extractPrimaryHostname(result.bot_id);
+  const query = `labels."compute.googleapis.com/resource_name":"${hostName}"`;
   let timeStart;
   let timeEnd;
   if (result.started_ts) {
@@ -163,34 +163,6 @@ const idAndButtons = (ele) => {
           ?disabled=${!ele.permissions.cancel_task}
           @click=${ele._promptCancel} class=kill>kill</button>
 </div>`;
-};
-
-const taskRow = (result, idx) => {
-  if (!result.task_id) {
-    return html`<tr>
-      <td>&lt;loading&gt;</td>
-      <td></td>
-      <td></td>
-    </tr>`;
-  }
-  // Convert the summary id to the run id
-  let taskId = result.task_id.substring(0, result.task_id.length - 1);
-  taskId += idx + 1;
-  return html`
-    <tr>
-      <td>
-        <a href=${ifDefined(taskPageLink(taskId, true))} target="_blank">
-          ${taskId}
-        </a>
-      </td>
-      <td>
-        <a href=${ifDefined(botPageLink(result.bot_id))} target="_blank">
-          ${result.bot_id}
-        </a>
-      </td>
-      <td class=${stateClass(result)}>${humanState(result)}</td>
-    </tr>
-  `;
 };
 
 const slicePicker = (ele) => {
@@ -554,7 +526,7 @@ const commitBlock = (tagMap) => {
   `;
 };
 
-const executionBlock = (properties, env, env_prefixes) => html`
+const executionBlock = (properties, env, envPrefixes) => html`
   <tr>
     <td>Command</td>
     <td class="code break-all">
@@ -567,7 +539,7 @@ const executionBlock = (properties, env, env_prefixes) => html`
   </tr>
   ${arrayInTable(env, "Environment Vars", (env) => env.key + "=" + env.value)}
   ${arrayInTable(
-    env_prefixes,
+    envPrefixes,
     "Environment Prefixes",
     (prefix) => prefix.key + "=" + prefix.value.join(":")
   )}
@@ -1689,7 +1661,6 @@ time.sleep(${leaseDuration})`,
 
     _fetchExtraTries(taskId, tries, extra) {
       this.app.addBusyTasks(tries);
-      const baseTaskId = taskId.substring(0, taskId.length - 1);
       for (let i = 0; i < tries; i++) {
         fetch(`/_ah/api/swarming/v1/task/${taskId + (i + 1)}/result`, extra)
           .then(jsonOrThrow)

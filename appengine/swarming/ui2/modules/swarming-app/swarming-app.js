@@ -39,42 +39,41 @@ import * as query from "common-sk/modules/query";
 import { errorMessage } from "elements-sk/errorMessage";
 import { upgradeProperty } from "elements-sk/upgradeProperty";
 import { html, render } from "lit-html";
-import { ifDefined } from "lit-html/directives/if-defined";
 
-const button_template = document.createElement("template");
-button_template.innerHTML = `
+const buttonTemplate = document.createElement("template");
+buttonTemplate.innerHTML = `
 <button class=toggle-button>
   <menu-icon-sk>
   </menu-icon-sk>
 </button>
 `;
 
-const spinner_template = document.createElement("template");
-spinner_template.innerHTML = `
+const spinnerTemplate = document.createElement("template");
+spinnerTemplate.innerHTML = `
 <div class=spinner-spacer>
   <spinner-sk></spinner-sk>
 </div>
 `;
 
-const pantheon_url = `https://console.cloud.google.com/appengine/versions?project=`;
-const version_filter_prefix =
+const pantheonUrl = `https://console.cloud.google.com/appengine/versions?project=`;
+const versionFilterPrefix =
   `&serviceId=default&pageState=(%22versionsTable` +
   `%22:(%22f%22:%22%255B%257B_22k_22_3A_22Version` +
   `_22_2C_22t_22_3A10_2C_22v_22_3A_22_5C_22`;
-const version_filter_postfix =
+const versionFilterPostfix =
   `_5C_22_22_2C_22s_22_3Atrue_2C_22i_22_3A_22` + `id_22%257D%255D%22))`;
-const version_default = "You must log in to see more details";
+const versionDefault = "You must log in to see more details";
 
-function serverLink(project_id, details) {
+function serverLink(projectId, details) {
   if (!details || !details.server_version) {
-    return version_default;
+    return versionDefault;
   }
   return html`<a
-    href=${pantheon_url.concat(
-      project_id,
-      version_filter_prefix,
+    href=${pantheonUrl.concat(
+      projectId,
+      versionFilterPrefix,
       details.server_version,
-      version_filter_postfix
+      versionFilterPostfix
     )}
   >
     ${details.server_version}</a
@@ -95,14 +94,14 @@ function gitLink(details) {
   return html`<a href=https://chromium.googlesource.com/infra/luci/luci-py/+/${version}>${version}</a>`;
 }
 
-const dynamic_content_template = (ele) => html` <div class="server-version">
+const dynamicContentTemplate = (ele) => html` <div class="server-version">
     AppEngine version: ${serverLink(ele._project_id, ele._server_details)} Git
     version:${gitLink(ele._server_details)}
   </div>
   <oauth-login ?testing_offline=${ele.testing_offline}> </oauth-login>`;
 
-const fab_template = document.createElement("template");
-fab_template.innerHTML = `
+const fabTemplate = document.createElement("template");
+fabTemplate.innerHTML = `
 <a target=_blank rel=noopener
    href="https://bugs.chromium.org/p/chromium/issues/entry?components=Infra%3ELUCI%3ETaskDistribution%3EUI&owner=kjlubick@chromium.org&status=Assigned">
   <bug-report-icon-sk class=fab></bug-report-icon-sk>
@@ -119,7 +118,7 @@ window.customElements.define(
       this._auth_header = "";
       this._profile = {};
       this._server_details = {
-        server_version: version_default,
+        server_version: versionDefault,
         bot_version: "",
         cas_viewer_server: "",
       };
@@ -240,7 +239,7 @@ window.customElements.define(
         return;
       }
       // Add the collapse button to the header as the first item.
-      let btn = button_template.content.cloneNode(true);
+      let btn = buttonTemplate.content.cloneNode(true);
       // btn is a document-fragment, so we need to insert it into the
       // DOM to make it "expand" into a real button. Then, and only then,
       // we can add a "click" listener.
@@ -250,7 +249,7 @@ window.customElements.define(
 
       // Add the spinner that will visually indicate the state of the
       // busy property.
-      const spinner = spinner_template.content.cloneNode(true);
+      const spinner = spinnerTemplate.content.cloneNode(true);
       header.insertBefore(spinner, sidebar);
       // The real spinner is a child of the template, so we need to grab it
       // from the header after the template has been expanded.
@@ -271,7 +270,7 @@ window.customElements.define(
       const errorToast = document.createElement("error-toast-sk");
       footer.append(errorToast);
 
-      const fab = fab_template.content.cloneNode(true);
+      const fab = fabTemplate.content.cloneNode(true);
       footer.append(fab);
     }
 
@@ -350,7 +349,7 @@ window.customElements.define(
 
     render() {
       if (this._dynamicEle) {
-        render(dynamic_content_template(this), this._dynamicEle);
+        render(dynamicContentTemplate(this), this._dynamicEle);
       }
     }
 

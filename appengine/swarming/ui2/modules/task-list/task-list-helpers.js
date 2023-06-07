@@ -55,7 +55,9 @@ export function appendPossibleColumns(possibleColumns, data) {
   } else {
     // data is a map of tag -> values
     for (const tag in data) {
-      possibleColumns[tag + "-tag"] = true;
+      if (data.hasOwnProperty(tag)) {
+        possibleColumns[tag + "-tag"] = true;
+      }
     }
   }
 }
@@ -90,11 +92,13 @@ export function appendPrimaryMap(primaryMap, data) {
   } else {
     // data is a map of tag -> values
     for (const tag in data) {
-      let existing = primaryMap[tag + "-tag"];
-      for (const value of data[tag]) {
-        existing = _insertUnique(existing, value);
+      if (data.hasOwnProperty(tag)) {
+        let existing = primaryMap[tag + "-tag"];
+        for (const value of data[tag]) {
+          existing = _insertUnique(existing, value);
+        }
+        primaryMap[tag + "-tag"] = existing;
       }
-      primaryMap[tag + "-tag"] = existing;
     }
   }
 }

@@ -27,7 +27,7 @@ describe("task-list", function () {
     listQueryParams,
     processTasks,
   } = require("modules/task-list/task-list-helpers");
-  const { tasks_22 } = require("modules/task-list/test_data");
+  const { tasks22 } = require("modules/task-list/test_data");
   const { fleetDimensions } = require("modules/bot-list/test_data");
 
   beforeEach(function () {
@@ -48,7 +48,7 @@ describe("task-list", function () {
       cancel_task: false,
     });
 
-    fetchMock.get("glob:/_ah/api/swarming/v1/tasks/list?*", tasks_22);
+    fetchMock.get("glob:/_ah/api/swarming/v1/tasks/list?*", tasks22);
     fetchMock.get(
       "glob:/_ah/api/swarming/v1/bots/dimensions?*",
       fleetDimensions
@@ -310,7 +310,7 @@ describe("task-list", function () {
         // TruncateToMinute passes either a string or date
         // date constructor, sets seconds/mills to 0, and
         // returns an int that's seconds since the epoch.
-        const TruncateToMinute = function (date) {
+        const truncateToMinute = function (date) {
           const value = new Date(date);
           value.setSeconds(0);
           value.setMilliseconds(0);
@@ -321,16 +321,16 @@ describe("task-list", function () {
             const start = $$("#start_time", ele);
             expect(start).toBeTruthy();
             expect(start.disabled).toBeFalsy();
-            expect(TruncateToMinute(start.value)).toBe(
-              TruncateToMinute(yesterday),
+            expect(truncateToMinute(start.value)).toBe(
+              truncateToMinute(yesterday),
               "(start time is 24 hours ago)"
             );
 
             const end = $$("#end_time", ele);
             expect(end).toBeTruthy();
             expect(end.disabled).toBeTruthy();
-            expect(TruncateToMinute(end.value)).toBe(
-              TruncateToMinute(now),
+            expect(truncateToMinute(end.value)).toBe(
+              truncateToMinute(now),
               "(end time is now)"
             );
 
@@ -1311,7 +1311,7 @@ describe("task-list", function () {
   }); // end describe('api calls')
 
   describe("data parsing", function () {
-    const ANDROID_TASK = tasks_22.items[0];
+    const ANDROID_TASK = tasks22.items[0];
 
     it("turns the dates into DateObjects", function () {
       // Make a copy of the object because processTasks will modify it in place.
@@ -1335,7 +1335,7 @@ describe("task-list", function () {
 
     it("produces a list of tags", function () {
       const tags = {};
-      const tasks = processTasks(deepCopy(tasks_22.items), tags);
+      const tasks = processTasks(deepCopy(tasks22.items), tags);
       const keys = Object.keys(tags);
       expect(keys).toBeTruthy();
       expect(keys).toHaveSize(75);
@@ -1347,7 +1347,7 @@ describe("task-list", function () {
     });
 
     it("filters tasks based on special keys", function () {
-      const tasks = processTasks(deepCopy(tasks_22.items), {});
+      const tasks = processTasks(deepCopy(tasks22.items), {});
 
       expect(tasks).toBeTruthy();
       expect(tasks).toHaveSize(22);
@@ -1361,7 +1361,7 @@ describe("task-list", function () {
     });
 
     it("filters tasks based on tags", function () {
-      const tasks = processTasks(deepCopy(tasks_22.items), {});
+      const tasks = processTasks(deepCopy(tasks22.items), {});
 
       expect(tasks).toBeTruthy();
       expect(tasks).toHaveSize(22);

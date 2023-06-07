@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { $, $$ } from "common-sk/modules/dom";
+import { $$ } from "common-sk/modules/dom";
 
 /**
  * @module swarming-ui/modules/dialog-pop-over
@@ -15,8 +15,8 @@ import { $, $$ } from "common-sk/modules/dom";
  *
  */
 
-const backdrop_template = document.createElement("template");
-backdrop_template.innerHTML = `<div class=backdrop></div>`;
+const backdropTemplate = document.createElement("template");
+backdropTemplate.innerHTML = `<div class=backdrop></div>`;
 
 window.customElements.define(
   "dialog-pop-over",
@@ -28,7 +28,7 @@ window.customElements.define(
     }
 
     connectedCallback() {
-      const backdrop = backdrop_template.content.cloneNode(true);
+      const backdrop = backdropTemplate.content.cloneNode(true);
       this.appendChild(backdrop);
       // variable backdrop is a #document-fragment, so we need to
       // search for the expanded node after it has been added.
@@ -36,7 +36,9 @@ window.customElements.define(
 
       this._content = $$(".content", this);
       if (!this._content) {
-        throw "You must have an element with class content to show.";
+        throw new Exception(
+          "You must have an element with class content to show."
+        );
       }
     }
 

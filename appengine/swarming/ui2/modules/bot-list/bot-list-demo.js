@@ -4,7 +4,7 @@
 
 import "./index.js";
 
-import { bots_10, fleetCount, fleetDimensions, queryCount } from "./test_data";
+import { bots10, fleetCount, fleetDimensions, queryCount } from "./test_data";
 import { requireLogin, mockAuthdAppGETs } from "../test_util";
 import fetchMock from "fetch-mock";
 
@@ -30,7 +30,7 @@ import fetchMock from "fetch-mock";
 
   fetchMock.get(
     "glob:/_ah/api/swarming/v1/bots/list?*",
-    requireLogin(bots_10, 500)
+    requireLogin(bots10, 500)
   );
 
   fetchMock.get(

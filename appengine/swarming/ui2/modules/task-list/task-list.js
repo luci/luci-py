@@ -15,9 +15,9 @@
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
-import { $, $$ } from "common-sk/modules/dom";
+import { $$ } from "common-sk/modules/dom";
 import { errorMessage } from "elements-sk/errorMessage";
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined";
 import { until } from "lit-html/directives/until";
 import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
@@ -99,7 +99,7 @@ const columnOption = (key, ele) => html` <div class="item">
   </checkbox-sk>
 </div>`;
 
-const col_selector = (ele) => {
+const colSelector = (ele) => {
   if (!ele._showColSelector) {
     return "";
   }
@@ -118,7 +118,7 @@ const col_selector = (ele) => {
 </div>`;
 };
 
-const col_options = (
+const colOptions = (
   ele,
   firstCol
 ) => html` <!-- Put the click action here to make it bigger, especially for mobile.-->
@@ -137,7 +137,7 @@ const col_options = (
       .direction=${ele._dir}
     >
     </sort-toggle>
-    ${col_selector(ele)}
+    ${colSelector(ele)}
   </th>`;
 
 const primaryOption = (key, ele) => html` <div
@@ -300,7 +300,7 @@ const template = (ele) => html`
       <thead>
         <tr>
           <tr>
-          ${col_options(ele, ele._cols[0])}
+          ${colOptions(ele, ele._cols[0])}
           <!-- Slice off the first column so we can
                have a custom first box (including the widget to select columns).
             -->

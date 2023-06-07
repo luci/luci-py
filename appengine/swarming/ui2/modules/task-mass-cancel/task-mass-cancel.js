@@ -2,11 +2,9 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { $$ } from "common-sk/modules/dom";
 import { errorMessage } from "elements-sk/errorMessage";
 import { html, render } from "lit-html";
 import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
-import { until } from "lit-html/directives/until";
 
 import { initPropertyFromAttrOrProperty } from "../util";
 

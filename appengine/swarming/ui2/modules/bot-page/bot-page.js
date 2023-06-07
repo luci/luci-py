@@ -2,11 +2,10 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import { $, $$ } from "common-sk/modules/dom";
+import { $$ } from "common-sk/modules/dom";
 import { errorMessage } from "elements-sk/errorMessage";
-import { html, render } from "lit-html";
+import { html } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined";
-import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
 import { stateReflector } from "common-sk/modules/stateReflector";
 
 import "elements-sk/checkbox-sk";

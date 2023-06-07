@@ -5,7 +5,7 @@
 // This file has some data used for task-list tests.
 
 // 2 tasks of each of the various states.
-export const tasks_22 = {
+export const tasks22 = {
   items: [
     {
       created_ts: "2018-12-19T16:31:28.290449",

@@ -33,7 +33,7 @@ export class PrpcService {
   }
 
   get service() {
-    throw "Subclasses must define service";
+    throw new Exception("Subclasses must define service");
   }
 
   _call(method, request) {

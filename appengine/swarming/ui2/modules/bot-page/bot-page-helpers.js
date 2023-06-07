@@ -40,8 +40,10 @@ export function parseBotData(bot) {
         // device.temp is a map of zone: 'value'
         device.temp = device.temp || {};
         for (const t in device.temp) {
-          total += parseFloat(device.temp[t]);
-          count++;
+          if (device.temp.hasOwnProperty(t)) {
+            total += parseFloat(device.temp[t]);
+            count++;
+          }
         }
         if (count) {
           device.averageTemp = (total / count).toFixed(1);
@@ -117,13 +119,13 @@ export function parseTasks(tasks) {
       task.human_duration = timeDiffExact(task.startedTs, end);
       task.duration = (end.getTime() - task.startedTs) / 1000;
     }
-    const total_overhead =
+    const totalOverhead =
       (task.performanceStats && task.performanceStats.botOverhead) || 0;
     // total_duration includes overhead, to give a better sense of the bot
     // being 'busy', e.g. when uploading isolated outputs.
-    task.total_duration = task.duration + total_overhead;
+    task.total_duration = task.duration + totalOverhead;
     task.human_total_duration = humanDuration(task.total_duration);
-    task.total_overhead = total_overhead;
+    task.total_overhead = totalOverhead;
 
     task.human_state = task.state || "UNKNOWN";
     if (task.state === "COMPLETED") {

@@ -20,7 +20,9 @@ export const customMatchers = {
     return {
       compare: function (actual, regex) {
         if (!(regex instanceof RegExp)) {
-          throw `toContainRegex expects a regex, got ${JSON.stringify(regex)}`;
+          throw new Exception(
+            `toContainRegex expects a regex, got ${JSON.stringify(regex)}`
+          );
         }
         const result = {};
 
@@ -52,7 +54,7 @@ export const customMatchers = {
     return {
       compare: function (actual, attribute) {
         if (!isElement(actual)) {
-          throw `${actual} is not a DOM element`;
+          throw new Exception(`${actual} is not a DOM element`);
         }
         return {
           pass: actual.hasAttribute(attribute),
@@ -66,7 +68,7 @@ export const customMatchers = {
     return {
       compare: function (actual, text) {
         if (!isElement(actual)) {
-          throw `${actual} is not a DOM element`;
+          throw new Exception(`${actual} is not a DOM element`);
         }
         function normalize(s) {
           return s.trim().replace("\t", " ").replace(/ {2,}/g, " ");
@@ -144,30 +146,27 @@ export function mockAuthdAppGETs(fetchMock, permissions, serverDetails = {}) {
   );
 }
 
-export function requireLogin(logged_in, delay = 100) {
-  const original_items = logged_in.items && logged_in.items.slice();
+export function requireLogin(loggedIn, delay = 100) {
+  const originalItems = loggedIn.items && loggedIn.items.slice();
   return function (url, opts) {
     if (opts && opts.headers && opts.headers.authorization) {
       return new Promise((resolve) => {
         setTimeout(resolve, delay);
       }).then(() => {
-        if (logged_in.items instanceof Array) {
+        if (loggedIn.items instanceof Array) {
           // pretend there are two pages
-          if (!logged_in.cursor) {
+          if (!loggedIn.cursor) {
             // first page
-            logged_in.cursor = "fake_cursor12345";
-            logged_in.items = original_items.slice(
-              0,
-              original_items.length / 2
-            );
+            loggedIn.cursor = "fake_cursor12345";
+            loggedIn.items = originalItems.slice(0, originalItems.length / 2);
           } else {
             // second page
-            logged_in.cursor = undefined;
-            logged_in.items = original_items.slice(original_items.length / 2);
+            loggedIn.cursor = undefined;
+            loggedIn.items = originalItems.slice(originalItems.length / 2);
           }
         }
-        if (logged_in instanceof Function) {
-          const val = logged_in(url, opts);
+        if (loggedIn instanceof Function) {
+          const val = loggedIn(url, opts);
           if (!val) {
             return {
               status: 404,
@@ -183,7 +182,7 @@ export function requireLogin(logged_in, delay = 100) {
         }
         return {
           status: 200,
-          body: JSON.stringify(logged_in),
+          body: JSON.stringify(loggedIn),
           headers: { "content-type": "application/json" },
         };
       });

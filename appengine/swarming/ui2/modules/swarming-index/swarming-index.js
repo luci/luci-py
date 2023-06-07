@@ -15,10 +15,8 @@
  * @extends module:swarming-ui/SwarmingAppBoilerplate
  */
 
-import { html, render } from "lit-html";
-import { upgradeProperty } from "elements-sk/upgradeProperty";
+import { html } from "lit-html";
 import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
-import { errorMessage } from "elements-sk/errorMessage";
 
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 
@@ -30,11 +28,11 @@ const instancesURL = (ele) =>
   `https://console.cloud.google.com/appengine/instances?` +
   `project=${ele._project_id}&versionId=${ele.server_details.server_version}`;
 
-const errorsURL = (project_id) =>
-  `https://console.cloud.google.com/errors?project=${project_id}`;
+const errorsURL = (projectId) =>
+  `https://console.cloud.google.com/errors?project=${projectId}`;
 
-const logsURL = (project_id) =>
-  `https://console.cloud.google.com/logs/viewer?filters=status:500..599&project=${project_id}`;
+const logsURL = (projectId) =>
+  `https://console.cloud.google.com/logs/viewer?filters=status:500..599&project=${projectId}`;
 
 const bootstrapTemplate = (ele) => html`
   <div>
@@ -159,12 +157,12 @@ window.customElements.define(
     }
 
     _fetchToken() {
-      const post_extra = {
+      const postExtra = {
         headers: { authorization: this.auth_header },
         method: "POST",
       };
       this.app.addBusyTasks(1);
-      fetch("/_ah/api/swarming/v1/server/token", post_extra)
+      fetch("/_ah/api/swarming/v1/server/token", postExtra)
         .then(jsonOrThrow)
         .then((json) => {
           this._bootstrap_token = json.bootstrap_token;

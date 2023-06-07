@@ -22,7 +22,7 @@ export const queryCount = {
   now: "2018-05-14T12:28:06.316441",
 };
 
-export const bots_10 = {
+export const bots10 = {
   death_timeout: "600",
   items: [
     {

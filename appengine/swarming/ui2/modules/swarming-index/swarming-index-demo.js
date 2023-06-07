@@ -11,13 +11,13 @@ import fetchMock from "fetch-mock";
     get_bootstrap_token: true,
   });
 
-  const logged_in_token = {
+  const loggedInToken = {
     bootstrap_token: "8675309JennyDontChangeYourNumber8675309",
   };
 
   fetchMock.post(
     "/_ah/api/swarming/v1/server/token",
-    requireLogin(logged_in_token, 1500)
+    requireLogin(loggedInToken, 1500)
   );
 
   // Everything else

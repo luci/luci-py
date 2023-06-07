@@ -234,7 +234,6 @@ window.customElements.define(
       }
 
       const now = new Date();
-      const taskNames = [];
       const taskAgg = {};
 
       // to compute wall_time, we find the latest task (and assume tasks
@@ -286,14 +285,16 @@ window.customElements.define(
 
       const summarized = [];
       for (const name in taskAgg) {
-        const taskStats = taskAgg[name];
-        taskStats.avg_duration = taskStats.total_time / taskStats.total;
-        taskStats.avg_overhead = taskStats.total_overhead / taskStats.total;
-        taskStats.total_time_percent = (
-          (taskStats.total_time * 100) /
-          totalStats.total_time
-        ).toFixed(1);
-        summarized.push(taskStats);
+        if (taskAgg.hasOwnProperty(name)) {
+          const taskStats = taskAgg[name];
+          taskStats.avg_duration = taskStats.total_time / taskStats.total;
+          taskStats.avg_overhead = taskStats.total_overhead / taskStats.total;
+          taskStats.total_time_percent = (
+            (taskStats.total_time * 100) /
+            totalStats.total_time
+          ).toFixed(1);
+          summarized.push(taskStats);
+        }
       }
 
       totalStats.avg_duration = totalStats.total_time / totalStats.total;

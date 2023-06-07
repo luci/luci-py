@@ -753,7 +753,7 @@ describe("bot-page", function () {
       });
     });
 
-    fit("can kill a running task", function (done) {
+    it("can kill a running task", function (done) {
       serveBot("running");
       loggedInBotPage((ele) => {
         ele.permissions.cancel_task = true;
