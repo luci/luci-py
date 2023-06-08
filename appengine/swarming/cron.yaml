@@ -110,6 +110,11 @@ cron:
   url: /internal/cron/monitoring/bq
   schedule: every 1 minutes
 
+- description: Report RBE migration metrics
+  target: monitor
+  url: /internal/cron/report-rbe-bots
+  schedule: every 1 minutes
+
 
 ### Configs
 
