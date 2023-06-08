@@ -39,76 +39,93 @@ from proto.internals import rbe_pb2
 
 class RBETest(test_case.TestCase):
   @staticmethod
-  def bot_groups_config(rbe_mode_percent=0,
-                        enable_rbe_on=None,
-                        disable_rbe_on=None):
-    kwargs = {f: None for f in bot_groups_config.BotGroupConfig._fields}
-    kwargs['rbe_migration'] = bots_pb2.BotGroup.RBEMigration(
-        rbe_mode_percent=rbe_mode_percent or 0,
-        enable_rbe_on=enable_rbe_on or [],
-        disable_rbe_on=disable_rbe_on or [],
-    )
-    return bot_groups_config.BotGroupConfig(**kwargs)
-
-  @staticmethod
-  def pool_config(rbe_instance, rbe_mode_percent=100):
+  def pool_config(rbe_instance, rbe_mode_percent=100, allocs=None):
     rbe_mgration = None
     if rbe_instance is not None:
       rbe_mgration = pools_pb2.Pool.RBEMigration(
-          rbe_instance=rbe_instance, rbe_mode_percent=rbe_mode_percent)
+          rbe_instance=rbe_instance,
+          rbe_mode_percent=rbe_mode_percent,
+          bot_mode_allocation=[
+              pools_pb2.Pool.RBEMigration.BotModeAllocation(
+                  mode=mode,
+                  percent=percent,
+              ) for mode, percent in (allocs or {}).items()
+          ],
+      )
     return pools_config.init_pool_config(rbe_migration=rbe_mgration)
 
   @mock.patch('server.pools_config.get_pool_config')
   @mock.patch('server.rbe._quasi_random_100')
   def test_get_rbe_config_for_bot(self, quasi_random_100, pool_config):
-    pools = {
-        'pool-1-a': self.pool_config('instance-1'),
-        'pool-1-b': self.pool_config('instance-1'),
-        'pool-2': self.pool_config('instance-2'),
-        'pool-no-rbe-1': self.pool_config(None),
-        'pool-no-rbe-2': self.pool_config(''),
-    }
+    pools = {}
     pool_config.side_effect = lambda pool: pools[pool]
 
-    quasi_random_100.return_value = 30.0
-
-    # Randomizer.
-    cfg = rbe.get_rbe_config_for_bot(
-        'bot-id', ['pool-1-a'], self.bot_groups_config(rbe_mode_percent=25))
-    self.assertIsNone(cfg)
-    cfg = rbe.get_rbe_config_for_bot(
-        'bot-id', ['pool-1-a'], self.bot_groups_config(rbe_mode_percent=30))
-    self.assertEqual(cfg.instance, 'instance-1')
-
-    # Explicitly enabled.
-    cfg = rbe.get_rbe_config_for_bot(
-        'bot-id', ['pool-1-a'],
-        self.bot_groups_config(rbe_mode_percent=25, enable_rbe_on=['bot-id']))
-    self.assertEqual(cfg.instance, 'instance-1')
-
-    # Explicitly disabled.
-    cfg = rbe.get_rbe_config_for_bot(
-        'bot-id', ['pool-1-a'],
-        self.bot_groups_config(rbe_mode_percent=30, disable_rbe_on=['bot-id']))
+    # Pure Swarming pool.
+    pools['swarming'] = self.pool_config(None)
+    cfg = rbe.get_rbe_config_for_bot('bot-id', ['swarming'])
     self.assertIsNone(cfg)
 
-    # The pool is not using RBE.
-    cfg = rbe.get_rbe_config_for_bot(
-        'bot-id', ['pool-no-rbe-1', 'pool-no-rbe-1'],
-        self.bot_groups_config(enable_rbe_on=['bot-id']))
+    # A pool with mixed composition of bots.
+    pools['many-modes'] = self.pool_config('instance',
+                                           allocs={
+                                               'SWARMING': 10,
+                                               'HYBRID': 60,
+                                               'RBE': 30,
+                                           })
+    # Swarming mode.
+    quasi_random_100.return_value = 9
+    cfg = rbe.get_rbe_config_for_bot('bot-id', ['many-modes'])
+    self.assertIsNone(cfg)
+    # Hybrid mode.
+    quasi_random_100.return_value = 10
+    cfg = rbe.get_rbe_config_for_bot('bot-id', ['many-modes'])
+    self.assertEqual(cfg.instance, 'instance')
+    self.assertTrue(cfg.hybrid_mode)
+    # RBE mode.
+    quasi_random_100.return_value = 70
+    cfg = rbe.get_rbe_config_for_bot('bot-id', ['many-modes'])
+    self.assertEqual(cfg.instance, 'instance')
+    self.assertFalse(cfg.hybrid_mode)
+
+    # Older RBE migration config without allocations => use Swarming mode.
+    pools['old-config'] = self.pool_config('instance')
+    cfg = rbe.get_rbe_config_for_bot('bot-id', ['old-config'])
     self.assertIsNone(cfg)
 
-    # Pools agree on RBE instance.
-    cfg = rbe.get_rbe_config_for_bot(
-        'bot-id', ['pool-1-a', 'pool-1-b'],
-        self.bot_groups_config(enable_rbe_on=['bot-id']))
-    self.assertEqual(cfg.instance, 'instance-1')
+    # Multi-pool bot.
+    pools['pool-a'] = self.pool_config('instance',
+                                       allocs={
+                                           'SWARMING': 50,
+                                           'RBE': 50,
+                                       })
+    pools['pool-b'] = self.pool_config('instance',
+                                       allocs={
+                                           'SWARMING': 80,
+                                           'RBE': 20,
+                                       })
+    # All pools agree on a mode.
+    quasi_random_100.return_value = 90
+    cfg = rbe.get_rbe_config_for_bot('bot-id', ['pool-a', 'pool-b'])
+    self.assertEqual(cfg.instance, 'instance')
+    self.assertFalse(cfg.hybrid_mode)
+    # Pools disagree on a mode.
+    quasi_random_100.return_value = 60
+    cfg = rbe.get_rbe_config_for_bot('bot-id', ['pool-a', 'pool-b'])
+    self.assertEqual(cfg.instance, 'instance')
+    self.assertTrue(cfg.hybrid_mode)
 
-    # Pools disagree on RBE instance.
-    cfg = rbe.get_rbe_config_for_bot(
-        'bot-id', ['pool-1-a', 'pool-2'],
-        self.bot_groups_config(enable_rbe_on=['bot-id']))
-    self.assertIsNone(cfg)
+    # Multi-pool bot, pools disagree on RBE instance.
+    pools['pool-c'] = self.pool_config('instance-c', allocs={
+        'RBE': 100,
+    })
+    pools['pool-d'] = self.pool_config('instance-d', allocs={
+        'RBE': 100,
+    })
+    # All pools agree on a mode.
+    quasi_random_100.return_value = 90
+    cfg = rbe.get_rbe_config_for_bot('bot-id', ['pool-c', 'pool-d'])
+    self.assertEqual(cfg.instance, 'instance-c')
+    self.assertFalse(cfg.hybrid_mode)
 
   @mock.patch('random.uniform')
   def test_get_rbe_instance_for_task(self, uniform):
@@ -129,8 +146,8 @@ class RBETest(test_case.TestCase):
   def test_quasi_random_100(self):
     for i in range(1000):
       val = rbe._quasi_random_100(u'bot-%d' % i)
-      self.assertGreaterEqual(val, 0.0)
-      self.assertLessEqual(val, 100.0)
+      self.assertGreaterEqual(val, 0)
+      self.assertLess(val, 100)
 
 
 class PollTokenTest(test_case.TestCase):

@@ -480,11 +480,18 @@ class BotApiTest(test_env_handlers.AppTestBase):
     _, bot_auth_cfg = self.mock_bot_group_config(
         version='default',
         dimensions={u'pool': [u'default']},
-        rbe_migration=bots_pb2.BotGroup.RBEMigration(rbe_mode_percent=100),
         is_default=True)
     self.mock_pool_config(
         pool='default',
-        rbe_migration=pools_pb2.Pool.RBEMigration(rbe_instance='some-instance'),
+        rbe_migration=pools_pb2.Pool.RBEMigration(
+            rbe_instance='some-instance',
+            bot_mode_allocation=[
+                {
+                    'mode': 'RBE',
+                    'percent': 100
+                },
+            ],
+        ),
     )
     self.mock(rbe, 'generate_poll_token', mock.Mock())
     rbe.generate_poll_token.return_value = 'mocked-poll-token'
@@ -538,14 +545,18 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock_bot_group_config(
         version='default',
         dimensions={u'pool': [u'default']},
-        rbe_migration=bots_pb2.BotGroup.RBEMigration(
-            rbe_mode_percent=100,
-            hybrid_mode=True,
-        ),
         is_default=True)
     self.mock_pool_config(
         pool='default',
-        rbe_migration=pools_pb2.Pool.RBEMigration(rbe_instance='some-instance'),
+        rbe_migration=pools_pb2.Pool.RBEMigration(
+            rbe_instance='some-instance',
+            bot_mode_allocation=[
+                {
+                    'mode': 'HYBRID',
+                    'percent': 100
+                },
+            ],
+        ),
         realm='test:pool/default',
     )
     self.mock(rbe, 'generate_poll_token', mock.Mock())

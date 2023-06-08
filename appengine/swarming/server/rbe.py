@@ -23,6 +23,7 @@ from components import datastore_utils
 from components import gsm
 from components import utils
 
+from proto.config import pools_pb2
 from proto.internals import rbe_pb2
 from server import pools_config
 from server.constants import OR_DIM_SEP
@@ -52,7 +53,7 @@ def warmup():
     logging.exception('Failed to warmup up RBE HMAC key')
 
 
-def get_rbe_config_for_bot(bot_id, pools, bot_group_cfg):
+def get_rbe_config_for_bot(bot_id, pools):
   """Returns an RBE instance (and related parameters) to use for the given bot.
 
   If the bot should not be using RBE, returns None.
@@ -60,55 +61,83 @@ def get_rbe_config_for_bot(bot_id, pools, bot_group_cfg):
   Args:
     bot_id: ID of the bot as a string.
     pools: pool IDs the bot belongs to.
-    bot_group_cfg: a BotGroupConfig tuple with bot's bot group config.
 
   Returns:
     An RBEBotConfig tuple or None if the bot should not be using RBE.
   """
-  rbe_migration = bot_group_cfg.rbe_migration
-  if not rbe_migration:
+  BotMode = pools_pb2.Pool.RBEMigration.BotModeAllocation.BotMode
+
+  # This can happen during a handshake with a broken/misconfigured bot.
+  if not pools:
     return None
 
-  if bot_id in rbe_migration.enable_rbe_on:
-    use_rbe = True
-  elif bot_id in rbe_migration.disable_rbe_on:
-    use_rbe = False
-  else:
-    use_rbe = _quasi_random_100(bot_id) <= float(rbe_migration.rbe_mode_percent)
+  # This an int in range [0, 100).
+  bot_rand = _quasi_random_100(bot_id)
 
-  if not use_rbe:
-    logging.info('RBE: bot %s is not using RBE', bot_id)
-    return None
+  def derive_mode(allocs):
+    if not allocs:
+      return BotMode.SWARMING
 
-  # Check all pools the bot belongs to (most commonly only one) have RBE
-  # enabled and they all use the same RBE instance.
+    # This config should be validated already and all percents should sum up
+    # to 100. See pools_config.py.
+    per_mode = {}
+    for alloc in allocs:
+      assert alloc.mode not in per_mode, alloc
+      assert 0 <= alloc.percent <= 100, alloc
+      per_mode[alloc.mode] = alloc.percent
+    percent_swarming = per_mode.get(BotMode.SWARMING, 0)
+    percent_hybrid = per_mode.get(BotMode.HYBRID, 0)
+    percent_rbe = per_mode.get(BotMode.RBE, 0)
+    assert percent_swarming + percent_hybrid + percent_rbe == 100, allocs
+
+    # Pick the mode depending on what subrange the bot falls into in
+    # [---SWARMING---|---HYBRID---|---RBE---].
+    if bot_rand < percent_swarming:
+      return BotMode.SWARMING
+    if bot_rand < percent_swarming + percent_hybrid:
+      return BotMode.HYBRID
+    return BotMode.RBE
+
+  # For each pool (usually just one) calculate the mode and RBE instance the bot
+  # should be using there.
   assert isinstance(pools, list), pools
-  rbe_instances = set()
+  per_pool = []  # (BotMode, rbe_instance or None)
   for pool in pools:
     cfg = pools_config.get_pool_config(pool)
-    if cfg and cfg.rbe_migration and cfg.rbe_migration.rbe_instance:
-      rbe_instances.add(cfg.rbe_migration.rbe_instance)
+    if cfg and cfg.rbe_migration:
+      mode = derive_mode(cfg.rbe_migration.bot_mode_allocation)
+      per_pool.append((mode, cfg.rbe_migration.rbe_instance))
     else:
-      rbe_instances.add(None)
+      per_pool.append((BotMode.SWARMING, None))
 
-  rbe_instances = sorted(rbe_instances)
-  if len(rbe_instances) != 1:
-    logging.warning(
-        'RBE: disabling RBE for bot %s: bot pools disagree on RBE instance: %r',
-        bot_id, rbe_instances)
+  # If all pools agree on a single mode, use it whatever it is. Otherwise use
+  # HYBRID, since it is compatible with all modes.
+  modes = list(set(m for m, _ in per_pool))
+  if len(modes) == 1:
+    mode = modes[0]
+  else:
+    logging.warning('RBE: bot %s is assigned multiple modes %s', bot_id, modes)
+    mode = BotMode.HYBRID
+  logging.info('RBE: bot %s is in %s mode', bot_id, mode)
+
+  # Don't bother checking the rest for bots in pure Swarming mode.
+  if mode == BotMode.SWARMING:
     return None
+  assert mode in (BotMode.HYBRID, BotMode.RBE), mode
 
+  # Check all RBE pools agree on an RBE instance to use. If not, this is a
+  # configuration error. Unfortunately it is hard to detect it statically when
+  # validating the config. Instead log an error now and pick some arbitrary
+  # RBE instance. That way at least some tasks will still be executing.
+  rbe_instances = sorted(
+      set(inst for m, inst in per_pool if m != BotMode.SWARMING))
+  assert rbe_instances
+  if len(rbe_instances) > 1:
+    logging.error('RBE: bot %s: bot pools disagree on RBE instance: %r', bot_id,
+                  rbe_instances)
   rbe_instance = rbe_instances[0]
-  if not rbe_instance:
-    logging.warning(
-        'RBE: disabling RBE for bot %s: pools are not configure to use RBE',
-        bot_id)
-    return None
-
-  logging.info('RBE: bot %s is using RBE instance %s (hybrid_mode=%s)', bot_id,
-               rbe_instance, rbe_migration.hybrid_mode)
-  return RBEBotConfig(instance=rbe_instance,
-                      hybrid_mode=rbe_migration.hybrid_mode)
+  logging.info('RBE: bot %s is using RBE instance %s', bot_id, rbe_instance)
+  return RBEBotConfig(instance=rbe_instance, hybrid_mode=mode == BotMode.HYBRID)
 
 
 def generate_poll_token(bot_id, rbe_instance, enforced_dimensions,
@@ -397,10 +426,10 @@ def enqueue_rbe_cancel(task_request, task_to_run):
 
 
 def _quasi_random_100(s):
-  """Given a string, returns a quasi-random float in range [0; 100]."""
+  """Given a string, returns a quasi-random integer in range [0; 100)."""
   digest = hashlib.sha256(s).digest()
   num = float(ord(digest[0]) + ord(digest[1]) * 256)
-  return num * 100.0 / (256.0 + 256.0 * 256.0)
+  return int(num * 99.9 / (256.0 + 256.0 * 256.0))
 
 
 @utils.cache

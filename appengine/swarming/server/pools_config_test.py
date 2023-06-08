@@ -55,7 +55,16 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
                     allow_es_fallback=True,
                 )
             ],
-            rbe_migration=pools_pb2.Pool.RBEMigration(rbe_mode_percent=23),
+            rbe_migration=pools_pb2.Pool.RBEMigration(
+                rbe_instance='some/instance',
+                rbe_mode_percent=23,
+                bot_mode_allocation=[
+                    pools_pb2.Pool.RBEMigration.BotModeAllocation(
+                        mode='RBE',
+                        percent=100,
+                    ),
+                ],
+            ),
             scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
         ),
     ],
@@ -129,7 +138,16 @@ class PoolsConfigTest(test_case.TestCase):
             enabled=True,
             allow_es_fallback=True,
         ), ),
-        rbe_migration=pools_pb2.Pool.RBEMigration(rbe_mode_percent=23),
+        rbe_migration=pools_pb2.Pool.RBEMigration(
+            rbe_instance='some/instance',
+            rbe_mode_percent=23,
+            bot_mode_allocation=[
+                pools_pb2.Pool.RBEMigration.BotModeAllocation(
+                    mode='RBE',
+                    percent=100,
+                ),
+            ],
+        ),
         scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
     )
     expected2 = expected1._replace(name='another_name')
@@ -346,6 +364,61 @@ class PoolsConfigTest(test_case.TestCase):
         ])
     self.validator_test(cfg, [
       'bot_monitoring not referred to: mon',
+    ])
+
+  def test_rbe_migration_ok(self):
+    cfg = pools_pb2.PoolsCfg(pool=[
+        pools_pb2.Pool(
+            name=['abc'],
+            rbe_migration=pools_pb2.Pool.RBEMigration(
+                rbe_instance='some/instance',
+                rbe_mode_percent=23,
+                bot_mode_allocation=[
+                    pools_pb2.Pool.RBEMigration.BotModeAllocation(
+                        mode='SWARMING',
+                        percent=10,
+                    ),
+                    pools_pb2.Pool.RBEMigration.BotModeAllocation(
+                        mode='HYBRID',
+                        percent=70,
+                    ),
+                    pools_pb2.Pool.RBEMigration.BotModeAllocation(
+                        mode='RBE',
+                        percent=20,
+                    ),
+                ],
+            ),
+        ),
+    ], )
+    self.validator_test(cfg, [])
+
+  def test_rbe_migration_bad_percent_total(self):
+    cfg = pools_pb2.PoolsCfg(pool=[
+        pools_pb2.Pool(
+            name=['abc'],
+            rbe_migration=pools_pb2.Pool.RBEMigration(
+                rbe_instance='some/instance',
+                rbe_mode_percent=23,
+                bot_mode_allocation=[
+                    pools_pb2.Pool.RBEMigration.BotModeAllocation(
+                        mode='SWARMING',
+                        percent=5,
+                    ),
+                    pools_pb2.Pool.RBEMigration.BotModeAllocation(
+                        mode='HYBRID',
+                        percent=70,
+                    ),
+                    pools_pb2.Pool.RBEMigration.BotModeAllocation(
+                        mode='RBE',
+                        percent=20,
+                    ),
+                ],
+            ),
+        ),
+    ], )
+    self.validator_test(cfg, [
+        u'pool #0 (abc): rbe_migration: bot_mode_allocation percents should '
+        u'sum up to 100'
     ])
 
   def test_bootstrap_dev_server_acls(self):

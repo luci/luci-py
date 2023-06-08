@@ -84,9 +84,6 @@ BotGroupConfig = collections.namedtuple(
         # The cloud project id where the bot saves its logs.
         'logs_cloud_project',
 
-        # Controls RBE migration parameters, bots_pb2.BotGroup.RBEMigration.
-        'rbe_migration',
-
         # True if it's default group config.
         'is_default',
     ])
@@ -531,7 +528,6 @@ def _default_bot_groups():
           bot_config_script_content='',
           system_service_account='',
           logs_cloud_project=None,
-          rbe_migration=None,
           is_default=True))
 
 
@@ -553,7 +549,6 @@ def _gen_version(fields):
   # enough. Add a prefix and trim a bit, to clarify that is it not git hash or
   # anything like that, but just a dumb hash of the actual config.
   fields = fields.copy()
-  fields.pop('rbe_migration')  # does not affect bots directly
   fields['auth'] = [a._asdict() for a in fields['auth']]
   digest = hashlib.sha256(utils.encode_to_json(fields)).hexdigest()
   return 'hash:' + digest[:14]
@@ -597,8 +592,6 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
       bot_config_script_content=msg.bot_config_script_content or '',
       system_service_account=msg.system_service_account or '',
       logs_cloud_project=msg.logs_cloud_project or None,
-      rbe_migration=(
-          msg.rbe_migration if msg.HasField('rbe_migration') else None),
       is_default=not msg.bot_id and not msg.bot_id_prefix)
 
 

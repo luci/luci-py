@@ -559,6 +559,35 @@ def _validate_external_services(ctx, cfg):
   _validate_external_services_cipd(ctx, cfg.cipd)
 
 
+def _vaildate_rbe_migration(ctx, msg):
+  """Validates pools_pb2.Pool.RBEMigration."""
+  BotMode = pools_pb2.Pool.RBEMigration.BotModeAllocation.BotMode
+
+  if not msg.rbe_instance:
+    ctx.error('rbe_instance is required')
+  if not (0 <= msg.rbe_mode_percent <= 100):
+    ctx.error('rbe_mode_percent should be in [0; 100]')
+
+  allocs = {}
+  for i, alloc in enumerate(msg.bot_mode_allocation):
+    with ctx.prefix('bot_mode_allocation #%d:', i):
+      if alloc.mode == BotMode.UNKNOWN:
+        ctx.error('mode is require')
+        continue
+      if alloc.mode in allocs:
+        ctx.error('allocation for mode %s was already defined', alloc.mode)
+        continue
+      if not (0 <= alloc.percent <= 100):
+        ctx.error('percent should be in [0; 100]')
+        continue
+      allocs[alloc.mode] = alloc.percent
+
+  total = (allocs.get(BotMode.SWARMING, 0) + allocs.get(BotMode.HYBRID, 0) +
+           allocs.get(BotMode.RBE, 0))
+  if total != 100:
+    ctx.error('bot_mode_allocation percents should sum up to 100')
+
+
 @utils.cache_with_expiration(60)
 def _fetch_pools_config():
   """Loads pools.cfg and parses it into a _PoolsCfg instance."""
@@ -694,6 +723,10 @@ def _validate_pools_cfg(cfg, ctx):
           ctx.error('%sth external scheduler config had no address', j)
 
       _resolve_deployment(ctx, msg, template_map, deployment_map)
+
+      if msg.HasField('rbe_migration'):
+        with ctx.prefix('rbe_migration: '):
+          _vaildate_rbe_migration(ctx, msg.rbe_migration)
 
       if msg.bot_monitoring:
         if msg.bot_monitoring not in bot_monitorings:
