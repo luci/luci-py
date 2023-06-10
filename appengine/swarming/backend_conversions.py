@@ -6,6 +6,7 @@
 import collections
 import copy
 import posixpath
+import logging
 
 from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
@@ -209,7 +210,6 @@ def convert_results_to_tasks(task_results, task_ids):
         unexpected state.
   """
   tasks = []
-
   for i, result in enumerate(task_results):
     task = task_pb2.Task(
         id=task_pb2.TaskID(
@@ -223,51 +223,62 @@ def convert_results_to_tasks(task_results, task_ids):
       tasks.append(task)
       continue
 
-    if result.state == task_result.State.PENDING:
-      task.status = common_pb2.SCHEDULED
+    convert_task_state_to_status(result.state, result.failure, task)
 
-    elif result.state == task_result.State.RUNNING:
-      task.status = common_pb2.STARTED
-
-    elif result.state == task_result.State.EXPIRED:
-      task.status = common_pb2.INFRA_FAILURE
-      task.summary_html = 'Task expired.'
-      task.status_details.resource_exhaustion.SetInParent()
-      task.status_details.timeout.SetInParent()
-
-    elif result.state == task_result.State.TIMED_OUT:
-      task.status = common_pb2.INFRA_FAILURE
-      task.summary_html = 'Task timed out.'
-      task.status_details.timeout.SetInParent()
-
-    elif result.state == task_result.State.CLIENT_ERROR:
-      task.status = common_pb2.FAILURE
-      task.summary_html = 'Task client error.'
-
-    elif result.state == task_result.State.BOT_DIED:
-      task.status = common_pb2.INFRA_FAILURE
-      task.summary_html = 'Task bot died.'
-
-    elif result.state in [task_result.State.CANCELED, task_result.State.KILLED]:
-      task.status = common_pb2.CANCELED
-
-    elif result.state == task_result.State.NO_RESOURCE:
-      task.status = common_pb2.INFRA_FAILURE
-      task.summary_html = 'Task did not start, no resource.'
-      task.status_details.resource_exhaustion.SetInParent()
-
-    elif result.state == task_result.State.COMPLETED:
-      if result.failure:
-        task.status = common_pb2.FAILURE
-        task.summary_html = ('Task completed with failure.')
-      else:
-        task.status = common_pb2.SUCCESS
-
-    else:
+    if task.status == common_pb2.STATUS_UNSPECIFIED:
       logging.error('Unexpected state for task result: %r', result)
       raise handlers_exceptions.InternalException('Unrecognized task status')
 
     # TODO(crbug/1236848): Fill Task.details.
     tasks.append(task)
-
   return tasks
+
+
+def convert_task_state_to_status(state, failure, task):
+  # type: StateProperty, bool, task_pb2.Task -> None
+  """
+  Converts a swarming task result's state to a common_pb2 status. Updates
+  StatusDetails and SummaryHTML accordingly. Modifies task in place.
+  """
+  task.status = common_pb2.STATUS_UNSPECIFIED
+  task.summary_html = ""
+
+  if state == task_result.State.PENDING:
+    task.status = common_pb2.SCHEDULED
+
+  elif state == task_result.State.RUNNING:
+    task.status = common_pb2.STARTED
+
+  elif state == task_result.State.EXPIRED:
+    task.status = common_pb2.INFRA_FAILURE
+    task.summary_html = 'Task expired.'
+    task.status_details.resource_exhaustion.SetInParent()
+    task.status_details.timeout.SetInParent()
+
+  elif state == task_result.State.TIMED_OUT:
+    task.status = common_pb2.INFRA_FAILURE
+    task.summary_html = 'Task timed out.'
+    task.status_details.timeout.SetInParent()
+
+  elif state == task_result.State.CLIENT_ERROR:
+    task.status = common_pb2.FAILURE
+    task.summary_html = 'Task client error.'
+
+  elif state == task_result.State.BOT_DIED:
+    task.status = common_pb2.INFRA_FAILURE
+    task.summary_html = 'Task bot died.'
+
+  elif state in [task_result.State.CANCELED, task_result.State.KILLED]:
+    task.status = common_pb2.CANCELED
+
+  elif state == task_result.State.NO_RESOURCE:
+    task.status = common_pb2.INFRA_FAILURE
+    task.summary_html = 'Task did not start, no resource.'
+    task.status_details.resource_exhaustion.SetInParent()
+
+  elif state == task_result.State.COMPLETED:
+    if failure:
+      task.status = common_pb2.FAILURE
+      task.summary_html = ('Task completed with failure.')
+    else:
+      task.status = common_pb2.SUCCESS

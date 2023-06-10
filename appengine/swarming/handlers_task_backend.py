@@ -5,8 +5,8 @@
 
 import logging
 
+from google.appengine.api import app_identity
 from google.appengine.ext import ndb
-from google.protobuf import empty_pb2
 
 from components import auth
 
@@ -17,6 +17,8 @@ import prpc_helpers
 
 from bb.go.chromium.org.luci.buildbucket.proto import backend_prpc_pb2
 from bb.go.chromium.org.luci.buildbucket.proto import backend_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import task_pb2
 
 from server import acl
 from server import bot_management
@@ -40,7 +42,7 @@ class TaskBackendAPIService(object):
   @auth.require(acl.can_use_task_backend, log_identity=True)
   def RunTask(self, request, _context):
     # type: (backend_pb2.RunTaskRequest, context.ServicerContext)
-    #     -> empty_pb2.Empty
+    #     -> backend_pb2.RunTaskResponse
 
     api_helpers.validate_backend_configs(
         [backend_conversions.ingest_backend_config(request.backend_config)])
@@ -63,8 +65,14 @@ class TaskBackendAPIService(object):
     if is_deduped:
       logging.info('Reusing task %s with uuid %s', result.task_id,
                    request.request_id)
-
-    return empty_pb2.Empty()
+    hostname = app_identity.get_default_version_hostname()
+    task = task_pb2.Task(id=task_pb2.TaskID(id=result.task_id,
+                                            target=request.target),
+                         link="https://%s/task?id=%s&o=true&w=true" %
+                         (hostname, result.task_id))
+    backend_conversions.convert_task_state_to_status(
+      result.state, result.failure, task)
+    return backend_pb2.RunTaskResponse(task=task)
 
   @prpc_helpers.method
   @auth.require(acl.can_use_task_backend, log_identity=True)

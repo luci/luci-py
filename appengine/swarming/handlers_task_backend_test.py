@@ -7,6 +7,7 @@ import datetime
 import logging
 import os
 import cgi
+import random
 import sys
 import unittest
 
@@ -98,6 +99,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
 
   def _basic_run_task_request(self):
     return backend_pb2.RunTaskRequest(
+        target="swarming://testing",
         secrets=launcher_pb2.BuildSecrets(build_token='tok'),
         realm='some:realm',
         build_id='42423',
@@ -126,7 +128,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         start_deadline=timestamp_pb2.Timestamp(seconds=int(utils.time_time() +
                                                            120)),
         dimensions=[self._req_dim_prpc('pool', 'default')],
-        backend_token='token-token-token',
+        register_backend_task_token='token-token-token',
         buildbucket_host='cow-buildbucket.appspot.com',
     )
 
@@ -145,8 +147,18 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     request = self._basic_run_task_request()
     request_id = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
     request.request_id = request_id
-    self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask', _encode(request),
-                  self._headers)
+    self.mock(random, 'getrandbits', lambda _: 0x86)
+    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
+                             _encode(request), self._headers)
+    actual_resp = backend_pb2.RunTaskResponse()
+    _decode(raw_resp.body, actual_resp)
+    expected_task_id = '4225526b80008610'
+    l='https://test-swarming.appspot.com/task?id=4225526b80008610&o=true&w=true'
+    expected_response = backend_pb2.RunTaskResponse(task=task_pb2.Task(
+        id=task_pb2.TaskID(id=expected_task_id, target='swarming://testing'),
+        link=l,
+        status=common_pb2.SCHEDULED))
+    self.assertEqual(actual_resp, expected_response)
     self.assertEqual(1, task_request.TaskRequest.query().count())
     self.assertEqual(1, task_request.BuildToken.query().count())
     self.assertEqual(1, task_request.SecretBytes.query().count())
@@ -156,16 +168,34 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         memcache.get(request_idempotency_key, namespace='backend_run_task'))
 
     # Test requests are correctly deduped if `request_id` matches.
-    self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask', _encode(request),
-                  self._headers)
+    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
+                             _encode(request), self._headers)
+    actual_resp = backend_pb2.RunTaskResponse()
+    _decode(raw_resp.body, actual_resp)
+    expected_response = backend_pb2.RunTaskResponse(task=task_pb2.Task(
+        id=task_pb2.TaskID(id=expected_task_id, target='swarming://testing'),
+        link=l,
+        status=common_pb2.SCHEDULED))
+    self.assertEqual(actual_resp, expected_response)
     self.assertEqual(1, task_request.TaskRequest.query().count())
     self.assertEqual(1, task_request.BuildToken.query().count())
     self.assertEqual(1, task_request.SecretBytes.query().count())
 
     # Test tasks with different `request_id`s are not deduped.
     request.request_id = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a8'
-    self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask', _encode(request),
-                  self._headers)
+    self.mock(random, 'getrandbits', lambda _: 0x87)
+    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
+                             _encode(request), self._headers)
+    actual_resp = backend_pb2.RunTaskResponse()
+    _decode(raw_resp.body, actual_resp)
+    new_expected_task_id = '4225526b80008710'
+    l='https://test-swarming.appspot.com/task?id=4225526b80008710&o=true&w=true'
+    expected_response = backend_pb2.RunTaskResponse(
+        task=task_pb2.Task(id=task_pb2.TaskID(id=new_expected_task_id,
+                                              target='swarming://testing'),
+                           link=l,
+                           status=common_pb2.SCHEDULED))
+    self.assertEqual(actual_resp, expected_response)
     self.assertEqual(2, task_request.TaskRequest.query().count())
     self.assertEqual(2, task_request.BuildToken.query().count())
     self.assertEqual(2, task_request.SecretBytes.query().count())
