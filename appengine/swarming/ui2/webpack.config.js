@@ -83,9 +83,7 @@ function demoFinder(dir, webpackConfig, demoType) {
     .filter(isDir);
 
   if (demoType !== "demo" && demoType !== "live") {
-    throw new Exception(
-      "Only 'demo' and 'live' are valid values for demo type"
-    );
+    throw new Error("Only 'demo' and 'live' are valid values for demo type");
   }
   const htmlSuffix = `-${demoType}.html`;
   const jsSuffix = `-${demoType}.js`;
@@ -97,7 +95,7 @@ function demoFinder(dir, webpackConfig, demoType) {
     files.forEach((file) => {
       if (file.endsWith(htmlSuffix)) {
         if (!!demoHTML) {
-          throw new Exception(
+          throw new Error(
             "Only one -demo.html file is allowed per directory: " + file
           );
         }
@@ -105,7 +103,7 @@ function demoFinder(dir, webpackConfig, demoType) {
       }
       if (file.endsWith(jsSuffix)) {
         if (demoJS != "") {
-          throw new Exception(
+          throw new Error(
             "Only one -demo.js file is allowed per directory: " + file
           );
         }

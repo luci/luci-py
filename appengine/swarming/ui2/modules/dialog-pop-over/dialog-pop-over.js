@@ -36,9 +36,7 @@ window.customElements.define(
 
       this._content = $$(".content", this);
       if (!this._content) {
-        throw new Exception(
-          "You must have an element with class content to show."
-        );
+        throw new Error("You must have an element with class content to show.");
       }
     }
 

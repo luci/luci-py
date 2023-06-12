@@ -20,7 +20,7 @@ export const customMatchers = {
     return {
       compare: function (actual, regex) {
         if (!(regex instanceof RegExp)) {
-          throw new Exception(
+          throw new Error(
             `toContainRegex expects a regex, got ${JSON.stringify(regex)}`
           );
         }
@@ -54,7 +54,7 @@ export const customMatchers = {
     return {
       compare: function (actual, attribute) {
         if (!isElement(actual)) {
-          throw new Exception(`${actual} is not a DOM element`);
+          throw new Error(`${actual} is not a DOM element`);
         }
         return {
           pass: actual.hasAttribute(attribute),
@@ -68,7 +68,7 @@ export const customMatchers = {
     return {
       compare: function (actual, text) {
         if (!isElement(actual)) {
-          throw new Exception(`${actual} is not a DOM element`);
+          throw new Error(`${actual} is not a DOM element`);
         }
         function normalize(s) {
           return s.trim().replace("\t", " ").replace(/ {2,}/g, " ");
