@@ -1298,6 +1298,8 @@ class _BotLoopState:
 
     # Number of consecutive Swarming poll failures.
     self._swarming_consecutive_errors = 0
+    # True if the last Swarming poll returned no tasks. None before the poll.
+    self._swarming_idle = None
     # When we should poll Swarming next time. Initially set to ASAP.
     self._swarming_poll_timer = self._clock.timer(0.0)
 
@@ -1313,6 +1315,8 @@ class _BotLoopState:
     self._rbe_session = None
     # Number of consecutive RBE poll failures.
     self._rbe_consecutive_errors = 0
+    # True if the last RBE poll returned no tasks. None before the poll.
+    self._rbe_idle = None
     # When we should poll RBE next time (if at all).
     self._rbe_poll_timer = None
 
@@ -1463,11 +1467,6 @@ class _BotLoopState:
         self.swarming_handle_cmd(cmd, param)
       elif rbe_lease:
         self.rbe_handle_lease(rbe_lease)
-      elif self._rbe_hybrid_mode and cmd == 'rbe' and swarming_forced:
-        # When force polling from Swarming, `rbe` reply means there are no tasks
-        # in the Swarming scheduler. Since we also already checked there are no
-        # RBE leases, it means the bot is sitting idle this cycle.
-        self.on_idle_poll_cycle()
 
       # If we ran a command, need to poll from the scheduler ASAP without
       # sleeping. In pure RBE mode this is already taken care of via
@@ -1476,6 +1475,30 @@ class _BotLoopState:
       # polling.
       if self._rbe_hybrid_mode and (cmd == 'run' or rbe_lease):
         self._swarming_poll_timer.reset(0.0)
+
+      # Decide if this was an idle cycle.
+      logging.info('Swarming idle: %s, RBE idle: %s', self._swarming_idle,
+                   self._rbe_idle)
+      report_idle = False
+      if self._rbe_hybrid_mode:
+        # In hybrid mode we need to do full polls from both Swarming and RBE
+        # (i.e. do two loop cycles) before putting the bot into the idle state,
+        # since we need to check that both queues are empty.
+        report_idle = self._rbe_idle and self._swarming_idle
+      elif self._rbe_intended_instance:
+        # Pure RBE mode.
+        report_idle = self._rbe_idle
+      else:
+        # Pure Swarming mode.
+        report_idle = self._swarming_idle
+      if report_idle:
+        # Reset idleness flags, need to collect them again based on schedulers
+        # replies before reporting the next cycle as idle. Important in the
+        # hybrid mode which needs *both* flags collected.
+        self._swarming_idle = None
+        self._rbe_idle = None
+        # This actually flips the bot into the idle state making self.idle True.
+        self.on_idle_poll_cycle()
 
       # Update the bot idleness state reported to Swarming and details about
       # the RBE session (if any).
@@ -1644,6 +1667,7 @@ class _BotLoopState:
     self._rbe_intended_instance = None
     self._rbe_intended_status = remote_client.RBESessionStatus.BOT_TERMINATING
     self._rbe_hybrid_mode = False
+    self._rbe_idle = None
     self._rbe_consecutive_errors = 0
     if self._rbe_session:
       logging.info('RBE: terminating session %s', self._rbe_session.session_id)
@@ -1688,6 +1712,8 @@ class _BotLoopState:
       self._rbe_session = None
 
     if not self._rbe_session:
+      # Don't know if there are pending tasks, need a session for it.
+      self._rbe_idle = None
       # If we don't actually need a healthy session anymore, do nothing. This
       # can happen if the bot is already shutting down. To avoid potential weird
       # issues if the shutdown fails due to errors, reschedule the poll some
@@ -1729,16 +1755,18 @@ class _BotLoopState:
         self._rbe_consecutive_errors += 1
         self._rbe_session.abandon()
         self._rbe_session = None
+        self._rbe_idle = None
         return None
       # The session is healthy! Return whatever was polled, if anything.
+      if report_status == remote_client.RBESessionStatus.OK:
+        self._rbe_idle = not lease
       self._rbe_consecutive_errors = 0
-      if not lease and not maintenance:
-        self.on_idle_poll_cycle()
       return lease
     except remote_client_errors.RBEServerError as e:
       if self._rbe_consecutive_errors > 3:
         self.report_exception('Failed to update RBE Session: %s' % e)
       self._rbe_consecutive_errors += 1
+      self._rbe_idle = None
       return None
 
   @_trap_all_exceptions
@@ -1801,11 +1829,23 @@ class _BotLoopState:
         logging.debug('Hybrid mode: poll Swarming, force:%s', force)
       cmd, param = self._bot.remote.poll(self._bot.attributes, force)
       logging.debug('Swarming poll response:\n%s: %s', cmd, param)
+      if cmd == 'sleep':
+        # Pure Swarming bot, no tasks.
+        self._swarming_idle = True
+      elif cmd != 'rbe':
+        # Any kind of bot, have a pending task or some command.
+        self._swarming_idle = False
+      elif not self._rbe_hybrid_mode or force:
+        # Ignore `rbe` when it is returned as part of non-forced poll in hybrid
+        # mode. In that case there still can be Swarming tasks pending.
+        # Otherwise `rbe` indicates the Swarming queue is empty.
+        self._swarming_idle = True
       self._swarming_consecutive_errors = 0
       return cmd, param
     except remote_client_errors.PollError as e:
       logging.error('Swarming poll error: %s' % e)
       self._swarming_consecutive_errors += 1
+      self._swarming_idle = None
       return None, None
 
   def swarming_handle_cmd(self, cmd, param):
@@ -1839,7 +1879,6 @@ class _BotLoopState:
   @_trap_all_exceptions
   def cmd_sleep(self, duration):
     """Called when Swarming asks the bot to sleep."""
-    self.on_idle_poll_cycle()
     self._swarming_poll_timer.reset(duration)
 
   @_trap_all_exceptions

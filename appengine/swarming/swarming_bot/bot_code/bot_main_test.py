@@ -1560,7 +1560,7 @@ class TestBotMain(TestBotBase):
                                          blocking=False),
     ])
     self.poll_once()
-    self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
 
     # The next poll is from RBE scheduler. Makes a non-forced Swarming poll,
     # gets nothing. Makes a full RBE poll.
@@ -1576,15 +1576,15 @@ class TestBotMain(TestBotBase):
                     'sleep': 10.0,
                 },
             },
-            rbe_idle=True,
-            sleep_streak=1,
+            rbe_idle=False,
+            sleep_streak=0,
             force=False),
         self.expected_rbe_update_request('pt0', 'st0', blocking=False),
     ])
     self.poll_once()
-    self.assertEqual(self.loop_state._consecutive_idle_cycles, 2)
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
 
-    # Swarming's turn again.
+    # Swarming's turn again. Reports idle status now.
     self.assertEqual(self.loop_state._next_scheduler, 'swarming')
     self.expected_requests([
         self.expected_poll_request(
@@ -1598,7 +1598,7 @@ class TestBotMain(TestBotBase):
                 },
             },
             rbe_idle=True,
-            sleep_streak=2,
+            sleep_streak=1,
             force=True),
         self.expected_rbe_update_request('pt0',
                                          'st0',
@@ -1606,7 +1606,7 @@ class TestBotMain(TestBotBase):
                                          blocking=False),
     ])
     self.poll_once()
-    self.assertEqual(self.loop_state._consecutive_idle_cycles, 3)
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
 
   def test_hybrid_mode_swarming_scheduler_task(self):
     self.mock(bot_main, '_run_manifest', lambda *args: True)
@@ -1672,7 +1672,7 @@ class TestBotMain(TestBotBase):
         self.expected_rbe_update_request('pt0', 'st0', blocking=False),
     ])
     self.poll_once()
-    self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
 
   def test_hybrid_mode_rbe_scheduler_task(self):
     def run_manifest(_bot, _manifest, rbe_session):
@@ -1762,7 +1762,7 @@ class TestBotMain(TestBotBase):
                                          blocking=False),
     ])
     self.poll_once()
-    self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
+    self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
 
   def test_hybrid_mode_update(self):
     update = []
