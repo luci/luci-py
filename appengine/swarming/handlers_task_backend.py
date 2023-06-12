@@ -33,6 +33,18 @@ _FETCH_TASKS_LIMIT = 1000
 _CANCEL_TASKS_LIMIT = 500
 
 
+def validate_run_task_request(request):
+  # type: backend_pb2.RunTaskRequest -> None
+  if request.build_id == "":
+    raise handlers_exceptions.BadRequestException("build_id must be provided")
+  if request.target == "":
+    raise handlers_exceptions.BadRequestException("target must be provided")
+  expected_target = "swarming://%s" % app_identity.get_application_id()
+  if request.target != expected_target:
+    raise handlers_exceptions.BadRequestException(
+        "target does not match expected target")
+
+
 class TaskBackendAPIService(object):
   """Service implements the pRPC service in backend.proto."""
 
@@ -43,35 +55,27 @@ class TaskBackendAPIService(object):
   def RunTask(self, request, _context):
     # type: (backend_pb2.RunTaskRequest, context.ServicerContext)
     #     -> backend_pb2.RunTaskResponse
-
+    validate_run_task_request(request)
     api_helpers.validate_backend_configs(
         [backend_conversions.ingest_backend_config(request.backend_config)])
     tr, secret_bytes, build_token = backend_conversions.compute_task_request(
         request)
-
+    caller = auth.get_current_identity().to_bytes()
+    request_id = "%s:%s" % (caller, request.build_id)
     api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
-
-    def _schedule_request():
-      try:
-        return task_scheduler.schedule_request(tr,
-                                               secret_bytes=secret_bytes,
-                                               build_token=build_token)
-      except (TypeError, ValueError) as e:
-        raise handlers_exceptions.BadRequestException(e.message)
-
-    result, is_deduped = api_helpers.cache_request('backend_run_task',
-                                                   request.request_id,
-                                                   _schedule_request)
-    if is_deduped:
-      logging.info('Reusing task %s with uuid %s', result.task_id,
-                   request.request_id)
+    try:
+      result_summary = task_scheduler.schedule_request(
+          tr, request_id, secret_bytes=secret_bytes, build_token=build_token)
+    except (TypeError, ValueError) as e:
+      raise handlers_exceptions.BadRequestException(str(e))
     hostname = app_identity.get_default_version_hostname()
-    task = task_pb2.Task(id=task_pb2.TaskID(id=result.task_id,
-                                            target=request.target),
+    task_id = task_pack.pack_result_summary_key(result_summary.key)
+    task = task_pb2.Task(id=task_pb2.TaskID(id=task_id, target=request.target),
                          link="https://%s/task?id=%s&o=true&w=true" %
-                         (hostname, result.task_id))
-    backend_conversions.convert_task_state_to_status(
-      result.state, result.failure, task)
+                         (hostname, task_id))
+    backend_conversions.convert_task_state_to_status(result_summary.state,
+                                                     result_summary.failure,
+                                                     task)
     return backend_pb2.RunTaskResponse(task=task)
 
   @prpc_helpers.method

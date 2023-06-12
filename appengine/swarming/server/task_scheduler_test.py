@@ -11,6 +11,7 @@ import os
 import random
 import sys
 import unittest
+import uuid
 
 from parameterized import parameterized
 import mock
@@ -100,6 +101,13 @@ def _gen_request_slices(properties=None, **kwargs):
   ret = task_request.TaskRequest(**args)
   task_request.init_new_request(ret, True, task_request.TEMPLATE_AUTO)
   return ret
+
+
+def _gen_request_id(rid=None):
+  if rid is None:
+    return str(uuid.uuid4())
+  return rid
+
 
 def _get_results(request_key):
   """Fetches all task results for a specified TaskRequest ndb.Key.
@@ -370,7 +378,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     expected.update(**kwargs)
     return expected
 
-  def _quick_schedule(self, secret_bytes=None, **kwargs):
+  def _quick_schedule(self, request_id=None, secret_bytes=None, **kwargs):
     """Schedules a task.
 
     Arguments:
@@ -378,7 +386,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     """
     self.execute_tasks()
     request = _gen_request_slices(**kwargs)
+    request_id = _gen_request_id(request_id)
     result_summary = task_scheduler.schedule_request(request,
+                                                     request_id,
                                                      secret_bytes=secret_bytes)
     # State will be either PENDING or COMPLETED (for deduped task)
     self.execute_tasks()
@@ -1319,13 +1329,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def _task_ran_successfully(self):
     """Runs an idempotent task successfully and returns the task_id."""
-    run_result = self._quick_reap(
-        task_slices=[
-            task_request.TaskSlice(
-                expiration_secs=60,
-                properties=_gen_properties(idempotent=True),
-                wait_for_capacity=False),
-        ])
+    run_result = self._quick_reap(task_slices=[
+        task_request.TaskSlice(expiration_secs=60,
+                               properties=_gen_properties(idempotent=True),
+                               wait_for_capacity=False),
+    ])
     self.assertEqual('localhost', run_result.bot_id)
     to_run_key = _run_result_to_to_run_key(run_result)
     self.assertIsNone(to_run_key.get().queue_number)
@@ -1381,6 +1389,30 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         try_number=0)
     self.assertEqual(expected, result_summary_duped.to_dict())
     self.assertEqual([], run_results_duped)
+
+  def test_request_idempotent_same_request_id(self):
+    request_id = "124890823507283423"
+    result_summary = self._quick_schedule(request_id=request_id)
+    tr_id = task_request.TaskRequestID.create_key(request_id).get()
+    assert (tr_id is not None)
+    result_summary_dedupe = self._quick_schedule(request_id=request_id)
+    self.assertEqual(result_summary, result_summary_dedupe)
+
+  def test_request_idempotent_diff_request_id(self):
+    result_summary = self._quick_schedule(request_id="124890823507283423")
+    tr_id = task_request.TaskRequestID.create_key("124890823507283423").get()
+    assert (tr_id is not None)
+    result_summary_2 = self._quick_schedule(request_id="124890823507283")
+    tr_id_2 = task_request.TaskRequestID.create_key("124890823507283").get()
+    assert (tr_id_2 is not None)
+    self.assertNotEqual(result_summary, result_summary_2)
+
+  def test_request_not_idempotent_no_request_id(self):
+    # since no request_id was provided, tasks created with same
+    # request paramaters are not idempotent.
+    result_summary = self._quick_schedule()
+    result_summary_2 = self._quick_schedule()
+    self.assertNotEqual(result_summary, result_summary_2)
 
   def test_task_idempotent(self):
     # First task is idempotent.

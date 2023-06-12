@@ -67,6 +67,10 @@ class ClaimError(Error):
   pass
 
 
+class TaskExistsException(Error):
+  pass
+
+
 def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
   """Expires a TaskToRunShardXXX and enqueues the next one, if necessary.
 
@@ -1188,6 +1192,7 @@ def check_schedule_request_acl_service_account(request):
 
 
 def schedule_request(request,
+                     request_id=None,
                      enable_resultdb=False,
                      secret_bytes=None,
                      build_token=None):
@@ -1205,6 +1210,9 @@ def schedule_request(request,
   Arguments:
   - request: TaskRequest entity to be saved in the DB. It's key must not be set
              and the entity must not be saved in the DB yet.
+  - request_id: Optional string. Used to pull TaskRequestID from datastore.
+             If request_id is not provided, there is no
+             guarantee of idempotency.
   - enable_resultdb: Optional Boolean (default False) of whether we use resultdb
              or not for this task.
   - secret_bytes: Optional SecretBytes entity to be saved in the DB. It's key
@@ -1216,6 +1224,29 @@ def schedule_request(request,
   """
   assert isinstance(request, task_request.TaskRequest), request
   assert not request.key, request.key
+
+  def _get_task_result_summary_from_task_id(task_id, request):
+    """Given a task_id, the corresponding TaskResultSummary is pulled.
+    The request object is also modified in place to associate the key
+    with the already existing key.
+
+    Arguments:
+    - task_id: string id to pull the TaskResultSummary
+    - request: TaskRequest to be modified
+    Returns:
+      TaskResultSummary.
+    """
+    req_key, result_summary_key = task_pack.get_request_and_result_keys(task_id)
+    request.key = req_key
+    return result_summary_key.get()
+
+  task_req_to_id_key = None
+  if request_id:
+    task_req_to_id_key = task_request.TaskRequestID.create_key(request_id)
+    task_req_to_id = task_req_to_id_key.get()
+    if task_req_to_id:
+      return _get_task_result_summary_from_task_id(task_req_to_id.task_id,
+                                                   request)
 
   # Register the dimension set in the native scheduler only when not on RBE.
   task_asserted_future = None
@@ -1326,6 +1357,18 @@ def schedule_request(request,
 
   def txn():
     """Returns True if stored everything, False on an ID collision."""
+    # Checking if a request_uuid => task_id relationship exists.
+    task_req_to_id = None
+    if task_req_to_id_key:
+      task_req_to_id = task_req_to_id_key.get()
+      if task_req_to_id:
+        raise TaskExistsException(task_req_to_id.task_id)
+      expire_at = utils.utcnow() + datetime.timedelta(days=7)
+      task_req_to_id = task_request.TaskRequestID(
+          key=task_req_to_id_key,
+          task_id=task_pack.pack_result_summary_key(result_summary.key),
+          expire_at=expire_at)
+
     existing = request.key.get()
     if existing:
       return existing.txn_uuid == request.txn_uuid
@@ -1333,11 +1376,8 @@ def schedule_request(request,
       rbe.enqueue_rbe_task(request, to_run)
     ndb.put_multi(
         filter(bool, [
-            request,
-            result_summary,
-            to_run,
-            secret_bytes,
-            build_token,
+            request, result_summary, to_run, secret_bytes, build_token,
+            task_req_to_id
         ]))
     return True
 
@@ -1347,7 +1387,9 @@ def schedule_request(request,
   while True:
     attempt += 1
     try:
-      if datastore_utils.transaction(txn, retries=3):
+      if datastore_utils.transaction(txn,
+                                     retries=3,
+                                     xg=bool(task_req_to_id_key)):
         break
       # There was an existing *different* entity. We need a new root key.
       prev = result_summary.task_id
@@ -1357,6 +1399,11 @@ def schedule_request(request,
     except datastore_utils.CommitError:
       # The transaction likely failed. Retry with the same key to confirm.
       pass
+    except TaskExistsException as e:
+      logging.warning(
+          'Could not schedule new task because task already exists: %s' %
+          e.message)
+      return _get_task_result_summary_from_task_id(e.message, request)
   logging.debug('Committed txn on attempt %d', attempt)
 
   # Note: This external_scheduler call is blocking, and adds risk

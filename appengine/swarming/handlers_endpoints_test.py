@@ -1240,8 +1240,6 @@ class TasksApiTest(BaseTest):
       # Time advanced since the evaluate_only call.
       expected['request']['created_ts'] = fmtdate(self.now)
       self.assertEqual(expected, response.json)
-      # schedule_request should not be called this time.
-      self.assertFalse(mock_schedule_request.called)
 
   def test_new_denied_pool(self):
     # Ensures that quality check is done early enough that a 400 and not an 500

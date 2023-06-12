@@ -414,44 +414,25 @@ def new_task(request, secret_bytes, template_apply, evaluate_only,
     request._pre_put_hook()
     return NewTaskResult(request=request, task_id=None, task_result=None)
 
-  # This check is for idempotency when creating new tasks.
-  # TODO(crbug.com/997221): Make idempotency robust.
-  # There is still possibility of duplicate task creation if requests with
-  # the same uuid are sent in a short period of time.
-  def _schedule_request():
-    try:
-      result_summary = task_scheduler.schedule_request(
-          request,
-          enable_resultdb=(request.resultdb and request.resultdb.enable),
-          secret_bytes=secret_bytes)
-    except (datastore_errors.BadValueError, TypeError, ValueError) as e:
-      logging.exception("got exception around task_scheduler.schedule_request")
-      raise handlers_exceptions.BadRequestException(e.message)
+  request_id = None
+  if request_uuid:
+    caller = auth.get_current_identity().to_bytes()
+    request_id = "%s:%s" % (caller, request_uuid)
 
-    return NewTaskResult(request=request,
-                         task_id=task_pack.pack_result_summary_key(
-                             result_summary.key),
-                         task_result=result_summary)
+  try:
+    result_summary = task_scheduler.schedule_request(
+        request,
+        request_id,
+        enable_resultdb=(request.resultdb and request.resultdb.enable),
+        secret_bytes=secret_bytes)
+  except (datastore_errors.BadValueError, TypeError, ValueError) as e:
+    logging.exception("got exception around task_scheduler.schedule_request")
+    raise handlers_exceptions.BadRequestException(e.message)
 
-  new_task_result, cache_hit = api_helpers.cache_request(
-      'task_new', request_uuid, _schedule_request)
-
-  if cache_hit:
-    # The returned metadata may have been fetched from cache.
-    # Compare it with original request
-    # Since request does not have key yet, it needs to be excluded for
-    # validation.
-    original_key = new_task_result.request.key
-    new_task_result.request.key = None
-    if new_task_result.request != request:
-      logging.warning(
-          'the same request_uuid value was reused for different task '
-          'requests')
-    new_task_result.request.key = original_key
-    logging.info('Reusing task %s with uuid %s',
-                 new_task_result.request.task_id, request_uuid)
-
-  return new_task_result
+  return NewTaskResult(request=request,
+                       task_id=task_pack.pack_result_summary_key(
+                           result_summary.key),
+                       task_result=result_summary)
 
 
 TasksCancelResult = namedtuple('TasksCancelResponse',

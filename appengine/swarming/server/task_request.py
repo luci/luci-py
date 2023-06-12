@@ -1101,6 +1101,31 @@ class TaskSlice(ndb.Model):
       raise datastore_errors.BadValueError('wait_for_capacity is required')
 
 
+class TaskRequestID(ndb.Model):
+  """Defines a mapping between request_id and task_id.
+
+  request_id is passed to create_key to create the key for this entity.
+
+  This model is immutable.
+  """
+  # Disable memcache and in-memory cache since this entity is almost
+  # always written and read only once.
+  _use_cache = False
+  _use_memcache = False
+
+  # The task_id (TaskResultSummay packed key) from a task that was created from
+  # a request_id.
+  task_id = ndb.StringProperty(required=True, indexed=False)
+
+  # When this entity should expire and be removed from datastore.
+  # TTL https://cloud.google.com/datastore/docs/ttl
+  expire_at = ndb.DateTimeProperty(indexed=False)
+
+  @classmethod
+  def create_key(cls, request_id):
+    return ndb.Key(cls, request_id)
+
+
 class TaskRequest(ndb.Model):
   """Contains a user request.
 

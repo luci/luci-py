@@ -88,6 +88,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     test_case.mock_now(self, now, 0)
 
     self.mock_tq_tasks()
+    self.mock(app_identity, 'get_application_id', lambda: 'test-swarming')
 
   # Test helpers.
   def _req_dim_prpc(self, key, value, exp_secs=None):
@@ -99,7 +100,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
 
   def _basic_run_task_request(self):
     return backend_pb2.RunTaskRequest(
-        target="swarming://testing",
+        target="swarming://test-swarming",
         secrets=launcher_pb2.BuildSecrets(build_token='tok'),
         realm='some:realm',
         build_id='42423',
@@ -145,8 +146,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.mock(service_accounts, 'has_token_server', lambda: True)
 
     request = self._basic_run_task_request()
-    request_id = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a9'
-    request.request_id = request_id
+    request.build_id = "8783198670850745761"
     self.mock(random, 'getrandbits', lambda _: 0x86)
     raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
                              _encode(request), self._headers)
@@ -154,35 +154,33 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     _decode(raw_resp.body, actual_resp)
     expected_task_id = '4225526b80008610'
     l='https://test-swarming.appspot.com/task?id=4225526b80008610&o=true&w=true'
-    expected_response = backend_pb2.RunTaskResponse(task=task_pb2.Task(
-        id=task_pb2.TaskID(id=expected_task_id, target='swarming://testing'),
-        link=l,
-        status=common_pb2.SCHEDULED))
+    expected_response = backend_pb2.RunTaskResponse(
+        task=task_pb2.Task(id=task_pb2.TaskID(
+            id=expected_task_id, target='swarming://test-swarming'),
+                           link=l,
+                           status=common_pb2.SCHEDULED))
     self.assertEqual(actual_resp, expected_response)
     self.assertEqual(1, task_request.TaskRequest.query().count())
     self.assertEqual(1, task_request.BuildToken.query().count())
     self.assertEqual(1, task_request.SecretBytes.query().count())
-    request_idempotency_key = 'request_id/%s/%s' % (
-        request_id, auth.get_current_identity().to_bytes())
-    self.assertIsNotNone(
-        memcache.get(request_idempotency_key, namespace='backend_run_task'))
 
     # Test requests are correctly deduped if `request_id` matches.
     raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
                              _encode(request), self._headers)
     actual_resp = backend_pb2.RunTaskResponse()
     _decode(raw_resp.body, actual_resp)
-    expected_response = backend_pb2.RunTaskResponse(task=task_pb2.Task(
-        id=task_pb2.TaskID(id=expected_task_id, target='swarming://testing'),
-        link=l,
-        status=common_pb2.SCHEDULED))
+    expected_response = backend_pb2.RunTaskResponse(
+        task=task_pb2.Task(id=task_pb2.TaskID(
+            id=expected_task_id, target='swarming://test-swarming'),
+                           link=l,
+                           status=common_pb2.SCHEDULED))
     self.assertEqual(actual_resp, expected_response)
     self.assertEqual(1, task_request.TaskRequest.query().count())
     self.assertEqual(1, task_request.BuildToken.query().count())
     self.assertEqual(1, task_request.SecretBytes.query().count())
 
-    # Test tasks with different `request_id`s are not deduped.
-    request.request_id = 'cf60878f-8f2a-4f1e-b1f5-8b5ec88813a8'
+    # Test tasks with different `build_id`s are not deduped.
+    request.build_id = '23895823794242'
     self.mock(random, 'getrandbits', lambda _: 0x87)
     raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
                              _encode(request), self._headers)
@@ -191,8 +189,8 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     new_expected_task_id = '4225526b80008710'
     l='https://test-swarming.appspot.com/task?id=4225526b80008710&o=true&w=true'
     expected_response = backend_pb2.RunTaskResponse(
-        task=task_pb2.Task(id=task_pb2.TaskID(id=new_expected_task_id,
-                                              target='swarming://testing'),
+        task=task_pb2.Task(id=task_pb2.TaskID(
+            id=new_expected_task_id, target='swarming://test-swarming'),
                            link=l,
                            status=common_pb2.SCHEDULED))
     self.assertEqual(actual_resp, expected_response)
@@ -200,10 +198,33 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.assertEqual(2, task_request.BuildToken.query().count())
     self.assertEqual(2, task_request.SecretBytes.query().count())
 
-  def test_run_task_exceptions_bad_conversion(self):
+  def test_run_task_bad_request(self):
     self.set_as_project()
 
+    # No build_id
     request = backend_pb2.RunTaskRequest()
+    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
+                             _encode(request),
+                             self._headers,
+                             expect_errors=True)
+    self.assertEqual(raw_resp.status, '400 Bad Request')
+    self.assertIn(('X-Prpc-Grpc-Code', '3'), raw_resp._headerlist)
+    self.assertIn('build_id must be provided', raw_resp.body)
+
+    # No target
+    request.build_id = "1"
+    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
+                             _encode(request),
+                             self._headers,
+                             expect_errors=True)
+    self.assertEqual(raw_resp.status, '400 Bad Request')
+    self.assertIn(('X-Prpc-Grpc-Code', '3'), raw_resp._headerlist)
+    self.assertIn('target must be provided', raw_resp.body)
+
+  def test_run_task_exceptions_bad_conversion(self):
+    self.set_as_project()
+    request = backend_pb2.RunTaskRequest(build_id="12345",
+                                         target="swarming://test-swarming")
     raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
                              _encode(request),
                              self._headers,
