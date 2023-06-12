@@ -157,7 +157,7 @@ const dataAndMPBlock = (ele, bot) => html`
     </td>
   </tr>
   <tr
-    class=${ele.server_details.bot_version === bot.version ? "" : "old_version"}
+    class=${ele.serverDetails.bot_version === bot.version ? "" : "old_version"}
     title="Version is based on the content of swarming_bot.zip which is the swarming bot code.
            The bot won't update if quarantined, dead, or busy."
   >
@@ -167,8 +167,8 @@ const dataAndMPBlock = (ele, bot) => html`
   <tr title="The version the server expects the bot to be using.">
     <td>Expected Bot Version</td>
     <td colspan="2">
-      ${ele.server_details.bot_version &&
-      ele.server_details.bot_version.substring(0, 10)}
+      ${ele.serverDetails.bot_version &&
+      ele.serverDetails.bot_version.substring(0, 10)}
     </td>
   </tr>
   <tr title="First time ever a bot with this id contacted the server.">
@@ -306,7 +306,7 @@ const eventsTable = (ele, events) => {
       </thead>
       <tbody>
         ${events.map((event) =>
-          eventRow(event, ele._showAll, ele.server_details.bot_version)
+          eventRow(event, ele._showAll, ele.serverDetails.bot_version)
         )}
       </tbody>
     </table>
@@ -479,11 +479,11 @@ window.customElements.define(
     }
 
     _createBotService() {
-      return new BotsService(this.auth_header, this._fetchController.signal);
+      return new BotsService(this.authHeader, this._fetchController.signal);
     }
 
     _createTasksService() {
-      return new TasksService(this.auth_header, this._fetchController.signal);
+      return new TasksService(this.authHeader, this._fetchController.signal);
     }
 
     _closePopup() {
@@ -523,7 +523,7 @@ window.customElements.define(
       // cannot be re-used once aborted.
       this._fetchController = new AbortController();
       const extra = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
         signal: this._fetchController.signal,
       };
       // re-fetch permissions with the bot ID.

@@ -43,7 +43,7 @@ describe("bot-mass-delete", function () {
   // calls the test callback with one element 'ele', a created <bot-mass-delete>.
   function createElement(test) {
     return window.customElements.whenDefined("bot-mass-delete").then(() => {
-      container.innerHTML = `<bot-mass-delete dimensions="pool:Chrome,os:Android" auth_header="fake"></bot-mass-delete>`;
+      container.innerHTML = `<bot-mass-delete dimensions="pool:Chrome,os:Android" authHeader="fake"></bot-mass-delete>`;
       expect(container.firstElementChild).toBeTruthy();
       test(container.firstElementChild);
     });
@@ -54,7 +54,7 @@ describe("bot-mass-delete", function () {
       expect(ele.dimensions).toHaveSize(2);
       expect(ele.dimensions).toContain("pool:Chrome");
       expect(ele.dimensions).toContain("os:Android");
-      expect(ele.auth_header).toBe("fake");
+      expect(ele.authHeader).toBe("fake");
       done();
     });
   });

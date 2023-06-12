@@ -29,7 +29,7 @@ describe("oauth-login", function () {
 
     it("starts off logged out", function (done) {
       createElement((ele) => {
-        expect(ele.auth_header).toBe("");
+        expect(ele.authHeader).toBe("");
         done();
       });
     });
@@ -39,17 +39,17 @@ describe("oauth-login", function () {
         ele.addEventListener("log-in", (e) => {
           e.stopPropagation();
           expect(e.detail).toBeDefined();
-          expect(e.detail.auth_header).toContain("Bearer ");
+          expect(e.detail.authHeader).toContain("Bearer ");
           done();
         });
         ele._logIn();
       });
     });
 
-    it("has auth_header set after log-in", function (done) {
+    it("has authHeader set after log-in", function (done) {
       createElement((ele) => {
         ele._logIn();
-        expect(ele.auth_header).toContain("Bearer ");
+        expect(ele.authHeader).toContain("Bearer ");
         done();
       });
     });
@@ -81,7 +81,7 @@ describe("oauth-login", function () {
       });
       createElement((ele) => {
         ele.addEventListener("log-in", () => {
-          expect(ele.auth_header).toEqual("Bearer 12345-zzzzzz");
+          expect(ele.authHeader).toEqual("Bearer 12345-zzzzzz");
           expect(ele.profile).toEqual({
             email: "someone@example.com",
             imageURL: "http://example.com/picture.jpg",

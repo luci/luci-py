@@ -275,11 +275,11 @@ describe("swarming-app", function () {
         createElement((ele) => {
           ele.addEventListener("server-details-loaded", (e) => {
             e.stopPropagation();
-            expect(ele.server_details).toBeTruthy();
-            expect(ele.server_details.server_version).toBe("1234-abcdefg");
+            expect(ele.serverDetails).toBeTruthy();
+            expect(ele.serverDetails.server_version).toBe("1234-abcdefg");
             done();
           });
-          expect(ele.server_details.server_version).toContain("must log in");
+          expect(ele.serverDetails.server_version).toContain("must log in");
           userLogsIn(ele, () => {});
         });
       });

@@ -42,7 +42,7 @@ describe("task-mass-cancel", function () {
   // calls the test callback with one element 'ele', a created <task-mass-cancel>.
   function createElement(test) {
     return window.customElements.whenDefined("task-mass-cancel").then(() => {
-      container.innerHTML = `<task-mass-cancel start=10000 end=20000 tags="pool:Chrome,os:Android" auth_header="fake"></task-mass-cancel>`;
+      container.innerHTML = `<task-mass-cancel start=10000 end=20000 tags="pool:Chrome,os:Android" authHeader="fake"></task-mass-cancel>`;
       expect(container.firstElementChild).toBeTruthy();
       test(container.firstElementChild);
     });
@@ -55,7 +55,7 @@ describe("task-mass-cancel", function () {
       expect(ele.tags).toHaveSize(2);
       expect(ele.tags).toContain("pool:Chrome");
       expect(ele.tags).toContain("os:Android");
-      expect(ele.auth_header).toBe("fake");
+      expect(ele.authHeader).toBe("fake");
       done();
     });
   });

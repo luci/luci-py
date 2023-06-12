@@ -21,14 +21,14 @@
  *
  * <pre>
  * {
- *   auth_header: "Bearer abc12d",
+ *   authHeader: "Bearer abc12d",
  *   profile: {
  *     email: 'foo@example.com',
  *     imageURL: 'http://example.com/img.png',
  *   }
  * }
  * </pre>
- * where auth_header is a string that should be used as the
+ * where authHeader is a string that should be used as the
  * "Authorization" header for authenticated requests.
  *
  */
@@ -42,7 +42,7 @@ import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
 // TODO: Support refreshing the token when it expires.
 
 const template = (ele) => {
-  if (ele.auth_header) {
+  if (ele.authHeader) {
     return html` <div>
       <img
         class="center"
@@ -93,9 +93,9 @@ window.customElements.define(
       return ["testing_offline"];
     }
 
-    /** @prop {string} auth_header the "Authorization" header that should be used
+    /** @prop {string} authHeader the "Authorization" header that should be used
      *                  for authenticated requests. Read-only. */
-    get auth_header() {
+    get authHeader() {
       return this._auth_header;
     }
 
@@ -106,9 +106,11 @@ window.customElements.define(
     }
 
     /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
+    // eslint-disable-next-line camelcase
     get testing_offline() {
       return this.hasAttribute("testing_offline");
     }
+    // eslint-disable-next-line camelcase
     set testing_offline(val) {
       if (val) {
         this.setAttribute("testing_offline", true);
@@ -126,7 +128,7 @@ window.customElements.define(
       this.dispatchEvent(
         new CustomEvent("log-in", {
           detail: {
-            auth_header: this._auth_header,
+            authHeader: this._auth_header,
             profile: this._profile,
           },
           bubbles: true,

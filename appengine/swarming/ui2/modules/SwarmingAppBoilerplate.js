@@ -51,7 +51,7 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
     upgradeProperty(this, "testing_offline");
 
     this._authHeaderEvent = (e) => {
-      this._auth_header = e.detail.auth_header;
+      this._auth_header = e.detail.authHeader;
     };
     this.addEventListener("log-in", this._authHeaderEvent);
   }
@@ -71,10 +71,10 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
     return this._app;
   }
 
-  /** @prop {string} auth_header - reflects the auth_header passed up from the
+  /** @prop {string} authHeader - reflects the authHeader passed up from the
                         &lt;oauth-login&gt;.
                         Read only.*/
-  get auth_header() {
+  get authHeader() {
     return this._auth_header;
   }
 
@@ -101,14 +101,16 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
   /** @prop {Object} server_details - reflects the server_details from the
                         included &lt;swarming-app&gt;
                         Read only.*/
-  get server_details() {
-    return (this._app && this._app.server_details) || {};
+  get serverDetails() {
+    return (this._app && this._app.serverDetails) || {};
   }
 
   /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
+  // eslint-disable-next-line camelcase
   get testing_offline() {
     return this.hasAttribute("testing_offline");
   }
+  // eslint-disable-next-line camelcase
   set testing_offline(val) {
     if (val) {
       this.setAttribute("testing_offline", true);

@@ -132,7 +132,7 @@ window.customElements.define(
       this._addHTML();
 
       this.addEventListener("log-in", (e) => {
-        this._auth_header = e.detail.auth_header;
+        this._auth_header = e.detail.authHeader;
         this._profile = e.detail.profile;
         this._fetch();
       });
@@ -167,14 +167,16 @@ window.customElements.define(
     /** @prop {Object} server_details The details about the server or a
                      placeholder object if the user is not logged in or
    *                 not authorized. Read-only. */
-    get server_details() {
+    get serverDetails() {
       return this._server_details;
     }
 
     /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
+    // eslint-disable-next-line camelcase
     get testing_offline() {
       return this.hasAttribute("testing_offline");
     }
+    // eslint-disable-next-line camelcase
     set testing_offline(val) {
       if (val) {
         this.setAttribute("testing_offline", true);

@@ -81,7 +81,7 @@ window.customElements.define(
     }
 
     connectedCallback() {
-      initPropertyFromAttrOrProperty(this, "auth_header");
+      initPropertyFromAttrOrProperty(this, "authHeader");
       initPropertyFromAttrOrProperty(this, "dimensions");
       // Used for when default was loaded via attribute.
       if (typeof this.dimensions === "string") {
@@ -106,7 +106,7 @@ window.customElements.define(
       });
 
       const extra = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
       };
 
       let bots = [];
@@ -133,7 +133,7 @@ window.customElements.define(
               // delete the bots one at a time, updating this._progress to be the
               // number completed.
               const post = {
-                headers: { authorization: this.auth_header },
+                headers: { authorization: this.authHeader },
                 method: "POST",
               };
               const deleteNext = (bots) => {
@@ -168,13 +168,13 @@ window.customElements.define(
     }
 
     _fetchCount() {
-      if (!this.auth_header) {
+      if (!this.authHeader) {
         // This should never happen
-        console.warn("no auth_header received, try refreshing the page?");
+        console.warn("no authHeader received, try refreshing the page?");
         return;
       }
       const extra = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
       };
       const queryParams = query.fromObject({ dimensions: this.dimensions });
 

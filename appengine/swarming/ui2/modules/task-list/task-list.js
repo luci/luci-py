@@ -316,7 +316,7 @@ const template = (ele) => html`
   <dialog-pop-over>
     <div class='cancel content'>
       <task-mass-cancel
-          .auth_header=${ele.auth_header}
+          .authHeader=${ele.authHeader}
           .start=${ele._startTime}
           .end=${ele._endTime}
           .tags=${tagsOnly(ele._filters).map(
@@ -544,7 +544,7 @@ window.customElements.define(
       // cannot be re-used once aborted.
       this._fetchController = new AbortController();
       const extra = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
         signal: this._fetchController.signal,
       };
       // Re-checks permissions with tags.
@@ -614,7 +614,7 @@ window.customElements.define(
 
       this.app.addBusyTasks(1);
       const extraNoSignal = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
         // No signal here because we shouldn't need to abort it.
         // This request does not depend on the filters.
       };

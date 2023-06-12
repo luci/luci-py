@@ -222,7 +222,7 @@ export function richLogsLink(ele) {
     }
     return miloHost.replace("%s", logs);
   }
-  const displayTemplate = ele.server_details.display_server_url_template;
+  const displayTemplate = ele.serverDetails.display_server_url_template;
   if (!displayTemplate || !ele._taskId) {
     return undefined;
   }

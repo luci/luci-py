@@ -314,7 +314,7 @@ const template = (ele) => html`
   <footer></footer>
   <dialog-pop-over>
     <div class='delete content'>
-      <bot-mass-delete .auth_header=${ele.auth_header}
+      <bot-mass-delete .authHeader=${ele.authHeader}
                        .dimensions=${dimensionsOnly(ele._filters)}>
       </bot-mass-delete>
       <button class=goback tabindex=0
@@ -509,7 +509,7 @@ window.customElements.define(
       if (bot.maintenance_msg) {
         classes += "maintenance ";
       }
-      if (bot.version !== this.server_details.bot_version) {
+      if (bot.version !== this.serverDetails.bot_version) {
         classes += "old_version";
       }
       return classes;
@@ -556,7 +556,7 @@ window.customElements.define(
       // cannot be re-used once aborted.
       this._fetchController = new AbortController();
       const extra = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
         signal: this._fetchController.signal,
       };
       // Re-checks permissions with tags.
@@ -629,7 +629,7 @@ window.customElements.define(
 
       this.app.addBusyTasks(1);
       const extraNoSignal = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
         // No signal here because we shouldn't need to abort it.
         // This request does not depend on the filters.
       };

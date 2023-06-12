@@ -1335,7 +1335,7 @@ window.customElements.define(
       fetch(`/_ah/api/swarming/v1/task/${this._taskId}/cancel`, {
         method: "POST",
         headers: {
-          authorization: this.auth_header,
+          authorization: this.authHeader,
           "content-type": "application/json; charset=UTF-8",
         },
         body: JSON.stringify(body),
@@ -1460,7 +1460,7 @@ time.sleep(${leaseDuration})`,
       // cannot be re-used once aborted.
       this._fetchController = new AbortController();
       const extra = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
         signal: this._fetchController.signal,
       };
       // re-fetch permissions with the task ID.
@@ -1681,7 +1681,7 @@ time.sleep(${leaseDuration})`,
       fetch("/_ah/api/swarming/v1/tasks/new", {
         method: "POST",
         headers: {
-          authorization: this.auth_header,
+          authorization: this.authHeader,
           "content-type": "application/json; charset=UTF-8",
         },
         body: JSON.stringify(newTask),

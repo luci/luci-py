@@ -97,7 +97,7 @@ window.customElements.define(
     }
 
     connectedCallback() {
-      initPropertyFromAttrOrProperty(this, "auth_header");
+      initPropertyFromAttrOrProperty(this, "authHeader");
       initPropertyFromAttrOrProperty(this, "end");
       initPropertyFromAttrOrProperty(this, "start");
       initPropertyFromAttrOrProperty(this, "tags");
@@ -135,7 +135,7 @@ window.customElements.define(
 
       const options = {
         headers: {
-          authorization: this.auth_header,
+          authorization: this.authHeader,
           "content-type": "application/json",
         },
         method: "POST",
@@ -158,7 +158,7 @@ window.customElements.define(
           }
           const options = {
             headers: {
-              authorization: this.auth_header,
+              authorization: this.authHeader,
               "content-type": "application/json",
             },
             method: "POST",
@@ -197,13 +197,13 @@ window.customElements.define(
     }
 
     _fetchCount() {
-      if (!this.auth_header) {
+      if (!this.authHeader) {
         // This should never happen
-        console.warn("no auth_header received, try refreshing the page?");
+        console.warn("no authHeader received, try refreshing the page?");
         return;
       }
       const extra = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
       };
 
       const pendingParams = query.fromObject({

@@ -26,7 +26,7 @@ import "../swarming-app";
 // as [object Object] when used as the href attribute.
 const instancesURL = (ele) =>
   `https://console.cloud.google.com/appengine/instances?` +
-  `project=${ele._project_id}&versionId=${ele.server_details.server_version}`;
+  `project=${ele._project_id}&versionId=${ele.serverDetails.server_version}`;
 
 const errorsURL = (projectId) =>
   `https://console.cloud.google.com/errors?project=${projectId}`;
@@ -83,9 +83,9 @@ const template = (ele) => html`
 
     <h2>Service Status</h2>
     <div>Server Version:
-      <span class=server_version> ${ele.server_details.server_version}</span>
+      <span class=server_version> ${ele.serverDetails.server_version}</span>
     </div>
-    <div>Bot Version: ${ele.server_details.bot_version} </div>
+    <div>Bot Version: ${ele.serverDetails.bot_version} </div>
     <ul>
       <li>
         <a href=${instancesURL(
@@ -158,7 +158,7 @@ window.customElements.define(
 
     _fetchToken() {
       const postExtra = {
-        headers: { authorization: this.auth_header },
+        headers: { authorization: this.authHeader },
         method: "POST",
       };
       this.app.addBusyTasks(1);
