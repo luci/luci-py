@@ -1437,7 +1437,15 @@ class _BotLoopState:
             # Never block in the hybrid mode. If there are no RBE leases we need
             # to sleep a bit and call Swarming instead of blocking on the
             # server side waiting for an RBE lease.
-            blocking=not self._rbe_hybrid_mode,
+            #
+            # Also do not block if the previous poll returned some tasks. That
+            # way if the queue becomes empty, we'll notice it ASAP (instead of
+            # waiting for a new task to appear). If the queue was empty on the
+            # previous cycle, we'll block for real here. This mechanism is
+            # needed to reduce latency of reporting of the idle status to
+            # Swarming server, since some Swarming clients rely on it for
+            # scheduling.
+            blocking=not self._rbe_hybrid_mode and self.idle,
         )
         # Poll ASAP if in pure RBE mode. In hybrid mode the Swarming timer is
         # used instead.
@@ -1510,7 +1518,8 @@ class _BotLoopState:
             self._rbe_session.session_id if self._rbe_session else None)
 
       # If the pure RBE bot switched into the idle state just now, report this
-      # to Swarming ASAP. Bot idleness status surfaces in the UI.
+      # to Swarming ASAP. Bot idleness status surfaces in the UI and some
+      # clients rely on it for scheduling.
       if currently_idle and not prev_idle and self._rbe_poll_timer:
         logging.info('RBE: the bot became idle, need to report')
         self._swarming_poll_timer.reset(0.0)
@@ -1650,9 +1659,11 @@ class _BotLoopState:
     if self._rbe_hybrid_mode:
       # In the hybrid mode poll Swarming again when the Swarming server tells
       # us, just like in the pure Swarming mode. This is similar to what
-      # cmd_sleep(...) does. Note this timer may be rescheduled later if we end
+      # cmd_sleep(...) does, except we reduce sleeping time 2x because we sleep
+      # *twice* every full polling cycle (once after polling Swarming, once
+      # after polling RBE). Note this timer may be rescheduled later if we end
       # up running a task (no need to sleep before the next poll in this case).
-      self._swarming_poll_timer.reset(rbe_state['sleep'])
+      self._swarming_poll_timer.reset(rbe_state['sleep'] / 2.0)
     else:
       # In pure RBE mode contact Python Swarming again ~2m from now. We'll
       # maintain this relatively low and constant polling frequency, since in
@@ -1740,8 +1751,8 @@ class _BotLoopState:
       report_status = self._rbe_intended_status
       if report_status == remote_client.RBESessionStatus.OK and maintenance:
         report_status = remote_client.RBESessionStatus.MAINTENANCE
-      logging.info('RBE: updating %s as %s', self._rbe_session.session_id,
-                   report_status)
+      logging.info('RBE: updating %s as %s (blocking=%s)',
+                   self._rbe_session.session_id, report_status, blocking)
       lease = self._rbe_session.update(report_status, self._bot.dimensions,
                                        self._rbe_poll_token, blocking)
       # A session can die either because we reported a terminal status (happens

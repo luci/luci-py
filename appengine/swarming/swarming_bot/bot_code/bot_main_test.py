@@ -213,7 +213,7 @@ class TestBotBase(net_utils.TestCase):
                                   status_out='OK',
                                   lease_in=None,
                                   lease_out=None,
-                                  blocking=True):
+                                  blocking=False):
     data = {
         'status': status_in,
         'dimensions': self.attributes['dimensions'],
@@ -1020,7 +1020,7 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0', 'st0', blocking=True),
     ])
     self.poll_once()
 
@@ -1031,7 +1031,7 @@ class TestBotMain(TestBotBase):
       self.assertTrue(self.loop_state._rbe_poll_timer.firing)
       polls += 1
       self.expected_requests([
-          self.expected_rbe_update_request('pt0', 'st0'),
+          self.expected_rbe_update_request('pt0', 'st0', blocking=True),
       ])
       self.poll_once()
     self.assertEqual(polls, 9)
@@ -1045,7 +1045,10 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=11),
-        self.expected_rbe_update_request('pt0', 'st0', 'BOT_TERMINATING'),
+        self.expected_rbe_update_request('pt0',
+                                         'st0',
+                                         'BOT_TERMINATING',
+                                         blocking=True),
         self.expected_task_update_request('terminate-id'),
     ])
     self.poll_once()
@@ -1087,7 +1090,7 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0', 'st0', blocking=True),
     ])
     self.poll_once()
 
@@ -1111,7 +1114,7 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=2),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0', 'st0', blocking=True),
     ])
     self.poll_once()
 
@@ -1152,7 +1155,10 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request(None, 'st0', 'BOT_TERMINATING'),
+        self.expected_rbe_update_request(None,
+                                         'st0',
+                                         'BOT_TERMINATING',
+                                         blocking=True),
     ])
     self.poll_once()
 
@@ -1178,7 +1184,7 @@ class TestBotMain(TestBotBase):
             },
         }),
         self.expected_rbe_create_request('pt1', 'st1'),
-        self.expected_rbe_update_request('pt1', 'st1'),
+        self.expected_rbe_update_request('pt1', 'st1', blocking=True),
     ])
     self.poll_once()
 
@@ -1218,7 +1224,8 @@ class TestBotMain(TestBotBase):
         self.expected_rbe_create_request('pt1', 'st1'),  # resets cons. errors
         self.expected_rbe_update_request('pt1',
                                          'st1',
-                                         status_out='BOT_TERMINATING'),
+                                         status_out='BOT_TERMINATING',
+                                         blocking=True),
     ])
     self.poll_once()
 
@@ -1260,9 +1267,12 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request(None, 'st0', 'BOT_TERMINATING'),
+        self.expected_rbe_update_request(None,
+                                         'st0',
+                                         'BOT_TERMINATING',
+                                         blocking=True),
         self.expected_rbe_create_request('pt1', 'st1'),
-        self.expected_rbe_update_request('pt1', 'st1'),
+        self.expected_rbe_update_request('pt1', 'st1', blocking=True),
     ])
     self.poll_once()
 
@@ -1394,12 +1404,16 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0', 'st0', blocking=True),
     ])
     self.poll_once()
 
-  def expected_rbe_poll_and_claim(self, poll_token, session_token, lease_id,
-                                  claim_resp):
+  def expected_rbe_poll_and_claim(self,
+                                  poll_token,
+                                  session_token,
+                                  lease_id,
+                                  claim_resp,
+                                  blocking=False):
     return [
         self.expected_poll_request({
             'cmd': 'rbe',
@@ -1413,6 +1427,7 @@ class TestBotMain(TestBotBase):
         self.expected_rbe_create_request(poll_token, session_token),
         self.expected_rbe_update_request(poll_token,
                                          session_token,
+                                         blocking=blocking,
                                          lease_out={
                                              'id': lease_id,
                                              'payload': {
@@ -1482,6 +1497,7 @@ class TestBotMain(TestBotBase):
                 'result': {},
                 'state': 'COMPLETED',
             },
+            blocking=True,
         ),
     ])
     self.loop_state.rbe_disable()
@@ -1554,10 +1570,7 @@ class TestBotMain(TestBotBase):
             },
             force=True),
         self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0',
-                                         'st0',
-                                         status_in='MAINTENANCE',
-                                         blocking=False),
+        self.expected_rbe_update_request('pt0', 'st0', status_in='MAINTENANCE'),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
@@ -1579,7 +1592,7 @@ class TestBotMain(TestBotBase):
             rbe_idle=False,
             sleep_streak=0,
             force=False),
-        self.expected_rbe_update_request('pt0', 'st0', blocking=False),
+        self.expected_rbe_update_request('pt0', 'st0'),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
@@ -1600,10 +1613,7 @@ class TestBotMain(TestBotBase):
             rbe_idle=True,
             sleep_streak=1,
             force=True),
-        self.expected_rbe_update_request('pt0',
-                                         'st0',
-                                         status_in='MAINTENANCE',
-                                         blocking=False),
+        self.expected_rbe_update_request('pt0', 'st0', status_in='MAINTENANCE'),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
@@ -1641,10 +1651,7 @@ class TestBotMain(TestBotBase):
             },
             force=True),
         self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0',
-                                         'st0',
-                                         status_in='MAINTENANCE',
-                                         blocking=False),
+        self.expected_rbe_update_request('pt0', 'st0', status_in='MAINTENANCE'),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
@@ -1669,7 +1676,7 @@ class TestBotMain(TestBotBase):
             rbe_idle=False,
             sleep_streak=0,
             force=False),
-        self.expected_rbe_update_request('pt0', 'st0', blocking=False),
+        self.expected_rbe_update_request('pt0', 'st0'),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
@@ -1719,8 +1726,7 @@ class TestBotMain(TestBotBase):
                                                  'task_to_run_id': 6,
                                              },
                                              'state': 'PENDING',
-                                         },
-                                         blocking=False),
+                                         }),
         self.expected_claim_request('lease-id', 'some-task-id', 5, 6, {
             'cmd': 'run',
             'manifest': {
@@ -1758,8 +1764,7 @@ class TestBotMain(TestBotBase):
                                              'id': 'lease-id',
                                              'result': {},
                                              'state': 'COMPLETED',
-                                         },
-                                         blocking=False),
+                                         }),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
