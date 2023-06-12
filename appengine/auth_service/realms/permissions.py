@@ -316,9 +316,10 @@ def db():
   role(
       'role/buildbucket.owner',
       [
+          include('role/buildbucket.creator'),
+          include('role/buildbucket.healthUpdater'),
           include('role/buildbucket.reader'),
           include('role/buildbucket.triggerer'),
-          include('role/buildbucket.healthUpdater'),
           permission('buildbucket.builds.lease'),  # used by v1 API only
           permission('buildbucket.builds.reset'),  # used by v1 API only
           permission('buildbucket.builders.setBuildNumber'),
