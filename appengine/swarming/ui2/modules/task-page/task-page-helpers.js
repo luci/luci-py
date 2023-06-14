@@ -233,11 +233,11 @@ export function richLogsLink(ele) {
  *  slice expires.
  */
 export function sliceSchedulingDeadline(slice, request) {
-  if (!request.created_ts) {
+  if (!request.createdTs) {
     return "";
   }
-  const delta = slice.expiration_secs * 1000;
-  return human.localeTime(new Date(request.created_ts.getTime() + delta));
+  const delta = slice.expirationSecs * 1000;
+  return human.localeTime(new Date(request.createdTs.getTime() + delta));
 }
 
 /** stateClass returns a class corresponding to the task's state.
@@ -280,11 +280,11 @@ export function taskCost(result) {
  *  expires, which is after any and all slices expire.
  */
 export function taskSchedulingDeadline(request) {
-  if (!request.created_ts) {
+  if (!request.createdTs) {
     return "";
   }
-  const delta = request.expiration_secs * 1000;
-  return human.localeTime(new Date(request.created_ts.getTime() + delta));
+  const delta = request.expirationSecs * 1000;
+  return human.localeTime(new Date(request.createdTs.getTime() + delta));
 }
 
 export function taskInfoClass(ele, result) {
@@ -323,4 +323,10 @@ const TASK_TIMES = [
   "created_ts",
   "modified_ts",
   "started_ts",
+  "abandonedTs",
+  "botIdleSinceTs",
+  "completedTs",
+  "createdTs",
+  "modifiedTs",
+  "startedTs",
 ];

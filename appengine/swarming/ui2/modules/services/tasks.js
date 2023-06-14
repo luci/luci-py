@@ -12,7 +12,7 @@ export class TasksService extends PrpcService {
   /**
    * Cancels task for given taskId
    *
-   * @param {String} taskId - id of task to cancel.
+   * @param {string} taskId - id of task to cancel.
    * @param {boolean} killRunning - whether to kill task while running.
    *
    * @returns {Object} with shape {canceled, was_running} - see CancelResponse in https://source.chromium.org/chromium/infra/infra/+/main:luci/appengine/swarming/proto/api_v2/swarming.proto for more details.
@@ -21,6 +21,36 @@ export class TasksService extends PrpcService {
     return this._call("CancelTask", {
       task_id: taskId,
       kill_running: killRunning,
+    });
+  }
+
+  /**
+   * Gets the standard output of the task.
+   *
+   * @param {string} taskId - id of task to retrieve.
+   * @param {number} offset - number of bytes from begining of task output to start.
+   * @param {number} length - number of bytes to retrieve.
+   *
+   * @returns {Object} see https://source.chromium.org/chromium/infra/infra/+/main:luci/appengine/swarming/proto/api_v2/swarming.proto;l=719?q=TaskOutputResponse
+   **/
+  stdout(taskId, offset, length) {
+    return this._call("GetStdout", {
+      task_id: taskId,
+      offset: offset,
+      length: length,
+    });
+  }
+
+  /**
+   * Retrieves task_request for given taskId.
+   *
+   * @param {string} taskId - id of task request to retrieve.
+   *
+   * @returns {Object} see https://source.chromium.org/chromium/infra/infra/+/main:luci/appengine/swarming/proto/api_v2/swarming.proto;l=618?q=TaskRequestResponse&sq= to view the return type proto.
+   **/
+  request(taskId) {
+    return this._call("GetRequest", {
+      task_id: taskId,
     });
   }
 }

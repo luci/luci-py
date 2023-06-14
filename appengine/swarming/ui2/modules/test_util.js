@@ -255,16 +255,34 @@ const stringify = function (data) {
  * @param {service} service is the string prpc service we wish to call.
  * @param {rpc} rpc string that service we want to call.
  * @param {data} data which is mocked as the response to the prpc rpc.
+ * @param {matcher} matcher is an optional predicate called on the body of the request. If false do not match it.
  */
-export function mockPrpc(fetchMock, service, rpc, data) {
-  fetchMock.post(
-    `path:/prpc/${service}/${rpc}`,
-    new Response(stringify(data), {
-      status: 200,
-      headers: {
-        "x-prpc-grpc-code": "0",
-        "content-type": "application/json",
-      },
-    })
-  );
+export function mockPrpc(fetchMock, service, rpc, data, matcher = null) {
+  const response = new Response(stringify(data), {
+    status: 200,
+    headers: {
+      "x-prpc-grpc-code": "0",
+      "content-type": "application/json",
+    },
+  });
+  if (matcher) {
+    const matchingFn = (url, opts) => {
+      return (
+        url.endsWith(`${service}/${rpc}`) &&
+        opts.method.toLowerCase() === "post" &&
+        matcher(JSON.parse(opts.body))
+      );
+    };
+    fetchMock.mock(matchingFn, response);
+  } else {
+    fetchMock.post(`path:/prpc/${service}/${rpc}`, response);
+  }
+}
+
+// Add an event listener which will fire after everything is done on the
+// element. This one can be stacked on top of others.
+export function eventually(ele, callback) {
+  ele.addEventListener("busy-end", (e) => {
+    callback(ele);
+  });
 }

@@ -47,7 +47,9 @@ import {
   parseDuration,
   taskListLink,
   taskPageLink,
+  b64toUtf8,
 } from "../util";
+import { TasksService } from "../services/tasks";
 
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 
@@ -104,9 +106,9 @@ const serverLogBaseQuery =
   "\n";
 
 const serverLogTimeRange = (request, result) => {
-  if (!request.created_ts) return [null, null];
-  const timeStart = new Date(request.created_ts.getTime() - 60 * 1000);
-  const tsEnd = result.completed_ts || result.abandoned_ts;
+  if (!request.createdTs) return [null, null];
+  const timeStart = new Date(request.createdTs.getTime() - 60 * 1000);
+  const tsEnd = result.completedTs || result.abandonedTs;
   const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60 * 1000) : new Date();
   return [timeStart, timeEnd];
 };
@@ -169,12 +171,12 @@ const slicePicker = (ele) => {
   if (!ele._taskId || ele._notFound) {
     return "";
   }
-  if (!(ele._request.task_slices && ele._request.task_slices.length > 1)) {
+  if (!(ele._request.taskSlices && ele._request.taskSlices.length > 1)) {
     return "";
   }
 
   return html` <div class="slice-picker">
-    ${ele._request.task_slices.map((_, idx) => sliceTab(ele, idx))}
+    ${ele._request.taskSlices.map((_, idx) => sliceTab(ele, idx))}
   </div>`;
 };
 
@@ -208,7 +210,7 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
         ${casBlock(
           "CAS Inputs",
           ele._app._server_details.cas_viewer_server,
-          currentSlice.properties.cas_input_root || {}
+          currentSlice.properties.casInputRoot || {}
         )}
         <tr ?hidden=${!result.resultdb_info}>
           <td>ResultDB</td>
@@ -236,25 +238,25 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
         ${executionBlock(
           currentSlice.properties,
           currentSlice.properties.env || [],
-          currentSlice.properties.env_prefixes || []
+          currentSlice.properties.envPrefixes || []
         )}
         ${arrayInTable(request.tags, "Tags", (tag) => tag)}
         <tr>
           <td>Execution timeout</td>
           <td>
-            ${humanDuration(currentSlice.properties.execution_timeout_secs)}
+            ${humanDuration(currentSlice.properties.executionTimeoutSecs)}
           </td>
         </tr>
         <tr>
           <td>I/O timeout</td>
-          <td>${humanDuration(currentSlice.properties.io_timeout_secs)}</td>
+          <td>${humanDuration(currentSlice.properties.ioTimeoutSecs)}</td>
         </tr>
         <tr>
           <td>Grace period</td>
-          <td>${humanDuration(currentSlice.properties.grace_period_secs)}</td>
+          <td>${humanDuration(currentSlice.properties.gracePeriodSecs)}</td>
         </tr>
 
-        ${cipdBlock(currentSlice.properties.cipd_input, result)}
+        ${cipdBlock(currentSlice.properties.cipdInput, result)}
         ${arrayInTable(
           currentSlice.properties.caches,
           "Named Caches",
@@ -289,7 +291,7 @@ const stateLoadBlock = (ele, request, result) => html`
   </tr>
   <tr ?hidden=${!result.deduped_from}>
     <td>Deduped On</td>
-    <td title=${request.created_ts}>${request.human_created_ts}</td>
+    <td title=${request.createdTs}>${request.human_createdTs}</td>
   </tr>
 `;
 
@@ -358,7 +360,7 @@ const requestBlock = (request, result, currentSlice) => html`
   </tr>
   <tr>
     <td>Wait for Capacity</td>
-    <td>${!!currentSlice.wait_for_capacity}</td>
+    <td>${!!currentSlice.waitForCapacity}</td>
   </tr>
   <tr>
     <td>Slice Scheduling Deadline</td>
@@ -372,15 +374,15 @@ const requestBlock = (request, result, currentSlice) => html`
     <td>Authenticated</td>
     <td>${request.authenticated}</td>
   </tr>
-  <tr ?hidden=${!request.service_account}>
+  <tr ?hidden=${!request.serviceAccount}>
     <td>Service Account</td>
-    <td>${request.service_account}</td>
+    <td>${request.serviceAccount}</td>
   </tr>
   <tr ?hidden=${!request.realm}>
     <td>Realm</td>
     <td>${request.realm}</td>
   </tr>
-  <tr ?hidden=${!currentSlice.properties.secret_bytes}>
+  <tr ?hidden=${!currentSlice.properties.secretBytes}>
     <td>Has Secret Bytes</td>
     <td
       title="The secret bytes are present on the machine, but not in the UI/API"
@@ -388,11 +390,11 @@ const requestBlock = (request, result, currentSlice) => html`
       true
     </td>
   </tr>
-  <tr ?hidden=${!request.parent_task_id}>
+  <tr ?hidden=${!request.parentTaskId}>
     <td>Parent Task</td>
     <td>
-      <a href=${taskPageLink(request.parent_task_id)}>
-        ${request.parent_task_id}
+      <a href=${taskPageLink(request.parentTaskId)}>
+        ${request.parentTaskId}
       </a>
     </td>
   </tr>
@@ -535,7 +537,7 @@ const executionBlock = (properties, env, envPrefixes) => html`
   </tr>
   <tr>
     <td>Relative Cwd</td>
-    <td class="code break-all">${properties.relative_cwd || "--"}</td>
+    <td class="code break-all">${properties.relativeCwd || "--"}</td>
   </tr>
   ${arrayInTable(env, "Environment Vars", (env) => env.key + "=" + env.value)}
   ${arrayInTable(
@@ -630,7 +632,7 @@ const cipdBlock = (cipdInput, result) => {
     <tr>
       <td>CIPD version</td>
       <td class="break-all">
-        ${cipdInput.client_package && cipdInput.client_package.version}
+        ${cipdInput.clientPackage && cipdInput.clientPackage.version}
       </td>
     </tr>
     <tr>
@@ -684,7 +686,7 @@ const taskTimingSection = (ele, request, result) => {
         <tbody>
           <tr>
             <td>Created</td>
-            <td title=${request.created_ts}>${request.human_created_ts}</td>
+            <td title=${request.createdTs}>${request.human_createdTs}</td>
           </tr>
           <tr ?hidden=${!wasPickedUp(result)}>
             <td>Started</td>
@@ -1043,9 +1045,9 @@ const reproduceSection = (ele, currentSlice) => {
     return "";
   }
   const casRef =
-    (currentSlice.properties && currentSlice.properties.cas_input_root) || {};
+    (currentSlice.properties && currentSlice.properties.casInputRoot) || {};
   const casDigest =
-    casRef.digest && `${casRef.digest.hash}/${casRef.digest.size_bytes}`;
+    casRef.digest && `${casRef.digest.hash}/${casRef.digest.sizeBytes}`;
   const hostUrl = window.location.hostname;
   return html`
     <div class="title">Reproducing the task locally</div>
@@ -1326,6 +1328,10 @@ window.customElements.define(
       this.removeEventListener("log-in", this._loginEvent);
     }
 
+    _createTasksService() {
+      return new TasksService(this.authHeader, this._fetchController.signal);
+    }
+
     _cancelTask() {
       const body = {};
       if (this._result.state === "RUNNING") {
@@ -1401,13 +1407,13 @@ window.customElements.define(
 
     _debugTask() {
       const newTask = {
-        expiration_secs: this._request.expiration_secs,
+        expiration_secs: this._request.expirationSecs,
         name: `leased to ${this.profile.email} for debugging`,
         pool_task_template: 3, // SKIP
         priority: 20,
         properties: this._currentSlice.properties,
         realm: this._request.realm,
-        service_account: this._request.service_account,
+        service_account: this._request.serviceAccount,
         tags: ["debug_task:1"],
         user: this.profile.email,
       };
@@ -1472,11 +1478,12 @@ time.sleep(${leaseDuration})`,
     _fetchTaskInfo(extra) {
       this.app.addBusyTasks(2);
       let currIdx = -1;
-      fetch(`/_ah/api/swarming/v1/task/${this._taskId}/request`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
+      const taskService = this._createTasksService();
+      taskService
+        .request(this._taskId)
+        .then((response) => {
           this._notFound = false;
-          this._request = parseRequest(json);
+          this._request = parseRequest(response);
           // Note, this triggers more fetch requests, which also adds to
           // app's busy task counts.
           this._fetchCounts(this._request, extra);
@@ -1520,17 +1527,14 @@ time.sleep(${leaseDuration})`,
       // unicode characters apart.
       let previousState = "";
       const fetchNextStdout = () => {
-        fetch(
-          `/_ah/api/swarming/v1/task/${this._taskId}/stdout?offset=${this._stdoutOffset}&` +
-            `length=${STDOUT_REQUEST_SIZE}`,
-          extra
-        )
-          .then(jsonOrThrow)
-          .then((json) => {
+        const tasksService = this._createTasksService();
+        tasksService
+          .stdout(this._taskId, this._stdoutOffset, STDOUT_REQUEST_SIZE)
+          .then((resp) => {
             if (!previousState) {
-              previousState = json.state;
+              previousState = resp.state;
             }
-            const s = json.output || "";
+            const s = b64toUtf8(resp.output) || "";
             // s.length returns number of UTF-8 code points
             // `offset` and `length` are in bytes
             const sLengthBytes = new Blob([s]).size;
@@ -1567,11 +1571,11 @@ time.sleep(${leaseDuration})`,
 
             this.render();
 
-            if (json.state !== previousState) {
+            if (resp.state !== previousState) {
               this._fetchTaskInfo(extra);
             }
 
-            if (json.state === "RUNNING" || json.state === "PENDING") {
+            if (resp.state === "RUNNING" || resp.state === "PENDING") {
               if (sLengthBytes < STDOUT_REQUEST_SIZE) {
                 // wait for more input because no new input from last fetch
                 setTimeout(fetchNextStdout, this._logFetchPeriod);
@@ -1588,15 +1592,15 @@ time.sleep(${leaseDuration})`,
                 fetchNextStdout();
               }
             }
-            previousState = json.state;
+            previousState = resp.state;
           })
-          .catch((e) => this.fetchError(e, "task/request"));
+          .catch((e) => this.prpcError(e, "task/request"));
       };
       fetchNextStdout();
     }
 
     _fetchCounts(request, extra) {
-      const numSlices = request.task_slices.length;
+      const numSlices = request.taskSlices.length;
       this.app.addBusyTasks(numSlices * 3);
       // reset current viewings
       this._capacityCounts = [];
@@ -1606,7 +1610,7 @@ time.sleep(${leaseDuration})`,
         const bParams = {
           dimensions: [],
         };
-        for (const dim of request.task_slices[i].properties.dimensions) {
+        for (const dim of request.taskSlices[i].properties.dimensions) {
           bParams.dimensions.push(`${dim.key}:${dim.value}`);
         }
         fetch(
@@ -1744,15 +1748,15 @@ time.sleep(${leaseDuration})`,
 
     _retryTask() {
       const newTask = {
-        expiration_secs: this._request.expiration_secs,
+        expiration_secs: this._request.expirationSecs,
         name: this._request.name + " (retry)",
         pool_task_template: 3, // SKIP
         priority: this._request.priority,
         properties: this._currentSlice.properties,
-        service_account: this._request.service_account,
+        service_account: this._request.serviceAccount,
         tags: this._request.tags,
         user: this.profile.email,
-        resultdb: { enable: Boolean(this._result.resultdb_info) },
+        resultdb: { enable: Boolean(this._result.resultdbInfo) },
         realm: this._request.realm,
       };
       newTask.tags.push("retry:1");
@@ -1769,10 +1773,10 @@ time.sleep(${leaseDuration})`,
 
     _setSlice(idx) {
       this._currentSliceIdx = idx;
-      if (!this._request.task_slices) {
+      if (!this._request.taskSlices) {
         return;
       }
-      this._currentSlice = this._request.task_slices[idx];
+      this._currentSlice = this._request.taskSlices[idx];
       this.render();
     }
 
