@@ -12,6 +12,7 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.api import field_behavior_pb2 as google_dot_api_dot_field__behavior__pb2
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
@@ -22,9 +23,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n3go.chromium.org/luci/buildbucket/proto/common.proto\x12\x0e\x62uildbucket.v2\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"V\n\nExecutable\x12\x14\n\x0c\x63ipd_package\x18\x01 \x01(\t\x12\x14\n\x0c\x63ipd_version\x18\x02 \x01(\t\x12\x0b\n\x03\x63md\x18\x03 \x03(\t\x12\x0f\n\x07wrapper\x18\x04 \x03(\t\"\xc3\x01\n\rStatusDetails\x12M\n\x13resource_exhaustion\x18\x03 \x01(\x0b\x32\x30.buildbucket.v2.StatusDetails.ResourceExhaustion\x12\x36\n\x07timeout\x18\x04 \x01(\x0b\x32%.buildbucket.v2.StatusDetails.Timeout\x1a\x14\n\x12ResourceExhaustion\x1a\t\n\x07TimeoutJ\x04\x08\x01\x10\x02J\x04\x08\x02\x10\x03\"2\n\x03Log\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08view_url\x18\x02 \x01(\t\x12\x0b\n\x03url\x18\x03 \x01(\t\"O\n\x0cGerritChange\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0e\n\x06\x63hange\x18\x03 \x01(\x03\x12\x10\n\x08patchset\x18\x04 \x01(\x03\"Y\n\rGitilesCommit\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\n\n\x02id\x18\x03 \x01(\t\x12\x0b\n\x03ref\x18\x04 \x01(\t\x12\x10\n\x08position\x18\x05 \x01(\r\"(\n\nStringPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"i\n\tTimeRange\x12.\n\nstart_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"_\n\x12RequestedDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12-\n\nexpiration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\"q\n\nCacheEntry\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x36\n\x13wait_for_warm_cache\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x0f\n\x07\x65nv_var\x18\x04 \x01(\t*\x87\x01\n\x06Status\x12\x16\n\x12STATUS_UNSPECIFIED\x10\x00\x12\r\n\tSCHEDULED\x10\x01\x12\x0b\n\x07STARTED\x10\x02\x12\x0e\n\nENDED_MASK\x10\x04\x12\x0b\n\x07SUCCESS\x10\x0c\x12\x0b\n\x07\x46\x41ILURE\x10\x14\x12\x11\n\rINFRA_FAILURE\x10$\x12\x0c\n\x08\x43\x41NCELED\x10\x44*%\n\x07Trinary\x12\t\n\x05UNSET\x10\x00\x12\x07\n\x03YES\x10\x01\x12\x06\n\x02NO\x10\x02*!\n\x0b\x43ompression\x12\x08\n\x04ZLIB\x10\x00\x12\x08\n\x04ZSTD\x10\x01\x42\x36Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
+  serialized_pb=b'\n3go.chromium.org/luci/buildbucket/proto/common.proto\x12\x0e\x62uildbucket.v2\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"V\n\nExecutable\x12\x14\n\x0c\x63ipd_package\x18\x01 \x01(\t\x12\x14\n\x0c\x63ipd_version\x18\x02 \x01(\t\x12\x0b\n\x03\x63md\x18\x03 \x03(\t\x12\x0f\n\x07wrapper\x18\x04 \x03(\t\"\xc3\x01\n\rStatusDetails\x12M\n\x13resource_exhaustion\x18\x03 \x01(\x0b\x32\x30.buildbucket.v2.StatusDetails.ResourceExhaustion\x12\x36\n\x07timeout\x18\x04 \x01(\x0b\x32%.buildbucket.v2.StatusDetails.Timeout\x1a\x14\n\x12ResourceExhaustion\x1a\t\n\x07TimeoutJ\x04\x08\x01\x10\x02J\x04\x08\x02\x10\x03\"2\n\x03Log\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08view_url\x18\x02 \x01(\t\x12\x0b\n\x03url\x18\x03 \x01(\t\"O\n\x0cGerritChange\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0e\n\x06\x63hange\x18\x03 \x01(\x03\x12\x10\n\x08patchset\x18\x04 \x01(\x03\"Y\n\rGitilesCommit\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\n\n\x02id\x18\x03 \x01(\t\x12\x0b\n\x03ref\x18\x04 \x01(\t\x12\x10\n\x08position\x18\x05 \x01(\r\"(\n\nStringPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"i\n\tTimeRange\x12.\n\nstart_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"_\n\x12RequestedDimension\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12-\n\nexpiration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\"q\n\nCacheEntry\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x36\n\x13wait_for_warm_cache\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x0f\n\x07\x65nv_var\x18\x04 \x01(\t\"\xea\x03\n\x0cHealthStatus\x12\x14\n\x0chealth_score\x18\x01 \x01(\x03\x12G\n\x0ehealth_metrics\x18\x02 \x03(\x0b\x32/.buildbucket.v2.HealthStatus.HealthMetricsEntry\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12=\n\tdoc_links\x18\x04 \x03(\x0b\x32*.buildbucket.v2.HealthStatus.DocLinksEntry\x12?\n\ndata_links\x18\x05 \x03(\x0b\x32+.buildbucket.v2.HealthStatus.DataLinksEntry\x12\x15\n\x08reporter\x18\x06 \x01(\tB\x03\xe0\x41\x03\x12\x36\n\rreported_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x03\xe0\x41\x03\x1a\x34\n\x12HealthMetricsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x02:\x02\x38\x01\x1a/\n\rDocLinksEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x30\n\x0e\x44\x61taLinksEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01*\x87\x01\n\x06Status\x12\x16\n\x12STATUS_UNSPECIFIED\x10\x00\x12\r\n\tSCHEDULED\x10\x01\x12\x0b\n\x07STARTED\x10\x02\x12\x0e\n\nENDED_MASK\x10\x04\x12\x0b\n\x07SUCCESS\x10\x0c\x12\x0b\n\x07\x46\x41ILURE\x10\x14\x12\x11\n\rINFRA_FAILURE\x10$\x12\x0c\n\x08\x43\x41NCELED\x10\x44*%\n\x07Trinary\x12\t\n\x05UNSET\x10\x00\x12\x07\n\x03YES\x10\x01\x12\x06\n\x02NO\x10\x02*!\n\x0b\x43ompression\x12\x08\n\x04ZLIB\x10\x00\x12\x08\n\x04ZSTD\x10\x01\x42\x36Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
   ,
-  dependencies=[google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,])
+  dependencies=[google_dot_api_dot_field__behavior__pb2.DESCRIPTOR,google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,])
 
 _STATUS = _descriptor.EnumDescriptor(
   name='Status',
@@ -76,8 +77,8 @@ _STATUS = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1008,
-  serialized_end=1143,
+  serialized_start=1534,
+  serialized_end=1669,
 )
 _sym_db.RegisterEnumDescriptor(_STATUS)
 
@@ -107,8 +108,8 @@ _TRINARY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1145,
-  serialized_end=1182,
+  serialized_start=1671,
+  serialized_end=1708,
 )
 _sym_db.RegisterEnumDescriptor(_TRINARY)
 
@@ -133,8 +134,8 @@ _COMPRESSION = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1184,
-  serialized_end=1217,
+  serialized_start=1710,
+  serialized_end=1743,
 )
 _sym_db.RegisterEnumDescriptor(_COMPRESSION)
 
@@ -203,8 +204,8 @@ _EXECUTABLE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=136,
-  serialized_end=222,
+  serialized_start=169,
+  serialized_end=255,
 )
 
 
@@ -228,8 +229,8 @@ _STATUSDETAILS_RESOURCEEXHAUSTION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=377,
-  serialized_end=397,
+  serialized_start=410,
+  serialized_end=430,
 )
 
 _STATUSDETAILS_TIMEOUT = _descriptor.Descriptor(
@@ -252,8 +253,8 @@ _STATUSDETAILS_TIMEOUT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=399,
-  serialized_end=408,
+  serialized_start=432,
+  serialized_end=441,
 )
 
 _STATUSDETAILS = _descriptor.Descriptor(
@@ -290,8 +291,8 @@ _STATUSDETAILS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=225,
-  serialized_end=420,
+  serialized_start=258,
+  serialized_end=453,
 )
 
 
@@ -336,8 +337,8 @@ _LOG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=422,
-  serialized_end=472,
+  serialized_start=455,
+  serialized_end=505,
 )
 
 
@@ -389,8 +390,8 @@ _GERRITCHANGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=474,
-  serialized_end=553,
+  serialized_start=507,
+  serialized_end=586,
 )
 
 
@@ -449,8 +450,8 @@ _GITILESCOMMIT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=555,
-  serialized_end=644,
+  serialized_start=588,
+  serialized_end=677,
 )
 
 
@@ -488,8 +489,8 @@ _STRINGPAIR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=646,
-  serialized_end=686,
+  serialized_start=679,
+  serialized_end=719,
 )
 
 
@@ -527,8 +528,8 @@ _TIMERANGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=688,
-  serialized_end=793,
+  serialized_start=721,
+  serialized_end=826,
 )
 
 
@@ -573,8 +574,8 @@ _REQUESTEDDIMENSION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=795,
-  serialized_end=890,
+  serialized_start=828,
+  serialized_end=923,
 )
 
 
@@ -626,8 +627,196 @@ _CACHEENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=892,
-  serialized_end=1005,
+  serialized_start=925,
+  serialized_end=1038,
+)
+
+
+_HEALTHSTATUS_HEALTHMETRICSENTRY = _descriptor.Descriptor(
+  name='HealthMetricsEntry',
+  full_name='buildbucket.v2.HealthStatus.HealthMetricsEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='buildbucket.v2.HealthStatus.HealthMetricsEntry.key', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='buildbucket.v2.HealthStatus.HealthMetricsEntry.value', index=1,
+      number=2, type=2, cpp_type=6, label=1,
+      has_default_value=False, default_value=float(0),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=b'8\001',
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1380,
+  serialized_end=1432,
+)
+
+_HEALTHSTATUS_DOCLINKSENTRY = _descriptor.Descriptor(
+  name='DocLinksEntry',
+  full_name='buildbucket.v2.HealthStatus.DocLinksEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='buildbucket.v2.HealthStatus.DocLinksEntry.key', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='buildbucket.v2.HealthStatus.DocLinksEntry.value', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=b'8\001',
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1434,
+  serialized_end=1481,
+)
+
+_HEALTHSTATUS_DATALINKSENTRY = _descriptor.Descriptor(
+  name='DataLinksEntry',
+  full_name='buildbucket.v2.HealthStatus.DataLinksEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='buildbucket.v2.HealthStatus.DataLinksEntry.key', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='buildbucket.v2.HealthStatus.DataLinksEntry.value', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=b'8\001',
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1483,
+  serialized_end=1531,
+)
+
+_HEALTHSTATUS = _descriptor.Descriptor(
+  name='HealthStatus',
+  full_name='buildbucket.v2.HealthStatus',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='health_score', full_name='buildbucket.v2.HealthStatus.health_score', index=0,
+      number=1, type=3, cpp_type=2, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='health_metrics', full_name='buildbucket.v2.HealthStatus.health_metrics', index=1,
+      number=2, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='description', full_name='buildbucket.v2.HealthStatus.description', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='doc_links', full_name='buildbucket.v2.HealthStatus.doc_links', index=3,
+      number=4, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='data_links', full_name='buildbucket.v2.HealthStatus.data_links', index=4,
+      number=5, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='reporter', full_name='buildbucket.v2.HealthStatus.reporter', index=5,
+      number=6, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=b'\340A\003', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='reported_time', full_name='buildbucket.v2.HealthStatus.reported_time', index=6,
+      number=7, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=b'\340A\003', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[_HEALTHSTATUS_HEALTHMETRICSENTRY, _HEALTHSTATUS_DOCLINKSENTRY, _HEALTHSTATUS_DATALINKSENTRY, ],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1041,
+  serialized_end=1531,
 )
 
 _STATUSDETAILS_RESOURCEEXHAUSTION.containing_type = _STATUSDETAILS
@@ -638,6 +827,13 @@ _TIMERANGE.fields_by_name['start_time'].message_type = google_dot_protobuf_dot_t
 _TIMERANGE.fields_by_name['end_time'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _REQUESTEDDIMENSION.fields_by_name['expiration'].message_type = google_dot_protobuf_dot_duration__pb2._DURATION
 _CACHEENTRY.fields_by_name['wait_for_warm_cache'].message_type = google_dot_protobuf_dot_duration__pb2._DURATION
+_HEALTHSTATUS_HEALTHMETRICSENTRY.containing_type = _HEALTHSTATUS
+_HEALTHSTATUS_DOCLINKSENTRY.containing_type = _HEALTHSTATUS
+_HEALTHSTATUS_DATALINKSENTRY.containing_type = _HEALTHSTATUS
+_HEALTHSTATUS.fields_by_name['health_metrics'].message_type = _HEALTHSTATUS_HEALTHMETRICSENTRY
+_HEALTHSTATUS.fields_by_name['doc_links'].message_type = _HEALTHSTATUS_DOCLINKSENTRY
+_HEALTHSTATUS.fields_by_name['data_links'].message_type = _HEALTHSTATUS_DATALINKSENTRY
+_HEALTHSTATUS.fields_by_name['reported_time'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 DESCRIPTOR.message_types_by_name['Executable'] = _EXECUTABLE
 DESCRIPTOR.message_types_by_name['StatusDetails'] = _STATUSDETAILS
 DESCRIPTOR.message_types_by_name['Log'] = _LOG
@@ -647,6 +843,7 @@ DESCRIPTOR.message_types_by_name['StringPair'] = _STRINGPAIR
 DESCRIPTOR.message_types_by_name['TimeRange'] = _TIMERANGE
 DESCRIPTOR.message_types_by_name['RequestedDimension'] = _REQUESTEDDIMENSION
 DESCRIPTOR.message_types_by_name['CacheEntry'] = _CACHEENTRY
+DESCRIPTOR.message_types_by_name['HealthStatus'] = _HEALTHSTATUS
 DESCRIPTOR.enum_types_by_name['Status'] = _STATUS
 DESCRIPTOR.enum_types_by_name['Trinary'] = _TRINARY
 DESCRIPTOR.enum_types_by_name['Compression'] = _COMPRESSION
@@ -731,6 +928,42 @@ CacheEntry = _reflection.GeneratedProtocolMessageType('CacheEntry', (_message.Me
   })
 _sym_db.RegisterMessage(CacheEntry)
 
+HealthStatus = _reflection.GeneratedProtocolMessageType('HealthStatus', (_message.Message,), {
+
+  'HealthMetricsEntry' : _reflection.GeneratedProtocolMessageType('HealthMetricsEntry', (_message.Message,), {
+    'DESCRIPTOR' : _HEALTHSTATUS_HEALTHMETRICSENTRY,
+    '__module__' : 'go.chromium.org.luci.buildbucket.proto.common_pb2'
+    # @@protoc_insertion_point(class_scope:buildbucket.v2.HealthStatus.HealthMetricsEntry)
+    })
+  ,
+
+  'DocLinksEntry' : _reflection.GeneratedProtocolMessageType('DocLinksEntry', (_message.Message,), {
+    'DESCRIPTOR' : _HEALTHSTATUS_DOCLINKSENTRY,
+    '__module__' : 'go.chromium.org.luci.buildbucket.proto.common_pb2'
+    # @@protoc_insertion_point(class_scope:buildbucket.v2.HealthStatus.DocLinksEntry)
+    })
+  ,
+
+  'DataLinksEntry' : _reflection.GeneratedProtocolMessageType('DataLinksEntry', (_message.Message,), {
+    'DESCRIPTOR' : _HEALTHSTATUS_DATALINKSENTRY,
+    '__module__' : 'go.chromium.org.luci.buildbucket.proto.common_pb2'
+    # @@protoc_insertion_point(class_scope:buildbucket.v2.HealthStatus.DataLinksEntry)
+    })
+  ,
+  'DESCRIPTOR' : _HEALTHSTATUS,
+  '__module__' : 'go.chromium.org.luci.buildbucket.proto.common_pb2'
+  # @@protoc_insertion_point(class_scope:buildbucket.v2.HealthStatus)
+  })
+_sym_db.RegisterMessage(HealthStatus)
+_sym_db.RegisterMessage(HealthStatus.HealthMetricsEntry)
+_sym_db.RegisterMessage(HealthStatus.DocLinksEntry)
+_sym_db.RegisterMessage(HealthStatus.DataLinksEntry)
+
 
 DESCRIPTOR._options = None
+_HEALTHSTATUS_HEALTHMETRICSENTRY._options = None
+_HEALTHSTATUS_DOCLINKSENTRY._options = None
+_HEALTHSTATUS_DATALINKSENTRY._options = None
+_HEALTHSTATUS.fields_by_name['reporter']._options = None
+_HEALTHSTATUS.fields_by_name['reported_time']._options = None
 # @@protoc_insertion_point(module_scope)

@@ -73,7 +73,9 @@ def add_bb_prefix_to_import(file_path):
 def main():
   """Updates all .proto files and compiles buildbucket/proto/*.proto."""
 
-  base = os.path.dirname(__file__)
+  base = os.path.normpath(os.path.dirname(__file__))
+
+  print(f"base: {base}")
   # All protos in SUB_PATHS expect imports live in go.chormium.org/luci.
   base_dir = os.path.join(base, "go.chromium.org/luci/")
 
@@ -118,13 +120,11 @@ def main():
     print("we don't really care about this error in this case")
 
   all_files = set()
-
   base_dir_py_protos = os.path.join(base, "go", "chromium", "org", "luci")
-
   for filename in glob.iglob(base_dir_py_protos + '**/**', recursive=True):
-    clean_filename = filename.split("/", 16)
-    if clean_filename[-1] and clean_filename[-1][-3:] == '.py':
-      all_files.add(clean_filename[-1])
+    split_filepath = filename.split("go/chromium/org/luci/")
+    if split_filepath[-1] and split_filepath[-1][-3:] == '.py':
+      all_files.add(split_filepath[-1])
 
   # removing python proto files we don't need
   seen = set()
@@ -144,6 +144,7 @@ def main():
 
   # Removing original .proto files
   shutil.rmtree(os.path.join(base, "go.chromium.org"))
+  print("removed: %s" % os.path.join(base, "go.chromium.org"))
 
   # removing empty folders in py protos directory
   walk = list(os.walk(base_dir_py_protos))

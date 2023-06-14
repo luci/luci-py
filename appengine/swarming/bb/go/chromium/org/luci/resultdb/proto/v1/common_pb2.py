@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z/go.chromium.org/luci/resultdb/proto/v1;resultpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n3go.chromium.org/luci/resultdb/proto/v1/common.proto\x12\x10luci.resultdb.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"f\n\x07Variant\x12/\n\x03\x64\x65\x66\x18\x01 \x03(\x0b\x32\".luci.resultdb.v1.Variant.DefEntry\x1a*\n\x08\x44\x65\x66\x45ntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"(\n\nStringPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"b\n\rGitilesCommit\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0b\n\x03ref\x18\x03 \x01(\t\x12\x13\n\x0b\x63ommit_hash\x18\x04 \x01(\t\x12\x10\n\x08position\x18\x05 \x01(\x04\"O\n\x0cGerritChange\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0e\n\x06\x63hange\x18\x03 \x01(\x03\x12\x10\n\x08patchset\x18\x04 \x01(\x03\"N\n\x0e\x43ommitPosition\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0b\n\x03ref\x18\x03 \x01(\t\x12\x10\n\x08position\x18\x04 \x01(\x03\"{\n\x13\x43ommitPositionRange\x12\x32\n\x08\x65\x61rliest\x18\x01 \x01(\x0b\x32 .luci.resultdb.v1.CommitPosition\x12\x30\n\x06latest\x18\x02 \x01(\x0b\x32 .luci.resultdb.v1.CommitPosition\"e\n\tTimeRange\x12,\n\x08\x65\x61rliest\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12*\n\x06latest\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"D\n\tSourceRef\x12-\n\x03git\x18\x01 \x01(\x0b\x32\x1e.luci.resultdb.v1.GitReferenceH\x00\x42\x08\n\x06system\":\n\x0cGitReference\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0b\n\x03ref\x18\x03 \x01(\tB1Z/go.chromium.org/luci/resultdb/proto/v1;resultpbb\x06proto3'
+  serialized_pb=b'\n3go.chromium.org/luci/resultdb/proto/v1/common.proto\x12\x10luci.resultdb.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"f\n\x07Variant\x12/\n\x03\x64\x65\x66\x18\x01 \x03(\x0b\x32\".luci.resultdb.v1.Variant.DefEntry\x1a*\n\x08\x44\x65\x66\x45ntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"(\n\nStringPair\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"b\n\rGitilesCommit\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0b\n\x03ref\x18\x03 \x01(\t\x12\x13\n\x0b\x63ommit_hash\x18\x04 \x01(\t\x12\x10\n\x08position\x18\x05 \x01(\x03\"O\n\x0cGerritChange\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0e\n\x06\x63hange\x18\x03 \x01(\x03\x12\x10\n\x08patchset\x18\x04 \x01(\x03\"N\n\x0e\x43ommitPosition\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0b\n\x03ref\x18\x03 \x01(\t\x12\x10\n\x08position\x18\x04 \x01(\x03\"{\n\x13\x43ommitPositionRange\x12\x32\n\x08\x65\x61rliest\x18\x01 \x01(\x0b\x32 .luci.resultdb.v1.CommitPosition\x12\x30\n\x06latest\x18\x02 \x01(\x0b\x32 .luci.resultdb.v1.CommitPosition\"e\n\tTimeRange\x12,\n\x08\x65\x61rliest\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12*\n\x06latest\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"F\n\tSourceRef\x12/\n\x07gitiles\x18\x01 \x01(\x0b\x32\x1c.luci.resultdb.v1.GitilesRefH\x00\x42\x08\n\x06system\"8\n\nGitilesRef\x12\x0c\n\x04host\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x0b\n\x03ref\x18\x03 \x01(\tB1Z/go.chromium.org/luci/resultdb/proto/v1;resultpbb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,])
 
@@ -174,7 +174,7 @@ _GITILESCOMMIT = _descriptor.Descriptor(
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='position', full_name='luci.resultdb.v1.GitilesCommit.position', index=4,
-      number=5, type=4, cpp_type=4, label=1,
+      number=5, type=3, cpp_type=2, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -389,7 +389,7 @@ _SOURCEREF = _descriptor.Descriptor(
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='git', full_name='luci.resultdb.v1.SourceRef.git', index=0,
+      name='gitiles', full_name='luci.resultdb.v1.SourceRef.gitiles', index=0,
       number=1, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -413,34 +413,34 @@ _SOURCEREF = _descriptor.Descriptor(
     fields=[]),
   ],
   serialized_start=741,
-  serialized_end=809,
+  serialized_end=811,
 )
 
 
-_GITREFERENCE = _descriptor.Descriptor(
-  name='GitReference',
-  full_name='luci.resultdb.v1.GitReference',
+_GITILESREF = _descriptor.Descriptor(
+  name='GitilesRef',
+  full_name='luci.resultdb.v1.GitilesRef',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='host', full_name='luci.resultdb.v1.GitReference.host', index=0,
+      name='host', full_name='luci.resultdb.v1.GitilesRef.host', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='project', full_name='luci.resultdb.v1.GitReference.project', index=1,
+      name='project', full_name='luci.resultdb.v1.GitilesRef.project', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='ref', full_name='luci.resultdb.v1.GitReference.ref', index=2,
+      name='ref', full_name='luci.resultdb.v1.GitilesRef.ref', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -458,7 +458,7 @@ _GITREFERENCE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=811,
+  serialized_start=813,
   serialized_end=869,
 )
 
@@ -468,10 +468,10 @@ _COMMITPOSITIONRANGE.fields_by_name['earliest'].message_type = _COMMITPOSITION
 _COMMITPOSITIONRANGE.fields_by_name['latest'].message_type = _COMMITPOSITION
 _TIMERANGE.fields_by_name['earliest'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
 _TIMERANGE.fields_by_name['latest'].message_type = google_dot_protobuf_dot_timestamp__pb2._TIMESTAMP
-_SOURCEREF.fields_by_name['git'].message_type = _GITREFERENCE
+_SOURCEREF.fields_by_name['gitiles'].message_type = _GITILESREF
 _SOURCEREF.oneofs_by_name['system'].fields.append(
-  _SOURCEREF.fields_by_name['git'])
-_SOURCEREF.fields_by_name['git'].containing_oneof = _SOURCEREF.oneofs_by_name['system']
+  _SOURCEREF.fields_by_name['gitiles'])
+_SOURCEREF.fields_by_name['gitiles'].containing_oneof = _SOURCEREF.oneofs_by_name['system']
 DESCRIPTOR.message_types_by_name['Variant'] = _VARIANT
 DESCRIPTOR.message_types_by_name['StringPair'] = _STRINGPAIR
 DESCRIPTOR.message_types_by_name['GitilesCommit'] = _GITILESCOMMIT
@@ -480,7 +480,7 @@ DESCRIPTOR.message_types_by_name['CommitPosition'] = _COMMITPOSITION
 DESCRIPTOR.message_types_by_name['CommitPositionRange'] = _COMMITPOSITIONRANGE
 DESCRIPTOR.message_types_by_name['TimeRange'] = _TIMERANGE
 DESCRIPTOR.message_types_by_name['SourceRef'] = _SOURCEREF
-DESCRIPTOR.message_types_by_name['GitReference'] = _GITREFERENCE
+DESCRIPTOR.message_types_by_name['GitilesRef'] = _GITILESREF
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 Variant = _reflection.GeneratedProtocolMessageType('Variant', (_message.Message,), {
@@ -547,12 +547,12 @@ SourceRef = _reflection.GeneratedProtocolMessageType('SourceRef', (_message.Mess
   })
 _sym_db.RegisterMessage(SourceRef)
 
-GitReference = _reflection.GeneratedProtocolMessageType('GitReference', (_message.Message,), {
-  'DESCRIPTOR' : _GITREFERENCE,
+GitilesRef = _reflection.GeneratedProtocolMessageType('GitilesRef', (_message.Message,), {
+  'DESCRIPTOR' : _GITILESREF,
   '__module__' : 'go.chromium.org.luci.resultdb.proto.v1.common_pb2'
-  # @@protoc_insertion_point(class_scope:luci.resultdb.v1.GitReference)
+  # @@protoc_insertion_point(class_scope:luci.resultdb.v1.GitilesRef)
   })
-_sym_db.RegisterMessage(GitReference)
+_sym_db.RegisterMessage(GitilesRef)
 
 
 DESCRIPTOR._options = None
