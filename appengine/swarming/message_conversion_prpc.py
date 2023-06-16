@@ -362,7 +362,7 @@ def _task_properties(props):
       env_prefixes=_string_list_pairs_from_dict(props.env_prefixes),
       env=[
           swarming_pb2.StringPair(key=k, value=v) for k, v in props.env.items()
-      ],
+      ] if props.env else None,
       dimensions=_duplicate_string_pairs_from_dict(props.dimensions),
       command=props.command,
       outputs=props.outputs,
