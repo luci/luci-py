@@ -350,13 +350,14 @@ def _cipd_input(cipd_input):
 def _task_properties(props):
   # type: Optional[task_request.TaskProperties]) ->
   #   Optional[swarming_pb2.TaskProperties]
-  if props is None:
+  if not props:
     return None
   return swarming_pb2.TaskProperties(
       caches=[_cache_entry(entry) for entry in props.caches],
       cas_input_root=_cas_reference(props.cas_input_root),
       containment=swarming_pb2.Containment(
-          containment_type=props.containment.containment_type),
+          containment_type=props.containment.containment_type)
+      if props.containment else None,
       cipd_input=_cipd_input(props.cipd_input),
       env_prefixes=_string_list_pairs_from_dict(props.env_prefixes),
       env=[

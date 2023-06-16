@@ -177,6 +177,12 @@ class TestMessageConversion(test_case.TestCase):
     self.assertTrue('same environment prefix key cannot be specified twice' in
                     str(ctx.exception))
 
+  def test_none_containment_type_does_not_break(self):
+    props = self._create_default_task_request_task_slice().properties
+    props.containment = None
+    props_proto = message_conversion_prpc._task_properties(props)
+    self.assertFalse(props_proto.HasField("containment"))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
