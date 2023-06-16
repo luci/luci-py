@@ -151,14 +151,24 @@ describe("task-page", function () {
       request,
       (body) => body.task_id === TEST_TASK_ID
     );
-    fetchMock.get(
-      `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result?include_performance_stats=true`,
-      result
+    mockPrpc(
+      fetchMock,
+      "swarming.v2.Tasks",
+      "GetResult",
+      result,
+      (body) => body.task_id === TEST_TASK_ID && body.include_performance_stats
     );
     if (idx === 0) {
       // The index 0 data has multiple tries that it requests data for (no perf stats),
       // so pass in some data for that.
-      fetchMock.get("glob:/_ah/api/swarming/v1/task/*/result", taskResults[1]);
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Tasks",
+        "GetResult",
+        taskResults[1],
+        (body) =>
+          body.task_id === TEST_TASK_ID && body.include_performance_stats
+      );
     }
     if (!nostdout) {
       mockPrpc(
@@ -820,23 +830,19 @@ describe("task-page", function () {
       loggedInTaskPage((ele) => {
         const protorpc = fetchMock.calls(MATCHED, "GET");
         expect(protorpc).toHaveSize(
-          2 + 2 + 6,
-          "2 GETs from swarming-app, 2 from task-page, " + "3 counts * 2 slices"
+          2 + 1 + 6,
+          "2 GETs from swarming-app, 1 from task-page, " + "3 counts * 2 slices"
         );
 
         const prpc = fetchMock.calls(MATCHED, "POST");
         // There is exactly 2 prpc calls
-        expect(prpc).toHaveSize(2);
+        expect(prpc).toHaveSize(3);
 
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
         const gets = protorpc.map((c) => c[0]);
 
-        expect(gets).toContain(
-          `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result` +
-            "?include_performance_stats=true"
-        );
         // spot check one of the counts
         expect(gets).toContain(
           "/_ah/api/swarming/v1/bots/count?" +
@@ -857,23 +863,19 @@ describe("task-page", function () {
       loggedInTaskPage((ele) => {
         // prpc calls count
         const prpc = fetchMock.calls(MATCHED, "POST");
-        // There are 2 prpc calls here.
-        expect(prpc).toHaveSize(2);
+        // There are 3 prpc calls here.
+        expect(prpc).toHaveSize(3);
 
         const protorpc = fetchMock.calls(MATCHED, "GET");
         expect(protorpc).toHaveSize(
-          2 + 2 + 3,
-          "2 GETs from swarming-app, 3 from task-page, " + "3 counts * 1 slice"
+          2 + 2 + 2,
+          "2 GETs from swarming-app, 2 from task-page, " + "3 counts * 1 slice"
         );
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
         const gets = protorpc.map((c) => c[0]);
 
-        expect(gets).toContain(
-          `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result` +
-            "?include_performance_stats=true"
-        );
         expect(gets).toContain(
           "/_ah/api/swarming/v1/tasks/count?start=1549212360&state=RUNNING&" +
             "tags=device_os%3AN&tags=os%3AAndroid&tags=pool%3AChrome-GPU&tags=device_type%3Afoster"
@@ -1109,10 +1111,9 @@ describe("task-page", function () {
           "this is cutoff on the second log line\n",
           "third log line\n",
         ]);
-        const calls = fetchMock.calls(MATCHED, "GET").map((arr) => arr[0]);
+        const calls = fetchMock.calls(MATCHED, "POST").map((arr) => arr[0]);
         const callsToResult = calls.filter(
-          (url) =>
-            url.indexOf(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`) >= 0
+          (url) => url.indexOf(`GetResult`) >= 0
         );
 
         // We expect the requests and results to be fetched after

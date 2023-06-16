@@ -121,20 +121,20 @@ const serverTaskLogsURL = (project, taskId, request, result) => {
 };
 
 const serverBotLogsURL = (project, request, result) => {
-  const query = serverLogBaseQuery + result.bot_id;
+  const query = serverLogBaseQuery + result.botId;
   const [timeStart, timeEnd] = serverLogTimeRange(request, result);
   return cloudLoggingURL(project, query, timeStart, timeEnd);
 };
 
 const botLogsURL = (botProjectID, botZone, request, result) => {
   // limit logs that we care
-  const hostName = extractPrimaryHostname(result.bot_id);
+  const hostName = extractPrimaryHostname(result.botId);
   const query = `labels."compute.googleapis.com/resource_name":"${hostName}"`;
   let timeStart;
   let timeEnd;
-  if (result.started_ts) {
-    timeStart = new Date(result.started_ts.getTime() - 60 * 1000);
-    const tsEnd = result.completed_ts || result.abandoned_ts;
+  if (result.startedTs) {
+    timeStart = new Date(result.startedTs.getTime() - 60 * 1000);
+    const tsEnd = result.completedTs || result.abandonedTs;
     timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60 * 1000) : new Date();
   }
   return cloudLoggingURL(botProjectID, query, timeStart, timeEnd);
@@ -212,7 +212,7 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
           ele._app._server_details.cas_viewer_server,
           currentSlice.properties.casInputRoot || {}
         )}
-        <tr ?hidden=${!result.resultdb_info}>
+        <tr ?hidden=${!result.resultdbInfo}>
           <td>ResultDB</td>
           <td>Enabled</td>
         </tr>
@@ -281,15 +281,15 @@ const stateLoadBlock = (ele, request, result) => html`
     ele._runningCounts[ele._currentSliceIdx],
     ele._currentSlice.properties || {}
   )}
-  <tr ?hidden=${!result.deduped_from} class="highlighted">
+  <tr ?hidden=${!result.dedupedFrom} class="highlighted">
     <td><b>Deduped From</b></td>
     <td>
-      <a href=${taskPageLink(result.deduped_from)} target="_blank">
-        ${result.deduped_from}
+      <a href=${taskPageLink(result.dedupedFrom)} target="_blank">
+        ${result.dedupedFrom}
       </a>
     </td>
   </tr>
-  <tr ?hidden=${!result.deduped_from}>
+  <tr ?hidden=${!result.dedupedFrom}>
     <td>Deduped On</td>
     <td title=${request.createdTs}>${request.human_createdTs}</td>
   </tr>
@@ -403,10 +403,10 @@ const requestBlock = (request, result, currentSlice) => html`
     <td>
       <a
         href=${taskListLink(
-          [{ key: "parent_task_id-tag", value: result.run_id }],
+          [{ key: "parent_task_id-tag", value: result.runId }],
           [],
-          result.started_ts,
-          result.completed_ts
+          result.startedTs,
+          result.completedTs
         )}
       >
         Task List
@@ -477,14 +477,14 @@ const missingCasRowSet = (host, input) => html`
   <tr>
     <td>
       <b>Instance: </b>
-      ${input.cas_instance}
+      ${input.casInstance}
     </td>
   </tr>
   <tr>
     <td>
       <b>Digest: </b>
       <a href=${casLink(host, input)} target='_blank'>
-        ${input.digest.hash}/${input.digest.size_bytes}
+        ${input.digest.hash}/${input.digest.sizeBytes}
       </a>
     </td>
   </tr>
@@ -596,7 +596,7 @@ const cipdBlock = (cipdInput, result) => {
     </tr>`;
   }
   const requestedPackages = cipdInput.packages || [];
-  const actualPackages = (result.cipd_pins && result.cipd_pins.packages) || [];
+  const actualPackages = (result.cipdPins && result.cipdPins.packages) || [];
   for (let i = 0; i < requestedPackages.length; i++) {
     const p = requestedPackages[i];
     p.requested = `${p.package_name}:${p.version}`;
@@ -608,8 +608,8 @@ const cipdBlock = (cipdInput, result) => {
     }
   }
   let packageName = "(available when task is run)";
-  if (result.cipd_pins && result.cipd_pins.client_package) {
-    packageName = result.cipd_pins.client_package.package_name;
+  if (result.cipdPins && result.cipdPins.clientPackage) {
+    packageName = result.cipdPins.clientPackage.packageName;
   }
   // We always need to at least double the number of packages because we
   // show the path and then the requested.  If the actual package info
@@ -678,7 +678,7 @@ const taskTimingSection = (ele, request, result) => {
     // when juxtaposed with the data from this task.
     return "";
   }
-  const performanceStats = result.performance_stats || {};
+  const performanceStats = result.performanceStats || {};
   return html`
     <div class="title">Task Timing Information</div>
     <div class="horizontal layout wrap">
@@ -690,23 +690,23 @@ const taskTimingSection = (ele, request, result) => {
           </tr>
           <tr ?hidden=${!wasPickedUp(result)}>
             <td>Started</td>
-            <td title=${result.started_ts}>${result.human_started_ts}</td>
+            <td title=${result.startedTs}>${result.human_startedTs}</td>
           </tr>
           <tr>
             <td>Scheduling Deadline</td>
             <td>${taskSchedulingDeadline(request)}</td>
           </tr>
-          <tr ?hidden=${!result.completed_ts}>
+          <tr ?hidden=${!result.completedTs}>
             <td>Completed</td>
-            <td title=${result.completed_ts}>${result.human_completed_ts}</td>
+            <td title=${result.completedTs}>${result.human_completedTs}</td>
           </tr>
-          <tr ?hidden=${!result.abandoned_ts}>
+          <tr ?hidden=${!result.abandonedTs}>
             <td>Abandoned</td>
-            <td title=${result.abandoned_ts}>${result.human_abandoned_ts}</td>
+            <td title=${result.abandonedTs}>${result.human_abandonedTs}</td>
           </tr>
           <tr>
             <td>Last updated</td>
-            <td title=${result.modified_ts}>${result.human_modified_ts}</td>
+            <td title=${result.modifiedTs}>${result.human_modifiedTs}</td>
           </tr>
           <tr>
             <td>Pending Time</td>
@@ -715,7 +715,7 @@ const taskTimingSection = (ele, request, result) => {
           <tr>
             <td>Total Overhead</td>
             <td class="overhead">
-              ${humanDuration(performanceStats.bot_overhead)}
+              ${humanDuration(performanceStats.botOverhead)}
             </td>
           </tr>
           <tr>
@@ -751,15 +751,15 @@ const logsSection = (ele, request, result) => {
   let botLogsCloudProject = null;
   let botProjectID = null;
   let botZone = null;
-  if (result && result.bot_dimensions) {
-    for (const dim of result.bot_dimensions) {
+  if (result && result.botDimensions) {
+    for (const dim of result.botDimensions) {
       if (dim.key == "gcp") botProjectID = dim.value[0];
       if (dim.key == "zone") {
         botZone = dim.value.reduce((a, b) => (a.length > b.length ? a : b));
       }
     }
     // Use result.bot_logs_cloud_project to fetch logs when it's not null
-    botLogsCloudProject = result.bot_logs_cloud_project;
+    botLogsCloudProject = result.botLogsCloudProject;
     if (!!botLogsCloudProject) {
       botProjectID = botLogsCloudProject;
     }
@@ -792,11 +792,11 @@ const logsSection = (ele, request, result) => {
               <a
                 href=${serverBotLogsURL(ele._project_id, request, result)}
                 target="_blank"
-                ?hidden=${!result.bot_id}
+                ?hidden=${!result.botId}
               >
                 View on Cloud Console
               </a>
-              <p ?hidden=${result.bot_id}>--</p>
+              <p ?hidden=${result.botId}>--</p>
             </td>
           </tr>
           <tr>
@@ -838,7 +838,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
 
       <p class="deduplicated">
         This task was deduplicated from task
-        <a href=${taskPageLink(result.deduped_from)}>${result.deduped_from}</a>.
+        <a href=${taskPageLink(result.dedupedFrom)}>${result.dedupedFrom}</a>.
         For more information on deduplication, see
         <a
           href="https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/swarming/doc/Detailed-Design.md#task-deduplication"
@@ -853,7 +853,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   }
   // Pre-process the dimensions so we can highlight those that were matched
   // against, with a bold on the subset of dimensions that matched.
-  const botDimensions = result.bot_dimensions || [];
+  const botDimensions = result.botDimensions || [];
   const usedDimensions = currentSlice.properties.dimensions || [];
 
   for (const dim of botDimensions) {
@@ -881,11 +881,11 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
 <table class=task-execution>
   <tr>
     <td>Bot assigned to task</td>
-    <td><a href=${botPageLink(result.bot_id)}>${result.bot_id}</td>
+    <td><a href=${botPageLink(result.botId)}>${result.botId}</td>
   </tr>
   <tr>
     <td>Bot idle since</td>
-    <td>${result.human_bot_idle_since_ts}</td>
+    <td>${result.human_botIdleSinceTs}</td>
   </tr>
   <tr>
     <td rowspan=${botDimensions.length + 1}>
@@ -895,7 +895,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   ${botDimensions.map((dim) => botDimensionRow(dim, usedDimensions))}
   <tr>
     <td>Exit Code</td>
-    <td>${result.exit_code}</td>
+    <td>${result.exitCode}</td>
   </tr>
   <tr>
     <td>Failure</td>
@@ -903,8 +903,8 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   </tr>
   <tr>
     <td>Internal Failure</td>
-    <td class=${result.internal_failure ? "exception" : ""}>${
-    result.internal_failure
+    <td class=${result.internalFailure ? "exception" : ""}>${
+    result.internalFailure
   }</td>
   </tr>
   <tr>
@@ -914,21 +914,21 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   ${missingCasBlock(
     "Missing CAS Input(s)",
     ele._app._server_details.cas_viewer_server,
-    result.missing_cas
+    result.missingCas
   )}
-  ${missingCipdBlock("Missing CIPD Package(s)", result.missing_cipd)}
+  ${missingCipdBlock("Missing CIPD Package(s)", result.missingCipd)}
   ${casBlock(
     "CAS Outputs",
     ele._app._server_details.cas_viewer_server,
-    result.cas_output_root || {}
+    result.casOutputRoot || {}
   )}
   <tr>
     <td>Bot Version</td>
-    <td>${result.bot_version}</td>
+    <td>${result.botVersion}</td>
   </tr>
   <tr>
     <td>Server Version</td>
-    <td>${result.server_versions}</td>
+    <td>${result.serverVersions}</td>
   </tr>
 </table>`;
 };
@@ -958,82 +958,84 @@ const performanceStatsSection = (ele, performanceStats) => {
         >
           Total Overhead
         </td>
-        <td>${humanDuration(performanceStats.bot_overhead)}</td>
+        <td>${humanDuration(performanceStats.botOverhead || 0)}</td>
       </tr>
       <tr>
         <td>Cache trimming before the task</td>
-        <td>${humanDuration(performanceStats.cache_trim.duration)}</td>
+        <td>${humanDuration(performanceStats.cacheTrim.duration || 0)}</td>
       </tr>
       <tr>
         <td>Installing CIPD packages</td>
         <td>
-          ${humanDuration(performanceStats.package_installation.duration)}
+          ${humanDuration(performanceStats.packageInstallation.duration || 0)}
         </td>
       </tr>
       <tr>
         <td>Installing Named Caches</td>
         <td>
-          ${humanDuration(performanceStats.named_caches_install.duration)}
+          ${humanDuration(performanceStats.namedCachesInstall.duration || 0)}
         </td>
       </tr>
       <tr>
         <td>Uninstalling Named Caches</td>
         <td>
-          ${humanDuration(performanceStats.named_caches_uninstall.duration)}
+          ${humanDuration(performanceStats.namedCachesUninstall.duration || 0)}
         </td>
       </tr>
       <tr>
         <td>Downloading Inputs</td>
-        <td>${humanDuration(performanceStats.isolated_download.duration)}</td>
+        <td>
+          ${humanDuration(performanceStats.isolatedDownload.duration || 0)}
+        </td>
       </tr>
       <tr>
         <td>Uploading Outputs</td>
-        <td>${humanDuration(performanceStats.isolated_upload.duration)}</td>
+        <td>${humanDuration(performanceStats.isolatedUpload.duration || 0)}</td>
       </tr>
       <tr>
         <td>Cleanup directories</td>
-        <td>${humanDuration(performanceStats.cleanup.duration)}</td>
+        <td>${humanDuration(performanceStats.cleanup.duration || 0)}</td>
       </tr>
       <tr>
         <td>Initial bot cache</td>
         <td>
-          ${performanceStats.isolated_download.initial_number_items || 0} items;
-          ${human.bytes(performanceStats.isolated_download.initial_size || 0)}
+          ${performanceStats.isolatedDownload.initialNumberItems || 0} items;
+          ${human.bytes(performanceStats.isolatedDownload.initialSize || 0)}
         </td>
       </tr>
       <tr>
         <td>Inputs (downloaded)</td>
         <td>
-          ${performanceStats.isolated_download.num_items_cold || 0} items;
+          ${performanceStats.isolatedDownload.numItemsCold || 0} items;
           ${human.bytes(
-            performanceStats.isolated_download.total_bytes_items_cold || 0
+            performanceStats.isolatedDownload.totalBytesItemsCold || 0
           )}
         </td>
       </tr>
       <tr>
         <td>Inputs (cached)</td>
         <td>
-          ${performanceStats.isolated_download.num_items_hot || 0} items;
+          ${performanceStats.isolatedDownload.numItemsHot || 0} items;
           ${human.bytes(
-            performanceStats.isolated_download.total_bytes_items_hot || 0
+            performanceStats.isolatedDownload.totalBytesItemsHot || 0
           )}
         </td>
       </tr>
       <tr>
         <td>Outputs (uploaded)</td>
         <td>
-          ${performanceStats.isolated_upload.num_items_cold || 0} items;
+          ${performanceStats.isolatedUpload.numItemsCold || 0} items;
           ${human.bytes(
-            performanceStats.isolated_upload.total_bytes_items_cold || 0
+            performanceStats.isolatedUpload.totalBytesItemsCold || 0
           )}
         </td>
       </tr>
       <tr>
         <td>Outputs (cached)</td>
         <td>
-          ${performanceStats.isolated_upload.num_items_hot || 0} items;
+          ${performanceStats.isolatedUpload.numItemsHot || 0} items;
           ${human.bytes(
-            performanceStats.isolated_upload.total_bytes_items_hot || 0
+            performanceStats.isolatedUpload.totalBytesItemsHot || 0
           )}
         </td>
       </tr>
@@ -1198,7 +1200,7 @@ const template = (ele) => html`
 
     ${taskExecutionSection(ele, ele._request, ele._result, ele._currentSlice)}
 
-    ${performanceStatsSection(ele, ele._result.performance_stats)}
+    ${performanceStatsSection(ele, ele._result.performanceStats)}
 
     ${reproduceSection(ele, ele._currentSlice)}
     </div>
@@ -1370,12 +1372,12 @@ window.customElements.define(
         newDimensions.push(
           {
             key: "id",
-            value: firstDimension(this._result.bot_dimensions, "id"),
+            value: firstDimension(this._result.botDimensions, "id"),
           },
           {
             // pool is always a required dimension
             key: "pool",
-            value: firstDimension(this._result.bot_dimensions, "pool"),
+            value: firstDimension(this._result.botDimensions, "pool"),
           }
         );
       } else {
@@ -1505,18 +1507,16 @@ time.sleep(${leaseDuration})`,
           this.fetchError(e, "task/request");
         });
       this._extraTries = [];
-      fetch(
-        `/_ah/api/swarming/v1/task/${this._taskId}/result?include_performance_stats=true`,
-        extra
-      )
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._result = parseResult(json);
-          currIdx = +this._result.current_task_slice;
+
+      taskService
+        .result(this._taskId, true)
+        .then((response) => {
+          this._result = parseResult(response);
+          currIdx = +this._result.currentTaskSlice;
           this._setSlice(currIdx); // calls render
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, "task/result"));
+        .catch((e) => this.prpcError(e, "task/result"));
     }
 
     _fetchStdOut(extra) {

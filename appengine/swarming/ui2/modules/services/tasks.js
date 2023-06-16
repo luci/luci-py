@@ -53,4 +53,19 @@ export class TasksService extends PrpcService {
       task_id: taskId,
     });
   }
+
+  /**
+   * Retrieves task_result for givenTaskId.
+   *
+   * @param {string} taskId - id of task to retrieve
+   * @param {boolean} includePerformanceStats - whether to include performance stats with the taskId
+   *
+   * @returns {Object} see - https://crsrc.org/i/luci/appengine/swarming/proto/api_v2/swarming.proto;l=738?q=TaskResultResponse&sq=
+   **/
+  result(taskId, includePerformanceStats) {
+    return this._call("GetResult", {
+      task_id: taskId,
+      include_performance_stats: includePerformanceStats,
+    });
+  }
 }
