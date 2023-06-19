@@ -669,6 +669,11 @@ class BotHandshakeHandler(_BotBaseHandler):
   def post(self):
     res = self.process()
 
+    # This boolean marks the state as "not fully initialized yet", since it
+    # lacks entries reported by custom bot hooks (the bot doesn't have them
+    # yet, they are returned below).
+    res.state['handshaking'] = True
+
     # The dimensions provided by Bot won't be applied to BotInfo since they
     # provide them without injected bot_config. The bot will report valid
     # dimensions at poll.

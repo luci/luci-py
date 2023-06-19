@@ -3339,7 +3339,8 @@ class BotApiTest(BaseTest):
     state = unicode(
         json.dumps(state_dict, sort_keys=True, separators=(',', ':')))
     state_dict.pop('bot_group_cfg_version')
-    state_no_cfg_ver = unicode(
+    state_dict['handshaking'] = True
+    state_handshake = unicode(
         json.dumps(state_dict, sort_keys=True, separators=(',', ':')))
     expected = [
         {
@@ -3391,7 +3392,7 @@ class BotApiTest(BaseTest):
             u'event_type': u'bot_connected',
             u'external_ip': unicode(self.source_ip),
             u'quarantined': False,
-            u'state': state_no_cfg_ver,
+            u'state': state_handshake,
             u'ts': fmtdate(t1),
             u'version': u'123',
         },

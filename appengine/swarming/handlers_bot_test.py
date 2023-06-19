@@ -1654,6 +1654,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'quarantined': False,
         'maintenance_msg': None,
         'state': {
+            u'handshaking': True,
             u'running_time': 1234.0,
             u'sleep_streak': 0,
             u'started_ts': 1410990411.111,
