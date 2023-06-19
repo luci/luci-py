@@ -278,6 +278,7 @@ def db():
           # This role is designed to allow users to see build and test failures
           # in Gerrit even if they don't have full read permission on the builds
           # themselves.
+          include('role/resultdb.limitedReader'),
           permission('buildbucket.builds.list'),
           permission('buildbucket.builds.getLimited'),
           permission('buildbucket.builders.get'),
