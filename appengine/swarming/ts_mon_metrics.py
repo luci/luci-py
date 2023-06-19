@@ -354,9 +354,6 @@ def _set_jobs_metrics():
       key = tuple(sorted(fields.items()))
       jobs_counts[key] += 1
 
-      fields['device_type'] = tags_dict.get('device_type', '')
-      key = tuple(sorted(fields.items()))
-
     logging.debug('_set_jobs_metrics: processed %d jobs', jobs_total)
 
   target_fields = dict(_TARGET_FIELDS)
@@ -442,6 +439,8 @@ def _extract_spec_name_field(tags_dict):
     spec_name = tags_dict.get('buildername', '')
     if tags_dict.get('build_is_experimental') == 'true':
       spec_name += ':experimental'
+  if not spec_name and tags_dict.get('terminate') == '1':
+    return 'swarming:terminate'
   return spec_name
 
 
