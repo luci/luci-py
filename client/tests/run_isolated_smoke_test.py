@@ -234,7 +234,7 @@ class RunIsolatedTest(unittest.TestCase):
 
   def test_simple(self):
     out, err, returncode = self._run(
-        ['--', 'python', '-c', 'print("no --root-dir")'])
+        ['--', 'python3', '-c', 'print("no --root-dir")'])
     self.assertEndsWith('no --root-dir\n', out)
     self.assertEqual('', err)
     self.assertEqual(0, returncode)
@@ -272,7 +272,7 @@ class RunIsolatedTest(unittest.TestCase):
         cas_util.cache_hash(CONTENTS['max_path.py']),
     ]
     out, err, returncode = self._run(
-        self._cmd_args(cas_digest) + ['--', 'python', 'max_path.py'])
+        self._cmd_args(cas_digest) + ['--', 'python3', 'max_path.py'])
     err = cas_util.filter_out_go_logs(err)
     self.assertEqual('', err)
     self.assertEndsWith('Success\n', out)
@@ -299,7 +299,7 @@ class RunIsolatedTest(unittest.TestCase):
     # Run the test once to generate the cache.
     # The weird file mode is because of test_env.py that sets umask(0070).
     out, err, returncode = self._run(
-        self._cmd_args(cas_digest) + ['--', 'python', '-V'])
+        self._cmd_args(cas_digest) + ['--', 'python3', '-V'])
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
         '.': (0o40707, 0o40707, 0o40777),
@@ -331,7 +331,7 @@ class RunIsolatedTest(unittest.TestCase):
 
     # Rerun the test and make sure the cache contains the right file afterwards.
     out, err, returncode = self._run(
-        self._cmd_args(cas_digest) + ['--', 'python', '-V'])
+        self._cmd_args(cas_digest) + ['--', 'python3', '-V'])
     self.assertEqual(0, returncode, (out, err, returncode))
     expected = {
         '.': (0o40700, 0o40700, 0o40700),

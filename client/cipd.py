@@ -479,7 +479,7 @@ def get_client(cache_dir,
           # 3 weeks.
           max_age_secs=21 * 24 * 60 * 60),
       trim=True)
-  if instance_id not in instance_cache:
+  if not instance_cache.touch(instance_id, local_caching.UNKNOWN_FILE_SIZE):
     logging.info('Fetching CIPD client %s:%s', package_name, instance_id)
     fetch_url = get_client_fetch_url(
         service_url, package_name, instance_id, timeout=timeoutfn())
