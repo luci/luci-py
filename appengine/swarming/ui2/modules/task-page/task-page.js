@@ -453,7 +453,7 @@ const casBlock = (title, host, ref) => {
     <td>${title}</td>
     <td>
       <a href=${casLink(host, ref)} target="_blank">
-        ${ref.digest.hash}/${ref.digest.size_bytes}
+        ${ref.digest.hash}/${ref.digest.sizeBytes}
       </a>
     </td>
   </tr>`;
