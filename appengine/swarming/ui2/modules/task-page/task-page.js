@@ -577,7 +577,7 @@ const missingCipdRowSet = (cipd) => html`
   <tr>
     <td>
       <b>Package: </b>
-      ${cipd.package_name}
+      ${cipd.packageName}
     </td>
   </tr>
   <tr>
@@ -599,12 +599,12 @@ const cipdBlock = (cipdInput, result) => {
   const actualPackages = (result.cipdPins && result.cipdPins.packages) || [];
   for (let i = 0; i < requestedPackages.length; i++) {
     const p = requestedPackages[i];
-    p.requested = `${p.package_name}:${p.version}`;
+    p.requested = `${p.packageName}:${p.version}`;
     // This makes the key assumption that the actual cipd array is in the same order
     // as the requested one. Otherwise, there's no easy way to match them up, because
     // of the wildcards (e.g. requested is foo/${platform} and actual is foo/linux-amd64)
     if (actualPackages[i]) {
-      p.actual = `${actualPackages[i].package_name}:${actualPackages[i].version}`;
+      p.actual = `${actualPackages[i].packageName}:${actualPackages[i].version}`;
     }
   }
   let packageName = "(available when task is run)";
@@ -1060,7 +1060,7 @@ const reproduceSection = (ele, currentSlice) => {
           # (if needed, use "\\\${platform}" as-is) cipd install
           "infra/tools/luci/cas/\\\${platform}" -root bar<br />
           # (if needed) ./bar/cas login<br />
-          ./bar/cas download -cas-instance ${casRef.cas_instance} -digest
+          ./bar/cas download -cas-instance ${casRef.casInstance} -digest
           ${casDigest} -dir foo
         </div>
       </div>
