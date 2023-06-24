@@ -4,8 +4,8 @@
 
 import * as human from "common-sk/modules/human";
 
-import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from "../util";
 import { EXCEPTIONAL_STATES, ONGOING_STATES } from "../task";
+import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from "../util";
 
 /** canRetry returns if the given task can be retried.
  *  See https://crbug.com/936530 for one case in which it should not.
@@ -119,8 +119,8 @@ export function humanState(result, currentSliceIdx) {
  */
 export function casLink(host, ref) {
   return (
-    `${host}/${ref.cas_instance}/blobs/` +
-    `${ref.digest.hash}/${ref.digest.size_bytes}/tree`
+    `${host}/${ref.casInstance}/blobs/` +
+    `${ref.digest.hash}/${ref.digest.sizeBytes}/tree`
   );
 }
 
