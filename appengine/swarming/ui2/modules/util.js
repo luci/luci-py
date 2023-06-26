@@ -300,21 +300,3 @@ export function pointFetchAtSwarmingDev() {
   window.fetch = fetchAboslute;
   return;
 }
-
-/**
- * Decodes b64 encoded string to utf8 encoded string.
- *
- * Source: https://developer.mozilla.org/en-US/docs/Glossary/Base64
- **/
-export function b64toUtf8(str) {
-  return decodeURIComponent(escape(window.atob(str)));
-}
-
-/**
- * Encodes utf-8 string to base64.
- *
- * Source: https://developer.mozilla.org/en-US/docs/Glossary/Base64
- **/
-export function utf8tob64(str) {
-  return window.btoa(unescape(encodeURIComponent(str)));
-}

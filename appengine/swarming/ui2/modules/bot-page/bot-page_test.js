@@ -17,7 +17,6 @@ describe("bot-page", function () {
     mockAppGETs,
     MATCHED,
     mockPrpc,
-    eventually,
   } = require("modules/test_util");
   const {
     botDataMap,
@@ -126,6 +125,14 @@ describe("bot-page", function () {
     const login = $$("oauth-login", ele);
     login._logIn();
     fetchMock.flush();
+  }
+
+  // Add an event listener which will fire after everything is done on the
+  // element. This one can be stacked on top of others.
+  function eventually(ele, callback) {
+    ele.addEventListener("busy-end", (e) => {
+      callback(ele);
+    });
   }
 
   // convenience function to save indentation and boilerplate.
