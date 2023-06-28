@@ -71,7 +71,7 @@ class TaskBackendAPIService(object):
       raise handlers_exceptions.BadRequestException(str(e))
     hostname = app_identity.get_default_version_hostname()
     task_id = task_pack.pack_run_result_key(
-        task_pack.result_summary_key_to_run_result_key(result_summary))
+        task_pack.result_summary_key_to_run_result_key(result_summary.key))
     task = task_pb2.Task(id=task_pb2.TaskID(id=task_id, target=request.target),
                          link="https://%s/task?id=%s&o=true&w=true" %
                          (hostname, task_id),
