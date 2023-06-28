@@ -153,12 +153,12 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                              _encode(request), self._headers)
     actual_resp = backend_pb2.RunTaskResponse()
     _decode(raw_resp.body, actual_resp)
-    expected_task_id = '4225526b80008610'
-    l='https://test-swarming.appspot.com/task?id=4225526b80008610&o=true&w=true'
+    expected_task_id = '4225526b80008611'
+    l = 'https://test-swarming.appspot.com/task?id=%s&o=true&w=true'
     expected_response = backend_pb2.RunTaskResponse(
         task=task_pb2.Task(id=task_pb2.TaskID(
             id=expected_task_id, target='swarming://test-swarming'),
-                           link=l,
+                           link=l % expected_task_id,
                            status=common_pb2.SCHEDULED,
                            update_id=1546398020))
     self.assertEqual(actual_resp, expected_response)
@@ -174,7 +174,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     expected_response = backend_pb2.RunTaskResponse(
         task=task_pb2.Task(id=task_pb2.TaskID(
             id=expected_task_id, target='swarming://test-swarming'),
-                           link=l,
+                           link=l % expected_task_id,
                            status=common_pb2.SCHEDULED,
                            update_id=1546398020))
     self.assertEqual(actual_resp, expected_response)
@@ -189,12 +189,11 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                              _encode(request), self._headers)
     actual_resp = backend_pb2.RunTaskResponse()
     _decode(raw_resp.body, actual_resp)
-    new_expected_task_id = '4225526b80008710'
-    l='https://test-swarming.appspot.com/task?id=4225526b80008710&o=true&w=true'
+    new_expected_task_id = '4225526b80008711'
     expected_response = backend_pb2.RunTaskResponse(
         task=task_pb2.Task(id=task_pb2.TaskID(
             id=new_expected_task_id, target='swarming://test-swarming'),
-                           link=l,
+                           link=l % new_expected_task_id,
                            status=common_pb2.SCHEDULED,
                            update_id=1546398020))
     self.assertEqual(actual_resp, expected_response)
