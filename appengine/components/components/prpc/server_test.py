@@ -462,14 +462,31 @@ class InterceptorsTestCase(test_case.TestCase):
       'Content-Type': encoding.Encoding.JSON[1],
       'Accept': encoding.Encoding.JSON[1],
     })
-    raw_resp = app.post(
-        '/prpc/test.Test/Echo',
-        json.dumps({'r': {'m': m}}),
-        headers,
-        expect_errors=True)
+    raw_resp = app.post('/prpc/test.Test/Echo',
+                        json.dumps({'r': {
+                            'm': m
+                        }}),
+                        headers,
+                        expect_errors=True)
     if return_raw_resp:
       return raw_resp
     return json.loads(raw_resp.body[4:])
+
+  def test_unknown_fields_allowed(self):
+    s = TestServicer()
+    app = self.make_test_server_app(s, [])
+    headers = {}
+    headers.update({
+        'Content-Type': encoding.Encoding.JSON[1],
+        'Accept': encoding.Encoding.JSON[1],
+    })
+    app.post('/prpc/test.Test/Echo',
+             json.dumps({
+                 'r': {
+                     'm': 123
+                 },
+                 'c': 'unknown'
+             }), headers)
 
   def test_no_interceptors(self):
     s = TestServicer()

@@ -39,7 +39,8 @@ def get_decoder(encoding):
   if encoding == Encoding.BINARY:
     return lambda string, proto: proto.ParseFromString(string)
   if encoding == Encoding.JSON:
-    return json_format.Parse
+    return lambda string, proto: json_format.Parse(
+        string, proto, ignore_unknown_fields=True)
   if encoding == Encoding.TEXT:
     return text_format.Merge
   assert False, 'Argument |encoding| was not a value of the Encoding enum.'
