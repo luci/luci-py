@@ -500,7 +500,7 @@ def _task_properties_from_rpc(props):
 
   caches = [_cache_entry_from_rpc(c) for c in props.caches]
   env = {i.key: i.value for i in props.env}
-  env_prefixes = {i.key: i.value for i in props.env_prefixes}
+  env_prefixes = {i.key: list(i.value) for i in props.env_prefixes}
 
   out = task_request.TaskProperties(
       caches=caches,

@@ -66,6 +66,10 @@ class TestMessageConversion(test_case.TestCase):
     props.io_timeout_secs = 1200
     props.outputs[:] = ['foo', 'path/to/foobar']
     props.command[:] = ['python', 'run_test.py']
+    props.env_prefixes.extend([
+        swarming_pb2.StringListPair(key=u'foo', value=[u'bar', u'baz']),
+    ])
+    props.env.extend([swarming_pb2.StringPair(key=u'foo', value=u'bar')])
 
     return ts
 
@@ -91,8 +95,8 @@ class TestMessageConversion(test_case.TestCase):
                 u'os': [u'Amiga'],
                 u'pool': [u'default']
             },
-            env={},
-            env_prefixes={},
+            env={u'foo': u'bar'},
+            env_prefixes={u'foo': [u'bar', u'baz']},
             execution_timeout_secs=3600,
             grace_period_secs=30,
             has_secret_bytes=False,
