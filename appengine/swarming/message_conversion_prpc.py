@@ -477,7 +477,7 @@ def _task_properties_from_rpc(props):
   cas_input_root = None
   if props.HasField('cas_input_root'):
     if (props.cas_input_root.HasField('digest')
-        and props.cas_input_root.HasField('cas_instance')):
+        and props.cas_input_root.cas_instance):
       digest = _digest_from_rpc(props.cas_input_root.digest)
       cas_input_root = task_request.CASReference(
           cas_instance=props.cas_input_root.cas_instance,
