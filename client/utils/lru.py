@@ -178,6 +178,11 @@ class LRUDict:
     for key, (val, _ts) in self._items.items():
       yield key, val
 
+  def items_with_ts(self):
+    """Iterator over items with timestamp included."""
+    for key, (_val, ts) in self._items.items():
+      yield key, ts
+
   def values(self):
     """Iterator over stored values in order."""
     for val, _ in self._items.values():

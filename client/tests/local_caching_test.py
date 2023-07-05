@@ -169,20 +169,20 @@ class CacheTestMixin:
     # It depends on the implementation.
     pass
 
-  def test_get_oldest(self):
+  def test_oldest_evictable_item(self):
     cache = self.get_cache(_get_policies())
-    self.assertEqual(None, cache.get_oldest())
+    self.assertEqual(None, cache.oldest_evictable_ts())
     ts = self._now
     self._add_one_item(cache, 10)
     self._now += 10
     self._add_one_item(cache, 20)
-    self.assertEqual(ts, cache.get_oldest())
+    self.assertEqual(ts, cache.oldest_evictable_ts())
 
   def test_remove_oldest(self):
     cache = self.get_cache(_get_policies())
     self._add_one_item(cache, 10)
     self._add_one_item(cache, 100)
-    self.assertTrue(cache.remove_oldest())
+    self.assertTrue(cache.remove_oldest_evictable_item())
     self._add_one_item(cache, 20)
     # added is not yet updated.
     self.assertEqual([10, 100, 20], cache.added)
@@ -222,11 +222,11 @@ class ContentAddressedCacheTestMixin(CacheTestMixin):
     self._now = 1001
     n2 = self._add_one_item(cache, 2)
     self.assertEqual([n1, n2], list(cache))
-    self.assertEqual(1000, cache.get_oldest())
+    self.assertEqual(1000, cache.oldest_evictable_ts())
     self._now = 1002
     cache.touch(n1, None)
     self.assertEqual([n2, n1], list(cache))
-    self.assertEqual(1001, cache.get_oldest())
+    self.assertEqual(1001, cache.oldest_evictable_ts())
 
   def test_getfileobj(self):
     cache = self.get_cache(_get_policies())
@@ -523,6 +523,9 @@ class NamedCacheTest(TestCase, CacheTestMixin):
   def get_cache(self, policies):
     return local_caching.NamedCache(self.cache_dir, policies)
 
+  def get_named_cache(self, policies, keep):
+    return local_caching.NamedCache(self.cache_dir, policies, keep=keep)
+
   def test_clean_cache(self):
     dest_dir = os.path.join(self.tempdir, 'dest')
     cache = self.get_cache(_get_policies())
@@ -692,7 +695,7 @@ class NamedCacheTest(TestCase, CacheTestMixin):
     caches_to_touch.append(self._add_one_item(cache, 2))
     self._add_one_item(cache, 3)
     cache.touch(*caches_to_touch)
-    cache.remove_oldest()
+    cache.remove_oldest_evictable_item()
     self.assertEqual(len(cache), 2)
     self.assertEqual(sorted(caches_to_touch), sorted(cache))
 
@@ -701,6 +704,53 @@ class NamedCacheTest(TestCase, CacheTestMixin):
     item_count = 12
     for i in range(item_count):
       self._add_one_item(cache, i+1)
+    self.assertEqual(len(cache), item_count)
+    self.assertEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], cache.trim())
+    self.assertEqual(len(cache), 2)
+    self.assertEqual(
+        ['11', '12'],
+        sorted(fs.listdir(os.path.join(cache.cache_dir, cache.NAMED_DIR))))
+
+  def test_trim_with_keep(self):
+    cache = self.get_named_cache(_get_policies(max_items=2), keep=['1', '2'])
+    item_count = 12
+    for i in range(item_count):
+      self._add_one_item(cache, i + 1)
+    self.assertEqual(len(cache), item_count)
+    self.assertEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12], cache.trim())
+    self.assertEqual(len(cache), 2)
+    self.assertEqual(
+        ['1', '2'],
+        sorted(fs.listdir(os.path.join(cache.cache_dir, cache.NAMED_DIR))))
+
+  def test_trim_ignores_policy_for_keep_items(self):
+    """
+    In this case, we specify 3 items which should not be evicted but
+    a max_items value of 2.
+
+    Under these circumstances, trim will remove items until only the 3 items
+    remain.
+    """
+    cache = self.get_named_cache(_get_policies(max_items=2),
+                                 keep=['1', '2', '3'])
+    item_count = 12
+    for i in range(item_count):
+      self._add_one_item(cache, i + 1)
+    self.assertEqual(len(cache), item_count)
+    self.assertEqual([4, 5, 6, 7, 8, 9, 10, 11, 12], cache.trim())
+    self.assertEqual(len(cache), 3)
+    self.assertEqual(
+        ['1', '2', '3'],
+        sorted(fs.listdir(os.path.join(cache.cache_dir, cache.NAMED_DIR))))
+
+  def test_trim_ignores_irrelevant_keep_items(self):
+    """
+    Ignore dont evict if none of its items are in the cache.
+    """
+    cache = self.get_named_cache(_get_policies(max_items=2), keep=['a', 'b'])
+    item_count = 12
+    for i in range(item_count):
+      self._add_one_item(cache, i + 1)
     self.assertEqual(len(cache), item_count)
     self.assertEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], cache.trim())
     self.assertEqual(len(cache), 2)
@@ -838,9 +888,9 @@ class FnTest(TestCase):
       s = old_remove_oldest(c)
       self._free_disk += s
       return s
-    old_remove_oldest = self.mock(
-        local_caching.MemoryContentAddressedCache, 'remove_oldest',
-        remove_oldest)
+
+    old_remove_oldest = self.mock(local_caching.MemoryContentAddressedCache,
+                                  'remove_oldest_evictable_item', remove_oldest)
 
   def _prepare_cache(self, cache):
     now = self._now
@@ -920,6 +970,21 @@ class FnTest(TestCase):
     # Cache verification.
     self._verify_named_cache(named_cache, short_names, range(8, 11))
     self._verify_isolated_cache(isolated_cache, range(8, 11))
+
+  def test_trim_named_cache_with_no_evictable_items(self):
+    """Give a named cache where every entry is on the keep list. Trim must
+    deal with this by trimming nothing."""
+    policies = _get_policies(min_free_space=1)
+    named_cache = local_caching.NamedCache(tempfile.mkdtemp(dir=self.tempdir,
+                                                            prefix='nc'),
+                                           policies,
+                                           keep=[str(x) for x in range(1, 12)])
+    self._prepare_named_cache(named_cache)
+    trimmed = local_caching.trim_caches([named_cache],
+                                        self.tempdir,
+                                        min_free_space=policies.min_free_space,
+                                        max_age_secs=policies.max_age_secs)
+    self.assertEqual([], trimmed)
 
   def _get_5_caches(self):
     # Add items from size 1 to 101 randomly into 5 caches.

@@ -1447,12 +1447,16 @@ def process_named_cache_options(parser, options, time_fn=None):
     # with a really old cache.
     policies = local_caching.CachePolicies(
         # 1TiB.
-        max_cache_size=1024*1024*1024*1024,
+        max_cache_size=1024 * 1024 * 1024 * 1024,
         min_free_space=options.min_free_space,
         max_items=50,
         max_age_secs=MAX_AGE_SECS)
+    keep = [name for name, _, _ in options.named_caches]
     root_dir = os.path.abspath(options.named_cache_root)
-    cache = local_caching.NamedCache(root_dir, policies, time_fn=time_fn)
+    cache = local_caching.NamedCache(root_dir,
+                                     policies,
+                                     time_fn=time_fn,
+                                     keep=keep)
     # Touch any named caches we're going to use to minimize thrashing
     # between tasks that request some (but not all) of the same named caches.
     cache.touch(*[name for name, _, _ in options.named_caches])
