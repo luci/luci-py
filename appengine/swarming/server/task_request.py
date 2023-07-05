@@ -97,6 +97,12 @@ TEMPLATE_CANARY_PREFER = TemplateApplyEnum('TEMPLATE_CANARY_PREFER')
 TEMPLATE_CANARY_NEVER = TemplateApplyEnum('TEMPLATE_CANARY_NEVER')
 TEMPLATE_SKIP = TemplateApplyEnum('TEMPLATE_SKIP')
 
+# Default value to wait for pings from bot.
+DEFAULT_BOT_PING_TOLERANCE = 1200
+
+# Default value for grace_period for task cancellation.
+DEFAULT_GRACE_PERIOD_SECS = 30
+
 # Maximum allowed timeout for I/O and hard timeouts.
 #
 # Seven days in seconds. Includes an additional 10s to account for small jitter.
@@ -833,8 +839,10 @@ class TaskProperties(ndb.Model):
   # Grace period is the time between signaling the task it timed out and killing
   # the process. During this time the process should clean up itself as quickly
   # as possible, potentially uploading partial results back.
-  grace_period_secs = ndb.IntegerProperty(
-      validator=_validate_grace, default=30, indexed=False)
+  grace_period_secs = ndb.IntegerProperty(validator=_validate_grace,
+                                          default=DEFAULT_GRACE_PERIOD_SECS,
+                                          required=True,
+                                          indexed=False)
 
   # Bot controlled timeout for new bytes from the subprocess. If a subprocess
   # doesn't output new data to stdout for .io_timeout_secs, consider the command
@@ -1228,7 +1236,10 @@ class TaskRequest(ndb.Model):
   # I/O bound, so they would require higher threshold specified by the
   # user request.
   bot_ping_tolerance_secs = ndb.IntegerProperty(
-      indexed=False, validator=_validate_ping_tolerance, default=1200)
+      indexed=False,
+      validator=_validate_ping_tolerance,
+      required=True,
+      default=DEFAULT_BOT_PING_TOLERANCE)
 
   # The ResultDB invocation's update token for the task run that was created for
   # this request.

@@ -604,7 +604,8 @@ def new_task_request_from_rpc(request):
       service_account=request.service_account,
       # prefer to unset this if protobuf default value is used.
       # ndb has its own default of 1200.
-      bot_ping_tolerance_secs=request.bot_ping_tolerance_secs or None,
+      bot_ping_tolerance_secs=request.bot_ping_tolerance_secs
+      or task_request.DEFAULT_BOT_PING_TOLERANCE,
       resultdb=_resultdb_from_rpc(request),
       has_build_token=False,
       scheduling_algorithm=None,

@@ -193,6 +193,13 @@ class TestMessageConversion(test_case.TestCase):
     props_proto = message_conversion_prpc._task_properties(props)
     self.assertFalse(props_proto.env)
 
+  def test_bot_ping_tolerance_is_filled_correctly(self):
+    ntr = self._create_default_new_task_request()
+    ntr.bot_ping_tolerance_secs = 0
+    actual, _, _ = message_conversion_prpc.new_task_request_from_rpc(ntr)
+    self.assertEqual(actual.bot_ping_tolerance_secs,
+                     task_request.DEFAULT_BOT_PING_TOLERANCE)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
