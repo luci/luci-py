@@ -118,7 +118,8 @@ class BotsService(object):
   @auth.require(acl.can_access, log_identity=True)
   def TerminateBot(self, request, _context):
     bot_id = request.bot_id
-    task_id = api_common.terminate_bot(bot_id)
+    reason = request.reason
+    task_id = api_common.terminate_bot(bot_id, reason)
     return swarming_pb2.TerminateResponse(task_id=task_id)
 
   @prpc_helpers.method

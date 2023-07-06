@@ -587,7 +587,7 @@ class BotServicePrpcTest(PrpcTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
 
     self.set_as_admin()
-    request = swarming_pb2.BotRequest(bot_id="bot1")
+    request = swarming_pb2.TerminateRequest(bot_id="bot1")
     resp = self.post_prpc('TerminateBot', request)
     actual = swarming_pb2.TerminateResponse()
     _decode(resp.body, actual)
@@ -600,12 +600,29 @@ class BotServicePrpcTest(PrpcTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
 
     self.set_as_privileged_user()
-    request = swarming_pb2.BotRequest(bot_id="bot1")
+    bot_id = "bot1"
+    reason = "hello\n\n\tworld"
+    request = swarming_pb2.TerminateRequest(bot_id=bot_id, reason=reason)
     resp = self.post_prpc('TerminateBot', request)
     actual = swarming_pb2.TerminateResponse()
     _decode(resp.body, actual)
     expected = swarming_pb2.TerminateResponse(task_id='5cee488008810')
     self.assertEqual(expected, actual)
+    request_key, _ = task_pack.get_request_and_result_keys(actual.task_id)
+    request = request_key.get()
+    self.assertEqual("Terminate bot1: hello world", request.name)
+
+  def test_terminate_with_extremely_long_reason(self):
+    self.set_as_bot()
+    self.bot_poll()
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+
+    self.set_as_privileged_user()
+    bot_id = "bot1"
+    reason = "hello world" * 10000
+    request = swarming_pb2.TerminateRequest(bot_id=bot_id, reason=reason)
+    resp = self.post_prpc('TerminateBot', request, expect_errors=True)
+    self.assertEqual(resp.status, '400 Bad Request')
 
   def test_terminate_user(self):
     self.set_as_bot()
@@ -615,7 +632,7 @@ class BotServicePrpcTest(PrpcTest):
     # without realm permission.
     self.set_as_user()
     self.mock_auth_db([])
-    request = swarming_pb2.BotRequest(bot_id="bot1")
+    request = swarming_pb2.TerminateRequest(bot_id="bot1")
     resp = self.post_prpc('TerminateBot', request, expect_errors=True)
     expected = cgi.escape(
         'user "user@example.com" does not have '

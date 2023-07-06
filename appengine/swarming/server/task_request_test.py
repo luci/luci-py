@@ -419,6 +419,13 @@ class TaskRequestApiTest(TestCase):
         u'some-bot', wait_for_capacity=True)
     self.assertTrue(request.task_slice(0).properties.is_terminate)
 
+  def test_create_termination_task_with_reason(self):
+    reason = "hello world"
+    request = task_request.create_termination_task(u'some-bot',
+                                                   wait_for_capacity=True,
+                                                   reason=reason)
+    self.assertEqual(request.name, "Terminate some-bot: hello world")
+
   def test_new_request_key(self):
     for _ in range(3):
       delta = utils.utcnow() - task_request._BEGINING_OF_THE_WORLD
