@@ -890,8 +890,8 @@ describe("task-page", function () {
       serveTask(0, "running task on try number 3");
       loggedInTaskPage((ele) => {
         fetchMock.resetHistory();
-        fetchMock.post("/_ah/api/swarming/v1/tasks/new", {
-          task_id: TEST_TASK_ID,
+        mockPrpc(fetchMock, "swarming.v2.Tasks", "NewTask", {
+          taskId: TEST_TASK_ID,
         });
 
         const retryBtn = $$(".id_buttons button.retry", ele);
@@ -928,8 +928,8 @@ describe("task-page", function () {
       serveTask(1, "Completed task with 2 slices");
       loggedInTaskPage((ele) => {
         fetchMock.resetHistory();
-        fetchMock.post("/_ah/api/swarming/v1/tasks/new", {
-          task_id: TEST_TASK_ID,
+        mockPrpc(fetchMock, "swarming.v2.Tasks", "NewTask", {
+          taskId: TEST_TASK_ID,
         });
 
         const debugBtn = $$(".id_buttons button.debug", ele);

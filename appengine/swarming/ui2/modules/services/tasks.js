@@ -68,4 +68,13 @@ export class TasksService extends PrpcService {
       include_performance_stats: includePerformanceStats,
     });
   }
+
+  /**
+   * Creates a new task with the given newTask specification.
+   *
+   * @param {object} NewTask specification described in https://crsrc.org/i/luci/appengine/swarming/proto/api_v2/swarming.proto;l=526?q=filepath:api_v2%2Fswarming.proto%20%22NewTaskRequest%22
+   **/
+  new(newTaskSpec) {
+    return this._call("NewTask", newTaskSpec);
+  }
 }
