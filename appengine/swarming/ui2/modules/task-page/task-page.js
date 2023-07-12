@@ -47,7 +47,9 @@ import {
   parseDuration,
   taskListLink,
   taskPageLink,
+  b64toUtf8,
 } from "../util";
+import { TasksService } from "../services/tasks";
 
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 
@@ -104,9 +106,9 @@ const serverLogBaseQuery =
   "\n";
 
 const serverLogTimeRange = (request, result) => {
-  if (!request.created_ts) return [null, null];
-  const timeStart = new Date(request.created_ts.getTime() - 60 * 1000);
-  const tsEnd = result.completed_ts || result.abandoned_ts;
+  if (!request.createdTs) return [null, null];
+  const timeStart = new Date(request.createdTs.getTime() - 60 * 1000);
+  const tsEnd = result.completedTs || result.abandonedTs;
   const timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60 * 1000) : new Date();
   return [timeStart, timeEnd];
 };
@@ -119,20 +121,20 @@ const serverTaskLogsURL = (project, taskId, request, result) => {
 };
 
 const serverBotLogsURL = (project, request, result) => {
-  const query = serverLogBaseQuery + result.bot_id;
+  const query = serverLogBaseQuery + result.botId;
   const [timeStart, timeEnd] = serverLogTimeRange(request, result);
   return cloudLoggingURL(project, query, timeStart, timeEnd);
 };
 
 const botLogsURL = (botProjectID, botZone, request, result) => {
   // limit logs that we care
-  const hostName = extractPrimaryHostname(result.bot_id);
+  const hostName = extractPrimaryHostname(result.botId);
   const query = `labels."compute.googleapis.com/resource_name":"${hostName}"`;
   let timeStart;
   let timeEnd;
-  if (result.started_ts) {
-    timeStart = new Date(result.started_ts.getTime() - 60 * 1000);
-    const tsEnd = result.completed_ts || result.abandoned_ts;
+  if (result.startedTs) {
+    timeStart = new Date(result.startedTs.getTime() - 60 * 1000);
+    const tsEnd = result.completedTs || result.abandonedTs;
     timeEnd = tsEnd ? new Date(tsEnd.getTime() + 60 * 1000) : new Date();
   }
   return cloudLoggingURL(botProjectID, query, timeStart, timeEnd);
@@ -169,12 +171,12 @@ const slicePicker = (ele) => {
   if (!ele._taskId || ele._notFound) {
     return "";
   }
-  if (!(ele._request.task_slices && ele._request.task_slices.length > 1)) {
+  if (!(ele._request.taskSlices && ele._request.taskSlices.length > 1)) {
     return "";
   }
 
   return html` <div class="slice-picker">
-    ${ele._request.task_slices.map((_, idx) => sliceTab(ele, idx))}
+    ${ele._request.taskSlices.map((_, idx) => sliceTab(ele, idx))}
   </div>`;
 };
 
@@ -208,9 +210,9 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
         ${casBlock(
           "CAS Inputs",
           ele._app._server_details.cas_viewer_server,
-          currentSlice.properties.cas_input_root || {}
+          currentSlice.properties.casInputRoot || {}
         )}
-        <tr ?hidden=${!result.resultdb_info}>
+        <tr ?hidden=${!result.resultdbInfo}>
           <td>ResultDB</td>
           <td>Enabled</td>
         </tr>
@@ -236,25 +238,25 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
         ${executionBlock(
           currentSlice.properties,
           currentSlice.properties.env || [],
-          currentSlice.properties.env_prefixes || []
+          currentSlice.properties.envPrefixes || []
         )}
         ${arrayInTable(request.tags, "Tags", (tag) => tag)}
         <tr>
           <td>Execution timeout</td>
           <td>
-            ${humanDuration(currentSlice.properties.execution_timeout_secs)}
+            ${humanDuration(currentSlice.properties.executionTimeoutSecs)}
           </td>
         </tr>
         <tr>
           <td>I/O timeout</td>
-          <td>${humanDuration(currentSlice.properties.io_timeout_secs)}</td>
+          <td>${humanDuration(currentSlice.properties.ioTimeoutSecs)}</td>
         </tr>
         <tr>
           <td>Grace period</td>
-          <td>${humanDuration(currentSlice.properties.grace_period_secs)}</td>
+          <td>${humanDuration(currentSlice.properties.gracePeriodSecs)}</td>
         </tr>
 
-        ${cipdBlock(currentSlice.properties.cipd_input, result)}
+        ${cipdBlock(currentSlice.properties.cipdInput, result)}
         ${arrayInTable(
           currentSlice.properties.caches,
           "Named Caches",
@@ -279,17 +281,17 @@ const stateLoadBlock = (ele, request, result) => html`
     ele._runningCounts[ele._currentSliceIdx],
     ele._currentSlice.properties || {}
   )}
-  <tr ?hidden=${!result.deduped_from} class="highlighted">
+  <tr ?hidden=${!result.dedupedFrom} class="highlighted">
     <td><b>Deduped From</b></td>
     <td>
-      <a href=${taskPageLink(result.deduped_from)} target="_blank">
-        ${result.deduped_from}
+      <a href=${taskPageLink(result.dedupedFrom)} target="_blank">
+        ${result.dedupedFrom}
       </a>
     </td>
   </tr>
-  <tr ?hidden=${!result.deduped_from}>
+  <tr ?hidden=${!result.dedupedFrom}>
     <td>Deduped On</td>
-    <td title=${request.created_ts}>${request.human_created_ts}</td>
+    <td title=${request.createdTs}>${request.human_createdTs}</td>
   </tr>
 `;
 
@@ -358,7 +360,7 @@ const requestBlock = (request, result, currentSlice) => html`
   </tr>
   <tr>
     <td>Wait for Capacity</td>
-    <td>${!!currentSlice.wait_for_capacity}</td>
+    <td>${!!currentSlice.waitForCapacity}</td>
   </tr>
   <tr>
     <td>Slice Scheduling Deadline</td>
@@ -372,15 +374,15 @@ const requestBlock = (request, result, currentSlice) => html`
     <td>Authenticated</td>
     <td>${request.authenticated}</td>
   </tr>
-  <tr ?hidden=${!request.service_account}>
+  <tr ?hidden=${!request.serviceAccount}>
     <td>Service Account</td>
-    <td>${request.service_account}</td>
+    <td>${request.serviceAccount}</td>
   </tr>
   <tr ?hidden=${!request.realm}>
     <td>Realm</td>
     <td>${request.realm}</td>
   </tr>
-  <tr ?hidden=${!currentSlice.properties.secret_bytes}>
+  <tr ?hidden=${!currentSlice.properties.secretBytes}>
     <td>Has Secret Bytes</td>
     <td
       title="The secret bytes are present on the machine, but not in the UI/API"
@@ -388,11 +390,11 @@ const requestBlock = (request, result, currentSlice) => html`
       true
     </td>
   </tr>
-  <tr ?hidden=${!request.parent_task_id}>
+  <tr ?hidden=${!request.parentTaskId}>
     <td>Parent Task</td>
     <td>
-      <a href=${taskPageLink(request.parent_task_id)}>
-        ${request.parent_task_id}
+      <a href=${taskPageLink(request.parentTaskId)}>
+        ${request.parentTaskId}
       </a>
     </td>
   </tr>
@@ -401,10 +403,10 @@ const requestBlock = (request, result, currentSlice) => html`
     <td>
       <a
         href=${taskListLink(
-          [{ key: "parent_task_id-tag", value: result.run_id }],
+          [{ key: "parent_task_id-tag", value: result.runId }],
           [],
-          result.started_ts,
-          result.completed_ts
+          result.startedTs,
+          result.completedTs
         )}
       >
         Task List
@@ -475,14 +477,14 @@ const missingCasRowSet = (host, input) => html`
   <tr>
     <td>
       <b>Instance: </b>
-      ${input.cas_instance}
+      ${input.casInstance}
     </td>
   </tr>
   <tr>
     <td>
       <b>Digest: </b>
       <a href=${casLink(host, input)} target='_blank'>
-        ${input.digest.hash}/${input.digest.size_bytes}
+        ${input.digest.hash}/${input.digest.sizeBytes}
       </a>
     </td>
   </tr>
@@ -535,7 +537,7 @@ const executionBlock = (properties, env, envPrefixes) => html`
   </tr>
   <tr>
     <td>Relative Cwd</td>
-    <td class="code break-all">${properties.relative_cwd || "--"}</td>
+    <td class="code break-all">${properties.relativeCwd || "--"}</td>
   </tr>
   ${arrayInTable(env, "Environment Vars", (env) => env.key + "=" + env.value)}
   ${arrayInTable(
@@ -575,7 +577,7 @@ const missingCipdRowSet = (cipd) => html`
   <tr>
     <td>
       <b>Package: </b>
-      ${cipd.package_name}
+      ${cipd.packageName}
     </td>
   </tr>
   <tr>
@@ -594,20 +596,20 @@ const cipdBlock = (cipdInput, result) => {
     </tr>`;
   }
   const requestedPackages = cipdInput.packages || [];
-  const actualPackages = (result.cipd_pins && result.cipd_pins.packages) || [];
+  const actualPackages = (result.cipdPins && result.cipdPins.packages) || [];
   for (let i = 0; i < requestedPackages.length; i++) {
     const p = requestedPackages[i];
-    p.requested = `${p.package_name}:${p.version}`;
+    p.requested = `${p.packageName}:${p.version}`;
     // This makes the key assumption that the actual cipd array is in the same order
     // as the requested one. Otherwise, there's no easy way to match them up, because
     // of the wildcards (e.g. requested is foo/${platform} and actual is foo/linux-amd64)
     if (actualPackages[i]) {
-      p.actual = `${actualPackages[i].package_name}:${actualPackages[i].version}`;
+      p.actual = `${actualPackages[i].packageName}:${actualPackages[i].version}`;
     }
   }
   let packageName = "(available when task is run)";
-  if (result.cipd_pins && result.cipd_pins.client_package) {
-    packageName = result.cipd_pins.client_package.package_name;
+  if (result.cipdPins && result.cipdPins.clientPackage) {
+    packageName = result.cipdPins.clientPackage.packageName;
   }
   // We always need to at least double the number of packages because we
   // show the path and then the requested.  If the actual package info
@@ -630,7 +632,7 @@ const cipdBlock = (cipdInput, result) => {
     <tr>
       <td>CIPD version</td>
       <td class="break-all">
-        ${cipdInput.client_package && cipdInput.client_package.version}
+        ${cipdInput.clientPackage && cipdInput.clientPackage.version}
       </td>
     </tr>
     <tr>
@@ -676,7 +678,7 @@ const taskTimingSection = (ele, request, result) => {
     // when juxtaposed with the data from this task.
     return "";
   }
-  const performanceStats = result.performance_stats || {};
+  const performanceStats = result.performanceStats || {};
   return html`
     <div class="title">Task Timing Information</div>
     <div class="horizontal layout wrap">
@@ -684,27 +686,27 @@ const taskTimingSection = (ele, request, result) => {
         <tbody>
           <tr>
             <td>Created</td>
-            <td title=${request.created_ts}>${request.human_created_ts}</td>
+            <td title=${request.createdTs}>${request.human_createdTs}</td>
           </tr>
           <tr ?hidden=${!wasPickedUp(result)}>
             <td>Started</td>
-            <td title=${result.started_ts}>${result.human_started_ts}</td>
+            <td title=${result.startedTs}>${result.human_startedTs}</td>
           </tr>
           <tr>
             <td>Scheduling Deadline</td>
             <td>${taskSchedulingDeadline(request)}</td>
           </tr>
-          <tr ?hidden=${!result.completed_ts}>
+          <tr ?hidden=${!result.completedTs}>
             <td>Completed</td>
-            <td title=${result.completed_ts}>${result.human_completed_ts}</td>
+            <td title=${result.completedTs}>${result.human_completedTs}</td>
           </tr>
-          <tr ?hidden=${!result.abandoned_ts}>
+          <tr ?hidden=${!result.abandonedTs}>
             <td>Abandoned</td>
-            <td title=${result.abandoned_ts}>${result.human_abandoned_ts}</td>
+            <td title=${result.abandonedTs}>${result.human_abandonedTs}</td>
           </tr>
           <tr>
             <td>Last updated</td>
-            <td title=${result.modified_ts}>${result.human_modified_ts}</td>
+            <td title=${result.modifiedTs}>${result.human_modifiedTs}</td>
           </tr>
           <tr>
             <td>Pending Time</td>
@@ -713,7 +715,7 @@ const taskTimingSection = (ele, request, result) => {
           <tr>
             <td>Total Overhead</td>
             <td class="overhead">
-              ${humanDuration(performanceStats.bot_overhead)}
+              ${humanDuration(performanceStats.botOverhead)}
             </td>
           </tr>
           <tr>
@@ -749,15 +751,15 @@ const logsSection = (ele, request, result) => {
   let botLogsCloudProject = null;
   let botProjectID = null;
   let botZone = null;
-  if (result && result.bot_dimensions) {
-    for (const dim of result.bot_dimensions) {
+  if (result && result.botDimensions) {
+    for (const dim of result.botDimensions) {
       if (dim.key == "gcp") botProjectID = dim.value[0];
       if (dim.key == "zone") {
         botZone = dim.value.reduce((a, b) => (a.length > b.length ? a : b));
       }
     }
     // Use result.bot_logs_cloud_project to fetch logs when it's not null
-    botLogsCloudProject = result.bot_logs_cloud_project;
+    botLogsCloudProject = result.botLogsCloudProject;
     if (!!botLogsCloudProject) {
       botProjectID = botLogsCloudProject;
     }
@@ -790,11 +792,11 @@ const logsSection = (ele, request, result) => {
               <a
                 href=${serverBotLogsURL(ele._project_id, request, result)}
                 target="_blank"
-                ?hidden=${!result.bot_id}
+                ?hidden=${!result.botId}
               >
                 View on Cloud Console
               </a>
-              <p ?hidden=${result.bot_id}>--</p>
+              <p ?hidden=${result.botId}>--</p>
             </td>
           </tr>
           <tr>
@@ -836,7 +838,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
 
       <p class="deduplicated">
         This task was deduplicated from task
-        <a href=${taskPageLink(result.deduped_from)}>${result.deduped_from}</a>.
+        <a href=${taskPageLink(result.dedupedFrom)}>${result.dedupedFrom}</a>.
         For more information on deduplication, see
         <a
           href="https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/swarming/doc/Detailed-Design.md#task-deduplication"
@@ -851,7 +853,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   }
   // Pre-process the dimensions so we can highlight those that were matched
   // against, with a bold on the subset of dimensions that matched.
-  const botDimensions = result.bot_dimensions || [];
+  const botDimensions = result.botDimensions || [];
   const usedDimensions = currentSlice.properties.dimensions || [];
 
   for (const dim of botDimensions) {
@@ -879,11 +881,11 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
 <table class=task-execution>
   <tr>
     <td>Bot assigned to task</td>
-    <td><a href=${botPageLink(result.bot_id)}>${result.bot_id}</td>
+    <td><a href=${botPageLink(result.botId)}>${result.botId}</td>
   </tr>
   <tr>
     <td>Bot idle since</td>
-    <td>${result.human_bot_idle_since_ts}</td>
+    <td>${result.human_botIdleSinceTs}</td>
   </tr>
   <tr>
     <td rowspan=${botDimensions.length + 1}>
@@ -893,7 +895,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   ${botDimensions.map((dim) => botDimensionRow(dim, usedDimensions))}
   <tr>
     <td>Exit Code</td>
-    <td>${result.exit_code}</td>
+    <td>${result.exitCode}</td>
   </tr>
   <tr>
     <td>Failure</td>
@@ -901,8 +903,8 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   </tr>
   <tr>
     <td>Internal Failure</td>
-    <td class=${result.internal_failure ? "exception" : ""}>${
-    result.internal_failure
+    <td class=${result.internalFailure ? "exception" : ""}>${
+    result.internalFailure
   }</td>
   </tr>
   <tr>
@@ -912,21 +914,21 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   ${missingCasBlock(
     "Missing CAS Input(s)",
     ele._app._server_details.cas_viewer_server,
-    result.missing_cas
+    result.missingCas
   )}
-  ${missingCipdBlock("Missing CIPD Package(s)", result.missing_cipd)}
+  ${missingCipdBlock("Missing CIPD Package(s)", result.missingCipd)}
   ${casBlock(
     "CAS Outputs",
     ele._app._server_details.cas_viewer_server,
-    result.cas_output_root || {}
+    result.casOutputRoot || {}
   )}
   <tr>
     <td>Bot Version</td>
-    <td>${result.bot_version}</td>
+    <td>${result.botVersion}</td>
   </tr>
   <tr>
     <td>Server Version</td>
-    <td>${result.server_versions}</td>
+    <td>${result.serverVersions}</td>
   </tr>
 </table>`;
 };
@@ -956,82 +958,84 @@ const performanceStatsSection = (ele, performanceStats) => {
         >
           Total Overhead
         </td>
-        <td>${humanDuration(performanceStats.bot_overhead)}</td>
+        <td>${humanDuration(performanceStats.botOverhead || 0)}</td>
       </tr>
       <tr>
         <td>Cache trimming before the task</td>
-        <td>${humanDuration(performanceStats.cache_trim.duration)}</td>
+        <td>${humanDuration(performanceStats.cacheTrim.duration || 0)}</td>
       </tr>
       <tr>
         <td>Installing CIPD packages</td>
         <td>
-          ${humanDuration(performanceStats.package_installation.duration)}
+          ${humanDuration(performanceStats.packageInstallation.duration || 0)}
         </td>
       </tr>
       <tr>
         <td>Installing Named Caches</td>
         <td>
-          ${humanDuration(performanceStats.named_caches_install.duration)}
+          ${humanDuration(performanceStats.namedCachesInstall.duration || 0)}
         </td>
       </tr>
       <tr>
         <td>Uninstalling Named Caches</td>
         <td>
-          ${humanDuration(performanceStats.named_caches_uninstall.duration)}
+          ${humanDuration(performanceStats.namedCachesUninstall.duration || 0)}
         </td>
       </tr>
       <tr>
         <td>Downloading Inputs</td>
-        <td>${humanDuration(performanceStats.isolated_download.duration)}</td>
+        <td>
+          ${humanDuration(performanceStats.isolatedDownload.duration || 0)}
+        </td>
       </tr>
       <tr>
         <td>Uploading Outputs</td>
-        <td>${humanDuration(performanceStats.isolated_upload.duration)}</td>
+        <td>${humanDuration(performanceStats.isolatedUpload.duration || 0)}</td>
       </tr>
       <tr>
         <td>Cleanup directories</td>
-        <td>${humanDuration(performanceStats.cleanup.duration)}</td>
+        <td>${humanDuration(performanceStats.cleanup.duration || 0)}</td>
       </tr>
       <tr>
         <td>Initial bot cache</td>
         <td>
-          ${performanceStats.isolated_download.initial_number_items || 0} items;
-          ${human.bytes(performanceStats.isolated_download.initial_size || 0)}
+          ${performanceStats.isolatedDownload.initialNumberItems || 0} items;
+          ${human.bytes(performanceStats.isolatedDownload.initialSize || 0)}
         </td>
       </tr>
       <tr>
         <td>Inputs (downloaded)</td>
         <td>
-          ${performanceStats.isolated_download.num_items_cold || 0} items;
+          ${performanceStats.isolatedDownload.numItemsCold || 0} items;
           ${human.bytes(
-            performanceStats.isolated_download.total_bytes_items_cold || 0
+            performanceStats.isolatedDownload.totalBytesItemsCold || 0
           )}
         </td>
       </tr>
       <tr>
         <td>Inputs (cached)</td>
         <td>
-          ${performanceStats.isolated_download.num_items_hot || 0} items;
+          ${performanceStats.isolatedDownload.numItemsHot || 0} items;
           ${human.bytes(
-            performanceStats.isolated_download.total_bytes_items_hot || 0
+            performanceStats.isolatedDownload.totalBytesItemsHot || 0
           )}
         </td>
       </tr>
       <tr>
         <td>Outputs (uploaded)</td>
         <td>
-          ${performanceStats.isolated_upload.num_items_cold || 0} items;
+          ${performanceStats.isolatedUpload.numItemsCold || 0} items;
           ${human.bytes(
-            performanceStats.isolated_upload.total_bytes_items_cold || 0
+            performanceStats.isolatedUpload.totalBytesItemsCold || 0
           )}
         </td>
       </tr>
       <tr>
         <td>Outputs (cached)</td>
         <td>
-          ${performanceStats.isolated_upload.num_items_hot || 0} items;
+          ${performanceStats.isolatedUpload.numItemsHot || 0} items;
           ${human.bytes(
-            performanceStats.isolated_upload.total_bytes_items_hot || 0
+            performanceStats.isolatedUpload.totalBytesItemsHot || 0
           )}
         </td>
       </tr>
@@ -1043,9 +1047,9 @@ const reproduceSection = (ele, currentSlice) => {
     return "";
   }
   const casRef =
-    (currentSlice.properties && currentSlice.properties.cas_input_root) || {};
+    (currentSlice.properties && currentSlice.properties.casInputRoot) || {};
   const casDigest =
-    casRef.digest && `${casRef.digest.hash}/${casRef.digest.size_bytes}`;
+    casRef.digest && `${casRef.digest.hash}/${casRef.digest.sizeBytes}`;
   const hostUrl = window.location.hostname;
   return html`
     <div class="title">Reproducing the task locally</div>
@@ -1056,7 +1060,7 @@ const reproduceSection = (ele, currentSlice) => {
           # (if needed, use "\\\${platform}" as-is) cipd install
           "infra/tools/luci/cas/\\\${platform}" -root bar<br />
           # (if needed) ./bar/cas login<br />
-          ./bar/cas download -cas-instance ${casRef.cas_instance} -digest
+          ./bar/cas download -cas-instance ${casRef.casInstance} -digest
           ${casDigest} -dir foo
         </div>
       </div>
@@ -1196,7 +1200,7 @@ const template = (ele) => html`
 
     ${taskExecutionSection(ele, ele._request, ele._result, ele._currentSlice)}
 
-    ${performanceStatsSection(ele, ele._result.performance_stats)}
+    ${performanceStatsSection(ele, ele._result.performanceStats)}
 
     ${reproduceSection(ele, ele._currentSlice)}
     </div>
@@ -1326,6 +1330,10 @@ window.customElements.define(
       this.removeEventListener("log-in", this._loginEvent);
     }
 
+    _createTasksService() {
+      return new TasksService(this.authHeader, this._fetchController.signal);
+    }
+
     _cancelTask() {
       const body = {};
       if (this._result.state === "RUNNING") {
@@ -1364,12 +1372,12 @@ window.customElements.define(
         newDimensions.push(
           {
             key: "id",
-            value: firstDimension(this._result.bot_dimensions, "id"),
+            value: firstDimension(this._result.botDimensions, "id"),
           },
           {
             // pool is always a required dimension
             key: "pool",
-            value: firstDimension(this._result.bot_dimensions, "pool"),
+            value: firstDimension(this._result.botDimensions, "pool"),
           }
         );
       } else {
@@ -1401,13 +1409,13 @@ window.customElements.define(
 
     _debugTask() {
       const newTask = {
-        expiration_secs: this._request.expiration_secs,
+        expiration_secs: this._request.expirationSecs,
         name: `leased to ${this.profile.email} for debugging`,
         pool_task_template: 3, // SKIP
         priority: 20,
         properties: this._currentSlice.properties,
         realm: this._request.realm,
-        service_account: this._request.service_account,
+        service_account: this._request.serviceAccount,
         tags: ["debug_task:1"],
         user: this.profile.email,
       };
@@ -1472,11 +1480,12 @@ time.sleep(${leaseDuration})`,
     _fetchTaskInfo(extra) {
       this.app.addBusyTasks(2);
       let currIdx = -1;
-      fetch(`/_ah/api/swarming/v1/task/${this._taskId}/request`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
+      const taskService = this._createTasksService();
+      taskService
+        .request(this._taskId)
+        .then((response) => {
           this._notFound = false;
-          this._request = parseRequest(json);
+          this._request = parseRequest(response);
           // Note, this triggers more fetch requests, which also adds to
           // app's busy task counts.
           this._fetchCounts(this._request, extra);
@@ -1498,18 +1507,16 @@ time.sleep(${leaseDuration})`,
           this.fetchError(e, "task/request");
         });
       this._extraTries = [];
-      fetch(
-        `/_ah/api/swarming/v1/task/${this._taskId}/result?include_performance_stats=true`,
-        extra
-      )
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._result = parseResult(json);
-          currIdx = +this._result.current_task_slice;
+
+      taskService
+        .result(this._taskId, true)
+        .then((response) => {
+          this._result = parseResult(response);
+          currIdx = +this._result.currentTaskSlice;
           this._setSlice(currIdx); // calls render
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, "task/result"));
+        .catch((e) => this.prpcError(e, "task/result"));
     }
 
     _fetchStdOut(extra) {
@@ -1520,17 +1527,14 @@ time.sleep(${leaseDuration})`,
       // unicode characters apart.
       let previousState = "";
       const fetchNextStdout = () => {
-        fetch(
-          `/_ah/api/swarming/v1/task/${this._taskId}/stdout?offset=${this._stdoutOffset}&` +
-            `length=${STDOUT_REQUEST_SIZE}`,
-          extra
-        )
-          .then(jsonOrThrow)
-          .then((json) => {
+        const tasksService = this._createTasksService();
+        tasksService
+          .stdout(this._taskId, this._stdoutOffset, STDOUT_REQUEST_SIZE)
+          .then((resp) => {
             if (!previousState) {
-              previousState = json.state;
+              previousState = resp.state;
             }
-            const s = json.output || "";
+            const s = b64toUtf8(resp.output) || "";
             // s.length returns number of UTF-8 code points
             // `offset` and `length` are in bytes
             const sLengthBytes = new Blob([s]).size;
@@ -1567,11 +1571,11 @@ time.sleep(${leaseDuration})`,
 
             this.render();
 
-            if (json.state !== previousState) {
+            if (resp.state !== previousState) {
               this._fetchTaskInfo(extra);
             }
 
-            if (json.state === "RUNNING" || json.state === "PENDING") {
+            if (resp.state === "RUNNING" || resp.state === "PENDING") {
               if (sLengthBytes < STDOUT_REQUEST_SIZE) {
                 // wait for more input because no new input from last fetch
                 setTimeout(fetchNextStdout, this._logFetchPeriod);
@@ -1588,15 +1592,15 @@ time.sleep(${leaseDuration})`,
                 fetchNextStdout();
               }
             }
-            previousState = json.state;
+            previousState = resp.state;
           })
-          .catch((e) => this.fetchError(e, "task/request"));
+          .catch((e) => this.prpcError(e, "task/request"));
       };
       fetchNextStdout();
     }
 
     _fetchCounts(request, extra) {
-      const numSlices = request.task_slices.length;
+      const numSlices = request.taskSlices.length;
       this.app.addBusyTasks(numSlices * 3);
       // reset current viewings
       this._capacityCounts = [];
@@ -1606,7 +1610,7 @@ time.sleep(${leaseDuration})`,
         const bParams = {
           dimensions: [],
         };
-        for (const dim of request.task_slices[i].properties.dimensions) {
+        for (const dim of request.taskSlices[i].properties.dimensions) {
           bParams.dimensions.push(`${dim.key}:${dim.value}`);
         }
         fetch(
@@ -1744,15 +1748,15 @@ time.sleep(${leaseDuration})`,
 
     _retryTask() {
       const newTask = {
-        expiration_secs: this._request.expiration_secs,
+        expiration_secs: this._request.expirationSecs,
         name: this._request.name + " (retry)",
         pool_task_template: 3, // SKIP
         priority: this._request.priority,
         properties: this._currentSlice.properties,
-        service_account: this._request.service_account,
+        service_account: this._request.serviceAccount,
         tags: this._request.tags,
         user: this.profile.email,
-        resultdb: { enable: Boolean(this._result.resultdb_info) },
+        resultdb: { enable: Boolean(this._result.resultdbInfo) },
         realm: this._request.realm,
       };
       newTask.tags.push("retry:1");
@@ -1769,10 +1773,10 @@ time.sleep(${leaseDuration})`,
 
     _setSlice(idx) {
       this._currentSliceIdx = idx;
-      if (!this._request.task_slices) {
+      if (!this._request.taskSlices) {
         return;
       }
-      this._currentSlice = this._request.task_slices[idx];
+      this._currentSlice = this._request.taskSlices[idx];
       this.render();
     }
 

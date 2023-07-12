@@ -4,6 +4,7 @@
 
 import "modules/task-page";
 import fetchMock from "fetch-mock";
+import { utf8tob64 } from "../util";
 
 // Tip from https://stackoverflow.com/a/37348710
 // for catching "full page reload" errors.
@@ -28,6 +29,7 @@ describe("task-page", function () {
     expectNoUnmatchedCalls,
     mockAppGETs,
     MATCHED,
+    mockPrpc,
   } = require("modules/test_util");
   const {
     taskOutput,
@@ -37,6 +39,11 @@ describe("task-page", function () {
   const { richLogsLink } = require("modules/task-page/task-page-helpers");
 
   const TEST_TASK_ID = "test0b3c0fac7810";
+  const checkOffset = (offset, length) => {
+    return function (body) {
+      return body.offset === offset && body.length == length;
+    };
+  };
 
   beforeEach(function () {
     jasmine.addMatchers(customMatchers);
@@ -137,23 +144,39 @@ describe("task-page", function () {
     const result = taskResults[idx];
     expect(result.name).toEqual(msg);
 
-    fetchMock.get(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`, request);
-    fetchMock.get(
-      `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result?include_performance_stats=true`,
-      result
+    mockPrpc(
+      fetchMock,
+      "swarming.v2.Tasks",
+      "GetRequest",
+      request,
+      (body) => body.task_id === TEST_TASK_ID
+    );
+    mockPrpc(
+      fetchMock,
+      "swarming.v2.Tasks",
+      "GetResult",
+      result,
+      (body) => body.task_id === TEST_TASK_ID && body.include_performance_stats
     );
     if (idx === 0) {
       // The index 0 data has multiple tries that it requests data for (no perf stats),
       // so pass in some data for that.
-      fetchMock.get("glob:/_ah/api/swarming/v1/task/*/result", taskResults[1]);
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Tasks",
+        "GetResult",
+        taskResults[1],
+        (body) =>
+          body.task_id === TEST_TASK_ID && body.include_performance_stats
+      );
     }
     if (!nostdout) {
-      fetchMock.get(
-        `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`,
-        {
-          state: "COMPLETED",
-          output: taskOutput,
-        }
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Tasks",
+        "GetStdout",
+        { state: "COMPLETED", output: utf8tob64(taskOutput) },
+        checkOffset(0, 102400)
       );
     }
 
@@ -222,6 +245,24 @@ describe("task-page", function () {
           { overwriteRoutes: true }
         );
         fetchMock.get("glob:/_ah/api/swarming/v1/task/*", 403, {
+          overwriteRoutes: true,
+        });
+
+        const resp = new Response(`)]}'"403 Unauthorized"`, {
+          status: 403,
+          headers: {
+            "x-prpc-grpc-code": "7",
+            "content-type": "application/json",
+          },
+        });
+        fetchMock.post(
+          "path:/prpc/swarming.v2.Tasks/GetRequest",
+          resp.clone(),
+          {
+            overwriteRoutes: true,
+          }
+        );
+        fetchMock.post("path:/prpc/swarming.v2.Tasks/GetStdout", resp.clone(), {
           overwriteRoutes: true,
         });
       }
@@ -774,15 +815,12 @@ describe("task-page", function () {
       });
     });
 
-    function checkAuthorizationAndNoPosts(calls) {
+    function checkAuthorization(calls) {
       // check authorization headers are set
       calls.forEach((c) => {
         expect(c[1].headers).toBeDefined();
         expect(c[1].headers.authorization).toContain("Bearer ");
       });
-
-      calls = fetchMock.calls(MATCHED, "POST");
-      expect(calls).toHaveSize(0, "no POSTs on task-page");
 
       expectNoUnmatchedCalls(fetchMock);
     }
@@ -790,26 +828,21 @@ describe("task-page", function () {
     it("makes auth'd API calls when a logged in user views landing page", function (done) {
       serveTask(1, "Completed task with 2 slices");
       loggedInTaskPage((ele) => {
-        const calls = fetchMock.calls(MATCHED, "GET");
-        expect(calls).toHaveSize(
-          2 + 4 + 6,
-          "2 GETs from swarming-app, 4 from task-page, " + "3 counts * 2 slices"
+        const protorpc = fetchMock.calls(MATCHED, "GET");
+        expect(protorpc).toHaveSize(
+          2 + 1 + 6,
+          "2 GETs from swarming-app, 1 from task-page, " + "3 counts * 2 slices"
         );
+
+        const prpc = fetchMock.calls(MATCHED, "POST");
+        // There is exactly 2 prpc calls
+        expect(prpc).toHaveSize(3);
+
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        const gets = calls.map((c) => c[0]);
+        const gets = protorpc.map((c) => c[0]);
 
-        expect(gets).toContain(
-          `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`
-        );
-        expect(gets).toContain(
-          `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result` +
-            "?include_performance_stats=true"
-        );
-        expect(gets).toContain(
-          `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`
-        );
         // spot check one of the counts
         expect(gets).toContain(
           "/_ah/api/swarming/v1/bots/count?" +
@@ -820,7 +853,7 @@ describe("task-page", function () {
             "b403fb5526a59936253_v2"
         );
 
-        checkAuthorizationAndNoPosts(calls);
+        checkAuthorization(protorpc.concat(prpc));
         done();
       });
     });
@@ -828,32 +861,27 @@ describe("task-page", function () {
     it("makes counts correctly with 1 slice", function (done) {
       serveTask(2, "Pending task - 1 slice - no rich logs");
       loggedInTaskPage((ele) => {
-        const calls = fetchMock.calls(MATCHED, "GET");
-        expect(calls).toHaveSize(
-          2 + 4 + 3,
-          "2 GETs from swarming-app, 4 from task-page, " + "3 counts * 1 slice"
+        // prpc calls count
+        const prpc = fetchMock.calls(MATCHED, "POST");
+        // There are 3 prpc calls here.
+        expect(prpc).toHaveSize(3);
+
+        const protorpc = fetchMock.calls(MATCHED, "GET");
+        expect(protorpc).toHaveSize(
+          2 + 2 + 2,
+          "2 GETs from swarming-app, 2 from task-page, " + "3 counts * 1 slice"
         );
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        const gets = calls.map((c) => c[0]);
+        const gets = protorpc.map((c) => c[0]);
 
-        expect(gets).toContain(
-          `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`
-        );
-        expect(gets).toContain(
-          `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result` +
-            "?include_performance_stats=true"
-        );
-        expect(gets).toContain(
-          `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`
-        );
         expect(gets).toContain(
           "/_ah/api/swarming/v1/tasks/count?start=1549212360&state=RUNNING&" +
             "tags=device_os%3AN&tags=os%3AAndroid&tags=pool%3AChrome-GPU&tags=device_type%3Afoster"
         );
 
-        checkAuthorizationAndNoPosts(calls);
+        checkAuthorization(prpc.concat(protorpc));
         done();
       });
     });
@@ -1047,38 +1075,31 @@ describe("task-page", function () {
     it("pages stdout", function (done) {
       jasmine.clock().uninstall(); // re-enable setTimeout
       serveTask(0, "running task on try number 3", true);
-      const FIRST_LINE = "first log line💥\nthis is cut";
+      const FIRST_LINE = utf8tob64("first log line💥\nthis is cut");
       const FIRST_LINE_LEN_BYTES = 30; // 💥 uses 4 bytes
-      const SECOND_LINE = "off on the second log line\r\n";
+      const SECOND_LINE = utf8tob64("off on the second log line\r\n");
       const SECOND_LINE_LEN_BYTES = 28;
-      const THIRD_LINE = "third log line\n";
-      fetchMock.get(
-        `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=0&length=102400`,
-        {
-          state: "RUNNING",
-          output: FIRST_LINE,
-        },
-        { overwriteRoutes: true }
+      const THIRD_LINE = utf8tob64("third log line\n");
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Tasks",
+        "GetStdout",
+        { state: "RUNNING", output: FIRST_LINE },
+        checkOffset(0, 102400)
       );
-      fetchMock.get(
-        `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?offset=${FIRST_LINE_LEN_BYTES}` +
-          "&length=102400",
-        {
-          state: "RUNNING",
-          output: SECOND_LINE,
-        },
-        { overwriteRoutes: true }
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Tasks",
+        "GetStdout",
+        { state: "RUNNING", output: SECOND_LINE },
+        checkOffset(FIRST_LINE_LEN_BYTES, 102400)
       );
-      fetchMock.get(
-        `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/stdout?` +
-          `offset=${
-            FIRST_LINE_LEN_BYTES + SECOND_LINE_LEN_BYTES
-          }&length=102400`,
-        {
-          state: "COMPLETED",
-          output: THIRD_LINE,
-        },
-        { overwriteRoutes: true }
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Tasks",
+        "GetStdout",
+        { state: "COMPLETED", output: THIRD_LINE },
+        checkOffset(FIRST_LINE_LEN_BYTES + SECOND_LINE_LEN_BYTES, 102400)
       );
 
       loggedInTaskPage((ele) => {
@@ -1090,19 +1111,14 @@ describe("task-page", function () {
           "this is cutoff on the second log line\n",
           "third log line\n",
         ]);
-        const calls = fetchMock.calls(MATCHED, "GET").map((arr) => arr[0]);
+        const calls = fetchMock.calls(MATCHED, "POST").map((arr) => arr[0]);
         const callsToResult = calls.filter(
-          (url) =>
-            url.indexOf(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/result`) >= 0
-        );
-        const callsToRequest = calls.filter(
-          (url) => url === `/_ah/api/swarming/v1/task/${TEST_TASK_ID}/request`
+          (url) => url.indexOf(`GetResult`) >= 0
         );
 
         // We expect the requests and results to be fetched after
         // the logs notice the state has changed from RUNNING to COMPLETED.
         expect(callsToResult).toHaveSize(2);
-        expect(callsToRequest).toHaveSize(2);
 
         done();
       });

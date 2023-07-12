@@ -4,8 +4,8 @@
 
 import * as human from "common-sk/modules/human";
 
-import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from "../util";
 import { EXCEPTIONAL_STATES, ONGOING_STATES } from "../task";
+import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from "../util";
 
 /** canRetry returns if the given task can be retried.
  *  See https://crbug.com/936530 for one case in which it should not.
@@ -98,7 +98,7 @@ export function humanState(result, currentSliceIdx) {
   }
   if (
     currentSliceIdx !== undefined &&
-    result.current_task_slice !== currentSliceIdx
+    result.currentTaskSlice !== currentSliceIdx
   ) {
     return "THIS SLICE DID NOT RUN. Select another slice above.";
   }
@@ -119,8 +119,8 @@ export function humanState(result, currentSliceIdx) {
  */
 export function casLink(host, ref) {
   return (
-    `${host}/${ref.cas_instance}/blobs/` +
-    `${ref.digest.hash}/${ref.digest.size_bytes}/tree`
+    `${host}/${ref.casInstance}/blobs/` +
+    `${ref.digest.hash}/${ref.digest.sizeBytes}/tree`
   );
 }
 
@@ -164,15 +164,15 @@ export function parseResult(result) {
 
   const now = new Date();
   // Running and bot_died tasks have no duration set, so we can figure it out.
-  if (!result.duration && result.state === "RUNNING" && result.started_ts) {
-    result.duration = (now - result.started_ts) / 1000;
+  if (!result.duration && result.state === "RUNNING" && result.startedTs) {
+    result.duration = (now - result.startedTs) / 1000;
   } else if (
     !result.duration &&
     result.state === "BOT_DIED" &&
-    result.started_ts &&
-    result.abandoned_ts
+    result.startedTs &&
+    result.abandonedTs
   ) {
-    result.duration = (result.abandoned_ts - result.started_ts) / 1000;
+    result.duration = (result.abandonedTs - result.startedTs) / 1000;
   }
   // Make the duration human readable
   result.human_duration = humanDuration(result.duration);
@@ -182,20 +182,20 @@ export function parseResult(result) {
     result.human_duration += " -- died";
   }
 
-  const end = result.started_ts || result.abandoned_ts || new Date();
-  if (!result.created_ts) {
+  const end = result.startedTs || result.abandonedTs || new Date();
+  if (!result.createdTs) {
     // This should never happen
     result.pending = 0;
     result.human_pending = "";
-  } else if (end <= result.created_ts) {
+  } else if (end <= result.createdTs) {
     // In the case of deduplicated tasks, started_ts comes before the task.
     result.pending = 0;
     result.human_pending = "0s";
   } else {
-    result.pending = (end - result.created_ts) / 1000; // convert to seconds.
-    result.human_pending = timeDiffExact(result.created_ts, end);
+    result.pending = (end - result.createdTs) / 1000; // convert to seconds.
+    result.human_pending = timeDiffExact(result.createdTs, end);
   }
-  result.current_task_slice = parseInt(result.current_task_slice) || 0;
+  result.currentTaskSlice = parseInt(result.currentTaskSlice) || 0;
   return result;
 }
 
@@ -233,11 +233,11 @@ export function richLogsLink(ele) {
  *  slice expires.
  */
 export function sliceSchedulingDeadline(slice, request) {
-  if (!request.created_ts) {
+  if (!request.createdTs) {
     return "";
   }
-  const delta = slice.expiration_secs * 1000;
-  return human.localeTime(new Date(request.created_ts.getTime() + delta));
+  const delta = slice.expirationSecs * 1000;
+  return human.localeTime(new Date(request.createdTs.getTime() + delta));
 }
 
 /** stateClass returns a class corresponding to the task's state.
@@ -280,11 +280,11 @@ export function taskCost(result) {
  *  expires, which is after any and all slices expire.
  */
 export function taskSchedulingDeadline(request) {
-  if (!request.created_ts) {
+  if (!request.createdTs) {
     return "";
   }
-  const delta = request.expiration_secs * 1000;
-  return human.localeTime(new Date(request.created_ts.getTime() + delta));
+  const delta = request.expirationSecs * 1000;
+  return human.localeTime(new Date(request.createdTs.getTime() + delta));
 }
 
 export function taskInfoClass(ele, result) {
@@ -292,7 +292,7 @@ export function taskInfoClass(ele, result) {
   if (!ele || !result || ele._currentSliceIdx === -1) {
     return "";
   }
-  if (ele._currentSliceIdx !== result.current_task_slice) {
+  if (ele._currentSliceIdx !== result.currentTaskSlice) {
     return "inactive";
   }
   return "";
@@ -301,7 +301,7 @@ export function taskInfoClass(ele, result) {
 /** wasDeduped returns true or false depending on if this task was de-duped.
  */
 export function wasDeduped(result) {
-  return result.deduped_from;
+  return result.dedupedFrom;
 }
 
 /** wasPickedUp returns true iff a task was started.
@@ -323,4 +323,10 @@ const TASK_TIMES = [
   "created_ts",
   "modified_ts",
   "started_ts",
+  "abandonedTs",
+  "botIdleSinceTs",
+  "completedTs",
+  "createdTs",
+  "modifiedTs",
+  "startedTs",
 ];
