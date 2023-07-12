@@ -45,15 +45,15 @@ export function durationChart(result) {
   let preOverhead = 0;
   let postOverhead = 0;
   // These are only put in upon task completion.
-  if (result.performance_stats) {
+  if (result.performanceStats) {
     postOverhead =
-      (result.performance_stats.isolated_upload &&
-        result.performance_stats.isolated_upload.duration) ||
+      (result.performanceStats.isolatedUpload &&
+        result.performanceStats.isolatedUpload.duration) ||
       0;
     // We only know the certain timings of isolating. To get
     // close enough (tm) overhead timings, we assume CIPD is the only
     // other source of overhead and all of CIPD's overhead is done pre-task.
-    preOverhead = result.performance_stats.bot_overhead - postOverhead;
+    preOverhead = result.performanceStats.botOverhead - postOverhead;
   }
   return [result.pending, preOverhead, result.duration, postOverhead].map(
     oneDecimalPlace
@@ -215,10 +215,10 @@ export function richLogsLink(ele) {
   if (logs && miloHost) {
     logs = logs.replace("logdog://", "");
     if (logs.indexOf(TASK_ID_PLACEHOLDER) !== -1) {
-      if (!ele._result || !ele._result.run_id) {
+      if (!ele._result || !ele._result.runId) {
         return undefined;
       }
-      logs = logs.replace(TASK_ID_PLACEHOLDER, ele._result.run_id);
+      logs = logs.replace(TASK_ID_PLACEHOLDER, ele._result.runId);
     }
     return miloHost.replace("%s", logs);
   }
@@ -270,10 +270,10 @@ export function stateClass(result) {
 /** taskCost returns a human readable cost in USD for a task.
  */
 export function taskCost(result) {
-  if (!result || !result.costs_usd || !result.costs_usd.length) {
+  if (!result || !result.costsUsd || !result.costsUsd.length) {
     return 0;
   }
-  return result.costs_usd[0].toFixed(4);
+  return result.costsUsd[0].toFixed(4);
 }
 
 /** taskSchedulingDeadline returns a human readable time stamp of when a task
