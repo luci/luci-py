@@ -130,23 +130,18 @@ class ConfigTest(test_case.TestCase):
     self.assertEqual(
         new_rev, config._get_imports_config_revision_async().get_result())
 
-  def test_validate_ip_allowlist_config_ok(self):
+  def test_validate_ip_allowlist_config_empty_assignments(self):
     conf = config_pb2.IPAllowlistConfig(
-        ip_allowlists=[
-          config_pb2.IPAllowlistConfig.IPAllowlist(
-              name='abc',
-              subnets=['127.0.0.1/32', '0.0.0.0/0']),
-          config_pb2.IPAllowlistConfig.IPAllowlist(
-              name='bots',
-              subnets=[],
-              includes=['abc']),
-        ],
-        assignments=[
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:abc@example.com',
-              ip_allowlist_name='abc'),
-        ])
-    config._validate_ip_allowlist_config(conf)
+      ip_allowlists=[
+        config_pb2.IPAllowlistConfig.IPAllowlist(name='abc'),
+      ],
+      assignments=[
+        config_pb2.IPAllowlistConfig.Assignment(
+          identity='should not exist',
+          ip_allowlist_name='abc'),
+      ])
+    with self.assertRaises(ValueError):
+      config._validate_ip_allowlist_config(conf)
 
   def test_validate_ip_allowlist_config_empty(self):
     config._validate_ip_allowlist_config(config_pb2.IPAllowlistConfig())
@@ -174,46 +169,6 @@ class ConfigTest(test_case.TestCase):
           config_pb2.IPAllowlistConfig.IPAllowlist(
               name='abc',
               subnets=['not a subnet']),
-        ])
-    with self.assertRaises(ValueError):
-      config._validate_ip_allowlist_config(conf)
-
-  def test_validate_ip_allowlist_config_bad_identity(self):
-    conf = config_pb2.IPAllowlistConfig(
-        ip_allowlists=[
-          config_pb2.IPAllowlistConfig.IPAllowlist(name='abc')
-        ],
-        assignments=[
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='bad identity',
-              ip_allowlist_name='abc'),
-        ])
-    with self.assertRaises(ValueError):
-      config._validate_ip_allowlist_config(conf)
-
-  def test_validate_ip_allowlist_config_unknown_allowlist(self):
-    conf = config_pb2.IPAllowlistConfig(
-        assignments=[
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:abc@example.com',
-              ip_allowlist_name='missing'),
-        ])
-    with self.assertRaises(ValueError):
-      config._validate_ip_allowlist_config(conf)
-
-  def test_validate_ip_allowlist_config_identity_twice(self):
-    conf = config_pb2.IPAllowlistConfig(
-        ip_allowlists=[
-          config_pb2.IPAllowlistConfig.IPAllowlist(name='abc'),
-          config_pb2.IPAllowlistConfig.IPAllowlist(name='def'),
-        ],
-        assignments=[
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:abc@example.com',
-              ip_allowlist_name='abc'),
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:abc@example.com',
-              ip_allowlist_name='def'),
         ])
     with self.assertRaises(ValueError):
       config._validate_ip_allowlist_config(conf)
@@ -286,7 +241,7 @@ class ConfigTest(test_case.TestCase):
     # Pushing empty config to empty DB -> no changes.
     self.assertFalse(run(config_pb2.IPAllowlistConfig()))
 
-    # Added a bunch of IP allowlists and assignments.
+    # Added a bunch of IP allowlists.
     conf = config_pb2.IPAllowlistConfig(
         ip_allowlists=[
           config_pb2.IPAllowlistConfig.IPAllowlist(
@@ -296,53 +251,10 @@ class ConfigTest(test_case.TestCase):
               name='bots',
               subnets=['0.0.0.2/32']),
           config_pb2.IPAllowlistConfig.IPAllowlist(name='empty'),
-        ],
-        assignments=[
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:abc@example.com',
-              ip_allowlist_name='abc'),
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:def@example.com',
-              ip_allowlist_name='bots'),
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:xyz@example.com',
-              ip_allowlist_name='bots'),
         ])
     self.assertTrue(run(conf))
 
     # Verify everything is there.
-    self.assertEqual({
-      'assignments': [
-        {
-          'comment':
-              u'Imported from ip_allowlist.cfg at rev ip_whitelist_cfg_rev',
-          'created_by': model.Identity(kind='service', name='sample-app'),
-          'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
-          'identity': model.Identity(kind='user', name='abc@example.com'),
-          'ip_whitelist': u'abc',
-        },
-        {
-          'comment':
-              u'Imported from ip_allowlist.cfg at rev ip_whitelist_cfg_rev',
-          'created_by': model.Identity(kind='service', name='sample-app'),
-          'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
-          'identity': model.Identity(kind='user', name='def@example.com'),
-          'ip_whitelist': u'bots',
-        },
-        {
-          'comment':
-              u'Imported from ip_allowlist.cfg at rev ip_whitelist_cfg_rev',
-          'created_by': model.Identity(kind='service', name='sample-app'),
-          'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
-          'identity': model.Identity(kind='user', name='xyz@example.com'),
-          'ip_whitelist': u'bots',
-        },
-      ],
-      'auth_db_rev': 1,
-      'auth_db_prev_rev': None,
-      'modified_by': model.get_service_self_identity(),
-      'modified_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
-    }, model.ip_whitelist_assignments_key().get().to_dict())
     self.assertEqual(
         {
           'abc': {
@@ -382,7 +294,7 @@ class ConfigTest(test_case.TestCase):
     self.mock_now(datetime.datetime(2014, 2, 2, 3, 4, 5))
     self.assertFalse(run(conf))
 
-    # Modify allowlist, add new one, remove some. Same for assignments.
+    # Modify allowlist, add new one, remove some.
     conf = config_pb2.IPAllowlistConfig(
         ip_allowlists=[
           config_pb2.IPAllowlistConfig.IPAllowlist(
@@ -392,54 +304,11 @@ class ConfigTest(test_case.TestCase):
               name='bots',
               subnets=['0.0.0.2/32']),
           config_pb2.IPAllowlistConfig.IPAllowlist(name='another'),
-        ],
-        assignments=[
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:abc@example.com',
-              ip_allowlist_name='abc'),
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:def@example.com',
-              ip_allowlist_name='another'),
-          config_pb2.IPAllowlistConfig.Assignment(
-              identity='user:zzz@example.com',
-              ip_allowlist_name='bots'),
         ])
     self.mock_now(datetime.datetime(2014, 3, 2, 3, 4, 5))
     self.assertTrue(run(conf))
 
     # Verify everything is there.
-    self.assertEqual({
-      'assignments': [
-        {
-          'comment':
-              u'Imported from ip_allowlist.cfg at rev ip_whitelist_cfg_rev',
-          'created_by': model.Identity(kind='service', name='sample-app'),
-          'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
-          'identity': model.Identity(kind='user', name='abc@example.com'),
-          'ip_whitelist': u'abc',
-        },
-        {
-          'comment':
-              u'Imported from ip_allowlist.cfg at rev ip_whitelist_cfg_rev',
-          'created_by': model.Identity(kind='service', name='sample-app'),
-          'created_ts': datetime.datetime(2014, 3, 2, 3, 4, 5),
-          'identity': model.Identity(kind='user', name='def@example.com'),
-          'ip_whitelist': u'another',
-        },
-        {
-          'comment':
-              u'Imported from ip_allowlist.cfg at rev ip_whitelist_cfg_rev',
-          'created_by': model.Identity(kind='service', name='sample-app'),
-          'created_ts': datetime.datetime(2014, 3, 2, 3, 4, 5),
-          'identity': model.Identity(kind='user', name='zzz@example.com'),
-          'ip_whitelist': u'bots',
-        },
-      ],
-      'auth_db_rev': 2,
-      'auth_db_prev_rev': 1,
-      'modified_by': model.get_service_self_identity(),
-      'modified_ts': datetime.datetime(2014, 3, 2, 3, 4, 5),
-    }, model.ip_whitelist_assignments_key().get().to_dict())
     self.assertEqual(
         {
           'abc': {

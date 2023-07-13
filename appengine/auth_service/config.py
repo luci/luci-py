@@ -337,17 +337,10 @@ def _validate_ip_allowlist_config(conf):
     for net in ip_allowlist.subnets:
       # Raises ValueError if subnet is not valid.
       ipaddr.subnet_from_string(net)
-  idents = []
-  for assignment in conf.assignments:
-    # Raises ValueError if identity is not valid.
-    ident = model.Identity.from_bytes(assignment.identity)
-    if assignment.ip_allowlist_name not in allowlists:
-      raise ValueError(
-          'Unknown IP allowlist: %s' % assignment.ip_allowlist_name)
-    if ident in idents:
-      raise ValueError('Identity %s is specified twice' % assignment.identity)
-    idents.append(ident)
-  # This raises ValueError on bad includes.
+
+  if conf.assignments:
+    raise ValueError('assignments are not supported anymore')
+
   _resolve_ip_allowlist_includes(conf.ip_allowlists)
 
 
@@ -414,37 +407,8 @@ def _update_ip_allowlist_config(root, rev, conf):
     if wl.key.id() not in imported_ip_allowlists:
       to_delete.append(wl)
 
-  # Update assignments. Don't touch created_ts and created_by for existing ones.
-  ip_allowlist_assignments = (
-      model.ip_whitelist_assignments_key().get() or
-      model.AuthIPWhitelistAssignments(
-          key=model.ip_whitelist_assignments_key()))
-  existing = {
-    (a.identity.to_bytes(), a.ip_whitelist): a
-    for a in ip_allowlist_assignments.assignments
-  }
-  updated = []
-  for a in conf.assignments:
-    key = (a.identity, a.ip_allowlist_name)
-    if key in existing:
-      updated.append(existing[key])
-    else:
-      new_one = model.AuthIPWhitelistAssignments.Assignment(
-          identity=model.Identity.from_bytes(a.identity),
-          ip_whitelist=a.ip_allowlist_name,
-          comment='Imported from ip_allowlist.cfg at rev %s' % rev.revision,
-          created_ts=now,
-          created_by=model.get_service_self_identity())
-      updated.append(new_one)
-
-  # Something has changed?
-  updated_keys = [
-    (a.identity.to_bytes(), a.ip_whitelist)
-    for a in updated
-  ]
-  if set(updated_keys) != set(existing):
-    ip_allowlist_assignments.assignments = updated
-    to_put.append(ip_allowlist_assignments)
+  if conf.assignments:
+    raise ValueError('assignments are not supported anymore')
 
   if not to_put and not to_delete:
     return False
