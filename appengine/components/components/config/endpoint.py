@@ -66,6 +66,16 @@ def is_trusted_requester():
     if identity == settings.trusted_config_account:
       return True
 
+    # TODO(yiwzhang): Temporarily allow both old and new LUCI Config service
+    # account to make the validation request. Revert this change after the old
+    # LUCI Config service is fully deprecated and all traffic have been
+    # migrated to the new LUCI Config service.
+    allowed_group = 'service-accounts-luci-config'
+    if 'dev' in settings.service_hostname:
+      allowed_group += '-dev'
+    if auth.is_group_member(allowed_group, identity):
+      return True
+
   return False
 
 

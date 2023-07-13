@@ -63,6 +63,17 @@ class EndpointTestCase(test_case.EndpointsTestCase):
     common.ConfigSettings.clear_cache()
     self.assertTrue(endpoint.is_trusted_requester())
 
+    # now use the new LUCI Config service account to call.
+    config_identity = auth.Identity(
+        'user', 'config-service@luci-config.iam.gserviceaccount.com')
+    self.mock(auth, 'get_current_identity', lambda: config_identity)
+    self.mock(auth, 'is_group_member', lambda _group, _id: True)
+    self.assertTrue(endpoint.is_trusted_requester())
+    config_identity = auth.Identity(
+        'user', 'config-service@luci-config-dev.iam.gserviceaccount.com')
+    self.mock(auth, 'is_group_member', lambda _group, _id: False)
+    self.assertFalse(endpoint.is_trusted_requester())
+
   def test_bad_message_text_characters(self):
     rule_set = validation.RuleSet()
     self.mock(validation, 'DEFAULT_RULE_SET', rule_set)
