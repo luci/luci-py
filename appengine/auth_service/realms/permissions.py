@@ -143,6 +143,12 @@ def db():
       permission('resultdb.invocations.create'),
       permission('resultdb.invocations.update'),
   ])
+  role('role/resultdb.baselineReader', [
+      permission('resultdb.baselines.get'),
+  ])
+  role('role/resultdb.baselineWriter', [
+      permission('resultdb.baselines.put'),
+  ])
   role('role/resultdb.limitedReader', [
       permission('resultdb.testResults.listLimited'),
       permission('resultdb.testExonerations.listLimited'),
@@ -159,6 +165,9 @@ def db():
       permission('resultdb.testExonerations.list'),
       permission('resultdb.testExonerations.get'),
       permission('resultdb.testMetadata.list'),
+  ])
+  role('role/luci.internal.resultdb.invocationSubmittedSetter', [
+      permission('resultdb.invocations.setSubmitted', internal=True),
   ])
 
   # Weetbix permissions and roles (b/239768873).
@@ -524,7 +533,7 @@ def db():
   builder.implicit_root_bindings = lambda project_id: [
       realms_config_pb2.Binding(
           role='role/luci.internal.system',
-          principals=['project:'+project_id],
+          principals=['project:' + project_id],
       ),
       realms_config_pb2.Binding(
           role='role/luci.internal.buildbucket.reader',
@@ -533,6 +542,10 @@ def db():
       realms_config_pb2.Binding(
           role='role/luci.internal.resultdb.reader',
           principals=['group:resultdb-internal-readers'],
+      ),
+      realms_config_pb2.Binding(
+          role='role/luci.internal.resultdb.invocationSubmittedSetter',
+          principals=['group:resultdb-internal-invocation-submitters'],
       ),
   ]
 
