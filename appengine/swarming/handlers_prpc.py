@@ -324,6 +324,15 @@ class InternalsService(object):
 
   DESCRIPTION = rbe_prpc_pb2.InternalsServiceDescription
 
+  # Not all expiration reasons map well to task states. Vague ones are not in
+  # this map and we'll use generic EXPIRED for them + report the error via
+  # the ereporter (to make it show up in aggregated error reports).
+  REASON_TO_TASK_STATE = {
+      rbe_pb2.ExpireSliceRequest.NO_RESOURCE: task_result.State.NO_RESOURCE,
+      rbe_pb2.ExpireSliceRequest.BOT_INTERNAL_ERROR: task_result.State.BOT_DIED,
+      rbe_pb2.ExpireSliceRequest.EXPIRED: task_result.State.EXPIRED,
+  }
+
   @prpc_helpers.method
   @auth.require(acl.is_swarming_itself, log_identity=True)
   def ExpireSlice(self, request, _context):
@@ -333,17 +342,17 @@ class InternalsService(object):
     to_run_key = task_to_run.task_to_run_key_from_parts(
         task_request_key, request.task_to_run_shard, request.task_to_run_id)
 
-    # Only NO_RESOURCE is expected to happen. All other conditions are internal
-    # failures due to server misconfiguration. Unfortunately there's no good
-    # task state to represent them, so just use EXPIRED + report the error via
-    # ereporter (it eventually results in a notification to admins).
-    terminal_state = task_result.State.EXPIRED
-    if request.reason == rbe_pb2.ExpireSliceRequest.NO_RESOURCE:
-      terminal_state = task_result.State.NO_RESOURCE
+    if request.reason in self.REASON_TO_TASK_STATE:
+      terminal_state = self.REASON_TO_TASK_STATE[request.reason]
+      report_to_log = terminal_state == task_result.State.BOT_DIED
+    else:
+      terminal_state = task_result.State.EXPIRED
+      report_to_log = True
+
     task_scheduler.expire_slice(to_run_key, terminal_state)
 
     # Submit the report only after expiring the slice, in case this is slow.
-    if request.reason != rbe_pb2.ExpireSliceRequest.NO_RESOURCE:
+    if report_to_log:
       ereporter2.log(source='rbe',
                      category=rbe_pb2.ExpireSliceRequest.Reason.Name(
                          request.reason),

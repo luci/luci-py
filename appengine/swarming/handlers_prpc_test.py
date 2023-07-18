@@ -2472,7 +2472,7 @@ class InternalsServicePrpcTest(PrpcTest):
     )
 
   @mock.patch('server.task_scheduler.expire_slice')
-  def test_expire_slice_no_internal(self, expire_slice_mock):
+  def test_expire_slice_permission_denied(self, expire_slice_mock):
     req_key = task_request.new_request_key()
     task_id = task_pack.pack_result_summary_key(
         task_pack.request_key_to_result_summary_key(req_key))
@@ -2498,6 +2498,40 @@ class InternalsServicePrpcTest(PrpcTest):
     self.assertEqual(
         errs[0].to_dict(include=['category', 'message', 'params']), {
             'category': u'PERMISSION_DENIED',
+            'message': u'Boo',
+            'params': {
+                u'slice_index': 2,
+                u'task_id': task_id,
+            },
+        })
+
+  @mock.patch('server.task_scheduler.expire_slice')
+  def test_expire_slice_bot_died(self, expire_slice_mock):
+    req_key = task_request.new_request_key()
+    task_id = task_pack.pack_result_summary_key(
+        task_pack.request_key_to_result_summary_key(req_key))
+
+    self.set_as_swarming_itself()
+    self.post_prpc(
+        'ExpireSlice',
+        rbe_pb2.ExpireSliceRequest(
+            task_id=task_id,
+            task_to_run_shard=15,
+            task_to_run_id=32,  # slice #2
+            reason=rbe_pb2.ExpireSliceRequest.BOT_INTERNAL_ERROR,
+            details='Boo',
+        ))
+
+    expire_slice_mock.assert_called_once_with(
+        task_to_run.task_to_run_key_from_parts(req_key, 15, 32),
+        task_result.State.BOT_DIED,
+    )
+
+    errs = list(ereporter2.Error.query())
+    self.assertEqual(len(errs), 1)
+    self.assertEqual(
+        errs[0].to_dict(include=['category', 'message', 'params']), {
+            'category': u'BOT_INTERNAL_ERROR',
             'message': u'Boo',
             'params': {
                 u'slice_index': 2,
