@@ -59,14 +59,14 @@ class TaskBackendAPIService(object):
     validate_run_task_request(request)
     api_helpers.validate_backend_configs(
         [backend_conversions.ingest_backend_config(request.backend_config)])
-    tr, secret_bytes, build_token = backend_conversions.compute_task_request(
+    tr, secret_bytes, build_task = backend_conversions.compute_task_request(
         request)
     caller = auth.get_current_identity().to_bytes()
     request_id = "%s:%s" % (caller, request.build_id)
     api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
     try:
       result_summary = task_scheduler.schedule_request(
-          tr, request_id, secret_bytes=secret_bytes, build_token=build_token)
+          tr, request_id, secret_bytes=secret_bytes, build_task=build_task)
     except (TypeError, ValueError) as e:
       raise handlers_exceptions.BadRequestException(str(e))
     hostname = app_identity.get_default_version_hostname()

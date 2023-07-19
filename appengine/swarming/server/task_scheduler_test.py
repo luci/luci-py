@@ -437,7 +437,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       self.assertEqual(1, len(self._taskqueue_stub.GetTasks('pubsub')))
       queued_tasks += 1
 
-    if kwargs.get('has_build_token', False):
+    if kwargs.get('has_build_task', False):
       self.assertEqual(1,
                        len(self._taskqueue_stub.GetTasks('buildbucket-notify')))
       queued_tasks += 1
@@ -468,7 +468,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_reap_task(self):
     # Essentially check _quick_reap() works.
-    run_result = self._quick_reap(has_build_token=True)
+    run_result = self._quick_reap(has_build_task=True)
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(1, run_result.try_number)
     to_run_key = task_to_run.request_to_task_to_run_key(

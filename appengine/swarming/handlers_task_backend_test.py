@@ -163,7 +163,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                            update_id=1546398020))
     self.assertEqual(actual_resp, expected_response)
     self.assertEqual(1, task_request.TaskRequest.query().count())
-    self.assertEqual(1, task_request.BuildToken.query().count())
+    self.assertEqual(1, task_request.BuildTask.query().count())
     self.assertEqual(1, task_request.SecretBytes.query().count())
 
     # Test requests are correctly deduped if `request_id` matches.
@@ -179,7 +179,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                            update_id=1546398020))
     self.assertEqual(actual_resp, expected_response)
     self.assertEqual(1, task_request.TaskRequest.query().count())
-    self.assertEqual(1, task_request.BuildToken.query().count())
+    self.assertEqual(1, task_request.BuildTask.query().count())
     self.assertEqual(1, task_request.SecretBytes.query().count())
 
     # Test tasks with different `build_id`s are not deduped.
@@ -198,7 +198,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                            update_id=1546398020))
     self.assertEqual(actual_resp, expected_response)
     self.assertEqual(2, task_request.TaskRequest.query().count())
-    self.assertEqual(2, task_request.BuildToken.query().count())
+    self.assertEqual(2, task_request.BuildTask.query().count())
     self.assertEqual(2, task_request.SecretBytes.query().count())
 
   def test_run_task_bad_request(self):
@@ -251,7 +251,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     def mocked_schedule_request(_,
                                 start_time=0,
                                 secret_bytes=None,
-                                build_token=None):
+                                build_task=None):
       raise TypeError('chicken')
 
     self.mock(task_scheduler, 'schedule_request', mocked_schedule_request)

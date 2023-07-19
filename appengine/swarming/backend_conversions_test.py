@@ -119,14 +119,14 @@ class TestBackendConversions(test_case.TestCase):
         bot_ping_tolerance_secs=70,
         service_account='who@serviceaccount.com',
         parent_task_id=parent_task_id,
-        has_build_token=True)
+        has_build_task=True)
 
     expected_sb = task_request.SecretBytes(
         secret_bytes=run_task_req.secrets.SerializeToString())
-    expected_bt = task_request.BuildToken(
+    expected_bt = task_request.BuildTask(
         build_id='4242',
-        token='token-token-token',
-        buildbucket_host='cow-buildbucket.appspot.com')
+        buildbucket_host='cow-buildbucket.appspot.com',
+        task_status=common_pb2.STATUS_UNSPECIFIED)
 
     actual_tr, actual_sb, actual_bt = backend_conversions.compute_task_request(
         run_task_req)

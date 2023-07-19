@@ -586,7 +586,7 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
     external_scheduler.notify_requests(
         es_cfg, [(request, result_summary)], True, False)
 
-  if request.has_build_token:
+  if request.has_build_task:
     task_id = task_pack.pack_result_summary_key(result_summary.key)
     ok = utils.enqueue_task(
         '/internal/taskqueue/important/buildbucket/notify-task/%s' % task_id,
@@ -1195,7 +1195,7 @@ def schedule_request(request,
                      request_id=None,
                      enable_resultdb=False,
                      secret_bytes=None,
-                     build_token=None):
+                     build_task=None):
   """Creates and stores all the entities to schedule a new task request.
 
   Assumes the request was already processed by api_helpers.process_task_request
@@ -1217,7 +1217,7 @@ def schedule_request(request,
              or not for this task.
   - secret_bytes: Optional SecretBytes entity to be saved in the DB. It's key
              will be set and the entity will be stored by this function.
-  - build_token: Optional BuildToken entity to be saved in the DB. It's key will
+  - build_task: Optional BuildTask entity to be saved in the DB. It's key will
              be set and the entity will be stored by this function.
   Returns:
     TaskResultSummary. TaskToRunShard is not returned.
@@ -1273,14 +1273,14 @@ def schedule_request(request,
         # previous results are returned. We still need to store the TaskRequest
         # and TaskResultSummary.
         # Since the task is never scheduled, TaskToRunShard is not stored.
-        # Since the has_secret_bytes/has_build_token property is already set
+        # Since the has_secret_bytes/has_build_task property is already set
         # for UI purposes, and the task itself will never be run, we skip
-        # storing the SecretBytes/BuildToken, as they would never be read and
+        # storing the SecretBytes/BuildTask, as they would never be read and
         # will just consume space in the datastore (and the task we deduplicated
         # with will have them stored anyway, if we really want to get them
         # again).
         secret_bytes = None
-        build_token = None
+        build_task = None
         break
 
   to_run = None
@@ -1311,7 +1311,7 @@ def schedule_request(request,
       # No available capacity for any slice. Fail the task right away.
       to_run = None
       secret_bytes = None
-      build_token = None
+      build_task = None
       result_summary.abandoned_ts = result_summary.created_ts
       result_summary.completed_ts = result_summary.created_ts
       result_summary.state = task_result.State.NO_RESOURCE
@@ -1345,8 +1345,8 @@ def schedule_request(request,
     if secret_bytes:
       assert request.secret_bytes_key
       secret_bytes.key = request.secret_bytes_key
-    if build_token:
-      build_token.key = request.build_token_key
+    if build_task:
+      build_task.key = request.build_task_key
 
   # Populate all initial keys.
   reparent(request.key)
@@ -1376,7 +1376,7 @@ def schedule_request(request,
       rbe.enqueue_rbe_task(request, to_run)
     ndb.put_multi(
         filter(bool, [
-            request, result_summary, to_run, secret_bytes, build_token,
+            request, result_summary, to_run, secret_bytes, build_task,
             task_req_to_id
         ]))
     return True

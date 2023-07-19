@@ -37,7 +37,7 @@ Graph of the schema:
         |          |      |
         v          |      v
     +-----------+  | +----------+
-    |SecretBytes|  | |BuildToken|
+    |SecretBytes|  | |BuildTask|
     |id=1       |  | |build_id  |
     +-----------+  | |token     |
                    | |bb_host   |
@@ -604,17 +604,18 @@ class SecretBytes(ndb.Model):
       validator=_get_validate_length(20 * 1024), indexed=False)
 
 
-class BuildToken(ndb.Model):
-  """Stores the build_id and a token sent by buildbucket.
+class BuildTask(ndb.Model):
+  """Stores the buildbucket related fields sent by buildbucket.
 
-  When a task changes state, the token is used in the request to Buildbucket
-  to update the status of the build.
+  Also stores task state in the form of a buildbucket.v2.Status.
   """
 
   _use_memcache = False
   build_id = ndb.StringProperty(required=True, indexed=False)
-  token = ndb.StringProperty(required=True, indexed=False)
   buildbucket_host = ndb.StringProperty(required=True, indexed=False)
+  # A buildbucket.v2.Status that will keep the latest updated status
+  # for the task.
+  task_status = ndb.IntegerProperty(required=True, indexed=False)
 
 
 class CipdPackage(ndb.Model):
@@ -1259,8 +1260,8 @@ class TaskRequest(ndb.Model):
   # ResultDB property in task new request.
   resultdb = ndb.LocalStructuredProperty(ResultDBCfg, compressed=True)
 
-  # If True, the TaskRequest has an associated BuildToken.
-  has_build_token = ndb.BooleanProperty(default=False, indexed=False)
+  # If True, the TaskRequest has an associated BuildTask.
+  has_build_task = ndb.BooleanProperty(default=False, indexed=False)
 
   @property
   def num_task_slices(self):
@@ -1300,9 +1301,9 @@ class TaskRequest(ndb.Model):
           return task_pack.request_key_to_secret_bytes_key(self.key)
 
   @property
-  def build_token_key(self):
-    if self.has_build_token:
-      return task_pack.request_key_to_build_token_key(self.key)
+  def build_task_key(self):
+    if self.has_build_task:
+      return task_pack.request_key_to_build_task_key(self.key)
 
   @property
   def task_id(self):

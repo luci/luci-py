@@ -120,7 +120,7 @@ class TestMessageConversion(test_case.TestCase):
     return task_request.TaskRequest(
         bot_ping_tolerance_secs=600,
         created_ts=FAKE_UTCNOW,
-        has_build_token=False,
+        has_build_task=False,
         manual_tags=[u'a:tag'],
         name=u'job1',
         priority=20,

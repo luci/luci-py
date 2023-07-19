@@ -40,10 +40,10 @@ def compute_task_request(run_task_req):
         invalid.
   """
 
-  build_token = task_request.BuildToken(
+  build_task = task_request.BuildTask(
       build_id=run_task_req.build_id,
-      token=run_task_req.register_backend_task_token,
-      buildbucket_host=run_task_req.buildbucket_host)
+      buildbucket_host=run_task_req.buildbucket_host,
+      task_status=common_pb2.STATUS_UNSPECIFIED)
 
   # NOTE: secret_bytes cannot be passed via `-secret_bytes` in `command`
   # because tasks in swarming can view command details of other tasks.
@@ -69,13 +69,13 @@ def compute_task_request(run_task_req):
       priority=backend_config.priority,
       bot_ping_tolerance_secs=backend_config.bot_ping_tolerance,
       service_account=backend_config.service_account,
-      has_build_token=True)
+      has_build_task=True)
 
   parent_id = backend_config.parent_run_id
   if parent_id:
     tr.parent_task_id = parent_id
 
-  return tr, secret_bytes, build_token
+  return tr, secret_bytes, build_task
 
 
 def ingest_backend_config(req_backend_config):
