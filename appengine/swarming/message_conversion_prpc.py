@@ -406,7 +406,8 @@ def task_request_response(request):
       resultdb=_resultdb_cfg(request.resultdb),
       tags=request.tags,
       user=request.user,
-      authenticated=request.authenticated.to_bytes(),
+      authenticated=request.authenticated.to_bytes()
+      if request.authenticated else None,
       service_account=request.service_account,
       realm=request.realm,
       expiration_secs=request.expiration_secs,
@@ -418,6 +419,7 @@ def task_request_response(request):
       pubsub_userdata=request.pubsub_userdata,
       bot_ping_tolerance_secs=request.bot_ping_tolerance_secs,
       task_slices=slices,
+      rbe_instance=request.rbe_instance,
   )
 
 

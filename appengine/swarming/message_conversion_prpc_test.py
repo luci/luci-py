@@ -24,13 +24,13 @@ FAKE_UTCNOW = datetime.datetime(2016, 4, 7)
 class TestMessageConversion(test_case.TestCase):
   no_run = 1
 
-  def _create_default_new_task_request(self):
+  def _create_default_new_task_request_proto(self):
     ntr = swarming_pb2.NewTaskRequest(name='job1',
                                       priority=20,
                                       tags=[u'a:tag'],
                                       user='joe@localhost',
                                       bot_ping_tolerance_secs=600)
-    ts = self._create_default_proto_task_slice()
+    ts = self._create_default_task_slice_proto()
     ntr.task_slices.extend([ts])
     ntr.realm = 'test:task_realm'
     ntr.resultdb.enable = True
@@ -39,7 +39,7 @@ class TestMessageConversion(test_case.TestCase):
 
     return ntr
 
-  def _create_default_proto_task_slice(self):
+  def _create_default_task_slice_proto(self):
     ts = swarming_pb2.TaskSlice(expiration_secs=180, wait_for_capacity=True)
     # Hack to get min line length.
     props = ts.properties
@@ -116,7 +116,7 @@ class TestMessageConversion(test_case.TestCase):
             relative_cwd=u''),
         wait_for_capacity=True)
 
-  def _create_default_new_task_result(self):
+  def _create_default_new_task_request(self):
     return task_request.TaskRequest(
         bot_ping_tolerance_secs=600,
         created_ts=FAKE_UTCNOW,
@@ -135,13 +135,13 @@ class TestMessageConversion(test_case.TestCase):
 
   @mock.patch('components.utils.utcnow', lambda: FAKE_UTCNOW)
   def test_task_request_from_new_task_request(self):
-    ntr = self._create_default_new_task_request()
+    ntr = self._create_default_new_task_request_proto()
     actual = message_conversion_prpc.new_task_request_from_rpc(ntr)
-    expected = (self._create_default_new_task_result(), None, 'TEMPLATE_AUTO')
+    expected = (self._create_default_new_task_request(), None, 'TEMPLATE_AUTO')
     self.assertEqual(expected, actual)
 
   def test_that_global_expiration_throws_error(self):
-    ntr = self._create_default_new_task_request()
+    ntr = self._create_default_new_task_request_proto()
     ntr.expiration_secs = 1000
     with self.assertRaises(ValueError) as ctx:
       message_conversion_prpc.new_task_request_from_rpc(ntr)
@@ -151,10 +151,10 @@ class TestMessageConversion(test_case.TestCase):
         str(ctx.exception))
 
   def test_that_different_secret_bytes_throws_error(self):
-    ntr = self._create_default_new_task_request()
-    ts1 = self._create_default_proto_task_slice()
+    ntr = self._create_default_new_task_request_proto()
+    ts1 = self._create_default_task_slice_proto()
     ts1.properties.secret_bytes = b'123'
-    ts2 = self._create_default_proto_task_slice()
+    ts2 = self._create_default_task_slice_proto()
     ts2.properties.secret_bytes = b'456'
     ntr.ClearField('task_slices')
     ntr.task_slices.extend([ts1, ts2])
@@ -167,7 +167,7 @@ class TestMessageConversion(test_case.TestCase):
             ctx.exception))
 
   def test_that_duplicate_env_variables_throws_error(self):
-    ntr = self._create_default_new_task_request()
+    ntr = self._create_default_new_task_request_proto()
     pairs = [
         swarming_pb2.StringPair(key='k', value='v'),
         swarming_pb2.StringPair(key='k', value='v')
@@ -179,7 +179,7 @@ class TestMessageConversion(test_case.TestCase):
                     str(ctx.exception))
 
   def test_that_duplicate_env_prefixes_throws_error(self):
-    ntr = self._create_default_new_task_request()
+    ntr = self._create_default_new_task_request_proto()
     pairs = [
         swarming_pb2.StringListPair(key='k', value=['v']),
         swarming_pb2.StringListPair(key='k', value=['v'])
@@ -203,11 +203,19 @@ class TestMessageConversion(test_case.TestCase):
     self.assertFalse(props_proto.env)
 
   def test_bot_ping_tolerance_is_filled_correctly(self):
-    ntr = self._create_default_new_task_request()
+    ntr = self._create_default_new_task_request_proto()
     ntr.bot_ping_tolerance_secs = 0
     actual, _, _ = message_conversion_prpc.new_task_request_from_rpc(ntr)
     self.assertEqual(actual.bot_ping_tolerance_secs,
                      task_request.DEFAULT_BOT_PING_TOLERANCE)
+
+  def test_rbe_value_is_set(self):
+    request = self._create_default_new_task_request()
+    rbe = "some.rbe.instance"
+    request.rbe_instance = rbe
+    request.expiration_ts = datetime.datetime.now()
+    proto = message_conversion_prpc.task_request_response(request)
+    self.assertEqual(proto.rbe_instance, rbe)
 
 
 if __name__ == '__main__':
