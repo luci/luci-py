@@ -933,6 +933,40 @@ class TestRBESession(unittest.TestCase):
         'state': 'COMPLETED'
     }, remote.last_lease.to_dict())
 
+  def test_finish_active_lease_flush(self):
+    remote = MockedRBERemote()
+    dims = {'dim': ['v1', 'v2']}
+
+    s = remote_client.RBESession(remote, 'some-instance', dims, 'poll_tok')
+
+    # Get a task.
+    remote.mock_next_response(
+        remote_client.RBESessionStatus.OK,
+        remote_client.RBELease(
+            'lease-0',
+            remote_client.RBELeaseState.PENDING,
+            {},
+            None,
+        ),
+    )
+    s.update(remote_client.RBESessionStatus.OK, dims, 'poll_tok')
+    self.assertEqual('lease-0', s.active_lease.id)
+
+    # Finish it and flush the result right away.
+    remote.mock_next_response(remote_client.RBESessionStatus.OK, None)
+    s.finish_active_lease({}, flush=True)
+    self.assertIsNone(s.active_lease)
+    self.assertTrue(s.alive)
+
+    # Check the call arguments.
+    self.assertEqual(remote_client.RBESessionStatus.MAINTENANCE,
+                     remote.last_status)
+    self.assertEqual(dims, remote.last_dimensions)
+    self.assertIsNone(remote.last_poll_token)
+    self.assertEqual('lease-0', remote.last_lease.id)
+    self.assertEqual(remote_client.RBELeaseState.COMPLETED,
+                     remote.last_lease.state)
+
 
 if __name__ == '__main__':
   logging.basicConfig(

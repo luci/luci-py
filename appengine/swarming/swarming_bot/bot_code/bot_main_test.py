@@ -1969,7 +1969,8 @@ class TestBotMain(TestBotBase):
     rbe_session._active_lease = remote_client.RBELease(
         'id', remote_client.RBELeaseState.ACTIVE)
     rbe_results = []
-    self.mock(rbe_session, 'finish_active_lease', rbe_results.append)
+    self.mock(rbe_session, 'finish_active_lease',
+              lambda res, **_kwargs: rbe_results.append(res))
 
     self._mock_popen(
         url='https://localhost:3',

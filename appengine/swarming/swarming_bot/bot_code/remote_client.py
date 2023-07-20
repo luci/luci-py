@@ -1078,24 +1078,31 @@ class RBESession:
     # Keep working on the lease if the server tells it is still ACTIVE.
     return lease.state == RBELeaseState.ACTIVE
 
-  def finish_active_lease(self, result):
+  def finish_active_lease(self, result, flush=False):
     """Marks the current active lease as done.
 
     Must be called only if `active_lease` is set. This method unsets it, thus
     signifying the session is ready to pick up a new lease in update(...). Must
     be called even if the lease was canceled by the server.
 
-    The result of the finished lease will be reported to the backend with the
-    next update(...) or terminate(...) calls, whenever they happen. If the
-    session is dead, the result will be lost.
+    If `flush` is False, the result of the finished lease will be reported to
+    the backend with the next update(...) or terminate(...) calls, whenever they
+    happen. In this case this is a purely local state change, it doesn't do any
+    RPCs.
 
-    This is a purely local state change, it doesn't do any RPCs.
+    If `flush` is True, the result will be reported to the backend right here
+    via a call to update(...) with MAINTENANCE status and the latest used
+    dimensions. Note that this may flip the session into the dead state if the
+    session expired on the backend side.
+
+    If the session is already dead, the result will be lost.
 
     Arguments:
       result: a dict with task execution results or None if not available.
 
     Raises:
       RBESessionException if the local session is in a wrong state.
+      RBEServerError if `flush` is True and the RPC fails for whatever reason.
     """
     if not self.active_lease:
       raise RBESessionException('finish_active_lease(...) without a lease')
@@ -1106,6 +1113,23 @@ class RBESession:
 
     assert not self._finished_lease
     self._finished_lease = lease
+
+    if not flush:
+      return
+
+    if not self.alive:
+      logging.error('Losing results of %s', self._finished_lease.id)
+      self._finished_lease = None
+      return
+
+    lease = self._update(status=RBESessionStatus.MAINTENANCE,
+                         dimensions=self._dimensions,
+                         lease=self._finished_lease,
+                         blocking=False,
+                         retry_transient=True)
+    self._finished_lease = None  # flushed the result successfully
+    if lease:
+      logging.error('Ignoring unexpected lease in MAINTENANCE: %s', lease.id)
 
   def terminate(self):
     """Terminates this RBE session.
