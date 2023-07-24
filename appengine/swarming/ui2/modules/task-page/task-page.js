@@ -1080,7 +1080,9 @@ const reproduceSection = (ele, currentSlice) => {
         # '-realm' is only needed if resultdb is enabled for the task.<br />
         # Please use a realm that has 'role/resultdb.invocationCreator' in the
         realms.cfg of your project.<br />
-        ./bar/swarming reproduce -S ${hostUrl} -realm project:foo ${ele._taskId}
+        mkdir repro_dir && cd repro_dir<br />
+        ../bar/swarming reproduce -S ${hostUrl} -realm project:foo
+        ${ele._taskId}
       </div>
 
       <div>Download output results into directory <i>foo</i>:</div>
@@ -1088,7 +1090,8 @@ const reproduceSection = (ele, currentSlice) => {
         # (if needed, use "\\\${platform}" as-is) cipd install
         "infra/tools/luci/swarming/\\\${platform}" -root bar<br />
         # (if needed) ./bar/swarming login<br />
-        ./bar/swarming collect -S ${hostUrl} -output-dir=foo ${ele._taskId}
+        mkdir collect_dir && cd collect_dir<br />
+        ../bar/swarming collect -S ${hostUrl} -output-dir=foo ${ele._taskId}
       </div>
     </div>
   `;
