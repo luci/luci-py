@@ -1130,6 +1130,12 @@ class TaskResultSummary(_TaskResultCommon):
   deduped_from = ndb.StringProperty(indexed=False)
 
   # Delay from TaskRequest.expiratoin_ts to the actual expired time.
+  #
+  # This is set at expiration process if the last task slice expired by reaching
+  # its deadline. Unset if the last slice expired because there were no bots
+  # that could run it.
+  #
+  # Exclusively for monitoring.
   expiration_delay = ndb.FloatProperty(indexed=False)
 
   # Previous state, will be set in _pre_put_hook and compared in _post_pre_hook

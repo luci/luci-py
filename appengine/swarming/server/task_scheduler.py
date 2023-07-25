@@ -123,17 +123,19 @@ def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
   # Will accumulate all entities that need to be stored at the end.
   to_put = []
 
-  # Record the expiration delay. It may end up negative if there's a clock drift
-  # between the process that ran yield_expired_task_to_run() and the process
-  # that runs this transaction. This should be rare.
-  delay = (now - to_run.expiration_ts).total_seconds()
-  if delay < 0:
-    logging.warning(
-        '_expire_slice_tx: the task is not expired. task_id=%s slice=%d '
-        'expiration_ts=%s, delay=%f', to_run.task_id, to_run.task_slice_index,
-        to_run.expiration_ts, delay)
-    delay = 0.0
-  to_run.expiration_delay = delay
+  # Record the expiration delay if the slice expired by reaching its deadline.
+  # It may end up negative if there's a clock drift between the process that ran
+  # yield_expired_task_to_run() and the process that runs this transaction. This
+  # should be rare.
+  if terminal_state == task_result.State.EXPIRED:
+    delay = (now - to_run.expiration_ts).total_seconds()
+    if delay < 0:
+      logging.warning(
+          '_expire_slice_tx: the task is not expired. task_id=%s slice=%d '
+          'expiration_ts=%s, delay=%f', to_run.task_id, to_run.task_slice_index,
+          to_run.expiration_ts, delay)
+      delay = 0.0
+    to_run.expiration_delay = delay
 
   # Mark the current TaskToRunShardXXX as consumed.
   to_run.consume(None)
@@ -160,10 +162,9 @@ def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
     result_summary.modified_ts = now
     result_summary.abandoned_ts = now
     result_summary.completed_ts = now
-    # This may be negative if some slices have been skipped without waiting due
-    # to lack of capacity.
-    delay = (now - request.expiration_ts).total_seconds()
-    result_summary.expiration_delay = max(0.0, delay)
+    if terminal_state == task_result.State.EXPIRED:
+      delay = (now - request.expiration_ts).total_seconds()
+      result_summary.expiration_delay = max(0.0, delay)
 
   futures = ndb.put_multi_async(to_put)
   _maybe_taskupdate_notify_via_tq(result_summary,

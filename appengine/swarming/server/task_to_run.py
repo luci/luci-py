@@ -157,7 +157,11 @@ class _TaskToRunBase(ndb.Model):
   #
   # Used in both native and RBE mode.
   #
-  # This is set at expiration process. Exclusively for monitoring.
+  # This is set at expiration process if the slice expired by reaching its
+  # deadline. Unset if the slice expired because there were no bots that could
+  # run it.
+  #
+  # Exclusively for monitoring.
   expiration_delay = ndb.FloatProperty(indexed=False)
 
   # A magical number by which bots and tasks find one another.

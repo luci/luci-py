@@ -500,12 +500,13 @@ def on_task_expired(summary, task_to_run):
   }
 
   # slice expiration delay
-  _tasks_slice_expiration_delay.add(
-      task_to_run.expiration_delay,
-      fields=dict(fields, slice_index=task_to_run.task_slice_index))
+  if task_to_run.expiration_delay is not None:
+    _tasks_slice_expiration_delay.add(
+        task_to_run.expiration_delay,
+        fields=dict(fields, slice_index=task_to_run.task_slice_index))
 
   # task expiration delay
-  if summary.expiration_delay:
+  if summary.expiration_delay is not None:
     _tasks_expiration_delay.add(summary.expiration_delay, fields=fields)
 
 
