@@ -676,11 +676,11 @@ def get_ssd():
   wbem = _get_wmi_wbem(_WMI_STORAGE_NS)
   if not wbem:
     return ()
-  # https://docs.microsoft.com/en-us/previous-versions/windows/desktop/stormgmt/msft-physicaldisk
+  # https://learn.microsoft.com/en-us/windows-hardware/drivers/storage/msft-physicaldisk
   try:
     return sorted(d.DeviceId
                   for d in wbem.query('SELECT * FROM MSFT_PhysicalDisk')
-                  if d.MediaType == 4)
+                  if d.MediaType == 4 or d.Model == 'nvme_card')
   except AttributeError:
     return ()
 
