@@ -1543,7 +1543,7 @@ def get_automatic_tags(request, index):
   return tags
 
 
-def create_termination_task(bot_id, wait_for_capacity, reason=None):
+def create_termination_task(bot_id, reason=None):
   """Returns a task to terminate the given bot.
 
   ACL check must have been done before.
@@ -1572,7 +1572,7 @@ def create_termination_task(bot_id, wait_for_capacity, reason=None):
       task_slices=[
           TaskSlice(expiration_secs=24 * 60 * 60,
                     properties=properties,
-                    wait_for_capacity=wait_for_capacity),
+                    wait_for_capacity=True),
       ],
       manual_tags=[u'terminate:1'])
   assert request.task_slice(0).properties.is_terminate

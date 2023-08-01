@@ -415,15 +415,12 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(expected, task_request.get_automatic_tags(req, 1))
 
   def test_create_termination_task(self):
-    request = task_request.create_termination_task(
-        u'some-bot', wait_for_capacity=True)
+    request = task_request.create_termination_task(u'some-bot')
     self.assertTrue(request.task_slice(0).properties.is_terminate)
 
   def test_create_termination_task_with_reason(self):
     reason = "hello world"
-    request = task_request.create_termination_task(u'some-bot',
-                                                   wait_for_capacity=True,
-                                                   reason=reason)
+    request = task_request.create_termination_task(u'some-bot', reason=reason)
     self.assertEqual(request.name, "Terminate some-bot: hello world")
 
   def test_new_request_key(self):
