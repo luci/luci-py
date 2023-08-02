@@ -453,8 +453,7 @@ def check_task_get_acl(task_request):
 
   # check 'swarming.pools.listTasks' permission of the pool in bot dimensions.
   if task_request.bot_id:
-    pools = bot_management.get_pools_from_dimensions_flat(
-        _retrieve_bot_dimensions(task_request.bot_id))
+    pools = _retrieve_bot_pools(task_request.bot_id)
     pool_realms = [
         p.realm for p in map(pools_config.get_pool_config, pools) if p.realm
     ]
@@ -509,8 +508,7 @@ def check_task_cancel_acl(task_request):
 
   # check 'swarming.pools.cancelTask' permission of the pool in bot dimensions.
   if task_request.bot_id:
-    pools = bot_management.get_pools_from_dimensions_flat(
-        _retrieve_bot_dimensions(task_request.bot_id))
+    pools = _retrieve_bot_pools(task_request.bot_id)
     pool_realms = [
         p.realm for p in map(pools_config.get_pool_config, pools) if p.realm
     ]
@@ -677,14 +675,13 @@ def _check_permission(perm, realms, identity=None):
                identity.kind, identity.name, perm.name, realms)
 
 
-def _retrieve_bot_dimensions(bot_id):
-  """Retrieves bot dimensions"""
-  # get the last BotEvent because BotInfo may have been deleted.
-  events = bot_management.get_events_query(bot_id).fetch(1)
-  if not events:
+def _retrieve_bot_pools(bot_id):
+  """Retrieves bot pools."""
+  pools = bot_management.get_bot_pools(bot_id)
+  if not pools:
     raise auth.AuthorizationError(
         'No such bot or no permission to use it: "%s".' % bot_id)
-  return events[0].dimensions_flat
+  return pools
 
 
 def _check_pools_filters_acl(perm_enum, pools):
@@ -721,8 +718,7 @@ def _check_bot_acl(perm_enum, bot_id):
     auth.AuthorizationError: if the caller is not allowed.
   """
   # retrieve the pools from bot dimensions.
-  pools = bot_management.get_pools_from_dimensions_flat(
-      _retrieve_bot_dimensions(bot_id))
+  pools = _retrieve_bot_pools(bot_id)
   realms = []
   for p in pools:
     pool_cfg = pools_config.get_pool_config(p)

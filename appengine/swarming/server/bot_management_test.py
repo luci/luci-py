@@ -378,6 +378,63 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(
         expected, [i.to_dict() for i in bot_management.get_events_query('id1')])
 
+  def test_get_latest_info(self):
+    stored = _ensure_bot_info('bot-id')
+    fetched, alive = bot_management.get_latest_info('bot-id')
+    self.assertEqual(stored.dimensions_flat, fetched.dimensions_flat)
+    self.assertTrue(alive)
+
+  def test_get_latest_info_dead(self):
+    stored = _ensure_bot_info('bot-id')
+    stored.key.delete()
+    fetched, alive = bot_management.get_latest_info('bot-id')
+    self.assertEqual(stored.dimensions_flat, fetched.dimensions_flat)
+    self.assertFalse(alive)
+
+  def test_get_latest_info_missing(self):
+    fetched, alive = bot_management.get_latest_info('bot-id')
+    self.assertIsNone(fetched)
+    self.assertFalse(alive)
+
+  def test_get_latest_info_race_condition_crbug_1407381(self):
+    stored = _ensure_bot_info('bot-id')
+    stored.key.delete()
+
+    # The bot is considered dead now.
+    fetched, alive = bot_management.get_latest_info('bot-id')
+    self.assertIsNotNone(fetched)
+    self.assertFalse(alive)
+
+    # Has an event history.
+    self.assertTrue(bot_management.get_events_query('bot-id').fetch(1))
+
+    get_events_query = bot_management.get_events_query
+
+    # A bot reappears when the history is being fetched.
+    def get_events_query_mock(bot_id):
+      self.assertEqual(bot_id, 'bot-id')
+      _ensure_bot_info(bot_id)
+      return get_events_query(bot_id)
+
+    with mock.patch('server.bot_management.get_events_query',
+                    side_effect=get_events_query_mock) as m:
+      fetched, alive = bot_management.get_latest_info('bot-id')
+      self.assertEqual(stored.dimensions_flat, fetched.dimensions_flat)
+      self.assertTrue(alive)  # considered alive now
+      m.assert_called_once()
+
+  def test_get_bot_pools(self):
+    _ensure_bot_info(bot_id='bot-id', dimensions={'pool': ['p1', 'p2']})
+    self.assertEqual(bot_management.get_bot_pools('bot-id'), ['p1', 'p2'])
+
+  def test_get_bot_pools_dead(self):
+    e = _ensure_bot_info(bot_id='bot-id', dimensions={'pool': ['p1', 'p2']})
+    e.key.delete()
+    self.assertEqual(bot_management.get_bot_pools('bot-id'), ['p1', 'p2'])
+
+  def test_get_bot_pools_missing(self):
+    self.assertEqual(bot_management.get_bot_pools('bot-id'), [])
+
   @parameterized.expand([
       (u'request_sleep', ),
       (u'bot_idle', ),

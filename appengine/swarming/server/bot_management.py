@@ -459,6 +459,89 @@ def get_events_query(bot_id):
   return q
 
 
+def get_latest_info(bot_id):
+  """Returns the last known BotInfo, reconstructing it from the event history
+  if necessary.
+
+  The returned BotInfo should not be used in any transactions since it may not
+  really exist.
+
+  Returns:
+    (BotInfo, exists) where `exists` is True if BotInfo exists for real and
+    False if the bot was already deleted and BotInfo was reconstructed from
+    the history.
+  """
+  # A quick check for bots that exist.
+  info_key = get_info_key(bot_id)
+  bot = info_key.get()
+  if bot:
+    return bot, True
+
+  # If there is no BotInfo, it means the bot doesn't currently exist (i.e. it
+  # was deleted or never existed). Look into the event history to get its last
+  # known state. If the history is empty, it means the bot never existed or was
+  # deleted long time ago. If there's a history, it means the bot existed, but
+  # was deleted.
+  events = get_events_query(bot_id).fetch(1)
+  if not events:
+    return None, False
+
+  # After the first get() and before get_events_query() a bot may have
+  # handshaked, which created a BotEvent record that get_events_query() fetched.
+  # Here, another get() is made to make sure the bot is still actually missing.
+  # If we skip this check, we may accidentally mark a very new bot as deleted.
+  #
+  # See https://crbug.com/1407381 for more information.
+  bot = info_key.get(use_cache=False)
+  if bot:
+    return bot, True
+
+  # Reconstruct BotInfo of the deleted bot based on the latest event.
+  bot = BotInfo(key=info_key,
+                dimensions_flat=events[0].dimensions_flat,
+                state=events[0].state,
+                external_ip=events[0].external_ip,
+                authenticated_as=events[0].authenticated_as,
+                version=events[0].version,
+                quarantined=events[0].quarantined,
+                maintenance_msg=events[0].maintenance_msg,
+                task_id=events[0].task_id,
+                last_seen_ts=events[0].ts)
+
+  # message_conversion.bot_info_to_rpc calls `is_dead` and this property
+  # require `composite` to be calculated. The calculation is done in
+  # _pre_put_hook usually. But the BotInfo shouldn't be stored in this
+  # case, as it's already deleted.
+  bot.composite = bot.calc_composite()
+
+  return bot, False
+
+
+def get_bot_pools(bot_id):
+  """Returns pools the bot belongs to or should belong to once it appears.
+
+  Uses the latest BotInfo, falling back to the last recorded BotEvent for
+  deleted bots that don't have a BotInfo. If there's no such bot at all returns
+  an empty list.
+
+  Returns:
+    List of pools or an empty list if the bot is unknown.
+  """
+  # TODO(vadimsh): Check the static config first before hitting the datastore.
+  # Fallback to the datastore only if the config is empty (to support showing
+  # deleted bots).
+
+  # Note: unlike get_latest_info() here we don't care about carefully detecting
+  # if a bot is dead. This allows to skip one get() when checking deleted bots.
+  bot = get_info_key(bot_id).get()
+  if bot:
+    return get_pools_from_dimensions_flat(bot.dimensions_flat)
+  events = get_events_query(bot_id).fetch(1)
+  if not events:
+    return []
+  return get_pools_from_dimensions_flat(events[0].dimensions_flat)
+
+
 def get_settings_key(bot_id):
   """Returns the BotSettings ndb.Key for a known bot."""
   return ndb.Key(BotSettings, 'settings', parent=get_root_key(bot_id))

@@ -75,30 +75,6 @@ class ApiCommonTest(test_case.TestCase):
         with self.assertRaises(handlers_exceptions.BadRequestException):
           api_common.terminate_bot('bot1')
 
-  def test_race_condition_handling_get_bot(self):
-    """Tests a specific race condition described http://go/crb/1407381"""
-    with mock.patch('server.realms.check_bot_get_acl'):
-      self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5, 6))
-      bot_id = 'bot1'
-      _bot_event(bot_id=bot_id, event_type='bot_connected')
-      expected_bot = bot_management.get_info_key(bot_id).get()
-      bot_management.get_info_key(bot_id).delete()
-      get_info_key = bot_management.get_info_key
-      with mock.patch('server.bot_management.get_info_key',
-                      new_callable=mock.Mock) as m:
-
-        def side_effect_once(bot_id):
-          m.side_effect = get_info_key
-          bot_key = get_info_key(bot_id=bot_id)
-          self.assertIsNone(bot_key.get())
-          _bot_event(bot_id=bot_id, event_type='bot_connected')
-          return bot_key
-
-        m.side_effect = side_effect_once
-        bot, deleted = api_common.get_bot(bot_id)
-        self.assertFalse(deleted)
-        self.assertEqual(expected_bot, bot)
-
 
 if __name__ == '__main__':
   logging.basicConfig(
