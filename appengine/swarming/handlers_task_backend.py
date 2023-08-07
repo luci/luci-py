@@ -44,6 +44,9 @@ def validate_run_task_request(request):
   if request.target != expected_target:
     raise handlers_exceptions.BadRequestException(
         "target does not match expected target")
+  if request.pubsub_topic == "":
+    raise handlers_exceptions.BadRequestException(
+        "pubsub_topic must be provided")
 
 
 class TaskBackendAPIService(object):

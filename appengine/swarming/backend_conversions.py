@@ -43,7 +43,8 @@ def compute_task_request(run_task_req):
   build_task = task_request.BuildTask(
       build_id=run_task_req.build_id,
       buildbucket_host=run_task_req.buildbucket_host,
-      task_status=common_pb2.STATUS_UNSPECIFIED)
+      task_status=common_pb2.STATUS_UNSPECIFIED,
+      pubsub_topic=run_task_req.pubsub_topic)
 
   # NOTE: secret_bytes cannot be passed via `-secret_bytes` in `command`
   # because tasks in swarming can view command details of other tasks.

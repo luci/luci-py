@@ -87,6 +87,7 @@ class TestBackendConversions(test_case.TestCase):
         dimensions=[req_dim_prpc('required-1', 'req-1')],
         register_backend_task_token='token-token-token',
         buildbucket_host='cow-buildbucket.appspot.com',
+        pubsub_topic="my_subscription_topic",
     )
 
     expected_slice = task_request.TaskSlice(
@@ -126,7 +127,8 @@ class TestBackendConversions(test_case.TestCase):
     expected_bt = task_request.BuildTask(
         build_id='4242',
         buildbucket_host='cow-buildbucket.appspot.com',
-        task_status=common_pb2.STATUS_UNSPECIFIED)
+        task_status=common_pb2.STATUS_UNSPECIFIED,
+        pubsub_topic="my_subscription_topic")
 
     actual_tr, actual_sb, actual_bt = backend_conversions.compute_task_request(
         run_task_req)

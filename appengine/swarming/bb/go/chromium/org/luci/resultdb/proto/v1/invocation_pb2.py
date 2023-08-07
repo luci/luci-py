@@ -24,7 +24,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z/go.chromium.org/luci/resultdb/proto/v1;resultpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n7go.chromium.org/luci/resultdb/proto/v1/invocation.proto\x12\x10luci.resultdb.v1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x33go.chromium.org/luci/resultdb/proto/v1/common.proto\x1a\x36go.chromium.org/luci/resultdb/proto/v1/predicate.proto\"\xa9\x05\n\nInvocation\x12\x14\n\x04name\x18\x01 \x01(\tB\x06\xe0\x41\x03\xe0\x41\x05\x12\x31\n\x05state\x18\x02 \x01(\x0e\x32\".luci.resultdb.v1.Invocation.State\x12\x37\n\x0b\x63reate_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x06\xe0\x41\x03\xe0\x41\x05\x12*\n\x04tags\x18\x05 \x03(\x0b\x32\x1c.luci.resultdb.v1.StringPair\x12\x36\n\rfinalize_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x03\xe0\x41\x03\x12,\n\x08\x64\x65\x61\x64line\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1c\n\x14included_invocations\x18\x08 \x03(\t\x12:\n\x10\x62igquery_exports\x18\t \x03(\x0b\x32 .luci.resultdb.v1.BigQueryExport\x12\x17\n\ncreated_by\x18\n \x01(\tB\x03\xe0\x41\x03\x12\x19\n\x11producer_resource\x18\x0b \x01(\t\x12\r\n\x05realm\x18\x0c \x01(\t\x12\x39\n\x0fhistory_options\x18\r \x01(\x0b\x32 .luci.resultdb.v1.HistoryOptions\x12+\n\nproperties\x18\x0e \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x31\n\x0bsource_spec\x18\x0f \x01(\x0b\x32\x1c.luci.resultdb.v1.SourceSpec\"I\n\x05State\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\n\n\x06\x41\x43TIVE\x10\x01\x12\x0e\n\nFINALIZING\x10\x02\x12\r\n\tFINALIZED\x10\x03J\x04\x08\x03\x10\x04\"\x81\x03\n\x0e\x42igQueryExport\x12\x14\n\x07project\x18\x01 \x01(\tB\x03\xe0\x41\x02\x12\x14\n\x07\x64\x61taset\x18\x02 \x01(\tB\x03\xe0\x41\x02\x12\x12\n\x05table\x18\x03 \x01(\tB\x03\xe0\x41\x02\x12\x44\n\x0ctest_results\x18\x04 \x01(\x0b\x32,.luci.resultdb.v1.BigQueryExport.TestResultsH\x00\x12H\n\x0etext_artifacts\x18\x06 \x01(\x0b\x32..luci.resultdb.v1.BigQueryExport.TextArtifactsH\x00\x1aG\n\x0bTestResults\x12\x38\n\tpredicate\x18\x01 \x01(\x0b\x32%.luci.resultdb.v1.TestResultPredicate\x1aG\n\rTextArtifacts\x12\x36\n\tpredicate\x18\x01 \x01(\x0b\x32#.luci.resultdb.v1.ArtifactPredicateB\r\n\x0bresult_type\"d\n\x0eHistoryOptions\x12 \n\x18use_invocation_timestamp\x18\x01 \x01(\x08\x12\x30\n\x06\x63ommit\x18\x02 \x01(\x0b\x32 .luci.resultdb.v1.CommitPosition\"I\n\nSourceSpec\x12*\n\x07sources\x18\x01 \x01(\x0b\x32\x19.luci.resultdb.v1.Sources\x12\x0f\n\x07inherit\x18\x02 \x01(\x08\"\x89\x01\n\x07Sources\x12\x37\n\x0egitiles_commit\x18\x01 \x01(\x0b\x32\x1f.luci.resultdb.v1.GitilesCommit\x12\x33\n\x0b\x63hangelists\x18\x02 \x03(\x0b\x32\x1e.luci.resultdb.v1.GerritChange\x12\x10\n\x08is_dirty\x18\x03 \x01(\x08\x42\x31Z/go.chromium.org/luci/resultdb/proto/v1;resultpbb\x06proto3'
+  serialized_pb=b'\n7go.chromium.org/luci/resultdb/proto/v1/invocation.proto\x12\x10luci.resultdb.v1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x33go.chromium.org/luci/resultdb/proto/v1/common.proto\x1a\x36go.chromium.org/luci/resultdb/proto/v1/predicate.proto\"\xbe\x05\n\nInvocation\x12\x14\n\x04name\x18\x01 \x01(\tB\x06\xe0\x41\x03\xe0\x41\x05\x12\x31\n\x05state\x18\x02 \x01(\x0e\x32\".luci.resultdb.v1.Invocation.State\x12\x37\n\x0b\x63reate_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x06\xe0\x41\x03\xe0\x41\x05\x12*\n\x04tags\x18\x05 \x03(\x0b\x32\x1c.luci.resultdb.v1.StringPair\x12\x36\n\rfinalize_time\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.TimestampB\x03\xe0\x41\x03\x12,\n\x08\x64\x65\x61\x64line\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1c\n\x14included_invocations\x18\x08 \x03(\t\x12:\n\x10\x62igquery_exports\x18\t \x03(\x0b\x32 .luci.resultdb.v1.BigQueryExport\x12\x17\n\ncreated_by\x18\n \x01(\tB\x03\xe0\x41\x03\x12\x19\n\x11producer_resource\x18\x0b \x01(\t\x12\r\n\x05realm\x18\x0c \x01(\t\x12\x39\n\x0fhistory_options\x18\r \x01(\x0b\x32 .luci.resultdb.v1.HistoryOptions\x12+\n\nproperties\x18\x0e \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x31\n\x0bsource_spec\x18\x0f \x01(\x0b\x32\x1c.luci.resultdb.v1.SourceSpec\x12\x13\n\x0b\x62\x61seline_id\x18\x10 \x01(\t\"I\n\x05State\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\n\n\x06\x41\x43TIVE\x10\x01\x12\x0e\n\nFINALIZING\x10\x02\x12\r\n\tFINALIZED\x10\x03J\x04\x08\x03\x10\x04\"\x81\x03\n\x0e\x42igQueryExport\x12\x14\n\x07project\x18\x01 \x01(\tB\x03\xe0\x41\x02\x12\x14\n\x07\x64\x61taset\x18\x02 \x01(\tB\x03\xe0\x41\x02\x12\x12\n\x05table\x18\x03 \x01(\tB\x03\xe0\x41\x02\x12\x44\n\x0ctest_results\x18\x04 \x01(\x0b\x32,.luci.resultdb.v1.BigQueryExport.TestResultsH\x00\x12H\n\x0etext_artifacts\x18\x06 \x01(\x0b\x32..luci.resultdb.v1.BigQueryExport.TextArtifactsH\x00\x1aG\n\x0bTestResults\x12\x38\n\tpredicate\x18\x01 \x01(\x0b\x32%.luci.resultdb.v1.TestResultPredicate\x1aG\n\rTextArtifacts\x12\x36\n\tpredicate\x18\x01 \x01(\x0b\x32#.luci.resultdb.v1.ArtifactPredicateB\r\n\x0bresult_type\"d\n\x0eHistoryOptions\x12 \n\x18use_invocation_timestamp\x18\x01 \x01(\x08\x12\x30\n\x06\x63ommit\x18\x02 \x01(\x0b\x32 .luci.resultdb.v1.CommitPosition\"I\n\nSourceSpec\x12*\n\x07sources\x18\x01 \x01(\x0b\x32\x19.luci.resultdb.v1.Sources\x12\x0f\n\x07inherit\x18\x02 \x01(\x08\"\x89\x01\n\x07Sources\x12\x37\n\x0egitiles_commit\x18\x01 \x01(\x0b\x32\x1f.luci.resultdb.v1.GitilesCommit\x12\x33\n\x0b\x63hangelists\x18\x02 \x03(\x0b\x32\x1e.luci.resultdb.v1.GerritChange\x12\x10\n\x08is_dirty\x18\x03 \x01(\x08\x42\x31Z/go.chromium.org/luci/resultdb/proto/v1;resultpbb\x06proto3'
   ,
   dependencies=[google_dot_api_dot_field__behavior__pb2.DESCRIPTOR,google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_resultdb_dot_proto_dot_v1_dot_common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_resultdb_dot_proto_dot_v1_dot_predicate__pb2.DESCRIPTOR,])
 
@@ -60,8 +60,8 @@ _INVOCATION_STATE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=885,
-  serialized_end=958,
+  serialized_start=906,
+  serialized_end=979,
 )
 _sym_db.RegisterEnumDescriptor(_INVOCATION_STATE)
 
@@ -172,6 +172,13 @@ _INVOCATION = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='baseline_id', full_name='luci.resultdb.v1.Invocation.baseline_id', index=14,
+      number=16, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -186,7 +193,7 @@ _INVOCATION = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=283,
-  serialized_end=964,
+  serialized_end=985,
 )
 
 
@@ -217,8 +224,8 @@ _BIGQUERYEXPORT_TESTRESULTS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1193,
-  serialized_end=1264,
+  serialized_start=1214,
+  serialized_end=1285,
 )
 
 _BIGQUERYEXPORT_TEXTARTIFACTS = _descriptor.Descriptor(
@@ -248,8 +255,8 @@ _BIGQUERYEXPORT_TEXTARTIFACTS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1266,
-  serialized_end=1337,
+  serialized_start=1287,
+  serialized_end=1358,
 )
 
 _BIGQUERYEXPORT = _descriptor.Descriptor(
@@ -312,8 +319,8 @@ _BIGQUERYEXPORT = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=967,
-  serialized_end=1352,
+  serialized_start=988,
+  serialized_end=1373,
 )
 
 
@@ -351,8 +358,8 @@ _HISTORYOPTIONS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1354,
-  serialized_end=1454,
+  serialized_start=1375,
+  serialized_end=1475,
 )
 
 
@@ -390,8 +397,8 @@ _SOURCESPEC = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1456,
-  serialized_end=1529,
+  serialized_start=1477,
+  serialized_end=1550,
 )
 
 
@@ -436,8 +443,8 @@ _SOURCES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1532,
-  serialized_end=1669,
+  serialized_start=1553,
+  serialized_end=1690,
 )
 
 _INVOCATION.fields_by_name['state'].enum_type = _INVOCATION_STATE
