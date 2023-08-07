@@ -127,7 +127,7 @@ class TestBackendConversions(test_case.TestCase):
     expected_bt = task_request.BuildTask(
         build_id='4242',
         buildbucket_host='cow-buildbucket.appspot.com',
-        task_status=common_pb2.STATUS_UNSPECIFIED,
+        latest_task_status=task_result.State.PENDING,
         pubsub_topic="my_subscription_topic")
 
     actual_tr, actual_sb, actual_bt = backend_conversions.compute_task_request(

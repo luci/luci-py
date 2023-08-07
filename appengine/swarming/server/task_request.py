@@ -607,18 +607,24 @@ class SecretBytes(ndb.Model):
 class BuildTask(ndb.Model):
   """Stores the buildbucket related fields sent by buildbucket.
 
-  Also stores task state in the form of a buildbucket.v2.Status.
+  Also stores latest task state.
   """
 
   _use_memcache = False
   build_id = ndb.StringProperty(required=True, indexed=False)
   buildbucket_host = ndb.StringProperty(required=True, indexed=False)
-  # A buildbucket.v2.Status that will keep the latest updated status
-  # for the task.
-  task_status = ndb.IntegerProperty(required=True, indexed=False)
-  # The pubsub topic that will be used to send UpdateBuildTask
+  # A TaskResult.State that will keep the latest task status
+  # that has been converted to a common_pb2.Status sent to buildbucket.
+  latest_task_status = ndb.IntegerProperty(required=True, indexed=False)
+  # The pubsub topic name that will be used to send UpdateBuildTask
   # messages to buildbucket.
   pubsub_topic = ndb.StringProperty(required=True, indexed=False)
+  # Bot dimensions for the task. Stored when bot_update_task is first called for
+  # a task backend build, thus that bot_update_task does not have to make any
+  # more extra datastore calls in subsequent bot_update_task calls.
+  bot_dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict,
+                                                             compressed=True,
+                                                             required=False)
 
 
 class CipdPackage(ndb.Model):

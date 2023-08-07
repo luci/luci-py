@@ -54,6 +54,8 @@ from server.task_result import State
 from proto.api import plugin_pb2
 from proto.config import pools_pb2
 
+from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
+
 # pylint: disable=W0212,W0612
 
 
@@ -97,7 +99,10 @@ def _gen_request_slices(properties=None, **kwargs):
       u'bot_ping_tolerance_secs':
       120,
   }
-  args.update(kwargs)
+  for k in kwargs:
+    if k == "build_task":
+      continue  # skipping since that arg isn't one for TaskRequest.
+    args[k] = kwargs[k]
   ret = task_request.TaskRequest(**args)
   task_request.init_new_request(ret, True, task_request.TEMPLATE_AUTO)
   return ret
@@ -107,6 +112,10 @@ def _gen_request_id(rid=None):
   if rid is None:
     return str(uuid.uuid4())
   return rid
+
+
+def _gen_build_task(**kwargs):
+  return kwargs.get("build_task", None)
 
 
 def _get_results(request_key):
@@ -387,9 +396,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.execute_tasks()
     request = _gen_request_slices(**kwargs)
     request_id = _gen_request_id(request_id)
+    build_task = _gen_build_task(**kwargs)
     result_summary = task_scheduler.schedule_request(request,
                                                      request_id,
-                                                     secret_bytes=secret_bytes)
+                                                     secret_bytes=secret_bytes,
+                                                     build_task=build_task)
     # State will be either PENDING or COMPLETED (for deduped task)
     self.execute_tasks()
     self.assertEqual(0, self.execute_tasks())
@@ -1850,6 +1861,23 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         0,
         ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
             fields=_update_fields_pubsub(http_status_code=200)).sum)
+
+  def test_bot_update_buildbucket_pubsub_ok(self):
+    self.mock(utils, "time_time", lambda: 12345678)
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(
+        has_build_task=True,
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic"))
+    self.assertEqual(
+        State.COMPLETED,
+        _bot_update_task(run_result.key, exit_code=0, duration=0.1))
+    self.assertEqual(1, len(pub_sub_calls))  # notification is sent
+    self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
+    self.assertEqual(1, self.execute_tasks())
 
   def _bot_update_timeouts(self, hard, io):
     run_result = self._quick_reap()

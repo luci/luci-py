@@ -43,7 +43,7 @@ def compute_task_request(run_task_req):
   build_task = task_request.BuildTask(
       build_id=run_task_req.build_id,
       buildbucket_host=run_task_req.buildbucket_host,
-      task_status=common_pb2.STATUS_UNSPECIFIED,
+      latest_task_status=task_result.State.PENDING,
       pubsub_topic=run_task_req.pubsub_topic)
 
   # NOTE: secret_bytes cannot be passed via `-secret_bytes` in `command`

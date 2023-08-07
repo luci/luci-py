@@ -160,7 +160,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
             id=expected_task_id, target='swarming://test-swarming'),
                            link=l % expected_task_id,
                            status=common_pb2.SCHEDULED,
-                           update_id=1546398020))
+                           update_id=1546398020000000000))
     self.assertEqual(actual_resp, expected_response)
     self.assertEqual(1, task_request.TaskRequest.query().count())
     self.assertEqual(1, task_request.BuildTask.query().count())
@@ -176,7 +176,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
             id=expected_task_id, target='swarming://test-swarming'),
                            link=l % expected_task_id,
                            status=common_pb2.SCHEDULED,
-                           update_id=1546398020))
+                           update_id=1546398020000000000))
     self.assertEqual(actual_resp, expected_response)
     self.assertEqual(1, task_request.TaskRequest.query().count())
     self.assertEqual(1, task_request.BuildTask.query().count())
@@ -195,7 +195,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
             id=new_expected_task_id, target='swarming://test-swarming'),
                            link=l % new_expected_task_id,
                            status=common_pb2.SCHEDULED,
-                           update_id=1546398020))
+                           update_id=1546398020000000000))
     self.assertEqual(actual_resp, expected_response)
     self.assertEqual(2, task_request.TaskRequest.query().count())
     self.assertEqual(2, task_request.BuildTask.query().count())
