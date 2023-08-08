@@ -36,7 +36,7 @@ TEST_CONFIG = bots_pb2.BotsCfg(
         ),
         # This group includes an injected bot_config and system_service_account.
         bots_pb2.BotGroup(
-            bot_id=['other_bot'],
+            bot_id=['other_bot', 'bot1--xxx'],
             bot_id_prefix=['bot'],
             auth=[bots_pb2.BotAuth(require_service_account=['a@example.com'])],
             bot_config_script='foo.py',
@@ -182,12 +182,14 @@ class BotGroupsConfigTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     cfg = bot_groups_config._fetch_bot_groups()
 
-    self.assertEquals({
-        u'bot1': EXPECTED_GROUP_1,
-        u'bot2': EXPECTED_GROUP_1,
-        u'bot3': EXPECTED_GROUP_1,
-        u'other_bot': EXPECTED_GROUP_2,
-    }, cfg.direct_matches)
+    self.assertEquals(
+        {
+            u'bot1': EXPECTED_GROUP_1,
+            u'bot1--xxx': EXPECTED_GROUP_2,
+            u'bot2': EXPECTED_GROUP_1,
+            u'bot3': EXPECTED_GROUP_1,
+            u'other_bot': EXPECTED_GROUP_2,
+        }, cfg.direct_matches)
     self.assertEquals([('bot', EXPECTED_GROUP_2)], cfg.prefix_matches)
     self.assertEquals(EXPECTED_GROUP_3, cfg.default_group)
 
@@ -195,6 +197,10 @@ class BotGroupsConfigTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.assertEquals(
         EXPECTED_GROUP_1, bot_groups_config.get_bot_group_config('bot1'))
+    self.assertEquals(EXPECTED_GROUP_1,
+                      bot_groups_config.get_bot_group_config('bot1--zzz'))
+    self.assertEquals(EXPECTED_GROUP_2,
+                      bot_groups_config.get_bot_group_config('bot1--xxx'))
     self.assertEquals(EXPECTED_GROUP_3,
                       bot_groups_config.get_bot_group_config('?'))
 

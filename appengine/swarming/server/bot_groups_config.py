@@ -111,8 +111,30 @@ class BadConfigError(Exception):
   """Raised if the current bots.cfg config is broken."""
 
 
+def get_host_bot_id(bot_id):
+  """Given a bot ID like `<host>--<sfx>` returns just `<host>`.
+
+  Bot IDs like `<host>--<sfx>` are called composite. They are used to represent
+  multiple bots running on the same host (e.g. as docker containers) sharing
+  the same host credentials. The `<host>` part identifies this host. It is used
+  when checking the authentication tokens and looking up the bot group config.
+
+  If the bot ID is not composite, returns it as is.
+  """
+  if not bot_id:
+    return bot_id
+  parts = bot_id.split('--')
+  if len(parts) == 2:
+    return parts[0]
+  if len(parts) > 2:
+    logging.error('Unable to parse composite bot_id: %s', bot_id)
+  return bot_id
+
+
 def get_bot_group_config(bot_id):
-  """Returns BotGroupConfig for a bot with given ID.
+  """Returns BotGroupConfig matching the given bot ID key.
+
+  Understands composite bot IDs, see get_host_bot_id(...).
 
   Returns:
     BotGroupConfig or None if not found.
@@ -123,14 +145,23 @@ def get_bot_group_config(bot_id):
   """
   cfg = _fetch_bot_groups()
 
-  gr = cfg.direct_matches.get(bot_id)
-  if gr is not None:
-    return gr
+  # If this is a composite bot ID try to find if there's a config for this
+  # *specific* composite ID first. This acts as an override if we need to
+  # single-out a bot that uses a concrete composite IDs.
+  host_id = get_host_bot_id(bot_id)
+  if host_id != bot_id:
+    bot_group = cfg.direct_matches.get(bot_id)
+    if bot_group is not None:
+      return bot_group
 
-  for prefix, gr in cfg.prefix_matches:
-    if bot_id.startswith(prefix):
-      return gr
-
+  # Otherwise look it up based on the host ID (which is the same as bot_id
+  # for non-composite IDs).
+  bot_group = cfg.direct_matches.get(host_id)
+  if bot_group is not None:
+    return bot_group
+  for prefix, bot_group in cfg.prefix_matches:
+    if host_id.startswith(prefix):
+      return bot_group
   return cfg.default_group
 
 
