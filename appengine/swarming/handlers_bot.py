@@ -28,6 +28,7 @@ from components import utils
 from server import acl
 from server import bot_auth
 from server import bot_code
+from server import bot_groups_config
 from server import bot_management
 from server import config
 from server import named_caches
@@ -844,49 +845,51 @@ class BotPollHandler(_BotBaseHandler):
     if res.rbe_instance and res.rbe_hybrid_mode and force_poll:
       logging.info('Force-polling Swarming from an RBE bot')
 
-    # There are 4 kind of polling:
+    # We need to make two separate decisions based on RBE migration status
+    # of the bot: whether the bot should be registered in the Swarming
+    # scheduler, and whether it should *use* the Swarming scheduler.
     #
-    #   1. Polling from a native Swarming bot. We need to consume tasks from all
-    #      matching queues.
-    #   2. Polling from a pure RBE-mode bot. In this case we check only queues
-    #      targeting this concrete bot via `id` dimension. These queues usually
-    #      contain termination tasks. This allows to keep reusing Swarming
-    #      scheduler for termination process, while using RBE for other tasks.
-    #   3. Polling from a hybrid bot that just wants to "check in". This is
-    #      the same as (2).
-    #   4. Polling from a hybrid bot that wants to get a task from the Swarming
-    #      scheduler (indicated by force==True). This is the same as (1).
+    # The answers are different for hybrid bots: we want to always register them
+    # in the scheduler, but we *use* the scheduler only when `force` is True.
     if not res.rbe_instance:
-      # Native Swarming bot. Need to poll all queues.
-      bot_queues_only = False
+      # Native Swarming bot. Need to use the Swarming scheduler.
+      scheduler_reg = True
+      scheduler_use = True
     elif not res.rbe_hybrid_mode:
-      # Pure RBE-mode bot. Need to poll only bot queues.
-      bot_queues_only = True
+      # Pure RBE-mode bot. Don't use the Swarming scheduler.
+      scheduler_reg = False
+      scheduler_use = False
     else:
-      # Decide based on `force` request field.
-      bot_queues_only = not force_poll
+      # Hybrid RBE-mode bot. Decide based on `force` request field.
+      scheduler_reg = True
+      scheduler_use = force_poll
 
-    try:
-      queues = task_queues.assert_bot(res.dimensions, bot_queues_only)
-    except self.TIMEOUT_EXCEPTIONS as e:
-      self.abort_by_timeout('assert_bot', e)
+    # Register in the Swarming scheduler, get queues to poll.
+    queues = None
+    if scheduler_reg:
+      try:
+        queues = task_queues.assert_bot(res.dimensions)
+      except self.TIMEOUT_EXCEPTIONS as e:
+        self.abort_by_timeout('assert_bot', e)
 
-    # Try to grab a task. Leave ~10s for bot_event(...) transaction below.
-    reap_deadline = deadline - datetime.timedelta(seconds=10)
-    request_uuid = res.request.get('request_uuid')
-    try:
-      (request, secret_bytes,
-       run_result), is_deduped = api_helpers.cache_request(
-           'bot_poll', request_uuid, lambda: task_scheduler.bot_reap_task(
-               res.dimensions, queues, res.bot_details, reap_deadline))
-    except self.TIMEOUT_EXCEPTIONS as e:
-      self.abort_by_timeout('bot_reap_task', e)
-
-    if is_deduped:
-      logging.info('Reusing request cache with uuid %s', request_uuid)
+    # Grab the task from the Swarming scheduler if actually using it.
+    request = None
+    if scheduler_use:
+      # Try to grab a task. Leave ~10s for bot_event(...) transaction below.
+      reap_deadline = deadline - datetime.timedelta(seconds=10)
+      request_uuid = res.request.get('request_uuid')
+      try:
+        (request, secret_bytes,
+         run_result), is_deduped = api_helpers.cache_request(
+             'bot_poll', request_uuid, lambda: task_scheduler.bot_reap_task(
+                 res.dimensions, queues, res.bot_details, reap_deadline))
+        if is_deduped:
+          logging.info('Reusing request cache with uuid %s', request_uuid)
+      except self.TIMEOUT_EXCEPTIONS as e:
+        self.abort_by_timeout('bot_reap_task', e)
 
     if not request:
-      # No tasks found in the Swarming scheduler.
+      # No tasks found in the Swarming scheduler or not using it at all.
       if not res.rbe_instance:
         # If this is a native Swarming bot, tell it to sleep a bit.
         bot_event('request_sleep')
@@ -1478,9 +1481,18 @@ class BotTaskUpdateHandler(_BotApiHandler):
               task_request.CipdPackage(**args) for args in cipd_pins['packages']
           ])
 
-    # Tell the task queues management engine that the bot is still alive, and
-    # it shall refresh the task queues.
-    task_queues.freshen_up_queues(bot_id)
+    # Notify the Swarming scheduler this bot is still alive. Don't do this for
+    # bots in pure RBE mode: they aren't using Swarming scheduler. Note that
+    # the bot doesn't send its pools with this RPC, so we either need to
+    # fetch them from the datastore or from configs. We use configs.
+    bot_group_cfg = bot_groups_config.get_bot_group_config(bot_id)
+    if bot_group_cfg:
+      pools = bot_group_cfg.dimensions.get('pool')
+      rbe_cfg = rbe.get_rbe_config_for_bot(bot_id, pools)
+      pure_rbe = rbe_cfg and not rbe_cfg.hybrid_mode
+      if not pure_rbe:
+        logging.debug('Keeping swarming queues alive')
+        task_queues.freshen_up_queues(bot_id)
 
     try:
       state = task_scheduler.bot_update_task(

@@ -103,7 +103,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
     self.mock(task_queues, '_random_timedelta_mins', random_dt)
 
-  def _assert_bot(self, bot_id=u'bot1', dimensions=None, bot_queues_only=False):
+  def _assert_bot(self, bot_id=u'bot1', dimensions=None):
     bot_dimensions = {
         u'cpu': [u'x86-64', u'x64'],
         u'id': [bot_id],
@@ -119,8 +119,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
                              state={},
                              version='1234',
                              register_dimensions=True)
-    queues = task_queues.assert_bot(bot_dimensions,
-                                    bot_queues_only=bot_queues_only)
+    queues = task_queues.assert_bot(bot_dimensions)
     return self.execute_tasks(), queues
 
   def _assert_task(self, dimensions=None):
@@ -455,20 +454,9 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # queues are actually matching the bot.
 
     # Matches both submitted tasks.
-    tq, queues = self._assert_bot('bot-id', bot_queues_only=False)
+    tq, queues = self._assert_bot('bot-id')
     self.assertEqual(0, tq)
     self.assertEqual([203088291, 3402762422], queues)
-
-    # Matches only the task with `id` dimension.
-    tq, queues = self._assert_bot('bot-id', bot_queues_only=True)
-    self.assertEqual(0, tq)
-    self.assertEqual([3402762422], queues)
-
-    # Verify this mysterious magic number is indeed "bot:..." queue.
-    s = task_queues.TaskDimensionsSets.get_by_id('bot:bot-id:3402762422')
-    self.assertEqual([{
-        u'dimensions': [u'id:bot-id', u'os:Ubuntu', u'pool:default']
-    }], s.sets)
 
   def test_task_dimensions_expiry(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
