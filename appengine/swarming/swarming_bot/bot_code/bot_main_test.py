@@ -386,7 +386,8 @@ class TestBotMain(TestBotBase):
 
     def get_dimensions(botobj):
       self.assertEqual(self.bot, botobj)
-      return 'invalid'
+      # Non-JSON serializable.
+      return {'invalid': b'blob'}
 
     self.mock(bot_config, 'get_dimensions', get_dimensions)
 
@@ -406,7 +407,8 @@ class TestBotMain(TestBotBase):
     }
     self.assertEqual(expected, bot_main._get_dimensions(self.bot))
     expected = {
-        'quarantined': "get_dimensions(): expected a dict, got 'invalid'",
+        'quarantined':
+        "get_dimensions(): expected a JSON dict, got {'invalid': b'blob'}",
         'sleep_streak': 0.1,
         'yo': 'dawh',
     }

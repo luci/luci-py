@@ -354,12 +354,12 @@ def _get_dimensions(botobj):
   Traps exceptions, quarantining the bot if they happen.
   """
   out = _call_hook_safe(False, botobj, 'get_dimensions')
-  if isinstance(out, dict):
+  if _is_jsonish_dict(out):
     out = out.copy()
     out['server_version'] = [_get_server_version_safe()]
     return out
   try:
-    _set_quarantined('get_dimensions(): expected a dict, got %r' % out)
+    _set_quarantined('get_dimensions(): expected a JSON dict, got %r' % out)
     out = os_utilities.get_dimensions()
     out['quarantined'] = ['1']
     out['server_version'] = [_get_server_version_safe()]
@@ -415,8 +415,8 @@ def _get_state(botobj, sleep_streak):
   Traps exceptions, quarantining the bot if they happen.
   """
   state = _call_hook_safe(False, botobj, 'get_state')
-  if not isinstance(state, dict):
-    _set_quarantined('get_state(): expected a dict, got %r' % state)
+  if not _is_jsonish_dict(state):
+    _set_quarantined('get_state(): expected a JSON dict, got %r' % state)
     state = {'broken': state}
 
   # TODO(vadimsh): This is temporary to detect bots that dynamically change ID.
@@ -602,6 +602,17 @@ def _is_base_dir_ok(botobj):
     # This can happen very early in the process lifetime.
     return THIS_DIR != os.path.expanduser('~')
   return botobj.base_dir != os.path.expanduser('~')
+
+
+def _is_jsonish_dict(d):
+  """Returns True if `d` is a JSON-serializable dict."""
+  if not isinstance(d, dict):
+    return False
+  try:
+    _ = json.dumps(d)
+  except Exception:
+    return False
+  return True
 
 
 ### Public functions used by __main__.py
