@@ -121,7 +121,8 @@ class AppTestBase(test_case.TestCase):
                   ('buildbucket-notify', 'cancel-children-tasks', 'pubsub',
                    'monitoring-bq-tasks-results-run',
                    'monitoring-bq-tasks-results-summary',
-                   'monitoring-bq-bots-events', 'monitoring-bq-tasks-requests'))
+                   'monitoring-bq-bots-events', 'monitoring-bq-tasks-requests',
+                   'rbe-enqueue'))
     return True
 
   @ndb.tasklet

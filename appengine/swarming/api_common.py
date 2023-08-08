@@ -18,16 +18,17 @@ from components import auth
 from components import datastore_utils
 from components import utils
 from server import acl
-from server import bot_management
 from server import bot_code
+from server import bot_management
 from server import config
 from server import pools_config
-from server import task_queues
+from server import rbe
 from server import realms
-from server import task_scheduler
-from server import task_request
 from server import task_pack
+from server import task_queues
+from server import task_request
 from server import task_result
+from server import task_scheduler
 
 # Whitespace replacement regexp
 _WHITESPACE_RE = re.compile(r'[\t|\n]+')
@@ -116,20 +117,28 @@ def terminate_bot(bot_id, reason=None):
     auth.AuthorizationError if bot fails realm authorization test.
   """
   realms.check_bot_terminate_acl(bot_id)
-  bot_key = bot_management.get_info_key(bot_id)
-  _get_or_raise(bot_key)  # raises 404 if there is no such bot
+
+  # Verify the bot exists and check if it is in full RBE mode. If it is, we'll
+  # send the termination task through the RBE scheduler.
+  bot = _get_or_raise(bot_management.get_info_key(bot_id))
+  pools = bot_management.get_pools_from_dimensions_flat(bot.dimensions_flat)
+  if not pools:
+    raise handlers_exceptions.BadRequestException('The bot is not in any pool')
+  rbe_instance = None
+  rbe_cfg = rbe.get_rbe_config_for_bot(bot_id, pools)
+  if rbe_cfg and not rbe_cfg.hybrid_mode:
+    rbe_instance = rbe_cfg.instance
+
   try:
     # Craft a special priority 0 task to tell the bot to shutdown.
     if reason:
       reason = re.sub(_WHITESPACE_RE, ' ', reason)
-    request = task_request.create_termination_task(bot_id, reason=reason)
+    request = task_request.create_termination_task(bot_id, rbe_instance, reason)
   except (datastore_errors.BadValueError, TypeError, ValueError) as e:
     raise handlers_exceptions.BadRequestException(str(e))
 
-  result_summary = task_scheduler.schedule_request(request,
-                                                   enable_resultdb=False)
+  result_summary = task_scheduler.schedule_request(request)
   return task_pack.pack_result_summary_key(result_summary.key)
-
 
 
 # Stores a list of filters for the function task_result.get_run_results_query

@@ -40,12 +40,13 @@ from server import bot_code
 from server import bot_management
 from server import bot_management
 from server import config
+from server import rbe
 from server import service_accounts
 from server import task_pack
 from server import task_request
 from server import task_result
-from server import task_to_run
 from server import task_scheduler
+from server import task_to_run
 
 import handlers_bot
 import handlers_prpc
@@ -648,6 +649,29 @@ class BotServicePrpcTest(PrpcTest):
     _decode(resp.body, actual)
     expected = swarming_pb2.TerminateResponse(task_id='5cee488008810')
     self.assertEqual(expected, actual)
+
+  def test_terminate_via_rbe(self):
+    self.set_as_bot()
+    self.bot_poll()
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+
+    def mocked_rbe_config(*_args):
+      return rbe.RBEBotConfig(
+          instance='some/rbe/instance',
+          hybrid_mode=False)
+    self.mock(rbe, 'get_rbe_config_for_bot', mocked_rbe_config)
+
+    self.set_as_admin()
+    request = swarming_pb2.TerminateRequest(bot_id="bot1")
+    resp = self.post_prpc('TerminateBot', request)
+    actual = swarming_pb2.TerminateResponse()
+    _decode(resp.body, actual)
+    expected = swarming_pb2.TerminateResponse(task_id='5cee488008810')
+    self.assertEqual(expected, actual)
+
+    key, _ = task_pack.get_request_and_result_keys(actual.task_id)
+    req = key.get()
+    self.assertEqual(req.rbe_instance, 'some/rbe/instance')
 
   def test_tasks_ok(self):
     """Asserts that tasks produces bot information."""

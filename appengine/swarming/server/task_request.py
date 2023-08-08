@@ -1552,16 +1552,14 @@ def get_automatic_tags(request, index):
   return tags
 
 
-def create_termination_task(bot_id, reason=None):
+def create_termination_task(bot_id, rbe_instance=None, reason=None):
   """Returns a task to terminate the given bot.
 
-  ACL check must have been done before.
+  ACL check and the check that the bot exists must have been done before.
 
   Returns:
     TaskRequest for priority 0 (highest) termination task.
   """
-  # TODO(vadimsh): If `bot_id` is in full RBE mode, schedule this task via
-  # RBE as well.
   properties = TaskProperties(
       dimensions_data={u'id': [unicode(bot_id)]},
       execution_timeout_secs=0,
@@ -1577,13 +1575,17 @@ def create_termination_task(bot_id, reason=None):
       expiration_ts=now + datetime.timedelta(days=1),
       name=name,
       priority=0,
+      rbe_instance=rbe_instance,
       scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
       task_slices=[
           TaskSlice(expiration_secs=24 * 60 * 60,
                     properties=properties,
                     wait_for_capacity=True),
       ],
-      manual_tags=[u'terminate:1'])
+      manual_tags=[
+          u'terminate:1',
+          u'rbe:%s' % (rbe_instance or 'none'),
+      ])
   assert request.task_slice(0).properties.is_terminate
   init_new_request(request, True, TEMPLATE_SKIP)
   return request
