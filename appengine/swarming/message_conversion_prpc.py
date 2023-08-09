@@ -539,6 +539,18 @@ def _task_slice_from_rpc(task_slice):
   return out, secret_bytes
 
 
+def _log_new_task_request(ntr):
+  ntrc = swarming_pb2.NewTaskRequest()
+  ntrc.CopyFrom(ntr)
+  if ntrc.properties.secret_bytes:
+    ntrc.properties.secret_bytes = b'<REDACTED>'
+  for ts in ntrc.task_slices:
+    if ts.properties.secret_bytes:
+      ts.properties.secret_bytes = b'<REDACTED>'
+  logging.info("NewTaskRequest %s", ntrc)
+  return ntrc
+
+
 def new_task_request_from_rpc(request):
   # type: (swarming_pb2.NewTaskRequest) ->
   #   tuple(task_request.TaskRequest,
@@ -556,6 +568,7 @@ def new_task_request_from_rpc(request):
   Raises:
     ValueError when the task request is invalid.
   """
+  _log_new_task_request(request)
   if request.task_slices and request.HasField('properties'):
     raise ValueError('Specify one of properties or task_slices, not both')
 

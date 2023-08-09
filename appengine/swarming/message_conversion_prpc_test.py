@@ -217,6 +217,15 @@ class TestMessageConversion(test_case.TestCase):
     proto = message_conversion_prpc.task_request_response(request)
     self.assertEqual(proto.rbe_instance, rbe)
 
+  def test_log_task_request(self):
+    ntr = self._create_default_new_task_request_proto()
+    ntr.properties.secret_bytes = b'hello'
+    ntr.task_slices[0].properties.secret_bytes = b'hello'
+    ntrc = message_conversion_prpc._log_new_task_request(ntr)
+    self.assertEqual(ntrc.properties.secret_bytes, b'<REDACTED>')
+    for ts in ntrc.task_slices:
+      self.assertEqual(ts.properties.secret_bytes, b'<REDACTED>')
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
