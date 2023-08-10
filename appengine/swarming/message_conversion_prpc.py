@@ -444,8 +444,8 @@ def _cipd_package_from_rpc(package):
 def _digest_from_rpc(digest):
   # type: (swarming_pb2.Digest) -> task_request.Digest
   return task_request.Digest(
-      hash=digest.hash or None,
-      size_bytes=digest.size_bytes or None,
+      hash=digest.hash,
+      size_bytes=digest.size_bytes,
   )
 
 
