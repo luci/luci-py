@@ -71,12 +71,14 @@ queue:
 # /internal/tasks/t/rbe-enqueue/.*
 # This is served by Swarming Go via go.chromium.org/luci/server/tq.
 - name: rbe-enqueue
+  target: default-go
   bucket_size: 100
   rate: 500/s
 
 # /internal/tasks/t/rbe-cancel/.*
 # This is served by Swarming Go via go.chromium.org/luci/server/tq.
 - name: rbe-cancel
+  target: default-go
   bucket_size: 100
   rate: 500/s
 
