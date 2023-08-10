@@ -367,12 +367,16 @@ class EnqueueTest(test_case.TestCase):
   def make_request(self):
     def make_slice(name):
       return task_request.TaskSlice(
-          properties=task_request.TaskProperties(dimensions_data={
-              u'id': [u'bot-id'],
-              u'dim1': [u'val1', u'val2|val3'],
-              u'dim2': [u'val4'],
-              u'name': [name],
-          }, ),
+          properties=task_request.TaskProperties(
+              dimensions_data={
+                  u'id': [u'bot-id'],
+                  u'dim1': [u'val1', u'val2|val3'],
+                  u'dim2': [u'val4'],
+                  u'name': [name],
+              },
+              execution_timeout_secs=700,
+              grace_period_secs=300,
+          ),
           expiration_secs=123,
       )
     req = task_request.TaskRequest(
@@ -425,6 +429,8 @@ class EnqueueTest(test_case.TestCase):
                     },
                     u'rbeInstance':
                     u'some-instance',
+                    u'executionTimeout':
+                    u'1030s',
                     u'expiry':
                     u'2112-01-01T01:07:10Z',
                     u'requestedBotId':

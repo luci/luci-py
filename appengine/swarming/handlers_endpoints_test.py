@@ -1123,7 +1123,7 @@ class TasksApiTest(BaseTest):
     resp = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
         u'error': {
-            u'message': u'expiration_secs (0) must be between 1s and 7 days',
+            u'message': u'expiration_secs (0) must be between 1s and 604800s',
         },
     }
     self.assertEqual(expected, resp.json)

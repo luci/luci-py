@@ -103,15 +103,23 @@ DEFAULT_BOT_PING_TOLERANCE = 1200
 # Default value for grace_period for task cancellation.
 DEFAULT_GRACE_PERIOD_SECS = 30
 
+# Maximum allowed grace_period for task cancellation.
+#
+# This is the maximum amount the bot will spend waiting for a canceled or
+# timed out task to react to SIGTERM before forcefully killing it. For timed out
+# tasks it applies after `execution_timeout_secs` has already passed.
+MAX_GRACE_PERIOD_SECS = 60 * 60
+
 # Maximum allowed timeout for I/O and hard timeouts.
 #
-# Seven days in seconds. Includes an additional 10s to account for small jitter.
-MAX_TIMEOUT_SECS = 7 * 24 * 60 * 60 + 10
+# The overall timeout including the grace period and all overheads must fit
+# under 7 days (per RBE limits). So this value is slightly less than 7 days.
+MAX_TIMEOUT_SECS = 7 * 24 * 60 * 60 - MAX_GRACE_PERIOD_SECS - 60
 
 # Maximum allowed expiration for a pending task.
 #
-# Seven days in seconds. Includes an additional 10s to account for small jitter.
-MAX_EXPIRATION_SECS = 7 * 24 * 60 * 60 + 10
+# Seven days in seconds.
+MAX_EXPIRATION_SECS = 7 * 24 * 60 * 60
 
 # Minimum value for timeouts.
 #
@@ -320,8 +328,8 @@ def _check_expiration_secs(name, value):
   """Validates expiration_secs."""
   if not (_MIN_TIMEOUT_SECS <= value <= MAX_EXPIRATION_SECS):
     raise datastore_errors.BadValueError(
-        '%s (%s) must be between %ds and 7 days' %
-        (name, value, _MIN_TIMEOUT_SECS))
+        '%s (%s) must be between %ds and %ds' %
+        (name, value, _MIN_TIMEOUT_SECS, MAX_EXPIRATION_SECS))
 
 
 def _validate_expiration_ts(prop, value):
@@ -340,9 +348,10 @@ def _validate_expiration_secs(prop, value):
 def _validate_grace(prop, value):
   """Validates grace_period_secs in TaskProperties."""
   # pylint: disable=protected-access
-  if not (0 <= value <= 60 * 60):
+  if not (0 <= value <= MAX_GRACE_PERIOD_SECS):
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be between 0s and one hour' % (prop._name, value))
+        '%s (%ds) must be between 0s and %ds' %
+        (prop._name, value, MAX_GRACE_PERIOD_SECS))
 
 
 def _validate_priority(_prop, value):
@@ -366,8 +375,8 @@ def _validate_hard_timeout(prop, value):
     # 0 is tolerated for termination task, but we don't advertize that, that's
     # an internal detail.
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be between %ds and seven days' %
-        (prop._name, value, _MIN_TIMEOUT_SECS))
+        '%s (%ds) must be between %ds and %ds' %
+        (prop._name, value, _MIN_TIMEOUT_SECS, MAX_TIMEOUT_SECS))
 
 
 def _validate_io_timeout(prop, value):
@@ -375,8 +384,8 @@ def _validate_io_timeout(prop, value):
   # pylint: disable=protected-access
   if value and not (_MIN_TIMEOUT_SECS <= value <= MAX_TIMEOUT_SECS):
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be 0 or between %ds and seven days' %
-        (prop._name, value, _MIN_TIMEOUT_SECS))
+        '%s (%ds) must be 0 or between %ds and %ds' %
+        (prop._name, value, _MIN_TIMEOUT_SECS, MAX_TIMEOUT_SECS))
 
 
 def _validate_tags(prop, value):

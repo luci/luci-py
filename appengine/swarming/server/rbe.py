@@ -15,6 +15,7 @@ import uuid
 
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
+from google.protobuf import duration_pb2
 from google.protobuf import json_format
 from google.protobuf import timestamp_pb2
 
@@ -302,18 +303,18 @@ def enqueue_rbe_task(task_request, task_to_run):
   expiry = timestamp_pb2.Timestamp()
   expiry.FromDatetime(task_to_run.expiration_ts)
 
-  dims = task_request.task_slice(
-      task_to_run.task_slice_index).properties.dimensions
+  # Properties of this particular slice.
+  props = task_request.task_slice(task_to_run.task_slice_index).properties
 
   # Convert dimensions to a format closer to what RBE wants. They are already
   # validated to be correct by that point by _validate_dimensions.
   requested_bot_id = None
   constraints = []
-  for k, v in sorted(dims.items()):
-    assert isinstance(v, list), dims
+  for k, v in sorted(props.dimensions.items()):
+    assert isinstance(v, list), props.dimensions
     if u'id' == k:
-      assert len(v) == 1, dims
-      assert OR_DIM_SEP not in v[0], dims
+      assert len(v) == 1, props.dimensions
+      assert OR_DIM_SEP not in v[0], props.dimensions
       requested_bot_id = v[0]
     else:
       # {k: [a, b|c]} => k:a AND (k:b | k:c).
@@ -350,6 +351,11 @@ def enqueue_rbe_task(task_request, task_to_run):
               constraints=constraints,
               priority=task_request.priority,
               scheduling_algorithm=task_request.scheduling_algorithm,
+              execution_timeout=duration_pb2.Duration(
+                  seconds=(
+                      props.execution_timeout_secs + props.grace_period_secs +
+                      30  # some extra to compensate for bot's own overhead
+                  ), ),
           )),
   }
 
