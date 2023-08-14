@@ -301,13 +301,25 @@ export function pointFetchAtSwarmingDev() {
   return;
 }
 
+function _base64ToBytes(base64) {
+  const binString = atob(base64);
+  return Uint8Array.from(binString, (m) => m.codePointAt(0));
+}
+
+function _bytesToBase64(bytes) {
+  const binString = Array.from(bytes, (x) => String.fromCodePoint(x)).join("");
+  return btoa(binString);
+}
+
 /**
  * Decodes b64 encoded string to utf8 encoded string.
  *
  * Source: https://developer.mozilla.org/en-US/docs/Glossary/Base64
  **/
 export function b64toUtf8(str) {
-  return decodeURIComponent(escape(window.atob(str)));
+  return new TextDecoder("utf-8", {
+    fatal: false,
+  }).decode(_base64ToBytes(str));
 }
 
 /**
@@ -316,5 +328,5 @@ export function b64toUtf8(str) {
  * Source: https://developer.mozilla.org/en-US/docs/Glossary/Base64
  **/
 export function utf8tob64(str) {
-  return window.btoa(unescape(encodeURIComponent(str)));
+  return _bytesToBase64(new TextEncoder().encode(str));
 }
