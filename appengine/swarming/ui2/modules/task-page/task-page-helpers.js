@@ -120,7 +120,7 @@ export function humanState(result, currentSliceIdx) {
 export function casLink(host, ref) {
   return (
     `${host}/${ref.casInstance}/blobs/` +
-    `${ref.digest.hash}/${ref.digest.sizeBytes}/tree`
+    `${ref.digest.hash}/${ref.digest.sizeBytes || 0}/tree`
   );
 }
 
