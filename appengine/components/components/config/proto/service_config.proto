@@ -6,14 +6,17 @@
 //
 // In this file, "string pattern" is an exact string (can't have a colon) or a
 // string that starts with "regex:", followed by a regular expression. In case
-// of regex, the pattern must match an entire string, as if it was sorrounded by
+// of regex, the pattern must match an entire string, as if it was surrounded by
 // ^ and $.
 
 syntax = "proto3";
 
+package config;
+
+import "google/protobuf/empty.proto";
+
 option go_package = "go.chromium.org/luci/common/proto/config";
 
-package config;
 
 // Use to specify configuration stored in Git repository importable via Gitiles
 // API.
@@ -31,19 +34,25 @@ message GitilesLocation {
   //     https://chromium.googlesource.com/infra/infra/
   //     https://chromium.googlesource.com/infra/infra.git
   string repo = 1;
-  // Ref of the Git repository.
-  // Must be a fully qualifed ref starting with "refs/".
+  // Ref or commit hash of the Git repository.
+  //
+  // Must be a fully qualified ref starting with "refs/" or a commit hash.
   //
   // Example:
   //   OK:
   //     refs/heads/branch
   //     refs/heads/infra/config
   //     refs/branch-heads/beta
+  //     $a_valid_git_sha
   //   Not OK:
   //     main
   //     HEAD
   //     origin/main
   //     tags/123
+  //
+  // TODO: crbug/1446839 - Replace this field with a new `committish` field
+  // to better reflect the fact that field value can be either refs or
+  // revision hash.
   string ref = 2;
   // Path to the directory inside Git repository where configurations are stored.
   // Optional. If not specified, defaults to top-level folder of the git repo.
@@ -71,6 +80,15 @@ message IdentityConfig {
   // to become effective. Keep this in mind when migrating projects to a
   // new identity.
   string service_account_email = 1;
+}
+
+// Location is the source repo location where the configuration stores.
+// Currently, it only supports Gitiles repos.
+// TODO(crbug.com/1446839): replace Project.gitiles_location field later.
+message Location {
+  oneof location {
+    GitilesLocation gitiles_location = 1;
+  }
 }
 
 /******************************************************************************/
@@ -208,6 +226,9 @@ message Service {
   // Email addresses of responsible and point-of-contacts for the service.
   repeated string owners = 2;
   // An HTTPS endpoint that returns JSON-encoded ServiceDynamicMetadata in body.
+  //
+  // TODO: crbug/1232565 - Deprecate this field in favor of `service_endpoint`
+  // after the new LUCI Config service has launched.
   string metadata_url = 4;
   // The endpoint of the service.
   //
@@ -222,7 +243,6 @@ message Service {
   //
   // If not specified, only admins and trusted services have access.
   repeated string access = 5;
-
   // If set, use JWT auth in requests to services. This is usually used for
   // Cloud Endpoints v2 support.
   JWTAuth jwt_auth = 6;
@@ -347,8 +367,26 @@ message SchemasCfg {
 // match.
 message ConfigPattern {
   // A string pattern for config_set.
+  //
+  // If the pattern string starts with "regex:", everything after the prefix
+  // will be treated as regular expression to match the config set. The
+  // regular expression will be auto-anchored with "^" at the beginning and "$"
+  // at the end if not already.
+  //
+  // If the pattern string starts with "exact:" or "text:", everything after the
+  // prefix should be exactly the same as the config set to match the pattern.
+  //
+  // If the pattern string doesn't start with any of the above prefixes, it will
+  // be used as exact match just like "exact:" and "text:" prefixes.
+  //
+  // Note that LUCI Config will only send the service configs that belongs to
+  /// the service defined in `Service` or validation, even though the
+  // config_set pattern here can declare a much broader range (e.g.
+  // `regex:services/.+` that matches all services).
   string config_set = 1;
   // A string pattern for config file path.
+  //
+  // The pattern syntax is the same as `config_set`
   string path = 2;
 }
 
@@ -399,3 +437,83 @@ message ValidationResponseMessage {
   // If at least one error is found, the config is considered invalid.
   repeated Message messages = 1;
 }
+
+
+/******************************************************************************/
+/* Service                                                                    */
+/******************************************************************************/
+
+// Consumer can be implemented by the registered service that consumes config.
+//
+// The service should be registered in `ServicesCfg`. It is currently for a
+// service declaring configs of interest and validate those configs.
+service Consumer {
+  // GetMetadata returns the service metadata.
+  rpc GetMetadata(google.protobuf.Empty) returns(ServiceMetadata) {}
+  // ValidateConfigs validates the provided configs within a config set.
+  rpc ValidateConfigs(ValidateConfigsRequest) returns (ValidationResult) {};
+}
+
+// ServiceMetadata describes the metadata of a service.
+message ServiceMetadata {
+  // Patterns of config files that the service is "interested in".
+  //
+  // Interested means the service can validate config files on config files
+  // changes.
+  repeated ConfigPattern config_patterns = 1;
+}
+
+// ValidateConfigsRequest is the request to ValidateConfigs rpc.
+message ValidateConfigsRequest {
+  message Files {
+    repeated File files = 1;
+  }
+  // File represents a config file to validate.
+  message File {
+    // path of the config file relative to root config directory.
+    string path = 1;
+    oneof content {
+      // RawContent is the raw byte content of the config file.
+      bytes raw_content = 2;
+      // SignedURL is a GCS singed url to download full config content.
+      //
+      // The service MUST provide "Accept-Encoding: gzip" header to minimize
+      // the data on the wire and the service should also be able to
+      // handle the uncompressed data based on the presence of
+      // "Content-Encoding" header.
+      // The signed url will expire shortly. Currently LUCI Config sets the
+      // expiration time to 10 min.
+      string signed_url = 3;
+    }
+  }
+  // Config set of the config files to validate.
+  string config_set = 1;
+  // Config files to validate.
+  Files files = 2;
+}
+
+// ValidationResult is the result of validating configs.
+message ValidationResult {
+  // Severity of a validation response message.
+  enum Severity {
+    UNKNOWN = 0;
+    DEBUG = 10;
+    INFO = 20;
+    WARNING = 30;
+    ERROR = 40;
+    CRITICAL = 50;
+  }
+  // A message that explains why a config is valid or not.
+  message Message {
+    // Path of the config file that has an error.
+    string path = 1;
+    // If an error, a config is considered invalid. Defaults to INFO.
+    Severity severity = 2;
+    // Textual representation of the message.
+    string text = 3;
+  }
+  // Errors, warnings and other information found during validation.
+  // If at least one error is found, the config is considered invalid.
+  repeated Message messages = 1;
+}
+

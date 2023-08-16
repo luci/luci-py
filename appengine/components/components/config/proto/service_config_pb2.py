@@ -11,6 +11,7 @@ from google.protobuf import symbol_database as _symbol_database
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
 DESCRIPTOR = _descriptor.FileDescriptor(
@@ -19,8 +20,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z(go.chromium.org/luci/common/proto/config',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n,components/config/proto/service_config.proto\x12\x06\x63onfig\":\n\x0fGitilesLocation\x12\x0c\n\x04repo\x18\x01 \x01(\t\x12\x0b\n\x03ref\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"/\n\x0eIdentityConfig\x12\x1d\n\x15service_account_email\x18\x01 \x01(\t\"\xb0\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x01(\t\x12\x33\n\x10gitiles_location\x18\x04 \x01(\x0b\x32\x17.config.GitilesLocationH\x00\x12/\n\x0fidentity_config\x18\x03 \x01(\x0b\x32\x16.config.IdentityConfig\x12\x10\n\x08owned_by\x18\x05 \x01(\tB\n\n\x08locationJ\x04\x08\x02\x10\x03R\x0f\x63onfig_location\"M\n\x04Team\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x1b\n\x13maintenance_contact\x18\x02 \x03(\t\x12\x1a\n\x12\x65scalation_contact\x18\x03 \x03(\t\"M\n\x0bProjectsCfg\x12!\n\x08projects\x18\x01 \x03(\x0b\x32\x0f.config.Project\x12\x1b\n\x05teams\x18\x02 \x03(\x0b\x32\x0c.config.Team\"\xc4\x01\n\x07Service\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x14\n\x0cmetadata_url\x18\x04 \x01(\t\x12\x18\n\x10service_endpoint\x18\x07 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x05 \x03(\t\x12)\n\x08jwt_auth\x18\x06 \x01(\x0b\x32\x17.config.Service.JWTAuth\x1a\x1b\n\x07JWTAuth\x12\x10\n\x08\x61udience\x18\x01 \x01(\tJ\x04\x08\x03\x10\x04R\x0f\x63onfig_location\"s\n\x16ServiceDynamicMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12%\n\nvalidation\x18\x02 \x01(\x0b\x32\x11.config.Validator\x12!\n\x19supports_gzip_compression\x18\x03 \x01(\x08\"0\n\x0bServicesCfg\x12!\n\x08services\x18\x01 \x03(\x0b\x32\x0f.config.Service\"\xcc\x02\n\x06\x41\x63lCfg\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\x12 \n\x18project_validation_group\x18\x08 \x01(\t\x12\x1e\n\x16project_reimport_group\x18\t \x01(\t\x12\x1c\n\x14service_access_group\x18\x07 \x01(\t\x12 \n\x18service_validation_group\x18\n \x01(\t\x12\x1e\n\x16service_reimport_group\x18\x0b \x01(\tJ\x04\x08\x03\x10\x04J\x04\x08\x04\x10\x05J\x04\x08\x05\x10\x06J\x04\x08\x06\x10\x07J\x04\x08\x0c\x10\rR\x18\x63onfig_get_by_hash_groupR\x0b\x61\x64min_groupR\x10validation_groupR\x0ereimport_groupR\x1blegacy_project_access_group\"\xe9\x01\n\tImportCfg\x12*\n\x07gitiles\x18\x01 \x01(\x0b\x32\x19.config.ImportCfg.Gitiles\x1a\xaf\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12\"\n\x1aproject_config_default_ref\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\x1f\n\x17ref_config_default_path\x18\x05 \x01(\t\"]\n\nSchemasCfg\x12*\n\x07schemas\x18\x01 \x03(\x0b\x32\x19.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\"1\n\rConfigPattern\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"A\n\tValidator\x12\'\n\x08patterns\x18\x01 \x03(\x0b\x32\x15.config.ConfigPattern\x12\x0b\n\x03url\x18\x02 \x01(\t\"M\n\x18ValidationRequestMessage\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\x0c\"\x91\x02\n\x19ValidationResponseMessage\x12;\n\x08messages\x18\x01 \x03(\x0b\x32).config.ValidationResponseMessage.Message\x1a\x63\n\x07Message\x12\x0c\n\x04path\x18\x01 \x01(\t\x12<\n\x08severity\x18\x02 \x01(\x0e\x32*.config.ValidationResponseMessage.Severity\x12\x0c\n\x04text\x18\x03 \x01(\t\"R\n\x08Severity\x12\x0b\n\x07UNKNOWN\x10\x00\x12\t\n\x05\x44\x45\x42UG\x10\n\x12\x08\n\x04INFO\x10\x14\x12\x0b\n\x07WARNING\x10\x1e\x12\t\n\x05\x45RROR\x10(\x12\x0c\n\x08\x43RITICAL\x10\x32\x42*Z(go.chromium.org/luci/common/proto/configb\x06proto3'
-)
+  serialized_pb=b'\n,components/config/proto/service_config.proto\x12\x06\x63onfig\x1a\x1bgoogle/protobuf/empty.proto\":\n\x0fGitilesLocation\x12\x0c\n\x04repo\x18\x01 \x01(\t\x12\x0b\n\x03ref\x18\x02 \x01(\t\x12\x0c\n\x04path\x18\x03 \x01(\t\"/\n\x0eIdentityConfig\x12\x1d\n\x15service_account_email\x18\x01 \x01(\t\"K\n\x08Location\x12\x33\n\x10gitiles_location\x18\x01 \x01(\x0b\x32\x17.config.GitilesLocationH\x00\x42\n\n\x08location\"\xb0\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x01(\t\x12\x33\n\x10gitiles_location\x18\x04 \x01(\x0b\x32\x17.config.GitilesLocationH\x00\x12/\n\x0fidentity_config\x18\x03 \x01(\x0b\x32\x16.config.IdentityConfig\x12\x10\n\x08owned_by\x18\x05 \x01(\tB\n\n\x08locationJ\x04\x08\x02\x10\x03R\x0f\x63onfig_location\"M\n\x04Team\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x1b\n\x13maintenance_contact\x18\x02 \x03(\t\x12\x1a\n\x12\x65scalation_contact\x18\x03 \x03(\t\"M\n\x0bProjectsCfg\x12!\n\x08projects\x18\x01 \x03(\x0b\x32\x0f.config.Project\x12\x1b\n\x05teams\x18\x02 \x03(\x0b\x32\x0c.config.Team\"\xc4\x01\n\x07Service\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x14\n\x0cmetadata_url\x18\x04 \x01(\t\x12\x18\n\x10service_endpoint\x18\x07 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x05 \x03(\t\x12)\n\x08jwt_auth\x18\x06 \x01(\x0b\x32\x17.config.Service.JWTAuth\x1a\x1b\n\x07JWTAuth\x12\x10\n\x08\x61udience\x18\x01 \x01(\tJ\x04\x08\x03\x10\x04R\x0f\x63onfig_location\"s\n\x16ServiceDynamicMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12%\n\nvalidation\x18\x02 \x01(\x0b\x32\x11.config.Validator\x12!\n\x19supports_gzip_compression\x18\x03 \x01(\x08\"0\n\x0bServicesCfg\x12!\n\x08services\x18\x01 \x03(\x0b\x32\x0f.config.Service\"\xcc\x02\n\x06\x41\x63lCfg\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\x12 \n\x18project_validation_group\x18\x08 \x01(\t\x12\x1e\n\x16project_reimport_group\x18\t \x01(\t\x12\x1c\n\x14service_access_group\x18\x07 \x01(\t\x12 \n\x18service_validation_group\x18\n \x01(\t\x12\x1e\n\x16service_reimport_group\x18\x0b \x01(\tJ\x04\x08\x03\x10\x04J\x04\x08\x04\x10\x05J\x04\x08\x05\x10\x06J\x04\x08\x06\x10\x07J\x04\x08\x0c\x10\rR\x18\x63onfig_get_by_hash_groupR\x0b\x61\x64min_groupR\x10validation_groupR\x0ereimport_groupR\x1blegacy_project_access_group\"\xe9\x01\n\tImportCfg\x12*\n\x07gitiles\x18\x01 \x01(\x0b\x32\x19.config.ImportCfg.Gitiles\x1a\xaf\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12\"\n\x1aproject_config_default_ref\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\x1f\n\x17ref_config_default_path\x18\x05 \x01(\t\"]\n\nSchemasCfg\x12*\n\x07schemas\x18\x01 \x03(\x0b\x32\x19.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\"1\n\rConfigPattern\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"A\n\tValidator\x12\'\n\x08patterns\x18\x01 \x03(\x0b\x32\x15.config.ConfigPattern\x12\x0b\n\x03url\x18\x02 \x01(\t\"M\n\x18ValidationRequestMessage\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\x0c\"\x91\x02\n\x19ValidationResponseMessage\x12;\n\x08messages\x18\x01 \x03(\x0b\x32).config.ValidationResponseMessage.Message\x1a\x63\n\x07Message\x12\x0c\n\x04path\x18\x01 \x01(\t\x12<\n\x08severity\x18\x02 \x01(\x0e\x32*.config.ValidationResponseMessage.Severity\x12\x0c\n\x04text\x18\x03 \x01(\t\"R\n\x08Severity\x12\x0b\n\x07UNKNOWN\x10\x00\x12\t\n\x05\x44\x45\x42UG\x10\n\x12\x08\n\x04INFO\x10\x14\x12\x0b\n\x07WARNING\x10\x1e\x12\t\n\x05\x45RROR\x10(\x12\x0c\n\x08\x43RITICAL\x10\x32\"A\n\x0fServiceMetadata\x12.\n\x0f\x63onfig_patterns\x18\x01 \x03(\x0b\x32\x15.config.ConfigPattern\"\xec\x01\n\x16ValidateConfigsRequest\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x33\n\x05\x66iles\x18\x02 \x01(\x0b\x32$.config.ValidateConfigsRequest.Files\x1a;\n\x05\x46iles\x12\x32\n\x05\x66iles\x18\x01 \x03(\x0b\x32#.config.ValidateConfigsRequest.File\x1aL\n\x04\x46ile\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x15\n\x0braw_content\x18\x02 \x01(\x0cH\x00\x12\x14\n\nsigned_url\x18\x03 \x01(\tH\x00\x42\t\n\x07\x63ontent\"\xf6\x01\n\x10ValidationResult\x12\x32\n\x08messages\x18\x01 \x03(\x0b\x32 .config.ValidationResult.Message\x1aZ\n\x07Message\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x33\n\x08severity\x18\x02 \x01(\x0e\x32!.config.ValidationResult.Severity\x12\x0c\n\x04text\x18\x03 \x01(\t\"R\n\x08Severity\x12\x0b\n\x07UNKNOWN\x10\x00\x12\t\n\x05\x44\x45\x42UG\x10\n\x12\x08\n\x04INFO\x10\x14\x12\x0b\n\x07WARNING\x10\x1e\x12\t\n\x05\x45RROR\x10(\x12\x0c\n\x08\x43RITICAL\x10\x32\x32\x9b\x01\n\x08\x43onsumer\x12@\n\x0bGetMetadata\x12\x16.google.protobuf.Empty\x1a\x17.config.ServiceMetadata\"\x00\x12M\n\x0fValidateConfigs\x12\x1e.config.ValidateConfigsRequest\x1a\x18.config.ValidationResult\"\x00\x42*Z(go.chromium.org/luci/common/proto/configb\x06proto3'
+  ,
+  dependencies=[google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,])
 
 
 
@@ -64,10 +66,55 @@ _VALIDATIONRESPONSEMESSAGE_SEVERITY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1923,
-  serialized_end=2005,
+  serialized_start=2029,
+  serialized_end=2111,
 )
 _sym_db.RegisterEnumDescriptor(_VALIDATIONRESPONSEMESSAGE_SEVERITY)
+
+_VALIDATIONRESULT_SEVERITY = _descriptor.EnumDescriptor(
+  name='Severity',
+  full_name='config.ValidationResult.Severity',
+  filename=None,
+  file=DESCRIPTOR,
+  create_key=_descriptor._internal_create_key,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='UNKNOWN', index=0, number=0,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='DEBUG', index=1, number=10,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='INFO', index=2, number=20,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='WARNING', index=3, number=30,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='ERROR', index=4, number=40,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='CRITICAL', index=5, number=50,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
+  ],
+  containing_type=None,
+  serialized_options=None,
+  serialized_start=2029,
+  serialized_end=2111,
+)
+_sym_db.RegisterEnumDescriptor(_VALIDATIONRESULT_SEVERITY)
 
 
 _GITILESLOCATION = _descriptor.Descriptor(
@@ -111,8 +158,8 @@ _GITILESLOCATION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=56,
-  serialized_end=114,
+  serialized_start=85,
+  serialized_end=143,
 )
 
 
@@ -143,8 +190,45 @@ _IDENTITYCONFIG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=116,
-  serialized_end=163,
+  serialized_start=145,
+  serialized_end=192,
+)
+
+
+_LOCATION = _descriptor.Descriptor(
+  name='Location',
+  full_name='config.Location',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='gitiles_location', full_name='config.Location.gitiles_location', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='location', full_name='config.Location.location',
+      index=0, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
+  ],
+  serialized_start=194,
+  serialized_end=269,
 )
 
 
@@ -201,8 +285,8 @@ _PROJECT = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=166,
-  serialized_end=342,
+  serialized_start=272,
+  serialized_end=448,
 )
 
 
@@ -247,8 +331,8 @@ _TEAM = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=344,
-  serialized_end=421,
+  serialized_start=450,
+  serialized_end=527,
 )
 
 
@@ -286,8 +370,8 @@ _PROJECTSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=423,
-  serialized_end=500,
+  serialized_start=529,
+  serialized_end=606,
 )
 
 
@@ -318,8 +402,8 @@ _SERVICE_JWTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=649,
-  serialized_end=676,
+  serialized_start=755,
+  serialized_end=782,
 )
 
 _SERVICE = _descriptor.Descriptor(
@@ -384,8 +468,8 @@ _SERVICE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=503,
-  serialized_end=699,
+  serialized_start=609,
+  serialized_end=805,
 )
 
 
@@ -430,8 +514,8 @@ _SERVICEDYNAMICMETADATA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=701,
-  serialized_end=816,
+  serialized_start=807,
+  serialized_end=922,
 )
 
 
@@ -462,8 +546,8 @@ _SERVICESCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=818,
-  serialized_end=866,
+  serialized_start=924,
+  serialized_end=972,
 )
 
 
@@ -529,8 +613,8 @@ _ACLCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=869,
-  serialized_end=1201,
+  serialized_start=975,
+  serialized_end=1307,
 )
 
 
@@ -589,8 +673,8 @@ _IMPORTCFG_GITILES = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1262,
-  serialized_end=1437,
+  serialized_start=1368,
+  serialized_end=1543,
 )
 
 _IMPORTCFG = _descriptor.Descriptor(
@@ -620,8 +704,8 @@ _IMPORTCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1204,
-  serialized_end=1437,
+  serialized_start=1310,
+  serialized_end=1543,
 )
 
 
@@ -659,8 +743,8 @@ _SCHEMASCFG_SCHEMA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1497,
-  serialized_end=1532,
+  serialized_start=1603,
+  serialized_end=1638,
 )
 
 _SCHEMASCFG = _descriptor.Descriptor(
@@ -690,8 +774,8 @@ _SCHEMASCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1439,
-  serialized_end=1532,
+  serialized_start=1545,
+  serialized_end=1638,
 )
 
 
@@ -729,8 +813,8 @@ _CONFIGPATTERN = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1534,
-  serialized_end=1583,
+  serialized_start=1640,
+  serialized_end=1689,
 )
 
 
@@ -768,8 +852,8 @@ _VALIDATOR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1585,
-  serialized_end=1650,
+  serialized_start=1691,
+  serialized_end=1756,
 )
 
 
@@ -814,8 +898,8 @@ _VALIDATIONREQUESTMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1652,
-  serialized_end=1729,
+  serialized_start=1758,
+  serialized_end=1835,
 )
 
 
@@ -860,8 +944,8 @@ _VALIDATIONRESPONSEMESSAGE_MESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1822,
-  serialized_end=1921,
+  serialized_start=1928,
+  serialized_end=2027,
 )
 
 _VALIDATIONRESPONSEMESSAGE = _descriptor.Descriptor(
@@ -892,10 +976,244 @@ _VALIDATIONRESPONSEMESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1732,
-  serialized_end=2005,
+  serialized_start=1838,
+  serialized_end=2111,
 )
 
+
+_SERVICEMETADATA = _descriptor.Descriptor(
+  name='ServiceMetadata',
+  full_name='config.ServiceMetadata',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='config_patterns', full_name='config.ServiceMetadata.config_patterns', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2113,
+  serialized_end=2178,
+)
+
+
+_VALIDATECONFIGSREQUEST_FILES = _descriptor.Descriptor(
+  name='Files',
+  full_name='config.ValidateConfigsRequest.Files',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='files', full_name='config.ValidateConfigsRequest.Files.files', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2280,
+  serialized_end=2339,
+)
+
+_VALIDATECONFIGSREQUEST_FILE = _descriptor.Descriptor(
+  name='File',
+  full_name='config.ValidateConfigsRequest.File',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='path', full_name='config.ValidateConfigsRequest.File.path', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='raw_content', full_name='config.ValidateConfigsRequest.File.raw_content', index=1,
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"",
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='signed_url', full_name='config.ValidateConfigsRequest.File.signed_url', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='content', full_name='config.ValidateConfigsRequest.File.content',
+      index=0, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
+  ],
+  serialized_start=2341,
+  serialized_end=2417,
+)
+
+_VALIDATECONFIGSREQUEST = _descriptor.Descriptor(
+  name='ValidateConfigsRequest',
+  full_name='config.ValidateConfigsRequest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='config_set', full_name='config.ValidateConfigsRequest.config_set', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='files', full_name='config.ValidateConfigsRequest.files', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[_VALIDATECONFIGSREQUEST_FILES, _VALIDATECONFIGSREQUEST_FILE, ],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2181,
+  serialized_end=2417,
+)
+
+
+_VALIDATIONRESULT_MESSAGE = _descriptor.Descriptor(
+  name='Message',
+  full_name='config.ValidationResult.Message',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='path', full_name='config.ValidationResult.Message.path', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='severity', full_name='config.ValidationResult.Message.severity', index=1,
+      number=2, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='text', full_name='config.ValidationResult.Message.text', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2492,
+  serialized_end=2582,
+)
+
+_VALIDATIONRESULT = _descriptor.Descriptor(
+  name='ValidationResult',
+  full_name='config.ValidationResult',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='messages', full_name='config.ValidationResult.messages', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[_VALIDATIONRESULT_MESSAGE, ],
+  enum_types=[
+    _VALIDATIONRESULT_SEVERITY,
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2420,
+  serialized_end=2666,
+)
+
+_LOCATION.fields_by_name['gitiles_location'].message_type = _GITILESLOCATION
+_LOCATION.oneofs_by_name['location'].fields.append(
+  _LOCATION.fields_by_name['gitiles_location'])
+_LOCATION.fields_by_name['gitiles_location'].containing_oneof = _LOCATION.oneofs_by_name['location']
 _PROJECT.fields_by_name['gitiles_location'].message_type = _GITILESLOCATION
 _PROJECT.fields_by_name['identity_config'].message_type = _IDENTITYCONFIG
 _PROJECT.oneofs_by_name['location'].fields.append(
@@ -916,8 +1234,24 @@ _VALIDATIONRESPONSEMESSAGE_MESSAGE.fields_by_name['severity'].enum_type = _VALID
 _VALIDATIONRESPONSEMESSAGE_MESSAGE.containing_type = _VALIDATIONRESPONSEMESSAGE
 _VALIDATIONRESPONSEMESSAGE.fields_by_name['messages'].message_type = _VALIDATIONRESPONSEMESSAGE_MESSAGE
 _VALIDATIONRESPONSEMESSAGE_SEVERITY.containing_type = _VALIDATIONRESPONSEMESSAGE
+_SERVICEMETADATA.fields_by_name['config_patterns'].message_type = _CONFIGPATTERN
+_VALIDATECONFIGSREQUEST_FILES.fields_by_name['files'].message_type = _VALIDATECONFIGSREQUEST_FILE
+_VALIDATECONFIGSREQUEST_FILES.containing_type = _VALIDATECONFIGSREQUEST
+_VALIDATECONFIGSREQUEST_FILE.containing_type = _VALIDATECONFIGSREQUEST
+_VALIDATECONFIGSREQUEST_FILE.oneofs_by_name['content'].fields.append(
+  _VALIDATECONFIGSREQUEST_FILE.fields_by_name['raw_content'])
+_VALIDATECONFIGSREQUEST_FILE.fields_by_name['raw_content'].containing_oneof = _VALIDATECONFIGSREQUEST_FILE.oneofs_by_name['content']
+_VALIDATECONFIGSREQUEST_FILE.oneofs_by_name['content'].fields.append(
+  _VALIDATECONFIGSREQUEST_FILE.fields_by_name['signed_url'])
+_VALIDATECONFIGSREQUEST_FILE.fields_by_name['signed_url'].containing_oneof = _VALIDATECONFIGSREQUEST_FILE.oneofs_by_name['content']
+_VALIDATECONFIGSREQUEST.fields_by_name['files'].message_type = _VALIDATECONFIGSREQUEST_FILES
+_VALIDATIONRESULT_MESSAGE.fields_by_name['severity'].enum_type = _VALIDATIONRESULT_SEVERITY
+_VALIDATIONRESULT_MESSAGE.containing_type = _VALIDATIONRESULT
+_VALIDATIONRESULT.fields_by_name['messages'].message_type = _VALIDATIONRESULT_MESSAGE
+_VALIDATIONRESULT_SEVERITY.containing_type = _VALIDATIONRESULT
 DESCRIPTOR.message_types_by_name['GitilesLocation'] = _GITILESLOCATION
 DESCRIPTOR.message_types_by_name['IdentityConfig'] = _IDENTITYCONFIG
+DESCRIPTOR.message_types_by_name['Location'] = _LOCATION
 DESCRIPTOR.message_types_by_name['Project'] = _PROJECT
 DESCRIPTOR.message_types_by_name['Team'] = _TEAM
 DESCRIPTOR.message_types_by_name['ProjectsCfg'] = _PROJECTSCFG
@@ -931,6 +1265,9 @@ DESCRIPTOR.message_types_by_name['ConfigPattern'] = _CONFIGPATTERN
 DESCRIPTOR.message_types_by_name['Validator'] = _VALIDATOR
 DESCRIPTOR.message_types_by_name['ValidationRequestMessage'] = _VALIDATIONREQUESTMESSAGE
 DESCRIPTOR.message_types_by_name['ValidationResponseMessage'] = _VALIDATIONRESPONSEMESSAGE
+DESCRIPTOR.message_types_by_name['ServiceMetadata'] = _SERVICEMETADATA
+DESCRIPTOR.message_types_by_name['ValidateConfigsRequest'] = _VALIDATECONFIGSREQUEST
+DESCRIPTOR.message_types_by_name['ValidationResult'] = _VALIDATIONRESULT
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 GitilesLocation = _reflection.GeneratedProtocolMessageType('GitilesLocation', (_message.Message,), {
@@ -946,6 +1283,13 @@ IdentityConfig = _reflection.GeneratedProtocolMessageType('IdentityConfig', (_me
   # @@protoc_insertion_point(class_scope:config.IdentityConfig)
   })
 _sym_db.RegisterMessage(IdentityConfig)
+
+Location = _reflection.GeneratedProtocolMessageType('Location', (_message.Message,), {
+  'DESCRIPTOR' : _LOCATION,
+  '__module__' : 'components.config.proto.service_config_pb2'
+  # @@protoc_insertion_point(class_scope:config.Location)
+  })
+_sym_db.RegisterMessage(Location)
 
 Project = _reflection.GeneratedProtocolMessageType('Project', (_message.Message,), {
   'DESCRIPTOR' : _PROJECT,
@@ -1070,6 +1414,87 @@ ValidationResponseMessage = _reflection.GeneratedProtocolMessageType('Validation
 _sym_db.RegisterMessage(ValidationResponseMessage)
 _sym_db.RegisterMessage(ValidationResponseMessage.Message)
 
+ServiceMetadata = _reflection.GeneratedProtocolMessageType('ServiceMetadata', (_message.Message,), {
+  'DESCRIPTOR' : _SERVICEMETADATA,
+  '__module__' : 'components.config.proto.service_config_pb2'
+  # @@protoc_insertion_point(class_scope:config.ServiceMetadata)
+  })
+_sym_db.RegisterMessage(ServiceMetadata)
+
+ValidateConfigsRequest = _reflection.GeneratedProtocolMessageType('ValidateConfigsRequest', (_message.Message,), {
+
+  'Files' : _reflection.GeneratedProtocolMessageType('Files', (_message.Message,), {
+    'DESCRIPTOR' : _VALIDATECONFIGSREQUEST_FILES,
+    '__module__' : 'components.config.proto.service_config_pb2'
+    # @@protoc_insertion_point(class_scope:config.ValidateConfigsRequest.Files)
+    })
+  ,
+
+  'File' : _reflection.GeneratedProtocolMessageType('File', (_message.Message,), {
+    'DESCRIPTOR' : _VALIDATECONFIGSREQUEST_FILE,
+    '__module__' : 'components.config.proto.service_config_pb2'
+    # @@protoc_insertion_point(class_scope:config.ValidateConfigsRequest.File)
+    })
+  ,
+  'DESCRIPTOR' : _VALIDATECONFIGSREQUEST,
+  '__module__' : 'components.config.proto.service_config_pb2'
+  # @@protoc_insertion_point(class_scope:config.ValidateConfigsRequest)
+  })
+_sym_db.RegisterMessage(ValidateConfigsRequest)
+_sym_db.RegisterMessage(ValidateConfigsRequest.Files)
+_sym_db.RegisterMessage(ValidateConfigsRequest.File)
+
+ValidationResult = _reflection.GeneratedProtocolMessageType('ValidationResult', (_message.Message,), {
+
+  'Message' : _reflection.GeneratedProtocolMessageType('Message', (_message.Message,), {
+    'DESCRIPTOR' : _VALIDATIONRESULT_MESSAGE,
+    '__module__' : 'components.config.proto.service_config_pb2'
+    # @@protoc_insertion_point(class_scope:config.ValidationResult.Message)
+    })
+  ,
+  'DESCRIPTOR' : _VALIDATIONRESULT,
+  '__module__' : 'components.config.proto.service_config_pb2'
+  # @@protoc_insertion_point(class_scope:config.ValidationResult)
+  })
+_sym_db.RegisterMessage(ValidationResult)
+_sym_db.RegisterMessage(ValidationResult.Message)
+
 
 DESCRIPTOR._options = None
+
+_CONSUMER = _descriptor.ServiceDescriptor(
+  name='Consumer',
+  full_name='config.Consumer',
+  file=DESCRIPTOR,
+  index=0,
+  serialized_options=None,
+  create_key=_descriptor._internal_create_key,
+  serialized_start=2669,
+  serialized_end=2824,
+  methods=[
+  _descriptor.MethodDescriptor(
+    name='GetMetadata',
+    full_name='config.Consumer.GetMetadata',
+    index=0,
+    containing_service=None,
+    input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
+    output_type=_SERVICEMETADATA,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
+    name='ValidateConfigs',
+    full_name='config.Consumer.ValidateConfigs',
+    index=1,
+    containing_service=None,
+    input_type=_VALIDATECONFIGSREQUEST,
+    output_type=_VALIDATIONRESULT,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+])
+_sym_db.RegisterServiceDescriptor(_CONSUMER)
+
+DESCRIPTOR.services_by_name['Consumer'] = _CONSUMER
+
 # @@protoc_insertion_point(module_scope)
