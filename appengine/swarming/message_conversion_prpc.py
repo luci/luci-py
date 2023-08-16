@@ -270,6 +270,7 @@ def task_result_response(result, include_performance_stats=True):
       name=result.name,
       current_task_slice=result.current_task_slice,
       completed_ts=date(result.completed_ts),
+      cost_saved_usd=result.cost_saved_usd,
       bot_idle_since_ts=date(result.bot_idle_since_ts),
       abandoned_ts=date(result.abandoned_ts),
       modified_ts=date(result.modified_ts),

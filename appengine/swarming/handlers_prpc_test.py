@@ -2171,6 +2171,7 @@ class TaskServicePrpcTest(PrpcTest):
     second.completed_ts.FromDatetime(self.now)
     second.created_ts.FromDatetime(now_60)
     second.deduped_from = '5cee488008811'
+    second.cost_saved_usd = 0.1
     second.duration = 0.1
     second.exit_code = 0
     second.modified_ts.FromDatetime(now_60)

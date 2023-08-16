@@ -344,16 +344,8 @@ class SwarmingClient(object):
 
 def gen_expected(**kwargs):
   expected = {
-      u'bot_dimensions':
-      None,
       u'bot_id':
       unicode(socket.getfqdn().split('.', 1)[0]),
-      u'current_task_slice':
-      u'0',
-      u'exit_code':
-      u'0',
-      u'name':
-      u'',
       u'output':
       re.compile(u'(\\s|\\S)*hi\n'),
       u'server_versions': [u'N/A'],
@@ -628,24 +620,14 @@ class Test(unittest.TestCase):
         u'named_caches_install': {},
         u'named_caches_uninstall': {},
         u'isolated_download': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_in),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_in)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_in)),
-            u'total_bytes_items_hot': u'0',
         },
         u'isolated_upload': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_out),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_out)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_out)),
-            u'total_bytes_items_hot': u'0',
         },
         u'cleanup': {},
     }
@@ -717,24 +699,14 @@ class Test(unittest.TestCase):
         u'named_caches_install': {},
         u'named_caches_uninstall': {},
         u'isolated_download': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_in),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_in)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_in)),
-            u'total_bytes_items_hot': u'0',
         },
         u'isolated_upload': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_out),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_out)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_out)),
-            u'total_bytes_items_hot': u'0',
         },
         u'cleanup': {},
     }
@@ -789,14 +761,9 @@ class Test(unittest.TestCase):
         u'named_caches_install': {},
         u'named_caches_uninstall': {},
         u'isolated_download': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_in),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_in)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_in)),
-            u'total_bytes_items_hot': u'0',
         },
         u'isolated_upload': {},
         u'cleanup': {},
@@ -846,7 +813,6 @@ class Test(unittest.TestCase):
             u'user:joe@localhost',
         ],
         state=u'TIMED_OUT')
-    expected_summary.pop('exit_code')
     expected_files = {
         'result.txt': 'test_hard_timeout_grace_with_cas',
     }
@@ -866,24 +832,14 @@ class Test(unittest.TestCase):
         u'named_caches_install': {},
         u'named_caches_uninstall': {},
         u'isolated_download': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_in),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_in)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_in)),
-            u'total_bytes_items_hot': u'0',
         },
         u'isolated_upload': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_out),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_out)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_out)),
-            u'total_bytes_items_hot': u'0',
         },
         u'cleanup': {},
     }
@@ -919,14 +875,9 @@ class Test(unittest.TestCase):
         u'named_caches_install': {},
         u'named_caches_uninstall': {},
         u'isolated_download': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_in),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_in)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_in)),
-            u'total_bytes_items_hot': u'0',
         },
         u'isolated_upload': {},
         u'cleanup': {},
@@ -1005,24 +956,14 @@ class Test(unittest.TestCase):
         u'named_caches_install': {},
         u'named_caches_uninstall': {},
         u'isolated_download': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_in),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_in)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_in)),
-            u'total_bytes_items_hot': u'0',
         },
         u'isolated_upload': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_out),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_out)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_out)),
-            u'total_bytes_items_hot': u'0',
         },
         u'cleanup': {},
     }
@@ -1074,14 +1015,9 @@ class Test(unittest.TestCase):
         u'named_caches_install': {},
         u'named_caches_uninstall': {},
         u'isolated_download': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_in),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_in)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_in)),
-            u'total_bytes_items_hot': u'0',
         },
         u'isolated_upload': {},
         u'cleanup': {},
@@ -1122,25 +1058,15 @@ class Test(unittest.TestCase):
         u'isolated_download': {
             # TODO(crbug.com/1268298): cas client doesn't set
             # initial_{number_items, size}.
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
-            u'items_cold': [],
             # Items are hot.
             u'items_hot': sorted(items_in),
-            u'num_items_cold': u'0',
             u'num_items_hot': unicode(len(items_in)),
-            u'total_bytes_items_cold': u'0',
             u'total_bytes_items_hot': unicode(sum(items_in)),
         },
         u'isolated_upload': {
-            u'initial_number_items': u'0',
-            u'initial_size': u'0',
             u'items_cold': sorted(items_out),
-            u'items_hot': [],
             u'num_items_cold': unicode(len(items_out)),
-            u'num_items_hot': u'0',
             u'total_bytes_items_cold': unicode(sum(items_out)),
-            u'total_bytes_items_hot': u'0',
         },
         u'cleanup': {},
     }
@@ -1396,7 +1322,7 @@ class Test(unittest.TestCase):
     task_id = self.client.task_trigger_raw(request)
     expected_summary = self.gen_expected(
         name=u'task_slice_fallback',
-        current_task_slice=u'1',
+        current_task_slice=1,
         output=re.compile(u'(\\s|\\S)*second\n'),
         tags=[
             # Bug!
