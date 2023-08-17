@@ -248,29 +248,8 @@ def disable_buffering():
     os.environ['PYTHONUNBUFFERED'] = 'x'
 
 
-def add_python_cmd(cmd):
-  """Adds a Python executable to the front of the command if running a .py file.
-
-  No-op if arg0 is anything besides a .py file.
-
-  Args:
-    cmd: A list containing the command to be run.
-
-  Returns:
-    |cmd| with a Python executable appended to the front if necessary.
-  """
-  if cmd[0].endswith('.py'):
-    if sys.platform == 'win32':
-      return ['python.exe'] + cmd
-    return ['python'] + cmd
-  return cmd
-
-
 def find_executable(cmd, env=None):
   """Finds the executable to run the given command via $PATH.
-
-  Automatically appends an appropriate Python executable to the front if arg0 is
-  a .py file before searching.
 
   Slashes in cmd[0] are normalized to the current platform's default.
 
@@ -300,7 +279,6 @@ def find_executable(cmd, env=None):
     the executable found via $PATH. arg0 is left unchanged if it is not found in
     $PATH. Will not modify the original |cmd| list.
   """
-  cmd = add_python_cmd(cmd)
 
   def _is_executable(candidate):
     return os.path.isfile(candidate) and os.access(candidate, os.X_OK)

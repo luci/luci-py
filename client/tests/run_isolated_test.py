@@ -945,28 +945,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     ], self.popen_calls)
 
   @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
-  def test_python_cmd_lower_priority(self):
-    self._run_tha_test(
-        command=['../out/cmd.py', 'arg'],
-        relative_cwd='some',
-        lower_priority=True)
-    # Injects sys.executable but on macOS, the path may be different than
-    # sys.executable due to symlinks.
-    self.assertEqual(1, len(self.popen_calls))
-    cmd, args = self.popen_calls[0]
-    self.assertEqual(
-        {
-          'cwd': self.ir_dir('some'),
-          'detached': True,
-          'close_fds': True,
-          'lower_priority': True,
-          'containment': None,
-        },
-        args)
-    self.assertIn('python', cmd[0])
-    self.assertEqual([os.path.join('..', 'out', 'cmd.py'), 'arg'], cmd[1:])
-
-  @unittest.skipIf(sys.platform == 'win32', 'crbug.com/1148174')
   def test_run_tha_test_non_isolated(self):
     _ = self._run_tha_test(command=['/bin/echo', 'hello', 'world'])
     self.assertEqual([

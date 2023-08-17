@@ -85,14 +85,6 @@ class FindExecutableTest(auto_stub.TestCase):
   def _fe(self, cmd):
     return tools.find_executable(cmd, env={'PATH': os.pathsep.join(self.PATH)})
 
-  def test_add_python(self):
-    cmd = ['not_a_real_path.py']
-    self.assertEqual([self._abs('SYSTEM', 'python')] + cmd, self._fe(cmd))
-
-  def test_WIN_add_python(self):
-    cmd = ['not_a_real_path.py']
-    self.assertEqual([self._abs('SYSTEM', 'python.exe')] + cmd, self._fe(cmd))
-
   def test_missing_passthrough(self):
     cmd = ['not_a_real_path']
     self.assertEqual(cmd, self._fe(cmd))
