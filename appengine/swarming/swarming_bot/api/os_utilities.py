@@ -167,7 +167,7 @@ def get_os_values():
       out.append('%s-%s.%s' % (os_name, parts[0], parts[1]))
     out.append('%s-%s' % (os_name, number))
     out.append('%s-%s-%s' % (os_name, number, build))
-  else:
+  elif sys.platform == 'linux':
     # TODO(crbug/1018836): Get rid of this, Linux is not an OS, it's a kernel.
     out.append('Linux')
     number = platforms.linux.get_os_version_number()
@@ -175,6 +175,8 @@ def get_os_values():
     for i in number.split('.'):
       version += '.' + i
       out.append('%s-%s' % (os_name, version[1:]))
+  else:
+    out.append('%s-%s' % (os_name, platform.release()))
   out.sort()
   return out
 
@@ -221,7 +223,7 @@ def get_os_name():
       # Uppercase the first letter for consistency with the other platforms.
       return os_id[0].upper() + os_id[1:]
 
-  return sys.platform.decode('utf-8')
+  return sys.platform
 
 
 @tools.cached
@@ -453,8 +455,7 @@ def get_physical_ram():
     return platforms.win.get_physical_ram()
   if sys.platform == 'darwin':
     return platforms.osx.get_physical_ram()
-  if os.path.isfile('/proc/meminfo'):
-    # linux.
+  if sys.platform == 'linux':
     meminfo = _safe_read('/proc/meminfo') or ''
     matched = re.search(br'MemTotal:\s+(\d+) kB', meminfo)
     if matched:
@@ -462,8 +463,8 @@ def get_physical_ram():
       if 0. < mb < 1.:
         return 1
       return int(round(mb))
+    logging.error('get_physical_ram() failed to query amount of physical RAM')
 
-  logging.error('get_physical_ram() failed to query amount of physical RAM')
   return 0
 
 
@@ -642,10 +643,10 @@ def get_uptime():
     return platforms.osx.get_uptime()
   if sys.platform == 'win32':
     return platforms.win.get_uptime()
-  if sys.platform == 'cygwin':
-    # Not important.
-    return 0.
-  return platforms.linux.get_uptime()
+  if sys.platform == 'linux':
+    return platforms.linux.get_uptime()
+  # Not important.
+  return 0.
 
 
 def get_reboot_required():
@@ -658,7 +659,9 @@ def get_reboot_required():
     return False
   if sys.platform == 'win32' or sys.platform == 'cygwin':
     return platforms.win.get_reboot_required()
-  return platforms.linux.get_reboot_required()
+  if sys.platform == 'linux':
+    return platforms.linux.get_reboot_required()
+  return False
 
 
 def get_ssd():
