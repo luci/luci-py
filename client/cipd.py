@@ -279,7 +279,7 @@ def get_platform():
       'win32': 'windows',
   }.get(sys.platform)
   if not os_name:
-    raise Error('Unknown OS: %s' % sys.platform)
+    os_name = sys.platform.lower().rstrip('0123456789.-_')
 
   # Use a specific architecture if told to. Happens on Swarming bots.
   arch_override = os.getenv('CIPD_ARCHITECTURE')

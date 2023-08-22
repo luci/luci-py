@@ -38,6 +38,15 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = ('Debian', 'Linux', 'Mac', 'Raspbian', 'Ubuntu', 'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
 
+  def test_get_os_name_cases(self):
+    cases = [
+        ('openbsd7', 'openbsd'),
+        ('netbsd9', 'netbsd'),
+    ]
+    for pform, result in cases:
+      self.mock(sys, "platform", pform)
+      self.assertEqual(os_utilities.get_os_name(), result)
+
   def test_get_cpu_type(self):
     cases = [
         ('x86_64', 'amd64', 'x86'),
@@ -64,6 +73,17 @@ class TestOsUtilities(auto_stub.TestCase):
       self.mock(os_utilities, 'get_cpu_type', lambda: cpu_type)
       self.mock(os_utilities, 'get_cpu_bitness', lambda: bitness)
       self.assertEqual(os_utilities.get_cipd_architecture(), expected)
+
+  def test_get_os_values(self):
+    cases = [
+        ('openbsd7', '7.2', ['openbsd', 'openbsd-7', 'openbsd-7.2']),
+        ('netbsd9', '9.3_STABLE',
+         ['netbsd', 'netbsd-9', 'netbsd-9.3', 'netbsd-9.3_STABLE']),
+    ]
+    for pform, rel, result in cases:
+      self.mock(sys, "platform", pform)
+      self.mock(platform, "release", lambda: rel)
+      self.assertEqual(os_utilities.get_os_values(), result)
 
   @unittest.skipUnless(sys.platform == 'linux', 'this is only for linux')
   def test_get_os_values_linux(self):
