@@ -243,15 +243,39 @@ class Provider(object):
     raise ndb.Return(revision, config)
 
   @ndb.tasklet
-  def _get_configs_multi(self, url_path):
+  def _get_configs_multi(self, url_path, cfg_path=None):
     """Returns a map config_set -> (revision, content)."""
     assert url_path
 
+    def to_config_dict(cfg):
+      assert isinstance(cfg, config_service_pb2.Config), cfg
+      return {
+          'config_set': cfg.config_set,
+          'revision': cfg.revision,
+          'content_hash': cfg.content_sha256
+      }
+
     # Response must return a dict with 'configs' key which is a list of configs.
     # Each config has keys 'config_set', 'revision' and 'content_hash'.
-    res = yield self._api_call_async(
-        url_path, params={'hashes_only': True}, allow_not_found=False)
-    configs = res.get('configs', [])
+    if self._is_v1_host():
+      res = yield self._api_call_async(url_path,
+                                       params={'hashes_only': True},
+                                       allow_not_found=False)
+      configs = res.get('configs', [])
+    else:
+      assert cfg_path
+      try:
+        res = yield self._config_v2_client().GetProjectConfigs(
+            config_service_pb2.GetProjectConfigsRequest(
+                path=cfg_path,
+                fields=field_mask_pb2.FieldMask(
+                    paths=['config_set', 'revision', 'content_sha256'])),
+            credentials=client.service_account_credentials())
+      except client.RpcError as rpce:
+        logging.error('RpcError for GetProjectConfigs(%s): %s\n' %
+                      (cfg_path, rpce))
+        raise rpce
+      configs = [to_config_dict(cfg) for cfg in res.configs]
 
     # Load config contents. Most of them will come from memcache.
     for cfg in configs:
@@ -278,14 +302,18 @@ class Provider(object):
     Returns:
       {"config_set -> (revision, content)} map.
     """
-    return self._get_configs_multi(format_url('configs/projects/%s', path))
+    return self._get_configs_multi(format_url('configs/projects/%s', path),
+                                   cfg_path=path)
 
   def get_ref_configs_async(self, path):
     """Reads a config file in all refs of all projects.
 
     Returns:
       {"config_set -> (revision, content)} map.
+
+    Note: It's deprecated in V2 Config Service.
     """
+    assert not self._is_v1_host(), 'V2 Config Service does not support refs'
     return self._get_configs_multi(format_url('configs/refs/%s', path))
 
   @ndb.tasklet

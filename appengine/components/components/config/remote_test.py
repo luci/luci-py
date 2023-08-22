@@ -272,13 +272,13 @@ class RemoteTestCase(test_case.TestCase):
       },
     ])
 
-  def test_get_project_configs_async_receives_404(self):
+  def test_get_project_configs_async_receives_404_v1(self):
     net.json_request_async.side_effect = net.NotFoundError(
         'Not found', 404, None)
     with self.assertRaises(net.NotFoundError):
       self.provider.get_project_configs_async('cfg').get_result()
 
-  def test_get_project_configs_async(self):
+  def test_get_project_configs_async_v1(self):
     self.mock(net, 'json_request_async', mock.Mock())
     net.json_request_async.return_value = ndb.Future()
     net.json_request_async.return_value.set_result({
@@ -298,6 +298,56 @@ class RemoteTestCase(test_case.TestCase):
     configs = self.provider.get_project_configs_async('cfg').get_result()
 
     self.assertEqual(configs, {'projects/chromium': ('aaaaaaaa', 'a config')})
+
+  def test_get_project_configs_async_v2(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetProjectConfigs.return_value = future(
+        config_service_pb2.GetProjectConfigsResponse(configs=[
+            config_service_pb2.Config(config_set='projects/chromium',
+                                      revision='aaaaaaaa',
+                                      content_sha256='deadbeef')
+        ]))
+    self.v2_cient_mock.GetConfig.return_value = future(
+        config_service_pb2.Config(raw_content=b'a config'))
+
+    configs = self.provider.get_project_configs_async('cfg').get_result()
+
+    self.assertEqual(configs, {'projects/chromium': ('aaaaaaaa', 'a config')})
+    self.v2_cient_mock.GetProjectConfigs.assert_called_once_with(
+        config_service_pb2.GetProjectConfigsRequest(
+            path='cfg',
+            fields=field_mask_pb2.FieldMask(
+                paths=['config_set', 'revision', 'content_sha256'])),
+        credentials=mock.ANY,
+    )
+    self.v2_cient_mock.GetConfig.assert_called_once_with(
+        config_service_pb2.GetConfigRequest(
+            content_sha256='deadbeef',
+            fields=field_mask_pb2.FieldMask(paths=['content'])),
+        credentials=mock.ANY,
+    )
+
+    # The 2nd call hits Memcache
+    self.v2_cient_mock.reset_mock()
+    self.assertEqual(configs, {'projects/chromium': ('aaaaaaaa', 'a config')})
+    self.assertFalse(self.v2_cient_mock.GetConfig.called)
+
+  def test_get_project_configs_async_v2_not_found(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetProjectConfigs.return_value = future(
+        config_service_pb2.GetProjectConfigsResponse())
+
+    configs = self.provider.get_project_configs_async('cfg').get_result()
+    self.assertEqual(configs, {})
+
+  def test_get_project_configs_async_v2_rpc_err(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetProjectConfigs.side_effect = client.RpcError(
+        'Internal Error', codes.StatusCode.INTERNAL, {})
+
+    with self.assertRaises(client.RpcError) as err:
+      self.provider.get_project_configs_async('cfg').get_result()
+    self.assertEqual(err.exception.status_code, codes.StatusCode.INTERNAL)
 
   def test_get_config_set_location_async(self):
     self.mock(net, 'json_request_async', mock.Mock())
