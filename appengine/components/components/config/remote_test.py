@@ -4,7 +4,9 @@
 # that can be found in the LICENSE file.
 
 import base64
+import cStringIO
 import datetime
+import gzip
 import sys
 import unittest
 
@@ -14,11 +16,16 @@ test_env.setup_test_env()
 import mock
 
 from google.appengine.ext import ndb
+from google.protobuf import field_mask_pb2
 
 from components import auth
 from components import net
 from components.config import remote
+from components.prpc import client
+from components.prpc import codes
 from test_support import test_case
+
+from .proto import config_service_pb2
 
 import test_config_pb2
 
@@ -33,6 +40,12 @@ class RemoteTestCase(test_case.TestCase):
     provider_future = ndb.Future()
     provider_future.set_result(self.provider)
     self.mock(remote, 'get_provider_async', lambda: provider_future)
+
+    # Inject a prpc config v2 client.
+    self.v2_cient_mock = mock.Mock()
+    mock.patch.object(
+        self.provider,
+        '_config_v2_client').start().return_value = self.v2_cient_mock
 
   @ndb.tasklet
   def json_request_async(self, url, **kwargs):
@@ -78,7 +91,7 @@ class RemoteTestCase(test_case.TestCase):
       })
     self.fail('Unexpected url: %s' % url)
 
-  def test_get_async(self):
+  def test_get_async_v1(self):
     revision, content = self.provider.get_async(
         'services/foo', 'bar.cfg').get_result()
     self.assertEqual(revision, 'aaaabbbb')
@@ -91,6 +104,116 @@ class RemoteTestCase(test_case.TestCase):
     self.assertEqual(revision, 'aaaabbbb')
     self.assertEqual(content, 'a config')
     self.assertFalse(net.json_request_async.called)
+
+  def test_get_async_v2(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetConfig.side_effect = [
+        future(
+            config_service_pb2.Config(revision='aaaabbbb',
+                                      content_sha256='sha256hash')),
+        future(config_service_pb2.Config(raw_content=b'a config')),
+    ]
+
+    revision, content = self.provider.get_async('services/foo',
+                                                'bar.cfg').get_result()
+
+    self.assertEqual(revision, 'aaaabbbb')
+    self.assertEqual(content, 'a config')
+    self.v2_cient_mock.GetConfig.assert_has_calls([
+        mock.call(
+            config_service_pb2.GetConfigRequest(
+                config_set='services/foo',
+                path='bar.cfg',
+                fields=field_mask_pb2.FieldMask(
+                    paths=['revision', 'content_sha256'])),
+            credentials=mock.ANY,
+        ),
+        mock.call(
+            config_service_pb2.GetConfigRequest(
+                content_sha256='sha256hash',
+                fields=field_mask_pb2.FieldMask(paths=['content']),
+            ),
+            credentials=mock.ANY,
+        ),
+    ])
+
+    # Memcache coverage
+    self.v2_cient_mock.reset_mock()
+    revision, content = self.provider.get_async('services/foo',
+                                                'bar.cfg').get_result()
+    self.assertEqual(revision, 'aaaabbbb')
+    self.assertEqual(content, 'a config')
+    self.assertFalse(self.v2_cient_mock.called)
+
+  def test_get_async_v2_content_in_signed_url(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetConfig.side_effect = [
+        future(
+            config_service_pb2.Config(revision='aaaabbbb',
+                                      content_sha256='sha256hash')),
+        future(config_service_pb2.Config(signed_url='signed_url')),
+    ]
+
+    @ndb.tasklet
+    def mock_request_async(url, **kwargs):
+      assert kwargs.get('headers', {}).get('Accept-Encoding') == 'gzip'
+      assert isinstance(kwargs['response_headers'], dict)
+      kwargs['response_headers'].update({'Content-Encoding': 'gzip'})
+      return _gzip_compress('a large config')
+
+    self.mock(net, 'request_async', mock.Mock())
+    net.request_async.side_effect = mock_request_async
+
+    revision, content = self.provider.get_async('services/foo',
+                                                'bar.cfg').get_result()
+
+    self.assertEqual(revision, 'aaaabbbb')
+    self.assertEqual(content, 'a large config')
+    self.v2_cient_mock.GetConfig.assert_has_calls([
+        mock.call(
+            config_service_pb2.GetConfigRequest(
+                config_set='services/foo',
+                path='bar.cfg',
+                fields=field_mask_pb2.FieldMask(
+                    paths=['revision', 'content_sha256'])),
+            credentials=mock.ANY,
+        ),
+        mock.call(
+            config_service_pb2.GetConfigRequest(
+                content_sha256='sha256hash',
+                fields=field_mask_pb2.FieldMask(paths=['content']),
+            ),
+            credentials=mock.ANY,
+        ),
+    ])
+
+    # Memcache coverage
+    self.v2_cient_mock.reset_mock()
+    revision, content = self.provider.get_async('services/foo',
+                                                'bar.cfg').get_result()
+    self.assertEqual(revision, 'aaaabbbb')
+    self.assertEqual(content, 'a large config')
+    self.assertFalse(self.v2_cient_mock.called)
+
+  def test_get_async_v2_not_found(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetConfig.side_effect = client.RpcError(
+        'Config Not Found', codes.StatusCode.NOT_FOUND, {})
+
+    revision, content = self.provider.get_async('services/foo',
+                                                'bar.cfg').get_result()
+
+    self.assertEqual(revision, None)
+    self.assertEqual(content, None)
+
+  def test_get_async_v2_rpc_err(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetConfig.side_effect = client.RpcError(
+        'Internal Error', codes.StatusCode.INTERNAL, {})
+
+    with self.assertRaises(client.RpcError) as err:
+      self.provider.get_async('services/foo', 'bar.cfg').get_result()
+    self.assertEqual(err.exception.status_code, codes.StatusCode.INTERNAL)
 
   def test_get_async_with_revision(self):
     revision, content = self.provider.get_async(
@@ -131,6 +254,7 @@ class RemoteTestCase(test_case.TestCase):
     self.assertEqual(content, 'a config')
 
     self.assertFalse(net.json_request_async.called)
+    self.assertFalse(self.v2_cient_mock.called)
 
   def test_get_projects(self):
     projects = self.provider.get_projects_async().get_result()
@@ -232,3 +356,16 @@ if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()
+
+
+def future(result):
+  f = ndb.Future()
+  f.set_result(result)
+  return f
+
+
+def _gzip_compress(blob):
+  out = cStringIO.StringIO()
+  with gzip.GzipFile(fileobj=out, mode='w') as f:
+    f.write(blob)
+  return out.getvalue()

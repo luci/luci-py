@@ -5,7 +5,9 @@
 """remote.Provider reads configs from a remote config service."""
 
 import base64
+import cStringIO
 import datetime
+import gzip
 import logging
 import math
 import random
@@ -20,12 +22,17 @@ utils.fix_protobuf_package()
 
 from google import protobuf
 from google.appengine.ext import ndb
+from google.protobuf import field_mask_pb2
 
 from components import net
 from components import utils
+from components.prpc import client
+from components.prpc import codes
 
 from . import common
 from . import validation
+from .proto import config_service_pb2
+from .proto import config_service_prpc_pb2
 
 
 MEMCACHE_PREFIX = 'components.config/v2/'
@@ -66,6 +73,10 @@ class Provider(object):
     assert service_hostname
     self.service_hostname = service_hostname
 
+  def _is_v1_host(self):
+    """Returns True if it's a V1 Config Service hostname."""
+    return self.service_hostname.endswith('.appspot.com')
+
   @ndb.tasklet
   def _api_call_async(self, path, allow_not_found=True, **kwargs):
     assert path
@@ -83,6 +94,58 @@ class Provider(object):
       logging.warning('%s response: %s', ex.status_code, ex.response)
       raise
 
+  def _config_v2_client(self):
+    """Returns a prpc client pointing to the V2 Config Service."""
+    assert not self._is_v1_host(
+    ), 'Should not create a prpc client for v1 Config Service'
+    return client.Client(self.service_hostname,
+                         config_service_prpc_pb2.ConfigsServiceDescription)
+
+  @ndb.tasklet
+  def _get_config_v2_async(self, req, allow_not_found=True):
+    """Make a GetConfig rpc call to V2 Config Service
+
+    Returns:
+      a config_service_pb2.Config or None if no such config and allow_not_found
+      arg is set to True.
+      If the rpc response has a signed url, the content will be downloaded from
+      that signed url and be populted it into the
+      config_service_pb2.Config.raw_content.
+    """
+    assert isinstance(req, config_service_pb2.GetConfigRequest), req
+
+    try:
+      res = yield self._config_v2_client().GetConfig(
+          req, credentials=client.service_account_credentials())
+    except client.RpcError as rpce:
+      if rpce.status_code == codes.StatusCode.NOT_FOUND and allow_not_found:
+        raise ndb.Return(None)
+      logging.error('RpcError for GetConfig(%s): %s\n' % (req, rpce))
+      raise rpce
+
+    if res.signed_url:
+      try:
+        headers = {}
+        blob = yield net.request_async(
+            url=res.signed_url,
+            method='GET',
+            params=net.PARAMS_IN_URL,  # GCS signed urls usually include params.
+            headers={'Accept-Encoding': 'gzip'},
+            response_headers=headers,
+        )
+        headers = {k.lower(): v for k, v in headers.items()}
+        if blob and headers.get('content-encoding', '').lower() == 'gzip':
+          res.raw_content = gzip.GzipFile(
+              fileobj=cStringIO.StringIO(blob)).read()
+        else:
+          res.raw_content = blob
+      except net.Error as ex:
+        logging.error(
+            'Error when downloading content from the signed url: HTTP %s - %s',
+            ex.status_code, ex.response)
+        raise
+    raise ndb.Return(res)
+
   @ndb.tasklet
   def get_config_by_hash_async(self, content_hash):
     """Returns a config blob by its hash. Memcaches results."""
@@ -93,8 +156,16 @@ class Provider(object):
     if content is not None:
       raise ndb.Return(zlib.decompress(content))
 
-    res = yield self._api_call_async('config/%s' % content_hash)
-    content = base64.b64decode(res.get('content')) if res else None
+    if self._is_v1_host():
+      res = yield self._api_call_async('config/%s' % content_hash)
+      content = base64.b64decode(res.get('content')) if res else None
+    else:
+      res = yield self._get_config_v2_async(
+          config_service_pb2.GetConfigRequest(
+              content_sha256=content_hash,
+              fields=field_mask_pb2.FieldMask(paths=['content']),
+          ))
+      content = res.raw_content if res else None
     if content is not None:
       yield ctx.memcache_set(cache_key, zlib.compress(content))
     raise ndb.Return(content)
@@ -120,18 +191,30 @@ class Provider(object):
       revision, content_hash = (
           (yield ctx.memcache_get(cache_key)) or (revision, None))
 
-    if not content_hash:
+    if content_hash:
+      raise ndb.Return(revision, content_hash)
+
+    if self._is_v1_host():
       url_path = format_url('config_sets/%s/config/%s', config_set, path)
       params = {'hash_only': True}
       if revision:
         params['revision'] = revision
       res = yield self._api_call_async(url_path, params=params)
-      if res:
-        revision = res['revision']
-        content_hash = res['content_hash']
-        if content_hash and use_memcache:
-          yield ctx.memcache_set(
-              cache_key, (revision, content_hash), time=60 if get_latest else 0)
+      revision = res['revision'] if res else revision
+      content_hash = res['content_hash'] if res else None
+    else:
+      res = yield self._get_config_v2_async(
+          config_service_pb2.GetConfigRequest(
+              config_set=config_set,
+              path=path,
+              fields=field_mask_pb2.FieldMask(
+                  paths=['revision', 'content_sha256'])))
+      revision = res.revision if res else revision
+      content_hash = res.content_sha256 if res else None
+
+    if content_hash and use_memcache:
+      yield ctx.memcache_set(cache_key, (revision, content_hash),
+                             time=60 if get_latest else 0)
     raise ndb.Return(revision, content_hash)
 
   @ndb.tasklet
