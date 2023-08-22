@@ -256,7 +256,7 @@ class RemoteTestCase(test_case.TestCase):
     self.assertFalse(net.json_request_async.called)
     self.assertFalse(self.v2_cient_mock.called)
 
-  def test_get_projects(self):
+  def test_get_projects_v1(self):
     projects = self.provider.get_projects_async().get_result()
     self.assertEqual(projects, [
       {
@@ -271,6 +271,47 @@ class RemoteTestCase(test_case.TestCase):
        'repo_url': 'https://chromium.googlesource.com/infra/infra',
       },
     ])
+
+  def test_get_projects_v2(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.ListConfigSets.return_value = future(
+        config_service_pb2.ListConfigSetsResponse(config_sets=[
+            config_service_pb2.ConfigSet(
+                name='projects/chromium',
+                url='https://chromium.googlesource.com/chromium/src'),
+            config_service_pb2.ConfigSet(
+                name='projects/infra',
+                url='https://chromium.googlesource.com/infra/infra'),
+        ]))
+
+    projects = self.provider.get_projects_async().get_result()
+    self.assertEqual(projects, [
+        {
+            'id': 'chromium',
+            'repo_type': 'GITILES',
+            'repo_url': 'https://chromium.googlesource.com/chromium/src',
+            'name': 'chromium'
+        },
+        {
+            'id': 'infra',
+            'repo_type': 'GITILES',
+            'repo_url': 'https://chromium.googlesource.com/infra/infra',
+            'name': 'infra'
+        },
+    ])
+    self.v2_cient_mock.ListConfigSets.assert_called_once_with(
+        config_service_pb2.ListConfigSetsRequest(domain='PROJECT'),
+        credentials=mock.ANY,
+    )
+
+  def test_get_projects_v2_rpc_err(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.ListConfigSets.side_effect = client.RpcError(
+        'Internal Error', codes.StatusCode.INTERNAL, {})
+
+    with self.assertRaises(client.RpcError) as err:
+      self.provider.get_projects_async().get_result()
+    self.assertEqual(err.exception.status_code, codes.StatusCode.INTERNAL)
 
   def test_get_project_configs_async_receives_404_v1(self):
     net.json_request_async.side_effect = net.NotFoundError(

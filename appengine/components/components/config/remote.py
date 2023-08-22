@@ -318,8 +318,32 @@ class Provider(object):
 
   @ndb.tasklet
   def get_projects_async(self):
-    res = yield self._api_call_async('projects', allow_not_found=False)
-    raise ndb.Return(res.get('projects', []))
+    """Returns a list of registered projects.
+
+    Returns: a list of project_dicts, where a project_dict has keys
+    'repo_type', 'id', 'repo_url' and 'name'.
+    """
+    if self._is_v1_host():
+      res = yield self._api_call_async('projects', allow_not_found=False)
+      raise ndb.Return(res.get('projects', []))
+
+    try:
+      res = yield self._config_v2_client().ListConfigSets(
+          config_service_pb2.ListConfigSetsRequest(domain='PROJECT'),
+          credentials=client.service_account_credentials())
+    except client.RpcError as rpce:
+      logging.warning('RpcError for listing projects: %s\n' % rpce)
+      raise rpce
+    project_dicts = []
+    for cs in res.config_sets:
+      project_dicts.append({
+          # V2 only supports GITILES for now.
+          'repo_type': 'GITILES',
+          'id': cs.name.split('/', 1)[1],
+          'name': cs.name.split('/', 1)[1],  # V2 treats name and id the same.
+          'repo_url': cs.url,
+      })
+    raise ndb.Return(project_dicts)
 
   @ndb.tasklet
   def get_config_set_location_async(self, config_set):
