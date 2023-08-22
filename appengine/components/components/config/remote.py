@@ -332,7 +332,7 @@ class Provider(object):
           config_service_pb2.ListConfigSetsRequest(domain='PROJECT'),
           credentials=client.service_account_credentials())
     except client.RpcError as rpce:
-      logging.warning('RpcError for listing projects: %s\n' % rpce)
+      logging.error('RpcError for listing projects: %s\n' % rpce)
       raise rpce
     project_dicts = []
     for cs in res.config_sets:
@@ -353,13 +353,30 @@ class Provider(object):
       URL or None if no such config set.
     """
     assert config_set
-    res = yield self._api_call_async(
-        'mapping', params={'config_set': config_set})
-    if not res:
-      raise ndb.Return(None)
-    for entry in res.get('mappings', []):
-      if entry.get('config_set') == config_set:
-        raise ndb.Return(entry.get('location'))
+    if self._is_v1_host():
+      res = yield self._api_call_async('mapping',
+                                       params={'config_set': config_set})
+      if not res:
+        raise ndb.Return(None)
+      for entry in res.get('mappings', []):
+        if entry.get('config_set') == config_set:
+          raise ndb.Return(entry.get('location'))
+    else:
+      try:
+        res = yield self._config_v2_client().GetConfigSet(
+            config_service_pb2.GetConfigSetRequest(
+                config_set=config_set,
+                fields=field_mask_pb2.FieldMask(paths=['url'])),
+            credentials=client.service_account_credentials())
+      except client.RpcError as rpce:
+        if rpce.status_code == codes.StatusCode.NOT_FOUND:
+          logging.warning('config_set(%s) is not found in Config Service')
+          raise ndb.Return(None)
+        logging.error('RpcError in getting config_set(%s) location: %s\n' %
+                      (config_set, rpce))
+        raise rpce
+      raise ndb.Return(res.url)
+
     raise ndb.Return(None)
 
   @ndb.tasklet

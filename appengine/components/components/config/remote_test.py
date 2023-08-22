@@ -390,7 +390,7 @@ class RemoteTestCase(test_case.TestCase):
       self.provider.get_project_configs_async('cfg').get_result()
     self.assertEqual(err.exception.status_code, codes.StatusCode.INTERNAL)
 
-  def test_get_config_set_location_async(self):
+  def test_get_config_set_location_async_v1(self):
     self.mock(net, 'json_request_async', mock.Mock())
     net.json_request_async.return_value = ndb.Future()
     net.json_request_async.return_value.set_result({
@@ -407,6 +407,37 @@ class RemoteTestCase(test_case.TestCase):
         'https://luci-config.appspot.com/_ah/api/config/v1/mapping',
         scopes=net.EMAIL_SCOPE,
         params={'config_set': 'services/abc'})
+
+  def test_get_config_set_location_async_v2(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetConfigSet.return_value = future(
+        config_service_pb2.ConfigSet(url='http://example.com'))
+
+    r = self.provider.get_config_set_location_async('services/abc').get_result()
+    self.assertEqual(r, 'http://example.com')
+    self.v2_cient_mock.GetConfigSet.assert_called_once_with(
+        config_service_pb2.GetConfigSetRequest(
+            config_set='services/abc',
+            fields=field_mask_pb2.FieldMask(paths=['url'])),
+        credentials=mock.ANY,
+    )
+
+  def test_get_config_set_location_async_v2_not_found(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetConfigSet.side_effect = client.RpcError(
+        'Not Found', codes.StatusCode.NOT_FOUND, {})
+
+    r = self.provider.get_config_set_location_async('services/abc').get_result()
+    self.assertIsNone(r)
+
+  def test_get_config_set_location_async_v2_rpc_err(self):
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.v2_cient_mock.GetConfigSet.side_effect = client.RpcError(
+        'Internal Error', codes.StatusCode.INTERNAL, {})
+
+    with self.assertRaises(client.RpcError) as err:
+      self.provider.get_config_set_location_async('services/abc').get_result()
+    self.assertEqual(err.exception.status_code, codes.StatusCode.INTERNAL)
 
   def test_cron_update_last_good_configs(self):
     self.provider.get_async(
