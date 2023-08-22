@@ -16,10 +16,9 @@ export class PrpcService {
       ...opts,
       accessToken: undefined,
     };
-    // If we are running a live_demo, this will be set so we must override
-    // the PrpcClients host function.
-    if (window.DEV_HOST) {
-      prpcOpts.host = window.DEV_HOST;
+    // If we are running a live demo, use insecure to avoid ssl errors
+    if (window.LIVE_DEMO) {
+      prpcOpts.insecure = true;
     }
     this._token = accessToken;
     if (signal) {

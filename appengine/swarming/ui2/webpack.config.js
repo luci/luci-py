@@ -271,6 +271,11 @@ module.exports = (env, argv) => {
       common.devServer.proxy = [
         {
           changeOrigin: true,
+          context: ["/prpc/", "/_ah/"],
+          target: "https://chromium-swarm-dev.appspot.com/",
+        },
+        {
+          changeOrigin: true,
           context: ["/auth"],
           target: "https://chromium-swarm-dev.appspot.com/",
           bypass: function (req, _res, _proxyOptions) {

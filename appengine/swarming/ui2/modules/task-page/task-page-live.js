@@ -3,8 +3,8 @@
 // that can be found in the LICENSE file.
 
 import "./index.js";
-import { pointFetchAtSwarmingDev } from "../util.js";
+import { setLiveDemoFlag } from "../util.js";
 
 (function () {
-  pointFetchAtSwarmingDev();
+  setLiveDemoFlag();
 })();

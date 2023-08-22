@@ -281,24 +281,11 @@ export function timeDiffExact(first, second) {
   return human.strDuration((second.getTime() - first.getTime()) / 1000) || "0s";
 }
 
-/** Rewrites fetch to point at the development instance of swarming when used
- * for live demos. Only chromium-swarming-dev environment is used since that is
- * the only swarming environment which allowlists origin http://localhost:8080
- * for logins.
+/**
+ * sets window.LIVE_DEMO = true which allows code to adjust itself to being in a demo environment.
  */
-export function pointFetchAtSwarmingDev() {
-  // We set DEV_HOST so that other parts of the UI can figure out that it must
-  // communicate with the development environment version of swarming.
-  const DEV_HOST = "chromium-swarm-dev.appspot.com";
-  window.DEV_HOST = DEV_HOST;
-  const origFetch = window.fetch;
-  const fetchAboslute = (url, ...params) => {
-    if (url.startsWith("/")) {
-      return origFetch(`https://${DEV_HOST}/${url}`, ...params);
-    } else return origFetch(url, ...params);
-  };
-  window.fetch = fetchAboslute;
-  return;
+export function setLiveDemoFlag() {
+  window.LIVE_DEMO = true;
 }
 
 function _base64ToBytes(base64) {

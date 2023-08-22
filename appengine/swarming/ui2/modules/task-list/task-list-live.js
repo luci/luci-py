@@ -3,6 +3,7 @@
 // that can be found in the LICENSE file.
 
 import "./index.js";
+
 import { setLiveDemoFlag } from "../util.js";
 
 (function () {
