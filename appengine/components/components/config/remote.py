@@ -243,9 +243,9 @@ class Provider(object):
     raise ndb.Return(revision, config)
 
   @ndb.tasklet
-  def _get_configs_multi(self, url_path, cfg_path=None):
+  def _get_configs_multi(self, cfg_path):
     """Returns a map config_set -> (revision, content)."""
-    assert url_path
+    assert cfg_path
 
     def to_config_dict(cfg):
       assert isinstance(cfg, config_service_pb2.Config), cfg
@@ -258,12 +258,12 @@ class Provider(object):
     # Response must return a dict with 'configs' key which is a list of configs.
     # Each config has keys 'config_set', 'revision' and 'content_hash'.
     if self._is_v1_host():
-      res = yield self._api_call_async(url_path,
+      res = yield self._api_call_async(format_url('configs/projects/%s',
+                                                  cfg_path),
                                        params={'hashes_only': True},
                                        allow_not_found=False)
       configs = res.get('configs', [])
     else:
-      assert cfg_path
       try:
         res = yield self._config_v2_client().GetProjectConfigs(
             config_service_pb2.GetProjectConfigsRequest(
@@ -302,19 +302,7 @@ class Provider(object):
     Returns:
       {"config_set -> (revision, content)} map.
     """
-    return self._get_configs_multi(format_url('configs/projects/%s', path),
-                                   cfg_path=path)
-
-  def get_ref_configs_async(self, path):
-    """Reads a config file in all refs of all projects.
-
-    Returns:
-      {"config_set -> (revision, content)} map.
-
-    Note: It's deprecated in V2 Config Service.
-    """
-    assert not self._is_v1_host(), 'V2 Config Service does not support refs'
-    return self._get_configs_multi(format_url('configs/refs/%s', path))
+    return self._get_configs_multi(path)
 
   @ndb.tasklet
   def get_projects_async(self):

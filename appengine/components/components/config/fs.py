@@ -98,23 +98,6 @@ class Provider(object):
     raise ndb.Return(result)
 
   @ndb.tasklet
-  def get_ref_configs_async(self, path):
-    """Reads a config file in all refs of all projects.
-
-    Returns:
-      {config_set -> (revision, content)} map, where revision is always None.
-    """
-    assert path
-    result = {}
-    for pid in self.get_project_ids():
-      for ref in self.get_project_refs(pid):
-        config_set = 'projects/%s/%s' % (pid, ref)
-        rev, content = yield self.get_async(config_set, path)
-        if content is not None:
-          result[config_set] = (rev, content)
-    raise ndb.Return(result)
-
-  @ndb.tasklet
   def get_config_set_location_async(self, _config_set):
     """Returns URL of where configs for given config set are stored.
 

@@ -191,51 +191,6 @@ def get_project_configs(path, dest_type=None):
 
 
 @ndb.tasklet
-def get_ref_configs_async(path, dest_type=None):
-  """Returns config at |path| in all refs of all projects.
-
-  Args:
-    path (str): path to configuration files. Files at this path will be
-      retrieved from all refs of all projects.
-    dest_type (type): if specified, config contents will be converted to
-      |dest_type|. Only protobuf messages are supported. If a config could not
-      be converted, the exception will be logged, but not raised.
-
-  Returns:
-    A map {project -> {ref -> (revision, config, exception)}}.
-    Here ref is a str that always starts with 'ref/'.
-    In file system mode, revision is None.
-    If config is invalid, config is None and exception is not.
-  """
-  assert path
-  common._validate_dest_type(dest_type)
-  provider = yield _get_config_provider_async()
-  configs = yield provider.get_ref_configs_async(path)
-  result = {}
-  for config_set, (revision, content) in configs.items():
-    assert config_set and config_set.startswith('projects/'), config_set
-    project_id, ref = config_set.split('/', 2)[1:]
-    assert project_id
-    assert ref
-    try:
-      config = common._convert_config(content, dest_type)
-    except common.ConfigFormatError as ex:
-      logging.exception(
-          'Could not parse config at %s in config set %s: %r',
-          path, config_set, content)
-      ref_value = (revision, None, ex)
-    else:
-      ref_value = (revision, config, None)
-    result.setdefault(project_id, {})[ref] = ref_value
-  raise ndb.Return(result)
-
-
-def get_ref_configs(path, dest_type=None):
-  """Blocking version of get_ref_configs_async."""
-  return get_ref_configs_async(path, dest_type).get_result()
-
-
-@ndb.tasklet
 def get_config_set_location_async(config_set):  # pragma: no cover
   """Returns URL of where configs for a given config set are stored.
 

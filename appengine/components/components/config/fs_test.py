@@ -51,21 +51,6 @@ class FsTestCase(test_case.TestCase):
         'foo.cfg').get_result()
     self.assertEqual({}, actual)
 
-  def test_get_ref_configs(self):
-    expected = {
-      'projects/chromium/refs/heads/main': (
-          None, 'projects/chromium/refs/heads/main:foo.cfg\n'),
-      'projects/chromium/refs/non-branch': (
-          None, 'projects/chromium/refs/non-branch:foo.cfg\n'),
-      'projects/v8/refs/heads/main': (
-          None, 'projects/v8/refs/heads/main:foo.cfg\n'),
-    }
-    actual = self.provider.get_ref_configs_async('foo.cfg').get_result()
-    self.assertEqual(expected, actual)
-
-    actual = self.empty_provider.get_ref_configs_async('foo.cfg').get_result()
-    self.assertEqual({}, actual)
-
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
