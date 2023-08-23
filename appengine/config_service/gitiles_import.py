@@ -502,7 +502,7 @@ def cron_run_import():  # pragma: no cover
   # don't give accidental priority to lexicographically first ones.
   random.shuffle(tasks)
 
-  q = taskqueue.Queue('gitiles-import')
+  q = taskqueue.Queue('legacy-gitiles-import')
   pending = tasks
   while pending:
     batch = pending[:100]
