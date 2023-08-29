@@ -1234,8 +1234,16 @@ def _run_bot_inner(arg_error, quit_bit):
   if not _ORIGINAL_BOT_ID:
     _ORIGINAL_BOT_ID = botobj.id
 
+  # RBE expects the version string to use a specific format.
+  rbe_bot_version = '%s_%s_swarming/%s-%s' % (
+      os_utilities.get_cipd_os(),
+      os_utilities.get_cipd_architecture(),
+      botobj.server_version,
+      botobj.bot_version,
+  )
+
   # Spin until getting a termination signal. Shutdown RBE on exit.
-  state = _BotLoopState(botobj, rbe_params, quit_bit)
+  state = _BotLoopState(botobj, rbe_params, rbe_bot_version, quit_bit)
   with botobj.mutate_internals() as mut:
     mut.set_exit_hook(lambda _: state.rbe_disable())
   state.run()
@@ -1289,7 +1297,12 @@ def _backoff(cycle, exponent, max_val=300.0):
 class _BotLoopState:
   """The state of the main bot poll loop."""
 
-  def __init__(self, botobj, rbe_params, quit_bit, clock_impl=None):
+  def __init__(self,
+               botobj,
+               rbe_params,
+               rbe_bot_version,
+               quit_bit,
+               clock_impl=None):
     # Instance of Bot.
     self._bot = botobj
     # threading.Event signaled when the bot should gracefully exit.
@@ -1317,6 +1330,8 @@ class _BotLoopState:
     # When we should poll Swarming next time. Initially set to ASAP.
     self._swarming_poll_timer = self._clock.timer(0.0)
 
+    # The version string to report to RBE for monitoring and logs.
+    self._rbe_bot_version = rbe_bot_version
     # The last RBE poll token received from Swarming.
     self._rbe_poll_token = None
     # The RBE instance Swarming told us to use.
@@ -1752,7 +1767,7 @@ class _BotLoopState:
         logging.info('RBE: opening session at %s', self._rbe_intended_instance)
         self._rbe_session = remote_client.RBESession(
             self._bot.remote, self._rbe_intended_instance, self._bot.dimensions,
-            self._rbe_poll_token)
+            self._rbe_bot_version, self._rbe_poll_token)
         logging.info('RBE: session is %s', self._rbe_session.session_id)
         self._rbe_consecutive_errors = 0
       except remote_client_errors.RBEServerError as e:

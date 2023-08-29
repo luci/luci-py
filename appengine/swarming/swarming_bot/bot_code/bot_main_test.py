@@ -129,8 +129,8 @@ class TestBotBase(net_utils.TestCase):
     bot_main._update_bot_attributes(self.bot, 0)
     self.clock = clock.Clock(self.quit_bit)
     self.clock._now_impl = lambda: self.quit_bit.now
-    self.loop_state = bot_main._BotLoopState(self.bot, None, self.quit_bit,
-                                             self.clock)
+    self.loop_state = bot_main._BotLoopState(self.bot, None, None,
+                                             self.quit_bit, self.clock)
 
   def poll_once(self):
     self.quit_bit.reset()
@@ -1966,8 +1966,9 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
 
     rbe_session = remote_client.RBESession(self.bot.remote, 'rbe-instance',
-                                           self.bot.dimensions, 'poll-token',
-                                           'session-token', 'session-id')
+                                           self.bot.dimensions, 'bot_version',
+                                           'poll-token', 'session-token',
+                                           'session-id')
     rbe_session._active_lease = remote_client.RBELease(
         'id', remote_client.RBELeaseState.ACTIVE)
     rbe_results = []

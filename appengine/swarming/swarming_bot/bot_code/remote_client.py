@@ -544,6 +544,7 @@ class RemoteClientNative(object):
 
   def rbe_create_session(self,
                          dimensions,
+                         bot_version,
                          poll_token,
                          session_token=None,
                          retry_transient=False):
@@ -556,6 +557,7 @@ class RemoteClientNative(object):
 
     Arguments:
       dimensions: a dict with bot dimensions as {str => [str]}.
+      bot_version: a string with bot version for monitoring and logs.
       poll_token: a token reported by `rbe` poll(...) command.
       session_token: a session token of a previous session if reopening it.
       retry_transient: True to retry many times on transient errors. This is
@@ -569,6 +571,8 @@ class RemoteClientNative(object):
       RBEServerError if the RPC fails for whatever reason.
     """
     data = {'dimensions': dimensions, 'poll_token': poll_token}
+    if bot_version:
+      data['bot_version'] = bot_version
     if session_token:
       data['session_token'] = session_token
     resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/create',
@@ -592,6 +596,7 @@ class RemoteClientNative(object):
                          session_token,
                          status,
                          dimensions,
+                         bot_version,
                          lease=None,
                          poll_token=None,
                          blocking=True,
@@ -606,6 +611,7 @@ class RemoteClientNative(object):
       session_token: the session token returned by the previous update call.
       status: the desired bot session status as RBESessionStatus enum.
       dimensions: a dict with bot dimensions as {str => [str]}.
+      bot_version: a string with bot version for monitoring and logs.
       lease: an optional RBELease the bot is or was working on.
       poll_token: a token reported by latest `rbe` poll(...) command, optional.
       blocking: if True, allow waiting for a bit for new leases to appear.
@@ -625,6 +631,8 @@ class RemoteClientNative(object):
         'status': status.name,
         'dimensions': dimensions,
     }
+    if bot_version:
+      data['bot_version'] = bot_version
     if lease:
       assert isinstance(lease, RBELease), lease
       data['lease'] = lease.to_dict(omit_payload=True)
@@ -814,6 +822,7 @@ class RBESession:
                remote,
                instance,
                dimensions,
+               bot_version,
                poll_token,
                session_token=None,
                session_id=None):
@@ -823,6 +832,7 @@ class RBESession:
       remote: an instance of RemoteClientNative to use to call Swarming RBE.
       instance: an RBE instance this session will be running on.
       dimensions: a dict with bot dimensions as {str => [str]}.
+      bot_version: a string with bot version for monitoring and logs.
       poll_token: a token reported by `rbe` poll(...) command.
       session_token: if set, do not call rbe_create_session, use this token.
       session_id: if set, do not call rbe_create_session, use this ID.
@@ -831,12 +841,13 @@ class RBESession:
       RBEServerError if the RPC fails for whatever reason.
     """
     if not session_token or not session_id:
-      resp = remote.rbe_create_session(dimensions, poll_token)
+      resp = remote.rbe_create_session(dimensions, bot_version, poll_token)
       session_token = resp.session_token
       session_id = resp.session_id
     self._remote = remote
     self._instance = instance
     self._dimensions = copy.deepcopy(dimensions)
+    self._bot_version = bot_version
     self._poll_token = poll_token
     self._session_token = session_token
     self._session_id = session_id
@@ -851,6 +862,8 @@ class RBESession:
         self._instance,
         'dimensions':
         self._dimensions,
+        'bot_version':
+        self._bot_version,
         'poll_token':
         self._poll_token,
         'session_token':
@@ -889,8 +902,8 @@ class RBESession:
         raise ValueError('Not a valid JSON: %s' % e)
     try:
       session = RBESession(remote, dump['instance'], dump['dimensions'],
-                           dump['poll_token'], dump['session_token'],
-                           dump['session_id'])
+                           dump['bot_version'], dump['poll_token'],
+                           dump['session_token'], dump['session_id'])
       last_acked_status = dump['last_acked_status']
       active_lease = dump['active_lease']
       finished_lease = dump['finished_lease']
@@ -920,6 +933,7 @@ class RBESession:
     self._instance = loaded._instance
     self._session_id = loaded._session_id
     self._dimensions = loaded._dimensions
+    self._bot_version = loaded._bot_version
     self._poll_token = loaded._poll_token
     self._session_token = loaded._session_token
     self._last_acked_status = loaded._last_acked_status
@@ -1183,7 +1197,8 @@ class RBESession:
     # Try to create a replacement session using the same parameters. We need to
     # pass the previous session token to grab server-signed parameters from it
     # in case the poll token is already stale.
-    resp = self._remote.rbe_create_session(self._dimensions, self._poll_token,
+    resp = self._remote.rbe_create_session(self._dimensions, self._bot_version,
+                                           self._poll_token,
                                            self._session_token)
     self._session_id = resp.session_id
     self._session_token = resp.session_token
@@ -1243,6 +1258,7 @@ class RBESession:
         self._session_token,
         status,
         dimensions,
+        self._bot_version,
         lease,
         poll_token,
         blocking,

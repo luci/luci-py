@@ -287,6 +287,18 @@ def get_cpu_bitness():
   return '64' if sys.maxsize > 2**32 else '32'
 
 
+def get_cipd_os():
+  """Returns the bots CIPD OS variant (e.g. `linux`, `mac`)."""
+  os_name = {
+      'darwin': 'mac',
+      'linux': 'linux',
+      'win32': 'windows',
+  }.get(sys.platform)
+  if not os_name:
+    os_name = sys.platform.lower().rstrip('0123456789.-_')
+  return os_name
+
+
 @tools.cached
 def get_cipd_architecture():
   """Returns the CPU architecture (e.g. `amd64`, `arm64`) of CIPD packages

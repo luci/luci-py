@@ -272,7 +272,7 @@ class CipdClient:
 
 def get_platform():
   """Returns ${platform} parameter value."""
-  # linux, mac or windows.
+  # linux, mac or windows. See also os_utilities.get_cipd_os().
   os_name = {
       'darwin': 'mac',
       'linux': 'linux',
