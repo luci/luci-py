@@ -110,9 +110,9 @@ cron:
   url: /internal/cron/monitoring/bq
   schedule: every 1 minutes
 
-- description: Report RBE migration metrics
+- description: Report bot metrics from go service
   target: monitor
-  url: /internal/cron/report-rbe-bots
+  url: /internal/cron/report-bots
   schedule: every 1 minutes
 
 
