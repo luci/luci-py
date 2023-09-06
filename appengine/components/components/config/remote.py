@@ -146,6 +146,15 @@ class Provider(object):
         raise
     raise ndb.Return(res)
 
+  def _check_content_hash_match(self, content_hash):
+    """"Check if content_hash matches the format in the setted service version.
+
+      In Luci-config v1, the content_hash format is v1:<sha>.
+      In v2, it is a pure sha256 string.
+    """
+    assert content_hash
+    return content_hash.startswith('v1:') if self._is_v1_host() else True
+
   @ndb.tasklet
   def get_config_by_hash_async(self, content_hash):
     """Returns a config blob by its hash. Memcaches results."""
@@ -191,7 +200,7 @@ class Provider(object):
       revision, content_hash = (
           (yield ctx.memcache_get(cache_key)) or (revision, None))
 
-    if content_hash:
+    if content_hash and self._check_content_hash_match(content_hash):
       raise ndb.Return(revision, content_hash)
 
     if self._is_v1_host():
@@ -387,8 +396,10 @@ class Provider(object):
 
     binary_missing = (
       current.proto_message_name and not current.content_binary)
-    if current.revision == revision and not binary_missing:
-      assert current.content_hash == content_hash
+    # Ensure content_hashes are the same. It will help to force an update during
+    # the short transition time window from v1 to v2.
+    if (current.revision == revision and not binary_missing
+        and current.content_hash == content_hash):
       return
 
     content = None

@@ -89,20 +89,31 @@ class RemoteTestCase(test_case.TestCase):
           },
         ]
       })
+
+    if url == URL_PREFIX + 'config_sets/services%2Ffoo/config/abc.cfg':
+      assert kwargs['params']['hash_only']
+      raise ndb.Return({
+          'content_hash': 'v1:abchash',
+          'revision': 'aaaabbbb',
+      })
+    if url == URL_PREFIX + 'config/v1:abchash':
+      raise ndb.Return({
+          'content': base64.b64encode('abc config'),
+      })
     self.fail('Unexpected url: %s' % url)
 
   def test_get_async_v1(self):
-    revision, content = self.provider.get_async(
-        'services/foo', 'bar.cfg').get_result()
+    revision, content = self.provider.get_async('services/foo',
+                                                'abc.cfg').get_result()
     self.assertEqual(revision, 'aaaabbbb')
-    self.assertEqual(content, 'a config')
+    self.assertEqual(content, 'abc config')
 
     # Memcache coverage
     net.json_request_async.reset_mock()
-    revision, content = self.provider.get_async(
-        'services/foo', 'bar.cfg').get_result()
+    revision, content = self.provider.get_async('services/foo',
+                                                'abc.cfg').get_result()
     self.assertEqual(revision, 'aaaabbbb')
-    self.assertEqual(content, 'a config')
+    self.assertEqual(content, 'abc config')
     self.assertFalse(net.json_request_async.called)
 
   def test_get_async_v2(self):
@@ -217,22 +228,25 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_async_with_revision(self):
     revision, content = self.provider.get_async(
-        'services/foo', 'bar.cfg', revision='aaaabbbb').get_result()
+        'services/foo', 'abc.cfg', revision='aaaabbbb').get_result()
     self.assertEqual(revision, 'aaaabbbb')
-    self.assertEqual(content, 'a config')
+    self.assertEqual(content, 'abc config')
 
     net.json_request_async.assert_any_call(
         'https://luci-config.appspot.com/_ah/api/config/v1/'
-        'config_sets/services%2Ffoo/config/bar.cfg',
-        params={'hash_only': True, 'revision': 'aaaabbbb'},
+        'config_sets/services%2Ffoo/config/abc.cfg',
+        params={
+            'hash_only': True,
+            'revision': 'aaaabbbb'
+        },
         scopes=net.EMAIL_SCOPE)
 
     # Memcache coverage
     net.json_request_async.reset_mock()
     revision, content = self.provider.get_async(
-        'services/foo', 'bar.cfg', revision='aaaabbbb').get_result()
+        'services/foo', 'abc.cfg', revision='aaaabbbb').get_result()
     self.assertEqual(revision, 'aaaabbbb')
-    self.assertEqual(content, 'a config')
+    self.assertEqual(content, 'abc config')
     self.assertFalse(net.json_request_async.called)
 
   def test_last_good(self):
@@ -472,6 +486,41 @@ class RemoteTestCase(test_case.TestCase):
     self.assertEquals(baz_cfg.content_binary, config.SerializeToString())
 
     self.assertIsNone(old_cfg.key.get())
+
+  def test_cron_update_last_good_configs_v1_v2_transition(self):
+    revision, config = self.provider.get_async(
+        'services/foo', 'abc.cfg', store_last_good=True).get_result()
+    remote.cron_update_last_good_configs()
+
+    revision, config = self.provider.get_async(
+        'services/foo', 'abc.cfg', store_last_good=True).get_result()
+    self.assertEqual(revision, 'aaaabbbb')
+    self.assertEqual(config, 'abc config')
+    abc_cfg = remote.LastGoodConfig.get_by_id(id='services/foo:abc.cfg')
+    self.assertEqual(abc_cfg.content_hash, 'v1:abchash')
+    self.assertEqual(abc_cfg.content, 'abc config')
+
+    # Switch from v1 to v2
+    self.provider.service_hostname = 'luci-config-v2.com'
+    self.mock(self.provider, 'get_config_hash_async', mock.Mock())
+    self.mock(self.provider, 'get_config_by_hash_async', mock.Mock())
+    self.provider.get_config_hash_async.return_value = future(
+        ('aaaabbbb', 'abchash'))
+    self.provider.get_config_by_hash_async.return_value = future('abc config')
+    # Still be able to get the result before the cron job running next time.
+    revision, config = self.provider.get_async(
+        'services/foo', 'abc.cfg', store_last_good=True).get_result()
+    self.assertEqual(revision, 'aaaabbbb')
+    self.assertEqual(config, 'abc config')
+    # After the job ran
+    remote.cron_update_last_good_configs()
+    revision, config = self.provider.get_async(
+        'services/foo', 'abc.cfg', store_last_good=True).get_result()
+    self.assertEqual(revision, 'aaaabbbb')
+    self.assertEqual(config, 'abc config')
+    abc_cfg = remote.LastGoodConfig.get_by_id(id='services/foo:abc.cfg')
+    self.assertEqual(abc_cfg.content_hash, 'abchash')
+    self.assertEqual(abc_cfg.content, 'abc config')
 
 
 if __name__ == '__main__':
