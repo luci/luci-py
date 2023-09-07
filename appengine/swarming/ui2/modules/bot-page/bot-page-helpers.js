@@ -80,7 +80,7 @@ export function parseEvents(events) {
 }
 
 const getField = (obj, options, def) => {
-  for (const opt in options) {
+  for (const opt of options) {
     if (obj[opt]) {
       return obj[opt];
     }
@@ -138,7 +138,7 @@ export function parseTasks(tasks) {
     }
   }
   tasks.sort((a, b) => {
-    return getStart(a) - getStart(b);
+    return getStart(b) - getStart(a);
   });
   return tasks;
 }
