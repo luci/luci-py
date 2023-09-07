@@ -4,6 +4,7 @@
 
 import "modules/bot-page";
 import fetchMock from "fetch-mock";
+import { mockUnauthorizedPrpc } from "../test_util";
 
 describe("bot-page", function () {
   // Instead of using import, we use require. Otherwise,
@@ -218,26 +219,9 @@ describe("bot-page", function () {
           { overwriteRoutes: true }
         );
 
-        const resp = new Response(`)]}'"403 Unauthorized"`, {
-          status: 403,
-          headers: {
-            "x-prpc-grpc-code": "7",
-            "content-type": "application/json",
-          },
-        });
-        fetchMock.post("path:/prpc/swarming.v2.Bots/GetBot", resp.clone(), {
-          overwriteRoutes: true,
-        });
-        fetchMock.post(
-          "path:/prpc/swarming.v2.Bots/ListBotTasks",
-          resp.clone(),
-          { overwriteRoutes: true }
-        );
-        fetchMock.post(
-          "path:/prpc/swarming.v2.Bots/ListBotEvents",
-          resp.clone(),
-          { overwriteRoutes: true }
-        );
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "GetBot");
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "ListBotTasks");
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "ListBotEvents");
       }
 
       beforeEach(notAuthorized);

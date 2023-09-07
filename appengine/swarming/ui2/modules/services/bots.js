@@ -88,4 +88,15 @@ export class BotsService extends PrpcService {
   delete(botId) {
     return this._call("DeleteBot", { bot_id: botId });
   }
+
+  /**
+   * Counts bots with given dimensions.
+   *
+   * @param {String} dimensions - object with shape [{key: string, value: string}]
+   *
+   * @returns {Object} BotsCount response object described here - https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#973
+   **/
+  count(dimensions) {
+    return this._call("CountBots", { dimensions });
+  }
 }

@@ -5,6 +5,7 @@
 import "modules/task-page";
 import fetchMock from "fetch-mock";
 import { utf8tob64 } from "../util";
+import { mockUnauthorizedPrpc } from "../test_util";
 
 // Tip from https://stackoverflow.com/a/37348710
 // for catching "full page reload" errors.
@@ -180,19 +181,18 @@ describe("task-page", function () {
       );
     }
 
-    fetchMock.get("glob:/_ah/api/swarming/v1/bots/count?*", {
+    mockPrpc(fetchMock, "swarming.v2.Bots", "CountBots", {
       busy: 1024,
       count: 1337,
       dead: 13,
       quarantined: 1,
       maintenance: 0,
     });
-    fetchMock.get("glob:/_ah/api/swarming/v1/tasks/count?*", (url, opts) => {
-      if (url.indexOf("PENDING") !== -1) {
-        return { count: 123 };
-      } else {
+    mockPrpc(fetchMock, "swarming.v2.Tasks", "CountTasks", (req) => {
+      if (req.state == "QUERY_RUNNING") {
         return { count: 56 };
       }
+      return { count: 123 };
     });
   }
 
@@ -244,27 +244,9 @@ describe("task-page", function () {
           {},
           { overwriteRoutes: true }
         );
-        fetchMock.get("glob:/_ah/api/swarming/v1/task/*", 403, {
-          overwriteRoutes: true,
-        });
-
-        const resp = new Response(`)]}'"403 Unauthorized"`, {
-          status: 403,
-          headers: {
-            "x-prpc-grpc-code": "7",
-            "content-type": "application/json",
-          },
-        });
-        fetchMock.post(
-          "path:/prpc/swarming.v2.Tasks/GetRequest",
-          resp.clone(),
-          {
-            overwriteRoutes: true,
-          }
-        );
-        fetchMock.post("path:/prpc/swarming.v2.Tasks/GetStdout", resp.clone(), {
-          overwriteRoutes: true,
-        });
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "GetRequest");
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "GetResult");
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "GetStdout");
       }
 
       beforeEach(notAuthorized);
@@ -318,17 +300,12 @@ describe("task-page", function () {
 
     describe("authorized user, but not authorized for counts APIs", function () {
       function notAuthorized() {
-        // overwrite the default fetchMock behaviors to return 403.
-        fetchMock.get("glob:/_ah/api/swarming/v1/tasks/count*", 403, {
-          overwriteRoutes: true,
-        });
-        fetchMock.get("glob:/_ah/api/swarming/v1/bots/count*", 403, {
-          overwriteRoutes: true,
-        });
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "CountTasks");
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "CountBots");
       }
       beforeEach(() => {
-        notAuthorized();
         serveTask(1, "Completed task with 2 slices");
+        notAuthorized();
       });
 
       it("does not display fleet capacity and similar load", function (done) {
@@ -830,29 +807,37 @@ describe("task-page", function () {
       loggedInTaskPage((ele) => {
         const protorpc = fetchMock.calls(MATCHED, "GET");
         expect(protorpc).toHaveSize(
-          2 + 1 + 6,
-          "2 GETs from swarming-app, 1 from task-page, " + "3 counts * 2 slices"
+          2 + 1,
+          "2 GETs from swarming-app, 1 from task-page "
         );
 
         const prpc = fetchMock.calls(MATCHED, "POST");
-        // There is exactly 2 prpc calls
-        expect(prpc).toHaveSize(3);
-
-        // calls is an array of 2-length arrays with the first element
-        // being the string of the url and the second element being
-        // the options that were passed in
-        const gets = protorpc.map((c) => c[0]);
+        // Number of calls expected:
+        // 1 GetRequest, 1 GetResult and 1 GetStout
+        // For each slice
+        // # BotCount = 1
+        // # TaskCount = 2
+        expect(prpc).toHaveSize(2 * 3 + 3);
 
         // spot check one of the counts
-        expect(gets).toContain(
-          "/_ah/api/swarming/v1/bots/count?" +
-            "dimensions=builder%3Alinux_chromium_cfi_rel_ng&" +
-            "dimensions=cores%3A32&dimensions=os%3AUbuntu-14.04&dimensions=cpu%3Ax86-64&" +
-            "dimensions=pool%3Aluci.chromium.try&" +
-            "dimensions=caches%3Abuilder_86e11e72bf6f8c2c424eb2189ffc073b483485cf12a42" +
-            "b403fb5526a59936253_v2"
-        );
-
+        let expectedDims = {
+          dimensions: [
+            { value: "32", key: "cores" },
+            { value: "linux_chromium_cfi_rel_ng", key: "builder" },
+            { value: "Ubuntu-14.04", key: "os" },
+            { value: "x86-64", key: "cpu" },
+            { value: "luci.chromium.try", key: "pool" },
+          ],
+        };
+        expectedDims = JSON.stringify(expectedDims);
+        const countCalls = prpc.filter((call) => {
+          const url = call[0];
+          if (!url.endsWith("CountBots")) {
+            return false;
+          }
+          return call[1].body === expectedDims;
+        });
+        expect(countCalls.length).toBeGreaterThan(0);
         checkAuthorization(protorpc.concat(prpc));
         done();
       });
@@ -860,27 +845,38 @@ describe("task-page", function () {
 
     it("makes counts correctly with 1 slice", function (done) {
       serveTask(2, "Pending task - 1 slice - no rich logs");
-      loggedInTaskPage((ele) => {
+      loggedInTaskPage((_ele) => {
         // prpc calls count
         const prpc = fetchMock.calls(MATCHED, "POST");
-        // There are 3 prpc calls here.
-        expect(prpc).toHaveSize(3);
+        // There are 6 prpc calls here.
+        expect(prpc).toHaveSize(6);
 
         const protorpc = fetchMock.calls(MATCHED, "GET");
         expect(protorpc).toHaveSize(
-          2 + 2 + 2,
-          "2 GETs from swarming-app, 2 from task-page, " + "3 counts * 1 slice"
-        );
-        // calls is an array of 2-length arrays with the first element
-        // being the string of the url and the second element being
-        // the options that were passed in
-        const gets = protorpc.map((c) => c[0]);
-
-        expect(gets).toContain(
-          "/_ah/api/swarming/v1/tasks/count?start=1549212360&state=RUNNING&" +
-            "tags=device_os%3AN&tags=os%3AAndroid&tags=pool%3AChrome-GPU&tags=device_type%3Afoster"
+          2 + 1,
+          "2 GETs from swarming-app, 1 from task-page"
         );
 
+        let expectedBody = {
+          tags: [
+            "device_os:N",
+            "os:Android",
+            "pool:Chrome-GPU",
+            "device_type:foster",
+          ],
+          start: "2019-02-03T16:46:00.234Z",
+          state: "QUERY_RUNNING",
+        };
+        expectedBody = JSON.stringify(expectedBody);
+        const countCalls = prpc.filter((call) => {
+          const url = call[0];
+          if (!url.endsWith("CountTasks")) {
+            return false;
+          }
+          return call[1].body === expectedBody;
+        });
+
+        expect(countCalls.length).toBeGreaterThan(0);
         checkAuthorization(prpc.concat(protorpc));
         done();
       });
@@ -996,8 +992,9 @@ describe("task-page", function () {
         ele.permissions.cancel_task = true;
         ele.render();
         fetchMock.resetHistory();
-        fetchMock.post(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/cancel`, {
-          success: true,
+        mockPrpc(fetchMock, "swarming.v2.Tasks", "CancelTask", {
+          canceled: true,
+          wasRunning: false,
         });
 
         const cancelBtn = $$(".id_buttons button.cancel", ele);
@@ -1023,7 +1020,9 @@ describe("task-page", function () {
           expect(calls).toHaveSize(1);
           const call = calls[0];
           const options = call[1];
-          expect(options.body).toEqual("{}");
+          expect(options.body).toEqual(
+            '{"task_id":"test0b3c0fac7810","kill_running":false}'
+          );
 
           expectNoUnmatchedCalls(fetchMock);
           done();
@@ -1037,8 +1036,9 @@ describe("task-page", function () {
         ele.permissions.cancel_task = true;
         ele.render();
         fetchMock.resetHistory();
-        fetchMock.post(`/_ah/api/swarming/v1/task/${TEST_TASK_ID}/cancel`, {
-          success: true,
+        mockPrpc(fetchMock, "swarming.v2.Tasks", "CancelTask", {
+          canceled: true,
+          wasRunning: true,
         });
 
         const killBtn = $$(".id_buttons button.kill", ele);
@@ -1064,7 +1064,9 @@ describe("task-page", function () {
           expect(calls).toHaveSize(1);
           const call = calls[0];
           const options = call[1];
-          expect(options.body).toEqual('{"kill_running":true}');
+          expect(options.body).toEqual(
+            '{"task_id":"test0b3c0fac7810","kill_running":true}'
+          );
 
           expectNoUnmatchedCalls(fetchMock);
           done();

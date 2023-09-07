@@ -6,7 +6,6 @@ import { $, $$ } from "common-sk/modules/dom";
 import { errorMessage } from "elements-sk/errorMessage";
 import { html } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined";
-import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
 import { stateReflector } from "common-sk/modules/stateReflector";
 
 import "elements-sk/checkbox-sk";
@@ -18,7 +17,6 @@ import "../stacked-time-chart";
 import "../swarming-app";
 
 import * as human from "common-sk/modules/human";
-import * as query from "common-sk/modules/query";
 
 import { applyAlias } from "../alias";
 import {
@@ -49,7 +47,6 @@ import {
   taskPageLink,
   b64toUtf8,
 } from "../util";
-import { TasksService } from "../services/tasks";
 
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 
@@ -267,34 +264,34 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   `;
 };
 
-const stateLoadBlock = (ele, request, result) => html`
-  <tr>
-    <td>State</td>
-    <td class=${stateClass(result)}>
-      ${humanState(result, ele._currentSliceIdx)}
-    </td>
-  </tr>
-  ${countBlocks(
-    result,
-    ele._capacityCounts[ele._currentSliceIdx],
-    ele._pendingCounts[ele._currentSliceIdx],
-    ele._runningCounts[ele._currentSliceIdx],
-    ele._currentSlice.properties || {}
-  )}
-  <tr ?hidden=${!result.dedupedFrom} class="highlighted">
-    <td><b>Deduped From</b></td>
-    <td>
-      <a href=${taskPageLink(result.dedupedFrom)} target="_blank">
-        ${result.dedupedFrom}
-      </a>
-    </td>
-  </tr>
-  <tr ?hidden=${!result.dedupedFrom}>
-    <td>Deduped On</td>
-    <td title=${request.createdTs}>${request.human_createdTs}</td>
-  </tr>
-`;
-
+const stateLoadBlock = (ele, request, result) =>
+  html`
+    <tr>
+      <td>State</td>
+      <td class=${stateClass(result)}>
+        ${humanState(result, ele._currentSliceIdx)}
+      </td>
+    </tr>
+    ${countBlocks(
+      result,
+      ele._capacityCounts[ele._currentSliceIdx],
+      ele._pendingCounts[ele._currentSliceIdx],
+      ele._runningCounts[ele._currentSliceIdx],
+      ele._currentSlice.properties || {}
+    )}
+    <tr ?hidden=${!result.dedupedFrom} class="highlighted">
+      <td><b>Deduped From</b></td>
+      <td>
+        <a href=${taskPageLink(result.dedupedFrom)} target="_blank">
+          ${result.dedupedFrom}
+        </a>
+      </td>
+    </tr>
+    <tr ?hidden=${!result.dedupedFrom}>
+      <td>Deduped On</td>
+      <td title=${request.createdTs}>${request.human_createdTs}</td>
+    </tr>
+  `;
 const countBlocks = (
   result,
   capacityCount,
@@ -307,12 +304,12 @@ const countBlocks = (
       ${result.state === "PENDING" ? "Why Pending?" : "Fleet Capacity"}
     </td>
     <td>
-      ${count(capacityCount, "count")}
+      ${count(capacityCount, "count", 0)}
       <a href=${botListLink(properties.dimensions)}>bots</a>
-      could possibly run this task (${count(capacityCount, "busy")} busy,
-      ${count(capacityCount, "dead")} dead,
-      ${count(capacityCount, "quarantined")} quarantined,
-      ${count(capacityCount, "maintenance")} maintenance)
+      could possibly run this task (${count(capacityCount, "busy", 0)} busy,
+      ${count(capacityCount, "dead", 0)} dead,
+      ${count(capacityCount, "quarantined", 0)} quarantined,
+      ${count(capacityCount, "maintenance", 0)} maintenance)
     </td>
   </tr>
   <tr ?hidden=${!pendingCount || !runningCount}>
@@ -342,10 +339,13 @@ const countBlocks = (
     </td>
   </tr>
 `;
-
-const count = (obj, value) => {
+const count = (obj, value, def) => {
   if (!obj || (value && obj[value] === undefined)) {
-    return html`<span class="italic">&lt;counting&gt</span>`;
+    if (def !== undefined) {
+      return def;
+    } else {
+      return html`<span class="italic">&lt;counting&gt</span>`;
+    }
   }
   if (value) {
     return obj[value];
@@ -1340,32 +1340,21 @@ window.customElements.define(
       this.removeEventListener("log-in", this._loginEvent);
     }
 
-    _createTasksService() {
-      return new TasksService(this.authHeader, this._fetchController.signal);
-    }
-
     _cancelTask() {
-      const body = {};
+      let killRunning = false;
       if (this._result.state === "RUNNING") {
-        body.kill_running = true;
+        killRunning = true;
       }
       this.app.addBusyTasks(1);
-      fetch(`/_ah/api/swarming/v1/task/${this._taskId}/cancel`, {
-        method: "POST",
-        headers: {
-          authorization: this.authHeader,
-          "content-type": "application/json; charset=UTF-8",
-        },
-        body: JSON.stringify(body),
-      })
-        .then(jsonOrThrow)
-        .then((response) => {
+      this._createTasksService()
+        .cancel(this._taskId, killRunning)
+        .then((_response) => {
           this._closePopups();
           errorMessage("Request sent", 4000);
           this.render();
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, "task/cancel"));
+        .catch((e) => this.prpcError(e, "task/cancel"));
     }
 
     _closePopups() {
@@ -1609,82 +1598,55 @@ time.sleep(${leaseDuration})`,
       fetchNextStdout();
     }
 
-    _fetchCounts(request, extra) {
+    _fetchCounts(request, _extra) {
       const numSlices = request.taskSlices.length;
       this.app.addBusyTasks(numSlices * 3);
       // reset current viewings
       this._capacityCounts = [];
+      this._capacityCounts.fill(undefined, 0, numSlices);
       this._pendingCounts = [];
+      this._pendingCounts.fill(undefined, 0, numSlices);
       this._runningCounts = [];
+      this._pendingCounts.fill(undefined, 0, numSlices);
       for (let i = 0; i < numSlices; i++) {
-        const bParams = {
-          dimensions: [],
-        };
+        const tags = [];
+        const dimensions = [];
+        const sl = i;
         for (const dim of request.taskSlices[i].properties.dimensions) {
-          bParams.dimensions.push(`${dim.key}:${dim.value}`);
+          dimensions.push(dim);
+          tags.push(`${dim.key}:${dim.value}`);
         }
-        fetch(
-          `/_ah/api/swarming/v1/bots/count?${query.fromObject(bParams)}`,
-          extra
-        )
-          .then(jsonOrThrow)
-          .then((json) => {
-            this._capacityCounts[i] = json;
+        this._createBotService()
+          .count(dimensions)
+          .then((resp) => {
+            this._capacityCounts[sl] = resp;
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, "bots/count slice " + i, true));
+          .catch((e) => this.prpcError(e, "bots/count slice " + i, true));
 
-        let start = new Date();
-        start.setSeconds(0);
+        const start = new Date();
         // go back 24 hours, rounded to the nearest minute for better caching.
-        start = "" + (start.getTime() - 24 * 60 * 60 * 1000);
-        // convert to seconds, because that's what the API expects.
-        start = start.substring(0, start.length - 3);
-        const tParams = {
-          start: [start],
-          state: ["RUNNING"],
-          tags: bParams.dimensions,
-        };
-        fetch(
-          `/_ah/api/swarming/v1/tasks/count?${query.fromObject(tParams)}`,
-          extra
-        )
-          .then(jsonOrThrow)
-          .then((json) => {
-            this._runningCounts[i] = json.count;
+        start.setSeconds(0);
+        start.setDate(start.getDate() - 1);
+        const service = this._createTasksService();
+        service
+          .count(tags, start, "QUERY_RUNNING")
+          .then((resp) => {
+            this._runningCounts[sl] = resp.count || "0";
             this.render();
             this.app.finishedTask();
           })
           .catch((e) => this.fetchError(e, "tasks/running slice " + i, true));
 
-        tParams.state = ["PENDING"];
-        fetch(
-          `/_ah/api/swarming/v1/tasks/count?${query.fromObject(tParams)}`,
-          extra
-        )
-          .then(jsonOrThrow)
-          .then((json) => {
-            this._pendingCounts[i] = json.count;
+        service
+          .count(tags, start, "QUERY_PENDING")
+          .then((resp) => {
+            this._pendingCounts[sl] = resp.count || "0";
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, "tasks/pending slice " + i, true));
-      }
-    }
-
-    _fetchExtraTries(taskId, tries, extra) {
-      this.app.addBusyTasks(tries);
-      for (let i = 0; i < tries; i++) {
-        fetch(`/_ah/api/swarming/v1/task/${taskId + (i + 1)}/result`, extra)
-          .then(jsonOrThrow)
-          .then((json) => {
-            const result = parseResult(json);
-            this._extraTries[i] = result;
-            this.render();
-            this.app.finishedTask();
-          })
-          .catch((e) => this.fetchError(e, "task/result"));
+          .catch((e) => this.prpcError(e, "tasks/pending slice " + i, true));
       }
     }
 

@@ -26,8 +26,6 @@ import {
 import { stateClass as taskClass } from "../task-page/task-page-helpers";
 import { timeDiffApprox, timeDiffExact, taskPageLink } from "../util";
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
-import { BotsService } from "../services/bots.js";
-import { TasksService } from "../services/tasks.js";
 
 /**
  * @module swarming-ui/modules/bot-page
@@ -476,14 +474,6 @@ window.customElements.define(
     disconnectedCallback() {
       super.disconnectedCallback();
       this.removeEventListener("log-in", this._loginEvent);
-    }
-
-    _createBotService() {
-      return new BotsService(this.authHeader, this._fetchController.signal);
-    }
-
-    _createTasksService() {
-      return new TasksService(this.authHeader, this._fetchController.signal);
     }
 
     _closePopup() {

@@ -7,6 +7,8 @@
 import { errorMessage } from "elements-sk/errorMessage";
 import { render } from "lit-html";
 import { upgradeProperty } from "elements-sk/upgradeProperty";
+import { TasksService } from "./services/tasks";
+import { BotsService } from "./services/bots";
 
 /** @classdesc
  * The SwarmingAppBoilerplate class deduplicates much of the boilerplate
@@ -177,5 +179,13 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
 
   attributeChangedCallback(attrName, oldVal, newVal) {
     this.render();
+  }
+
+  _createTasksService() {
+    return new TasksService(this.authHeader, this._fetchController.signal);
+  }
+
+  _createBotService() {
+    return new BotsService(this.authHeader, this._fetchController.signal);
   }
 }

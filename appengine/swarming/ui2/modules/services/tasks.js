@@ -15,7 +15,7 @@ export class TasksService extends PrpcService {
    * @param {string} taskId - id of task to cancel.
    * @param {boolean} killRunning - whether to kill task while running.
    *
-   * @returns {Object} with shape {canceled, was_running} - see CancelResponse in https://source.chromium.org/chromium/infra/infra/+/main:luci/appengine/swarming/proto/api_v2/swarming.proto for more details.
+   * @returns {Object} with shape {canceled, was_running} - see CancelResponse in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#702
    **/
   cancel(taskId, killRunning) {
     return this._call("CancelTask", {
@@ -31,7 +31,7 @@ export class TasksService extends PrpcService {
    * @param {number} offset - number of bytes from begining of task output to start.
    * @param {number} length - number of bytes to retrieve.
    *
-   * @returns {Object} see https://source.chromium.org/chromium/infra/infra/+/main:luci/appengine/swarming/proto/api_v2/swarming.proto;l=719?q=TaskOutputResponse
+   * @returns {Object} TaskOutputResponse object described in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#720
    **/
   stdout(taskId, offset, length) {
     return this._call("GetStdout", {
@@ -46,7 +46,7 @@ export class TasksService extends PrpcService {
    *
    * @param {string} taskId - id of task request to retrieve.
    *
-   * @returns {Object} see https://source.chromium.org/chromium/infra/infra/+/main:luci/appengine/swarming/proto/api_v2/swarming.proto;l=618?q=TaskRequestResponse&sq= to view the return type proto.
+   * @returns {Object} - TaskRequest object described in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#618
    **/
   request(taskId) {
     return this._call("GetRequest", {
@@ -72,9 +72,24 @@ export class TasksService extends PrpcService {
   /**
    * Creates a new task with the given newTask specification.
    *
-   * @param {object} NewTask specification described in https://crsrc.org/i/luci/appengine/swarming/proto/api_v2/swarming.proto;l=526?q=filepath:api_v2%2Fswarming.proto%20%22NewTaskRequest%22
+   * @param {Object} NewTask specification described in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#526
+   *
+   * @returns {Object} returns a TaskRequestMetadataResponse described in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#923
    **/
   new(newTaskSpec) {
     return this._call("NewTask", newTaskSpec);
+  }
+
+  /**
+   * Counts tasks from a given start date filtered by tags and state.
+   *
+   * @param {Array} tags is an of strings with the form ["k1:v1", "k2:v2", ....]
+   * @param {Date} start is the time from which to beging counting tasks.
+   * @param {string} state is a string representing the task state. Allowed values are found in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#127
+   *
+   * @returns {Object} TasksCount object described in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#917
+   **/
+  count(tags, start, state) {
+    return this._call("CountTasks", { tags, start, state });
   }
 }

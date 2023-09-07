@@ -249,22 +249,49 @@ const stringify = function (data) {
 };
 
 /**
+ * @callback fn
+ * @param {string} url url sent to fetch for the request
+ * @param {Object} opts options for the request object being created by fetch-mock
+ *
+ * @return {Response} response object - see: https://developer.mozilla.org/en-US/docs/Web/API/Response
+ */
+
+/**
+ * @callback matcher
+ * @param {string} url url sent to fetch for the request
+ * @param {Object} opts options for the request object being created by fetch-mock
+ *
+ * @return {boolean} true if the request should be matched.
+ */
+
+/**
  * Mocks out request to prpc service for a given fetchMock.
  *
- * @param {fetchMock} fetchMock instance to use for mocking.
- * @param {service} service is the string prpc service we wish to call.
- * @param {rpc} rpc string that service we want to call.
- * @param {data} data which is mocked as the response to the prpc rpc.
- * @param {matcher} matcher is an optional predicate called on the body of the request. If false do not match it.
+ * @param {Object} fetchMock instance to use for mocking.
+ * @param {string} service is the string prpc service we wish to call.
+ * @param {string} rpc string that service we want to call.
+ * @param {(fn|Object)} data data can be either a function or a callback which produces data.
+ * @param {(matcher|undefined)} matcher is a predicate which determines whether the request should be matched.
  */
 export function mockPrpc(fetchMock, service, rpc, data, matcher = null) {
-  const response = new Response(stringify(data), {
-    status: 200,
-    headers: {
-      "x-prpc-grpc-code": "0",
-      "content-type": "application/json",
-    },
-  });
+  const prpcHeaders = {
+    "x-prpc-grpc-code": "0",
+    "content-type": "application/json",
+  };
+  let response = (_url, _opts) =>
+    new Response(stringify(data), {
+      status: 200,
+      headers: prpcHeaders,
+    });
+  if (typeof data === "function") {
+    response = (_url, opts) => {
+      const body = JSON.parse(opts.body);
+      return new Response(stringify(data(body)), {
+        status: 200,
+        headers: prpcHeaders,
+      });
+    };
+  }
   if (matcher) {
     const matchingFn = (url, opts) => {
       return (
@@ -277,6 +304,31 @@ export function mockPrpc(fetchMock, service, rpc, data, matcher = null) {
   } else {
     fetchMock.post(`path:/prpc/${service}/${rpc}`, response);
   }
+}
+
+/**
+ * Makes a pRPC request always return unauthorized - which is a 403 status.
+ *
+ * @param {Object} fetchMock module to apply this too.
+ * @param {string} service is the prpc service to mock.
+ * @param {string} rpc is the specific RPC call to mock.
+ **/
+export function mockUnauthorizedPrpc(fetchMock, service, rpc) {
+  fetchMock.post(
+    `path:/prpc/${service}/${rpc}`,
+    (_url, _opts) => {
+      return new Response(`)]}'"403 Unauthorized"`, {
+        status: 403,
+        headers: {
+          "x-prpc-grpc-code": "7",
+          "content-type": "application/json",
+        },
+      });
+    },
+    {
+      overwriteRoutes: true,
+    }
+  );
 }
 
 // Add an event listener which will fire after everything is done on the
