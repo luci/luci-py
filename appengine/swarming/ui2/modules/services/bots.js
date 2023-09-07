@@ -99,4 +99,14 @@ export class BotsService extends PrpcService {
   count(dimensions) {
     return this._call("CountBots", { dimensions });
   }
+
+  /**
+   * Fetches bot dimensions which are present in a specific pool.
+   * @param {String} pool is the pool to search in.
+   *
+   * @returns {Object} BotDimensionsResponse described here - https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#983
+   **/
+  dimensions(pool) {
+    return this._call("GetBotDimensions", { pool });
+  }
 }

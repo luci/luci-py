@@ -81,15 +81,38 @@ export class TasksService extends PrpcService {
   }
 
   /**
-   * Counts tasks from a given start date filtered by tags and state.
+   * Counts tasks from a given query params.
    *
-   * @param {Array} tags is an of strings with the form ["k1:v1", "k2:v2", ....]
-   * @param {Date} start is the time from which to beging counting tasks.
-   * @param {string} state is a string representing the task state. Allowed values are found in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#127
+   * @param {Object} filters must be a protojson representation of TasksCountRequest https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#1114
    *
    * @returns {Object} TasksCount object described in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#917
    **/
-  count(tags, start, state) {
-    return this._call("CountTasks", { tags, start, state });
+  count(filters) {
+    return this._call("CountTasks", filters);
+  }
+
+  /**
+   * Fetches a list of tasks which conform a set of filters.
+   * If a state is not specified, QUERY_ALL will be sent back.
+   * @param {Object} filters must be protojson representation of TasksRequest https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#1103
+   *
+   * @returns {Object} TaskListResponse defined in https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#903 . If cursor != "" then there are likely more results to retrieve.
+   **/
+  list(filters) {
+    if (!filters.state) {
+      filters = { ...filters, state: "QUERY_ALL" };
+    }
+    return this._call("ListTasks", filters);
+  }
+
+  /**
+   * Mass cancels tasks which match specific filters.
+   *
+   * @param {Object} filters must be protojson representation of https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#654
+   *
+   * @returns {Object} response which displays https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#712
+   **/
+  massCancel(filters) {
+    return this._call("CancelTasks", filters);
   }
 }

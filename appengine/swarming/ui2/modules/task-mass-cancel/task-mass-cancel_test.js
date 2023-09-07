@@ -4,6 +4,8 @@
 
 import "modules/task-mass-cancel";
 import fetchMock from "fetch-mock";
+import { mockPrpc } from "../test_util";
+import { Timestamp } from "../task-list/task-list-helpers";
 
 describe("task-mass-cancel", function () {
   // Instead of using import, we use require. Otherwise,
@@ -26,7 +28,7 @@ describe("task-mass-cancel", function () {
 
     mockAppGETs(fetchMock, { delete_bot: true });
 
-    fetchMock.get("glob:/_ah/api/swarming/v1/tasks/count?*", { count: 17 });
+    mockPrpc(fetchMock, "swarming.v2.Tasks", "CountTasks", { count: 17 });
 
     // Everything else
     fetchMock.catch(404);
@@ -42,7 +44,7 @@ describe("task-mass-cancel", function () {
   // calls the test callback with one element 'ele', a created <task-mass-cancel>.
   function createElement(test) {
     return window.customElements.whenDefined("task-mass-cancel").then(() => {
-      container.innerHTML = `<task-mass-cancel start=10000 end=20000 tags="pool:Chrome,os:Android" authHeader="fake"></task-mass-cancel>`;
+      container.innerHTML = `<task-mass-cancel start=10 end=20 tags="pool:Chrome,os:Android" authHeader="fake"></task-mass-cancel>`;
       expect(container.firstElementChild).toBeTruthy();
       test(container.firstElementChild);
     });
@@ -76,7 +78,7 @@ describe("task-mass-cancel", function () {
       // is when we know the element has updated the _tasks.
       fetchMock.flush(true).then(() => {
         expectNoUnmatchedCalls(fetchMock);
-        const calls = fetchMock.calls(MATCHED, "GET");
+        const calls = fetchMock.calls(MATCHED, "POST");
         expect(calls).toHaveSize(2);
         done();
       });
@@ -85,7 +87,7 @@ describe("task-mass-cancel", function () {
 
   it("makes an API call to delete after clicking", function (done) {
     createElement((ele) => {
-      fetchMock.post("/_ah/api/swarming/v1/tasks/cancel", { matched: 22 });
+      mockPrpc(fetchMock, "swarming.v2.Tasks", "CancelTasks", { matched: 22 });
 
       let sawStartEvent = false;
       ele.addEventListener("tasks-canceling-started", () => {
@@ -99,10 +101,14 @@ describe("task-mass-cancel", function () {
         const calls = fetchMock.calls(MATCHED, "POST");
         expect(calls).toHaveSize(1, "1 to delete");
         const req = calls[0];
-        expect(req[0]).toBe("/_ah/api/swarming/v1/tasks/cancel");
-        expect(req[1].body).toBe(
-          '{"limit":100,"tags":["os:Android","pool:Chrome"],"start":10,"end":20}'
-        );
+        const payload = JSON.parse(req[1].body);
+        const expected = {
+          limit: 100,
+          tags: ["os:Android", "pool:Chrome"],
+          start: Timestamp.fromMilliseconds(10).toJSON(),
+          end: Timestamp.fromMilliseconds(20).toJSON(),
+        };
+        expect(payload).toEqual(expected);
         done();
       });
 

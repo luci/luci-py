@@ -10,8 +10,6 @@
 // it should go inside the element declaration.
 
 // query.fromObject is more readable than just 'fromObject'
-import * as query from "common-sk/modules/query";
-
 import { applyAlias } from "../alias";
 import { html } from "lit-html";
 import naturalSort from "javascript-natural-sort/naturalSort";
@@ -147,21 +145,21 @@ export function column(col, task, ele) {
 export const specialFilters = {
   state: function (task, s) {
     const state = task.state;
-    if (s === state || s === "ALL") {
+    if (s === state || s === "QUERY_ALL") {
       return true;
     }
-    if (s === "PENDING_RUNNING") {
+    if (s === "QUERY_PENDING_RUNNING") {
       return ONGOING_STATES.has(state);
     }
     const failure = task.failure;
-    if (s === "COMPLETED_SUCCESS") {
+    if (s === "QUERY_COMPLETED_SUCCESS") {
       return state === "COMPLETED" && !failure;
     }
-    if (s === "COMPLETED_FAILURE") {
+    if (s === "QUERY_COMPLETED_FAILURE") {
       return state === "COMPLETED" && failure;
     }
-    if (s === "DEDUPED") {
-      return state === "COMPLETED" && task.deduped_from;
+    if (s === "QUERY_DEDUPED") {
+      return state === "COMPLETED" && task.dedupedFrom;
     }
   },
 };
@@ -287,24 +285,26 @@ export function listQueryParams(filters, extra) {
     // from 'magic values' like name.
     key = stripTag(key);
     if (key === "state") {
-      params["state"] = rest;
+      if (rest.startsWith("QUERY_")) {
+        params["state"] = rest.toUpperCase();
+      } else {
+        params["state"] = `QUERY_${rest.toUpperCase()}`;
+      }
     } else {
       tags.push(key + ":" + rest);
     }
   }
-  params["tags"] = tags;
+  if (tags.length > 0) {
+    params["tags"] = tags;
+  }
   params["limit"] = extra.limit;
   if (extra.cursor) {
     params["cursor"] = extra.cursor;
   }
-  // The server expects these in epoch seconds, so we trim off the last 3
-  // digits representing milliseconds.
-  let ts = "" + extra.start;
-  params["start"] = ts.substring(0, ts.length - 3);
-  ts = "" + extra.end;
-  params["end"] = ts.substring(0, ts.length - 3);
+  params["start"] = extra.start;
+  params["end"] = extra.end;
 
-  return query.fromObject(params);
+  return params;
 }
 
 /** processTasks processes the array of tasks from the server and returns it.
@@ -339,51 +339,46 @@ export function processTasks(arr, existingTags) {
     }
     task.tagMap = tagMap;
 
-    if (!task.costs_usd || !Array.isArray(task.costs_usd)) {
-      task.costs_usd = EMPTY_VAL;
+    if (!task.costsUsd || !Array.isArray(task.costsUsd)) {
+      task.costsUsd = EMPTY_VAL;
     } else {
-      task.costs_usd.forEach(function (c, idx) {
-        task.costs_usd[idx] = "$" + c.toFixed(4);
-        if (task.state === "RUNNING" && task.started_ts) {
-          task.costs_usd[idx] = task.costs_usd[idx] + "*";
+      task.costsUsd.forEach(function (c, idx) {
+        task.costsUsd[idx] = "$" + c.toFixed(4);
+        if (task.state === "RUNNING" && task.startedTs) {
+          task.costsUsd[idx] = task.costsUsd[idx] + "*";
         }
       });
     }
 
-    if (task.cost_saved_usd) {
-      task.cost_saved_usd = "-$" + task.cost_saved_usd.toFixed(4);
+    if (task.costSavedUsd) {
+      task.costSavedUsd = "-$" + task.costSavedUsd.toFixed(4);
     }
 
     for (const time of TASK_TIMES) {
       sanitizeAndHumanizeTime(task, time);
 
       // Running tasks have no duration set, so we can figure it out.
-      if (!task.duration && task.state === "RUNNING" && task.started_ts) {
-        task.duration = (now - task.started_ts) / 1000;
+      if (!task.duration && task.state === "RUNNING" && task.startedTs) {
+        task.duration = (now - task.startedTs) / 1000;
       }
       // Make the duration human readable
       task.human_duration = humanDuration(task.duration);
-      if (task.state === "RUNNING" && task.started_ts) {
+      if (task.state === "RUNNING" && task.startedTs) {
         task.human_duration = task.human_duration + "*";
       }
 
       // Deduplicated tasks usually have tasks that ended before they were
       // created, so we need to account for that.
-      const et = task.started_ts || task.abandoned_ts || new Date();
-      const deduped = task.created_ts && et < task.created_ts;
+      const et = task.startedTs || task.abandonedTs || new Date();
+      const deduped = task.createdTs && et < task.createdTs;
 
-      task.pending_time = undefined;
-      if (!deduped && task.created_ts) {
-        task.pending_time = (et - task.created_ts) / 1000;
+      task.pendingTime = undefined;
+      if (!deduped && task.createdTs) {
+        task.pendingTime = (et - task.createdTs) / 1000;
       }
-      task.human_pending_time = humanDuration(task.pending_time);
-      if (
-        !deduped &&
-        task.created_ts &&
-        !task.started_ts &&
-        !task.abandoned_ts
-      ) {
-        task.human_pending_time = task.human_pending_time + "*";
+      task.human_pendingTime = humanDuration(task.pendingTime);
+      if (!deduped && task.createdTs && !task.startedTs && !task.abandonedTs) {
+        task.human_pendingTime = task.human_pendingTime + "*";
       }
     }
   }
@@ -394,13 +389,13 @@ export function processTasks(arr, existingTags) {
 // the order everything happened.
 const specialColOrder = [
   "name",
-  "created_ts",
-  "pending_time",
-  "started_ts",
+  "createdTs",
+  "pendingTime",
+  "startedTs",
   "duration",
-  "completed_ts",
-  "abandoned_ts",
-  "modified_ts",
+  "completedTs",
+  "abandonedTs",
+  "modifiedTs",
 ];
 const compareColumns = compareWithFixedOrder(specialColOrder);
 
@@ -523,38 +518,38 @@ export function useNaturalSort(key) {
 
 /** colHeaderMap maps keys to their human readable name.*/
 const colHeaderMap = {
-  abandoned_ts: "Abandoned On",
-  completed_ts: "Completed On",
+  abandonedTs: "Abandoned On",
+  completedTs: "Completed On",
   bot: "Bot Assigned",
-  costs_usd: "Cost (USD)",
-  created_ts: "Created On",
+  costsUsd: "Cost (USD)",
+  createdTs: "Created On",
   duration: "Duration",
   name: "Task Name",
-  modified_ts: "Last Modified",
-  started_ts: "Started Working On",
+  modifiedTs: "Last Modified",
+  startedTs: "Started Working On",
   state: "state (of task)",
   user: "Requesting User",
-  pending_time: "Time Spent Pending",
+  pendingTime: "Time Spent Pending",
 };
 
 const TASK_TIMES = [
-  "abandoned_ts",
-  "completed_ts",
-  "created_ts",
-  "modified_ts",
-  "started_ts",
+  "abandonedTs",
+  "completedTs",
+  "createdTs",
+  "modifiedTs",
+  "startedTs",
 ];
 
 const extraKeys = [
   "name",
   "state",
-  "costs_usd",
-  "deduped_from",
+  "costsUsd",
+  "dedupedFrom",
   "duration",
-  "pending_time",
-  "server_versions",
+  "pendingTime",
+  "serverVersions",
   "bot",
-  "exit_code",
+  "exitCode",
   ...TASK_TIMES,
 ];
 
@@ -563,9 +558,9 @@ const STILL_RUNNING_MSG =
   "and thus the time is dynamic.";
 
 const colMap = {
-  abandoned_ts: (task) => task.human_abandoned_ts,
+  abandonedTs: (task) => task.human_abandonedTs,
   bot: (task) => {
-    const id = task.bot_id;
+    const id = task.botId;
     if (id) {
       return html`<a target="_blank" rel="noopener" href=${botPageLink(id)}
         >${id}</a
@@ -573,14 +568,14 @@ const colMap = {
     }
     return EMPTY_VAL;
   },
-  completed_ts: (task) => task.human_completed_ts,
-  costs_usd: function (task) {
-    if (task.cost_saved_usd) {
-      return task.cost_saved_usd;
+  completedTs: (task) => task.human_completedTs,
+  costsUsd: function (task) {
+    if (task.costSavedUsd) {
+      return task.costSavedUsd;
     }
-    return task.costs_usd;
+    return task.costsUsd;
   },
-  created_ts: (task) => task.human_created_ts,
+  createdTs: (task) => task.human_createdTs,
   duration: (task) => {
     if (task.human_duration.indexOf("*")) {
       return html`<span title=${STILL_RUNNING_MSG}
@@ -589,8 +584,8 @@ const colMap = {
     }
     return task.human_duration;
   },
-  exit_code: (task) => task.exit_code || "--",
-  modified_ts: (task) => task.human_modified_ts,
+  exitCode: (task) => task.exitCode || "--",
+  modifiedTs: (task) => task.human_modifiedTs,
   name: (task, ele) => {
     let name = task.name;
     if (!ele._verbose && task.name.length > 70) {
@@ -600,30 +595,30 @@ const colMap = {
       target="_blank"
       rel="noopener"
       title=${task.name}
-      href=${taskPageLink(task.task_id)}
+      href=${taskPageLink(task.taskId)}
       >${name}</a
     >`;
   },
-  pending_time: (task) => {
-    if (task.human_pending_time.indexOf("*")) {
+  pendingTime: (task) => {
+    if (task.human_pendingTime.indexOf("*")) {
       return html`<span title=${STILL_RUNNING_MSG}
-        >${task.human_pending_time}</span
+        >${task.human_pendingTime}</span
       >`;
     }
-    return task.human_pending_time;
+    return task.human_pendingTime;
   },
-  source_revision: (task) => {
-    const r = task.source_revision;
+  sourceRevision: (task) => {
+    const r = task.sourceRevision;
     return r.substring(0, 8);
   },
-  started_ts: (task) => task.human_started_ts,
+  startedTs: (task) => task.human_startedTs,
   state: (task) => {
     const state = task.state;
     if (state === "COMPLETED") {
       if (task.failure) {
         return "COMPLETED (FAILURE)";
       }
-      if (task.deduped_from) {
+      if (task.dedupedFrom) {
         return "COMPLETED (DEDUPED)";
       }
       return "COMPLETED (SUCCESS)";
@@ -637,19 +632,19 @@ const colMap = {
  *  and -1 for descending and both bots and should return a number a la compare.
  */
 export const specialSortMap = {
-  abandoned_ts: sortableTime("abandoned_ts"),
+  abandonedTs: sortableTime("abandonedTs"),
   bot: (dir, taskA, taskB) =>
-    dir * naturalSort(taskA.bot_id || "z", taskB.bot_id || "z"),
-  completed_ts: sortableTime("completed_ts"),
-  created_ts: sortableTime("created_ts"),
+    dir * naturalSort(taskA.botId || "z", taskB.botId || "z"),
+  completedTs: sortableTime("completedTs"),
+  createdTs: sortableTime("createdTs"),
   duration: sortableDuration("duration"),
-  modified_ts: sortableTime("modified_ts"),
+  modifiedTs: sortableTime("modifiedTs"),
   name: (dir, taskA, taskB) => dir * naturalSort(taskA.name, taskB.name),
-  pending_time: sortableDuration("pending_time"),
-  started_ts: sortableTime("started_ts"),
+  pendingTime: sortableDuration("pendingTime"),
+  startedTs: sortableTime("startedTs"),
 };
 
-/** Given a time attribute like 'abandoned_ts', sortableTime returns a function
+/** Given a time attribute like 'abandonedTs', sortableTime returns a function
  *  that compares the tasks based on the attribute.  This is used for sorting.
  *
  *  @param {String} attr - a timestamp attribute.
@@ -666,7 +661,7 @@ function sortableTime(attr) {
   };
 }
 
-/** Given a duration attribute like 'pending_time', sortableDuration
+/** Given a duration attribute like 'pendingTime', sortableDuration
  *  returns a function that compares the tasks based on the attribute.
  *  This is used for sorting.
  *
@@ -679,4 +674,65 @@ function sortableDuration(attr) {
 
     return dir * (aCol - bCol);
   };
+}
+
+const re = /_[a-zA-Z]/g;
+
+function toCamelCase(str) {
+  return str.replace(re, function (match) {
+    return match.replace("_", "").toUpperCase();
+  });
+}
+
+/**
+ * Timestamps in url need to be integers for the `stateReflector` to detect
+ * changes in state. Further timestamps have traditionally been used in the url.
+ * This class wraps millisecond timestamps and allows those to be easily
+ * converted to json by the prpc client.
+ **/
+export class Timestamp {
+  constructor(seconds, ms) {
+    this._milliseconds = parseInt(seconds || 0) * 1000 + parseInt(ms || 0);
+  }
+
+  get seconds() {
+    return floorSecond(this._milliseconds);
+  }
+
+  get milliseconds() {
+    return this._milliseconds;
+  }
+
+  get date() {
+    return new Date(this.milliseconds);
+  }
+
+  static fromMilliseconds(ms) {
+    return new Timestamp(0, ms);
+  }
+
+  static hoursAgo(hs) {
+    const MILLISECONDS_IN_HOUR = 60 * 60 * 1000;
+    return new Timestamp(0, Date.now() - hs * MILLISECONDS_IN_HOUR);
+  }
+
+  toJSON() {
+    return this.date.toJSON();
+  }
+}
+
+export function convertFromLegacyState(newState) {
+  // convert columns which were snake_case to camelCase
+  if (newState.c) {
+    newState.c = newState.c.map((col) => {
+      return toCamelCase(col);
+    });
+  }
+
+  // convert sort to camelCase
+  if (newState.s) {
+    newState.s = toCamelCase(newState.s);
+  }
+
+  return newState;
 }

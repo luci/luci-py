@@ -1631,7 +1631,7 @@ time.sleep(${leaseDuration})`,
         start.setDate(start.getDate() - 1);
         const service = this._createTasksService();
         service
-          .count(tags, start, "QUERY_RUNNING")
+          .count({ tags, start, state: "QUERY_RUNNING" })
           .then((resp) => {
             this._runningCounts[sl] = resp.count || "0";
             this.render();
@@ -1640,7 +1640,7 @@ time.sleep(${leaseDuration})`,
           .catch((e) => this.fetchError(e, "tasks/running slice " + i, true));
 
         service
-          .count(tags, start, "QUERY_PENDING")
+          .count({ tags, start, state: "QUERY_PENDING" })
           .then((resp) => {
             this._pendingCounts[sl] = resp.count || "0";
             this.render();

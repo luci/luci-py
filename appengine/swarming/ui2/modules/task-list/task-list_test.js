@@ -4,6 +4,8 @@
 
 import "modules/task-list";
 import fetchMock from "fetch-mock";
+import { deepEquals, mockUnauthorizedPrpc } from "../test_util";
+import { convertFromLegacyState, Timestamp } from "./task-list-helpers";
 
 describe("task-list", function () {
   // Instead of using import, we use require. Otherwise,
@@ -19,6 +21,8 @@ describe("task-list", function () {
     getChildItemWithText,
     mockAppGETs,
     MATCHED,
+    mockPrpc,
+    eventually,
   } = require("modules/test_util");
   const {
     column,
@@ -27,8 +31,7 @@ describe("task-list", function () {
     listQueryParams,
     processTasks,
   } = require("modules/task-list/task-list-helpers");
-  const { tasks22 } = require("modules/task-list/test_data");
-  const { fleetDimensions } = require("modules/bot-list/test_data");
+  const { tasks22, fleetDimensions } = require("modules/task-list/test_data");
 
   beforeEach(function () {
     jasmine.addMatchers(customMatchers);
@@ -40,7 +43,7 @@ describe("task-list", function () {
     );
   });
 
-  beforeEach(function () {
+  const mockOutRpcsWithFetchMock = (excludeListTasks = false) => {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
     mockAppGETs(fetchMock, {});
@@ -48,15 +51,23 @@ describe("task-list", function () {
       cancel_task: false,
     });
 
-    fetchMock.get("glob:/_ah/api/swarming/v1/tasks/list?*", tasks22);
-    fetchMock.get(
-      "glob:/_ah/api/swarming/v1/bots/dimensions?*",
+    if (!excludeListTasks) {
+      mockPrpc(fetchMock, "swarming.v2.Tasks", "ListTasks", tasks22);
+    }
+    mockPrpc(
+      fetchMock,
+      "swarming.v2.Bots",
+      "GetBotDimensions",
       fleetDimensions
     );
-    fetchMock.get("glob:/_ah/api/swarming/v1/tasks/count?*", { count: 12345 });
+    mockPrpc(fetchMock, "swarming.v2.Tasks", "CountTasks", { count: 12345 });
 
     // Everything else
     fetchMock.catch(404);
+  };
+
+  beforeEach(function () {
+    mockOutRpcsWithFetchMock();
   });
 
   afterEach(function () {
@@ -177,15 +188,9 @@ describe("task-list", function () {
           },
           { overwriteRoutes: true }
         );
-        fetchMock.get("glob:/_ah/api/swarming/v1/tasks/list?*", 403, {
-          overwriteRoutes: true,
-        });
-        fetchMock.get("glob:/_ah/api/swarming/v1/bots/dimensions?*", 403, {
-          overwriteRoutes: true,
-        });
-        fetchMock.get("/_ah/api/swarming/v1/tasks/count", 403, {
-          overwriteRoutes: true,
-        });
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "ListTasks");
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "GetBotDimensions");
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "CountTasks");
       }
 
       beforeEach(notAuthorized);
@@ -357,9 +362,14 @@ describe("task-list", function () {
             expect(countRows[3].innerHTML).toContain("<a ", "contains a link");
             const link = $$("a", countRows[3]);
             expect(link.href).toContain(
-              "/tasklist?at=false&c=name&c=created_ts&c=pending_time&" +
-                "c=duration&c=bot&c=pool-tag&c=state&d=desc&et=1545237983234&" +
-                "f=state%3ACOMPLETED_FAILURE&k=&n=true&s=created_ts&st=1545151583000&v=false"
+              "/tasklist?at=false" +
+                "&c=name&c=createdTs&c=pendingTime" +
+                "&c=duration&c=bot&c=pool-tag" +
+                "&c=state&d=desc" +
+                "&et=1545237983234" +
+                "&f=state%3AQUERY_COMPLETED_FAILURE" +
+                "&k=&n=true&s=createdTs" +
+                "&st=1545151583234&v=false"
             );
 
             // The true on flush waits for res.json() to resolve too
@@ -417,16 +427,16 @@ describe("task-list", function () {
         expect(sortToggles[5].currentKey).toBe("name");
         expect(sortToggles[5].direction).toBe("desc");
 
-        ele._sort = "created_ts";
+        ele._sort = "createdTs";
         ele._dir = "asc";
         ele.render();
 
         expect(sortToggles[0].key).toBe("name");
-        expect(sortToggles[0].currentKey).toBe("created_ts");
+        expect(sortToggles[0].currentKey).toBe("createdTs");
         expect(sortToggles[0].direction).toBe("asc");
 
-        expect(sortToggles[1].key).toBe("created_ts");
-        expect(sortToggles[1].currentKey).toBe("created_ts");
+        expect(sortToggles[1].key).toBe("createdTs");
+        expect(sortToggles[1].currentKey).toBe("createdTs");
         expect(sortToggles[1].direction).toBe("asc");
         done();
       });
@@ -445,7 +455,7 @@ describe("task-list", function () {
         ele._dir = "asc";
         ele.render();
 
-        const actualIDOrder = ele._tasks.map((t) => t.task_id);
+        const actualIDOrder = ele._tasks.map((t) => t.taskId);
         const actualPoolOrder = ele._tasks.map((t) =>
           column("pool-tag", t, ele)
         );
@@ -537,12 +547,12 @@ describe("task-list", function () {
         ]);
 
         ele._verbose = false;
-        ele._sort = "pending_time";
+        ele._sort = "pendingTime";
         ele._dir = "asc";
         ele.render();
 
         const actualPendingOrder = ele._tasks.map((t) =>
-          t.human_pending_time.trim()
+          t.human_pendingTime.trim()
         );
         expect(actualPendingOrder).toEqual([
           "0s",
@@ -692,7 +702,7 @@ describe("task-list", function () {
 
     it("orders columns in selector alphabetically with selected cols on top", function (done) {
       loggedInTasklist((ele) => {
-        ele._cols = ["duration", "created_ts", "state", "name"];
+        ele._cols = ["duration", "createdTs", "state", "name"];
         ele._showColSelector = true;
         ele._refilterPossibleColumns(); // also calls render
 
@@ -812,26 +822,34 @@ describe("task-list", function () {
         ele.render();
 
         expect(ele._tasks).toHaveSize(22, "All 22 at the start");
+        fetchMock.reset();
+        mockOutRpcsWithFetchMock(true);
 
-        let wasCalled = false;
-        fetchMock.get(
-          "glob:/_ah/api/swarming/v1/tasks/list?*",
-          () => {
-            expect(ele._tasks).toHaveSize(2, "2 BOT_DIED there now.");
-            wasCalled = true;
-            return "[]"; // pretend no tasks match
-          },
-          { overwriteRoutes: true }
+        const matcher = () => {
+          // At this intermediate stage, before the fetch request has been sent
+          // the UI will have filtered the BOT_DIED which are already in the
+          // list of items. There are 2 examples in the sample data so we expect
+          // a list size of 2
+          expect(ele._tasks).toHaveSize(2, "2 BOT_DIED there now.");
+          return true;
+        };
+        mockPrpc(
+          fetchMock,
+          "swarming.v2.Tasks",
+          "ListTasks",
+          [],
+          matcher,
+          true
         );
-
         ele._addFilter("state:BOT_DIED");
-        // The true on flush waits for res.json() to resolve too, which
-        // is when we know the element has updated the _tasks.
         fetchMock.flush(true).then(() => {
-          expect(wasCalled).toBeTruthy();
-          expect(ele._tasks).toHaveSize(0, "none were actually returned");
-
-          done();
+          // Since pRPC calls `.json()` on the fetch promise,
+          // flush may return before rendering has been completed.
+          // Therfore we use eventually, which waits until rendering is finished
+          eventually(ele, (ele) => {
+            expect(ele._tasks).toHaveSize(0, "none were actually returned");
+            done();
+          });
         });
       });
     });
@@ -847,19 +865,20 @@ describe("task-list", function () {
         expect(ele._filters).toEqual([]);
         // Leave the input to let the user correct their mistake.
         expect(filterInput.value).toEqual("invalid filter");
-
+        fetchMock.reset();
+        mockOutRpcsWithFetchMock(true);
+        //
         // Spy on the list call to make sure a request is made with the right filter.
-        let calledTimes = 0;
-        fetchMock.get(
-          "glob:/_ah/api/swarming/v1/tasks/list?*",
-          (url, _) => {
-            expect(url).toContain(
-              encodeURIComponent("valid:filter:gpu:can:have:many:colons")
-            );
-            calledTimes++;
-            return "[]"; // pretend no bots match
+        mockPrpc(
+          fetchMock,
+          "swarming.v2.Tasks",
+          "ListTasks",
+          [],
+          (req) => {
+            expect(req.tags).toContain("valid:filter:gpu:can:have:many:colons");
+            return true;
           },
-          { overwriteRoutes: true }
+          true
         );
 
         filterInput.value = "valid-tag:filter:gpu:can:have:many:colons";
@@ -877,8 +896,6 @@ describe("task-list", function () {
         ]);
 
         fetchMock.flush(true).then(() => {
-          expect(calledTimes).toEqual(1, "Only request tasks once");
-
           done();
         });
       });
@@ -1070,10 +1087,10 @@ describe("task-list", function () {
 
     it("updates the links with filters and other settings", function (done) {
       loggedInTasklist((ele) => {
-        ele._startTime = 1545151583000;
-        ele._endTime = 1545237981000;
-        ele._sort = "completed_ts";
-        ele._filters = ["pool-tag:Chrome", "state:DEDUPED"];
+        ele._startTime = Timestamp.fromMilliseconds(1545151583000);
+        ele._endTime = Timestamp.fromMilliseconds(1545237981000);
+        ele._sort = "completedTs";
+        ele._filters = ["pool-tag:Chrome", "state:QUERY_DEDUPED"];
         ele.render();
 
         const countRows = $("#query_counts tr", ele);
@@ -1082,12 +1099,13 @@ describe("task-list", function () {
         expect(countRows[3].innerHTML).toContain("<a ", "contains a link");
         const link = $$("a", countRows[3]);
         expect(link.href).toContain(
-          "/tasklist?at=false&c=name&c=created_ts&" +
-            "c=pending_time&c=duration&c=bot&c=pool-tag&c=state&d=desc&et=1545237981000&" +
-            "f=pool-tag%3AChrome&f=state%3ACOMPLETED_FAILURE&k=&n=true&s=completed_ts&" +
-            "st=1545151583000&v=false"
+          "tasklist?at=false&c=name&c=createdTs" +
+            "&c=pendingTime&c=duration&c=bot&c=pool-tag" +
+            "&c=state&d=desc&et=1545237981000" +
+            "&f=pool-tag%3AChrome" +
+            "&f=state%3AQUERY_COMPLETED_FAILURE" +
+            "&k=&n=true&s=completedTs&st=1545151583000&v=false"
         );
-
         done();
       });
     });
@@ -1148,36 +1166,29 @@ describe("task-list", function () {
       });
     });
 
-    function checkAuthorizationAndNoPosts(calls) {
+    function checkAuthorization(calls) {
       // check authorization headers are set
       calls.forEach((c) => {
         expect(c[1].headers).toBeDefined();
         expect(c[1].headers.authorization).toContain("Bearer ");
       });
-      const postCalls = fetchMock.calls(MATCHED, "POST");
-      expect(postCalls).toHaveSize(0, "no POSTs on task-list");
-
       expectNoUnmatchedCalls(fetchMock);
     }
 
     it("makes auth'd API calls when a logged in user views landing page", function (done) {
       loggedInTasklist((ele) => {
-        const calls = fetchMock.calls(MATCHED, "GET");
-        expect(calls).toHaveSize(
-          2 + 3 + 13,
-          "2 GETs from swarming-app, 3 from task-list (13 counts)"
+        const protorpc = fetchMock.calls(MATCHED, "GET");
+        expect(protorpc).toHaveSize(
+          2 + 1,
+          "2 GETs from swarming-app, 1 from task-list-page for permsissions"
         );
-        // calls is an array of 2-length arrays with the first element
-        // being the string of the url and the second element being
-        // the options that were passed in
-        const gets = calls.map((c) => c[0]);
-
-        // limit=100 comes from the default limit value.
-        expect(gets).toContainRegex(
-          /\/_ah\/api\/swarming\/v1\/tasks\/list.+limit=100.*/
+        const prpc = fetchMock.calls(MATCHED, "POST");
+        expect(prpc).toHaveSize(
+          1 + 1 + 13,
+          "1 call to GetTasks, 1 to GetBotDimensions, 13 to TaskCounts"
         );
 
-        checkAuthorizationAndNoPosts(calls);
+        checkAuthorization(protorpc);
         done();
       });
     });
@@ -1186,21 +1197,20 @@ describe("task-list", function () {
       loggedInTasklist((ele) => {
         ele._filters = ["os-tag:Android"];
         fetchMock.resetHistory();
-        ele._addFilter("state:PENDING_RUNNING");
+        ele._addFilter("state:QUERY_PENDING_RUNNING");
         fetchMock.flush(true).then(() => {
-          const calls = fetchMock.calls(MATCHED, "GET");
-          expect(calls).toHaveSize(4 + 12, "4 from task-list and 12 counts");
+          const calls = fetchMock.calls(MATCHED, "POST");
+          expect(calls).toHaveSize(
+            2 + 13,
+            "1 to get dimensions, 1 to list tasks, 13 counts"
+          );
 
-          const gets = calls
-            .slice(1)
-            .map((c) => c[0])
-            .filter((g) => !g.includes("pool="));
-          for (const get of gets) {
-            // make sure there aren't two states when we do the count (which
-            // appends a state)
-            expect(get).not.toMatch(/state.+state/);
-            // %3A is url encoded colon (:)
-            expect(get).toMatch(/tags=os%3AAndroid/);
+          const prpc = calls
+            .filter((c) => !c[0].includes("swarming.v2.Bots"))
+            .map((c) => c[1]);
+          // Test that tag is always included in counts and list
+          for (const rpc of prpc) {
+            expect(rpc.body).toContain("os:Android");
           }
           done();
         });
@@ -1211,21 +1221,16 @@ describe("task-list", function () {
       loggedInTasklist((ele) => {
         ele._filters = [];
         fetchMock.resetHistory();
-        ele._addFilter("state:PENDING_RUNNING");
+        ele._addFilter("state:QUERY_PENDING_RUNNING");
         fetchMock.flush(true).then(() => {
-          const calls = fetchMock.calls(MATCHED, "GET");
-          expect(calls).toHaveSize(3 + 13, "3 from task-list and 13 counts");
+          const calls = fetchMock.calls(MATCHED, "POST");
+          expect(calls).toHaveSize(3 + 12, "2 from task-list and 13 counts");
 
-          const gets = calls
-            .slice(1)
-            .map((c) => c[0])
-            .filter((g) => !g.includes("pool="));
-          for (const get of gets) {
-            // make sure there aren't two states when we do the count (which
-            // appends a state)
-            expect(get).not.toMatch(/state.+state/);
-            // Only one state requested.
-            expect(get).toMatch(/state=/);
+          const prpc = calls
+            .filter((c) => !c[0].includes("GetBotDimensions"))
+            .map((c) => c[1]);
+          for (const rpc of prpc) {
+            expect(rpc.body).toContain("state");
           }
           done();
         });
@@ -1244,18 +1249,42 @@ describe("task-list", function () {
 
         fetchMock.flush(true).then(() => {
           expectNoUnmatchedCalls(fetchMock);
-          const calls = fetchMock.calls(MATCHED, "GET");
+          const calls = fetchMock.calls(MATCHED, "POST");
           expect(calls).toHaveSize(2, "2 counts, 1 running, 1 pending");
 
-          const gets = calls.map((c) => c[0]);
-          expect(gets).toContain(
-            "/_ah/api/swarming/v1/tasks/count?end=1545237983&" +
-              "start=1544633183&state=PENDING&tags=pool%3AChrome"
+          const checkForRequest = (expected) => {
+            const callsCount = calls.filter((c) => {
+              const rpc = c[1];
+              const request = JSON.parse(rpc.body);
+              return deepEquals(request, expected);
+            });
+            expect(callsCount).toHaveSize(
+              1,
+              `Expected one call to have the request ${JSON.stringify(
+                expected
+              )}`
+            );
+          };
+          // This is the default new Date() value specified in the test
+          // start and end are expected to be a week apart.
+          const start = Timestamp.fromMilliseconds(
+            Date.UTC(2018, 11, 12, 16, 46, 22, 1234)
           );
-          expect(gets).toContain(
-            "/_ah/api/swarming/v1/tasks/count?end=1545237983&" +
-              "start=1544633183&state=RUNNING&tags=pool%3AChrome"
+          const end = Timestamp.fromMilliseconds(
+            Date.UTC(2018, 11, 19, 16, 46, 22, 1234)
           );
+          checkForRequest({
+            tags: ["pool:Chrome"],
+            state: "QUERY_PENDING",
+            start: start.toJSON(),
+            end: end.toJSON(),
+          });
+          checkForRequest({
+            tags: ["pool:Chrome"],
+            state: "QUERY_RUNNING",
+            start: start.date.toJSON(),
+            end: end.toJSON(),
+          });
           done();
         });
       });
@@ -1263,7 +1292,7 @@ describe("task-list", function () {
 
     it("counts correctly when cancelling", function (done) {
       jasmine.clock().uninstall(); // re-enable setTimeout
-      fetchMock.post("/_ah/api/swarming/v1/tasks/cancel", { matched: 10 });
+      mockPrpc(fetchMock, "swarming.v2.Tasks", "CancelTasks", { matched: 10 });
       loggedInTasklist((ele) => {
         ele._filters = ["pool-tag:Chrome"];
         ele.permissions.cancel_task = true;
@@ -1293,8 +1322,8 @@ describe("task-list", function () {
               // being the string of the url and the second element being
               // the options that were passed in
               const cancelPost = calls[0];
-              expect(cancelPost[0]).toEqual(
-                "/_ah/api/swarming/v1/tasks/cancel"
+              expect(cancelPost[0]).toContain(
+                "/prpc/swarming.v2.Tasks/CancelTasks"
               );
 
               const req = JSON.parse(cancelPost[1].body);
@@ -1317,13 +1346,13 @@ describe("task-list", function () {
       // Make a copy of the object because processTasks will modify it in place.
       const tasks = processTasks([deepCopy(ANDROID_TASK)], {});
       const task = tasks[0];
-      expect(task.created_ts).toBeTruthy();
-      expect(task.created_ts instanceof Date).toBeTruthy(
+      expect(task.createdTs).toBeTruthy();
+      expect(task.createdTs instanceof Date).toBeTruthy(
         "Should be a date object"
       );
-      expect(task.human_created_ts).toBeTruthy();
-      expect(task.pending_time).toBeTruthy();
-      expect(task.human_pending_time).toBeTruthy();
+      expect(task.human_createdTs).toBeTruthy();
+      expect(task.pendingTime).toBeTruthy();
+      expect(task.human_pendingTime).toBeTruthy();
     });
 
     it("gracefully handles null data", function () {
@@ -1352,10 +1381,10 @@ describe("task-list", function () {
       expect(tasks).toBeTruthy();
       expect(tasks).toHaveSize(22);
 
-      const filtered = filterTasks(["state:COMPLETED_FAILURE"], tasks);
+      const filtered = filterTasks(["state:QUERY_COMPLETED_FAILURE"], tasks);
       expect(filtered).toHaveSize(2);
       const expectedIds = ["41e0310fe0b7c410", "41e031b2c8b46710"];
-      const actualIds = filtered.map((task) => task.task_id);
+      const actualIds = filtered.map((task) => task.taskId);
       actualIds.sort();
       expect(actualIds).toEqual(expectedIds);
     });
@@ -1368,35 +1397,45 @@ describe("task-list", function () {
 
       let filtered = filterTasks(["pool-tag:Chrome"], tasks);
       expect(filtered).toHaveSize(7);
-      let actualIds = filtered.map((task) => task.task_id);
+      let actualIds = filtered.map((task) => task.taskId);
       expect(actualIds).toContain("41e0204f39d06210"); // spot check
       expect(actualIds).not.toContain("41e0182a00fcc110");
 
       // some tasks have multiple 'purpose' tags
       filtered = filterTasks(["purpose-tag:luci"], tasks);
       expect(filtered).toHaveSize(10);
-      actualIds = filtered.map((task) => task.task_id);
+      actualIds = filtered.map((task) => task.taskId);
       expect(actualIds).toContain("41e020504d0a5110"); // spot check
       expect(actualIds).not.toContain("41e0310fe0b7c410");
 
       filtered = filterTasks(["pool-tag:Skia", "gpu-tag:none"], tasks);
       expect(filtered).toHaveSize(1);
-      expect(filtered[0].task_id).toBe("41e031b2c8b46710");
+      expect(filtered[0].taskId).toBe("41e031b2c8b46710");
 
       filtered = filterTasks(
         ["pool-tag:Skia", "gpu-tag:10de:1cb3-384.59"],
         tasks
       );
       expect(filtered).toHaveSize(2);
-      actualIds = filtered.map((task) => task.task_id);
+      actualIds = filtered.map((task) => task.taskId);
       expect(actualIds).toContain("41dfa79d3bf29010");
       expect(actualIds).toContain("41df677202f20310");
 
-      filtered = filterTasks(["state:DEDUPED"], tasks);
+      filtered = filterTasks(["state:QUERY_DEDUPED"], tasks);
       expect(filtered).toHaveSize(2);
-      actualIds = filtered.map((task) => task.task_id);
+      actualIds = filtered.map((task) => task.taskId);
       expect(actualIds).toContain("41e0284bc3ef4f10");
       expect(actualIds).toContain("41e0284bf01aef10");
+    });
+
+    it("correctly converts from a legacy state to a new state", function () {
+      const oldState = {
+        s: "created_ts",
+        c: ["modified_ts"],
+      };
+      convertFromLegacyState(oldState);
+      expect(oldState.s).toEqual("createdTs");
+      expect(oldState.c).toEqual(["modifiedTs"]);
     });
 
     it("correctly makes query params from filters", function () {
@@ -1411,7 +1450,12 @@ describe("task-list", function () {
             end: 456789012,
           },
           filters: ["state:BOT_DIED"],
-          output: "end=456789&limit=7&start=12345&state=BOT_DIED",
+          output: {
+            limit: 7,
+            start: 12345678,
+            end: 456789012,
+            state: "QUERY_BOT_DIED",
+          },
         },
         {
           // two tags
@@ -1421,8 +1465,12 @@ describe("task-list", function () {
             end: 456789012,
           },
           filters: ["os-tag:Window", "gpu-tag:10de"],
-          output:
-            "end=456789&limit=342&start=12345&tags=os%3AWindow&tags=gpu%3A10de",
+          output: {
+            limit: 342,
+            start: 12345678,
+            end: 456789012,
+            tags: ["os:Window", "gpu:10de"],
+          },
         },
         {
           // tags and state
@@ -1432,8 +1480,13 @@ describe("task-list", function () {
             end: 456789012,
           },
           filters: ["os-tag:Window", "state:RUNNING", "gpu-tag:10de"],
-          output:
-            "end=456789&limit=57&start=12345&state=RUNNING&tags=os%3AWindow&tags=gpu%3A10de",
+          output: {
+            start: 12345678,
+            end: 456789012,
+            limit: 57,
+            state: "QUERY_RUNNING",
+            tags: ["os:Window", "gpu:10de"],
+          },
         },
       ];
 
@@ -1441,11 +1494,14 @@ describe("task-list", function () {
         const qp = listQueryParams(testcase.filters, testcase.extra);
         expect(qp).toEqual(testcase.output);
       }
-
       const testcase = expectations[0];
       testcase.extra.cursor = "mock_cursor12345";
       const qp = listQueryParams(testcase.filters, testcase.extra);
-      expect(qp).toEqual("cursor=mock_cursor12345&" + testcase.output);
+      const expected = {
+        ...expectations[0].output,
+        cursor: "mock_cursor12345",
+      };
+      expect(qp).toEqual(expected);
     });
   }); // end describe('data parsing')
 });

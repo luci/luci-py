@@ -20,7 +20,6 @@ import { errorMessage } from "elements-sk/errorMessage";
 import { html } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined";
 import { until } from "lit-html/directives/until";
-import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
 import naturalSort from "javascript-natural-sort/naturalSort";
 import { stateReflector } from "common-sk/modules/stateReflector";
 
@@ -49,11 +48,11 @@ import {
   appendPrimaryMap,
   column,
   filterTasks,
-  floorSecond,
   getColHeader,
   humanizePrimaryKey,
   legacyTags,
   listQueryParams,
+  convertFromLegacyState,
   processTasks,
   sortColumns,
   sortPossibleColumns,
@@ -63,6 +62,7 @@ import {
   tagsOnly,
   taskClass,
   useNaturalSort,
+  Timestamp,
 } from "./task-list-helpers";
 import { botListLink, onSmallScreen } from "../util";
 import {
@@ -317,8 +317,8 @@ const template = (ele) => html`
     <div class='cancel content'>
       <task-mass-cancel
           .authHeader=${ele.authHeader}
-          .start=${ele._startTime}
-          .end=${ele._endTime}
+          .start=${ele._startTime.milliseconds}
+          .end=${ele._endTime.milliseconds}
           .tags=${tagsOnly(ele._filters).map(
             stripTagFromFilter
           )}></task-mass-cancel>
@@ -351,7 +351,7 @@ window.customElements.define(
 
       this._cols = [];
       this._dir = "";
-      this._endTime = 0;
+      this._endTime = Timestamp.fromMilliseconds(Date.now());
       this._filters = [];
       this._limit = 0; // _limit being 0 is a sentinel value for _fetch()
       // We won't actually make a request if _limit is 0.
@@ -361,7 +361,7 @@ window.customElements.define(
       this._now = true;
       this._primaryKey = "";
       this._sort = "";
-      this._startTime = 0;
+      this._startTime = Timestamp.hoursAgo(24);
       this._verbose = false;
       // show it by default on small screens (e.g. mobile)
       this._allStates = onSmallScreen();
@@ -372,17 +372,18 @@ window.customElements.define(
             // provide empty values
             c: this._cols,
             d: this._dir,
-            et: this._endTime,
+            st: this._startTime.milliseconds,
+            et: this._endTime.milliseconds,
             f: this._filters,
             k: this._primaryKey,
             n: this._now,
             s: this._sort,
-            st: this._startTime,
             at: this._allStates,
             v: this._verbose,
           };
         },
         /* setState*/ (newState) => {
+          newState = convertFromLegacyState(newState);
           // default values if not specified.
           this._allStates = newState.at; // default to false
           this._cols = newState.c;
@@ -391,8 +392,8 @@ window.customElements.define(
               "name",
               "state",
               "bot",
-              "created_ts",
-              "pending_time",
+              "createdTs",
+              "pendingTime",
               "duration",
               "pool-tag",
             ];
@@ -404,15 +405,14 @@ window.customElements.define(
           this._now = newState.n; // default to true
           this._primaryKey = newState.k; // default to ''
           // default to 24 hours ago, or if now is checked, update it to now
-          if (this._now || !newState.et) {
-            this._endTime = Date.now();
-          } else {
-            this._endTime = newState.et;
-          }
+          this._endTime = Timestamp.fromMilliseconds(
+            this._now || !newState.et ? Date.now() : newState.et
+          );
           // default to 24 hours ago
-          this._startTime =
-            newState.st || floorSecond(Date.now() - 24 * 60 * 60 * 1000);
-          this._sort = newState.s || "created_ts";
+          this._startTime = Timestamp.fromMilliseconds(
+            newState.st || Timestamp.hoursAgo(24).milliseconds
+          );
+          this._sort = newState.s || "createdTs";
           this._verbose = newState.v; // default to false
           this._fetch();
           this.render();
@@ -571,16 +571,17 @@ window.customElements.define(
       this.app.addBusyTasks(1);
       let queryParams = listQueryParams(this._filters, {
         limit: this._limit,
-        start: floorSecond(this._startTime),
-        end: floorSecond(this._now ? Date.now() : this._endTime),
+        start: this._startTime,
+        end: this._now ? new Date() : this._endTime,
       });
-      fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
+      const service = this._createTasksService();
+      service
+        .list(queryParams)
+        .then((resp) => {
           this._tasks = [];
-          const maybeLoadMore = (json) => {
+          const maybeLoadMore = (resp) => {
             const tags = {};
-            this._tasks = this._tasks.concat(processTasks(json.items, tags));
+            this._tasks = this._tasks.concat(processTasks(resp.items, tags));
             appendPossibleColumns(this._possibleColumns, tags);
             appendPrimaryMap(this._primaryMap, tags);
             this._rebuildFilterables();
@@ -588,81 +589,76 @@ window.customElements.define(
             this.render();
             // Special case: Don't load all the tasks when filters is empty to avoid
             // loading many many tasks unintentionally.
-            if (this._filters.length && json.cursor) {
+            if (this._filters.length && resp.cursor) {
               this._limit = BATCH_LOAD;
               queryParams = listQueryParams(this._filters, {
-                cursor: json.cursor,
+                cursor: resp.cursor,
                 limit: this._limit,
-                start: floorSecond(this._startTime),
-                end: floorSecond(this._now ? Date.now() : this._endTime),
+                start: this._startTime,
+                end: this._now ? new Date() : this._endTime,
               });
-              fetch(`/_ah/api/swarming/v1/tasks/list?${queryParams}`, extra)
-                .then(jsonOrThrow)
+              service
+                .list(queryParams)
                 .then(maybeLoadMore)
                 .catch((e) => {
-                  this.fetchError(e, "tasks/list (paging)", true);
+                  this.prpcError(e, "tasks/list (paging)", true);
                 });
             } else {
               this.app.finishedTask();
             }
           };
-          maybeLoadMore(json);
+          maybeLoadMore(resp);
         })
-        .catch((e) => this.fetchError(e, "tasks/list", true));
+        .catch((e) => this.prpcError(e, "tasks/list", true));
 
-      this._fetchCounts(queryParams, extra);
+      this._fetchCounts(queryParams);
 
       this.app.addBusyTasks(1);
-      const extraNoSignal = {
-        headers: { authorization: this.authHeader },
-        // No signal here because we shouldn't need to abort it.
-        // This request does not depend on the filters.
-      };
       const pool =
         this._filters
           .filter((f) => f.startsWith("pool-tag:"))
           .map((f) => f.replace("pool-tag:", ""))[0] || "";
-      fetch(`/_ah/api/swarming/v1/bots/dimensions?pool=${pool}`, extraNoSignal)
-        .then(jsonOrThrow)
-        .then((json) => {
-          appendPossibleColumns(this._possibleColumns, json.bots_dimensions);
-          appendPrimaryMap(this._primaryMap, json.bots_dimensions);
-          this._knownDimensions = json.bots_dimensions.map((d) => d.key);
+      this._createBotService()
+        .dimensions(pool)
+        .then((resp) => {
+          appendPossibleColumns(this._possibleColumns, resp.botsDimensions);
+          appendPrimaryMap(this._primaryMap, resp.botsDimensions);
+          this._knownDimensions = (resp.botsDimensions || []).map((d) => d.key);
           this._rebuildFilterables();
 
           this.render();
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, "bots/dimensions", true));
+        .catch((e) => this.prpcError(e, "bots/dimensions", true));
     }
 
-    _fetchCounts(queryParams, extra) {
+    _fetchCounts(queryParams) {
       const states = COUNT_FILTERS.slice(1).map((c) => c.filter);
       this.app.addBusyTasks(1 + states.length);
-      const totalPromise = fetch(
-        `/_ah/api/swarming/v1/tasks/count?${queryParams}`,
-        extra
-      )
-        .then(jsonOrThrow)
-        .then((json) => {
+      // Do not abort taskCount requests since they do not depend on filters
+      // which may change.
+      const service = this._createTasksService();
+      const totalPromise = service
+        .count(queryParams)
+        .then((resp) => {
           this.app.finishedTask();
-          return json.count;
+          return resp.count || 0;
         })
-        .catch((e) => this.fetchError(e, "count/total", true));
+        .catch((e) => this.prpcError(e, "count/total", true));
       this._queryCounts[0].value = html`${until(totalPromise, "...")}`;
 
-      const stateRemoved = queryParams.replace(/state=.+?(&|$)/g, "");
+      const statelessQueryParams = { ...queryParams };
+      delete statelessQueryParams["state"];
+      delete statelessQueryParams["limit"];
       for (let i = 0; i < states.length; i++) {
-        const promise = fetch(
-          `/_ah/api/swarming/v1/tasks/count?${stateRemoved}&state=${states[i]}`,
-          extra
-        )
-          .then(jsonOrThrow)
-          .then((json) => {
+        const query = { ...statelessQueryParams, state: states[i] };
+        const promise = service
+          .count(query)
+          .then((resp) => {
             this.app.finishedTask();
-            return json.count;
+            return resp.count || 0;
           })
-          .catch((e) => this.fetchError(e, `count/${states[i]}`, true));
+          .catch((e) => this.prpcError(e, `count/${states[i]}`, true));
         this._queryCounts[1 + i].value = html`${until(promise, "...")}`;
       }
     }
@@ -711,10 +707,11 @@ window.customElements.define(
       }
       flatpickr(this._startEle, {
         appendTo: $$(".picker", this), // otherwise, it leaks the calendar to <body>
-        defaultDate: this._startTime,
+        defaultDate: this._startTime.date,
         enableTime: true,
         onClose: (dates) => {
-          (this._startTime = dates[0].getTime()), this._stateChanged();
+          this._startTime = Timestamp.fromMilliseconds(dates[0].getTime());
+          this._stateChanged();
           this._fetch();
           this.render();
         },
@@ -727,10 +724,11 @@ window.customElements.define(
       });
       flatpickr(this._endEle, {
         appendTo: $$(".picker", this), // otherwise, it leaks the calendar to <body>
-        defaultDate: this._endTime,
+        defaultDate: this._endTime.date,
         enableTime: true,
         onClose: (dates) => {
-          (this._endTime = dates[0].getTime()), this._stateChanged();
+          this._endTime = Timestamp.fromMilliseconds(dates[0].getTime());
+          this._stateChanged();
           this._fetch();
           this.render();
         },
@@ -760,12 +758,12 @@ window.customElements.define(
         // provide empty values
         c: this._cols,
         d: this._dir,
-        et: this._endTime,
+        st: this._startTime.milliseconds,
+        et: this._endTime.milliseconds,
         f: withNewState,
         k: this._primaryKey,
         n: this._now,
         s: this._sort,
-        st: this._startTime,
         at: this._allStates,
         v: this._verbose,
       });
@@ -817,7 +815,7 @@ window.customElements.define(
       this._filteredPrimaryArr = this._primaryArr.slice();
     }
 
-    _refilterPrimaryKeys(e) {
+    _refilterPrimaryKeys(_e) {
       this._filterQuery = $$("#filter_search", this).value;
 
       this._filteredPrimaryArr = filterPossibleKeys(
@@ -840,7 +838,7 @@ window.customElements.define(
       this.render();
     }
 
-    _refilterPossibleColumns(e) {
+    _refilterPossibleColumns(_e) {
       const input = $$("#column_search", this);
       // If the column selector box is hidden, input will be null
       this._columnQuery = (input && input.value) || "";
@@ -942,7 +940,7 @@ window.customElements.define(
       return this._tasks;
     }
 
-    _toggleAllStates(e) {
+    _toggleAllStates(_e) {
       this._allStates = !this._allStates;
       this._stateChanged();
       this.render();

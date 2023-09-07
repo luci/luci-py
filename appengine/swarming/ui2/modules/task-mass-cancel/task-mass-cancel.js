@@ -4,15 +4,13 @@
 
 import { errorMessage } from "elements-sk/errorMessage";
 import { html, render } from "lit-html";
-import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
 
 import { initPropertyFromAttrOrProperty } from "../util";
 
-// query.fromObject is more readable than just 'fromObject'
-import * as query from "common-sk/modules/query";
-
 import "elements-sk/checkbox-sk";
 import "elements-sk/styles/buttons";
+import { TasksService } from "../services/tasks";
+import { Timestamp } from "../task-list/task-list-helpers";
 
 /**
  * @module swarming-ui/modules/task-mass-cancel
@@ -77,11 +75,6 @@ function fetchError(e, loadingWhat) {
   errorMessage(message, 5000);
 }
 
-function nowInSeconds() {
-  // convert milliseconds to seconds
-  return Math.round(Date.now() / 1000);
-}
-
 const CANCEL_BATCH_SIZE = 100;
 
 window.customElements.define(
@@ -105,6 +98,13 @@ window.customElements.define(
       if (typeof this.tags === "string") {
         this.tags = this.tags.split(",");
       }
+
+      if (this.start) {
+        this.start = Timestamp.fromMilliseconds(this.start);
+      }
+      if (this.end) {
+        this.end = Timestamp.fromMilliseconds(this.end);
+      }
       // sort for determinism
       this.tags.sort();
 
@@ -118,54 +118,35 @@ window.customElements.define(
       );
       this.render();
 
-      // Change unit from milliseconds to seconds.
-      const start = Math.round(this.start / 1000);
-      const end = Math.round(this.end / 1000);
-
       const payload = {
         limit: CANCEL_BATCH_SIZE,
         tags: this.tags,
-        start: start,
-        end: end,
+        start: this.start,
+        end: this.end,
       };
 
       if (this._both) {
         payload.kill_running = true;
       }
 
-      const options = {
-        headers: {
-          authorization: this.authHeader,
-          "content-type": "application/json",
-        },
-        method: "POST",
-        body: JSON.stringify(payload),
-      };
+      const service = new TasksService(this.authHeader);
 
-      const maybeCancelMore = (json) => {
-        this._progress += parseInt(json.matched);
+      const maybeCancelMore = (resp) => {
+        this._progress += parseInt(resp.matched || 0);
         this.render();
-        if (json.cursor) {
+        if (resp.cursor) {
           const payload = {
             limit: CANCEL_BATCH_SIZE,
             tags: this.tags,
-            start: start,
-            end: end,
-            cursor: json.cursor,
+            start: this.start,
+            end: this.end,
+            cursor: resp.cursor,
           };
           if (this._both) {
             payload.kill_running = true;
           }
-          const options = {
-            headers: {
-              authorization: this.authHeader,
-              "content-type": "application/json",
-            },
-            method: "POST",
-            body: JSON.stringify(payload),
-          };
-          fetch("/_ah/api/swarming/v1/tasks/cancel", options)
-            .then(jsonOrThrow)
+          service
+            .massCancel(payload)
             .then(maybeCancelMore)
             .catch((e) => fetchError(e, "task-mass-cancel/cancel (paging)"));
         } else {
@@ -177,8 +158,8 @@ window.customElements.define(
         }
       };
 
-      fetch("/_ah/api/swarming/v1/tasks/cancel", options)
-        .then(jsonOrThrow)
+      service
+        .massCancel(payload)
         .then(maybeCancelMore)
         .catch((e) => fetchError(e, "task-mass-cancel/cancel"));
     }
@@ -202,45 +183,37 @@ window.customElements.define(
         console.warn("no authHeader received, try refreshing the page?");
         return;
       }
-      const extra = {
-        headers: { authorization: this.authHeader },
-      };
+      const service = new TasksService(this.authHeader);
 
-      const pendingParams = query.fromObject({
-        state: "PENDING",
+      const pendingParams = {
+        state: "QUERY_PENDING",
         tags: this.tags,
         // Search in the last week to get the count.  PENDING tasks should expire
         // well before then, so this should be pretty accurate.
-        start: nowInSeconds() - 7 * 24 * 60 * 60,
-        end: nowInSeconds(),
-      });
+        start: Timestamp.hoursAgo(24 * 7),
+        end: new Date(),
+      };
 
-      const pendingPromise = fetch(
-        `/_ah/api/swarming/v1/tasks/count?${pendingParams}`,
-        extra
-      )
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._pendingCount = parseInt(json.count);
+      const pendingPromise = service
+        .count(pendingParams)
+        .then((resp) => {
+          this._pendingCount = parseInt(resp.count || 0);
         })
         .catch((e) => fetchError(e, "task-mass-cancel/pending"));
 
-      const runningParams = query.fromObject({
-        state: "RUNNING",
+      const runningParams = {
+        state: "QUERY_RUNNING",
         tags: this.tags,
         // Search in the last week to get the count.  RUNNING tasks should finish
         // well before then, so this should be pretty accurate.
-        start: nowInSeconds() - 7 * 24 * 60 * 60,
-        end: nowInSeconds(),
-      });
+        start: Timestamp.hoursAgo(7 * 24),
+        end: new Date(),
+      };
 
-      const runningPromise = fetch(
-        `/_ah/api/swarming/v1/tasks/count?${runningParams}`,
-        extra
-      )
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._runningCount = parseInt(json.count);
+      const runningPromise = service
+        .count(runningParams)
+        .then((resp) => {
+          this._runningCount = parseInt(resp.count || 0);
         })
         .catch((e) => fetchError(e, "task-mass-cancel/running"));
 
