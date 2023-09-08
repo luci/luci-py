@@ -118,7 +118,7 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_async_v2(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetConfig.side_effect = [
+    self.v2_cient_mock.GetConfigAsync.side_effect = [
         future(
             config_service_pb2.Config(revision='aaaabbbb',
                                       content_sha256='sha256hash')),
@@ -130,7 +130,7 @@ class RemoteTestCase(test_case.TestCase):
 
     self.assertEqual(revision, 'aaaabbbb')
     self.assertEqual(content, 'a config')
-    self.v2_cient_mock.GetConfig.assert_has_calls([
+    self.v2_cient_mock.GetConfigAsync.assert_has_calls([
         mock.call(
             config_service_pb2.GetConfigRequest(
                 config_set='services/foo',
@@ -158,7 +158,7 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_async_v2_content_in_signed_url(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetConfig.side_effect = [
+    self.v2_cient_mock.GetConfigAsync.side_effect = [
         future(
             config_service_pb2.Config(revision='aaaabbbb',
                                       content_sha256='sha256hash')),
@@ -180,7 +180,7 @@ class RemoteTestCase(test_case.TestCase):
 
     self.assertEqual(revision, 'aaaabbbb')
     self.assertEqual(content, 'a large config')
-    self.v2_cient_mock.GetConfig.assert_has_calls([
+    self.v2_cient_mock.GetConfigAsync.assert_has_calls([
         mock.call(
             config_service_pb2.GetConfigRequest(
                 config_set='services/foo',
@@ -208,7 +208,7 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_async_v2_not_found(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetConfig.side_effect = client.RpcError(
+    self.v2_cient_mock.GetConfigAsync.side_effect = client.RpcError(
         'Config Not Found', codes.StatusCode.NOT_FOUND, {})
 
     revision, content = self.provider.get_async('services/foo',
@@ -219,7 +219,7 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_async_v2_rpc_err(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetConfig.side_effect = client.RpcError(
+    self.v2_cient_mock.GetConfigAsync.side_effect = client.RpcError(
         'Internal Error', codes.StatusCode.INTERNAL, {})
 
     with self.assertRaises(client.RpcError) as err:
@@ -288,7 +288,7 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_projects_v2(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.ListConfigSets.return_value = future(
+    self.v2_cient_mock.ListConfigSetsAsync.return_value = future(
         config_service_pb2.ListConfigSetsResponse(config_sets=[
             config_service_pb2.ConfigSet(
                 name='projects/chromium',
@@ -313,14 +313,14 @@ class RemoteTestCase(test_case.TestCase):
             'name': 'infra'
         },
     ])
-    self.v2_cient_mock.ListConfigSets.assert_called_once_with(
+    self.v2_cient_mock.ListConfigSetsAsync.assert_called_once_with(
         config_service_pb2.ListConfigSetsRequest(domain='PROJECT'),
         credentials=mock.ANY,
     )
 
   def test_get_projects_v2_rpc_err(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.ListConfigSets.side_effect = client.RpcError(
+    self.v2_cient_mock.ListConfigSetsAsync.side_effect = client.RpcError(
         'Internal Error', codes.StatusCode.INTERNAL, {})
 
     with self.assertRaises(client.RpcError) as err:
@@ -356,26 +356,26 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_project_configs_async_v2(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetProjectConfigs.return_value = future(
+    self.v2_cient_mock.GetProjectConfigsAsync.return_value = future(
         config_service_pb2.GetProjectConfigsResponse(configs=[
             config_service_pb2.Config(config_set='projects/chromium',
                                       revision='aaaaaaaa',
                                       content_sha256='deadbeef')
         ]))
-    self.v2_cient_mock.GetConfig.return_value = future(
+    self.v2_cient_mock.GetConfigAsync.return_value = future(
         config_service_pb2.Config(raw_content=b'a config'))
 
     configs = self.provider.get_project_configs_async('cfg').get_result()
 
     self.assertEqual(configs, {'projects/chromium': ('aaaaaaaa', 'a config')})
-    self.v2_cient_mock.GetProjectConfigs.assert_called_once_with(
+    self.v2_cient_mock.GetProjectConfigsAsync.assert_called_once_with(
         config_service_pb2.GetProjectConfigsRequest(
             path='cfg',
             fields=field_mask_pb2.FieldMask(
                 paths=['config_set', 'revision', 'content_sha256'])),
         credentials=mock.ANY,
     )
-    self.v2_cient_mock.GetConfig.assert_called_once_with(
+    self.v2_cient_mock.GetConfigAsync.assert_called_once_with(
         config_service_pb2.GetConfigRequest(
             content_sha256='deadbeef',
             fields=field_mask_pb2.FieldMask(paths=['content'])),
@@ -385,11 +385,11 @@ class RemoteTestCase(test_case.TestCase):
     # The 2nd call hits Memcache
     self.v2_cient_mock.reset_mock()
     self.assertEqual(configs, {'projects/chromium': ('aaaaaaaa', 'a config')})
-    self.assertFalse(self.v2_cient_mock.GetConfig.called)
+    self.assertFalse(self.v2_cient_mock.GetConfigAsync.called)
 
   def test_get_project_configs_async_v2_not_found(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetProjectConfigs.return_value = future(
+    self.v2_cient_mock.GetProjectConfigsAsync.return_value = future(
         config_service_pb2.GetProjectConfigsResponse())
 
     configs = self.provider.get_project_configs_async('cfg').get_result()
@@ -397,7 +397,7 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_project_configs_async_v2_rpc_err(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetProjectConfigs.side_effect = client.RpcError(
+    self.v2_cient_mock.GetProjectConfigsAsync.side_effect = client.RpcError(
         'Internal Error', codes.StatusCode.INTERNAL, {})
 
     with self.assertRaises(client.RpcError) as err:
@@ -424,12 +424,12 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_config_set_location_async_v2(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetConfigSet.return_value = future(
+    self.v2_cient_mock.GetConfigSetAsync.return_value = future(
         config_service_pb2.ConfigSet(url='http://example.com'))
 
     r = self.provider.get_config_set_location_async('services/abc').get_result()
     self.assertEqual(r, 'http://example.com')
-    self.v2_cient_mock.GetConfigSet.assert_called_once_with(
+    self.v2_cient_mock.GetConfigSetAsync.assert_called_once_with(
         config_service_pb2.GetConfigSetRequest(
             config_set='services/abc',
             fields=field_mask_pb2.FieldMask(paths=['url'])),
@@ -438,7 +438,7 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_config_set_location_async_v2_not_found(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetConfigSet.side_effect = client.RpcError(
+    self.v2_cient_mock.GetConfigSetAsync.side_effect = client.RpcError(
         'Not Found', codes.StatusCode.NOT_FOUND, {})
 
     r = self.provider.get_config_set_location_async('services/abc').get_result()
@@ -446,7 +446,7 @@ class RemoteTestCase(test_case.TestCase):
 
   def test_get_config_set_location_async_v2_rpc_err(self):
     self.provider.service_hostname = 'luci-config-v2.com'
-    self.v2_cient_mock.GetConfigSet.side_effect = client.RpcError(
+    self.v2_cient_mock.GetConfigSetAsync.side_effect = client.RpcError(
         'Internal Error', codes.StatusCode.INTERNAL, {})
 
     with self.assertRaises(client.RpcError) as err:

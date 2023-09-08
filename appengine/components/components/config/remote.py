@@ -115,7 +115,7 @@ class Provider(object):
     assert isinstance(req, config_service_pb2.GetConfigRequest), req
 
     try:
-      res = yield self._config_v2_client().GetConfig(
+      res = yield self._config_v2_client().GetConfigAsync(
           req, credentials=client.service_account_credentials())
     except client.RpcError as rpce:
       if rpce.status_code == codes.StatusCode.NOT_FOUND and allow_not_found:
@@ -274,7 +274,7 @@ class Provider(object):
       configs = res.get('configs', [])
     else:
       try:
-        res = yield self._config_v2_client().GetProjectConfigs(
+        res = yield self._config_v2_client().GetProjectConfigsAsync(
             config_service_pb2.GetProjectConfigsRequest(
                 path=cfg_path,
                 fields=field_mask_pb2.FieldMask(
@@ -325,7 +325,7 @@ class Provider(object):
       raise ndb.Return(res.get('projects', []))
 
     try:
-      res = yield self._config_v2_client().ListConfigSets(
+      res = yield self._config_v2_client().ListConfigSetsAsync(
           config_service_pb2.ListConfigSetsRequest(domain='PROJECT'),
           credentials=client.service_account_credentials())
     except client.RpcError as rpce:
@@ -360,7 +360,7 @@ class Provider(object):
           raise ndb.Return(entry.get('location'))
     else:
       try:
-        res = yield self._config_v2_client().GetConfigSet(
+        res = yield self._config_v2_client().GetConfigSetAsync(
             config_service_pb2.GetConfigSetRequest(
                 config_set=config_set,
                 fields=field_mask_pb2.FieldMask(paths=['url'])),
