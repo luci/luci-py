@@ -90,16 +90,6 @@ class TestMetrics(test_case.TestCase):
     self.now = datetime.datetime(2016, 4, 7)
     self.mock_now(self.now)
 
-  def test_pool_from_dimensions(self):
-    dimensions = {
-        u'os': [u'Linux', u'Ubuntu', u'Ubuntu-14.04'],
-        u'cpu': [u'x86', u'x86-64'],
-    }
-    dimensions.update(
-        {k: 'ignored' for k in ts_mon_metrics._IGNORED_DIMENSIONS})
-    expected = u'cpu:x86-64|os:Linux|os:Ubuntu-14.04'
-    self.assertEqual(expected, ts_mon_metrics._pool_from_dimensions(dimensions))
-
   def test_on_task_completed(self):
     tags = [
         'project:test_project',
@@ -199,7 +189,7 @@ class TestMetrics(test_case.TestCase):
     # Smoke test for syntax errors.
     ts_mon_metrics.initialize()
 
-  def test_set_global_metrics(self):
+  def test_set_jobs_metrics(self):
     tags = [
         'project:test_project',
         'subproject:test_subproject',
@@ -229,26 +219,7 @@ class TestMetrics(test_case.TestCase):
     summary_pending.bot_id = ''
     summary_pending.put()
 
-    _gen_bot_info('bot_ready', self.now).put()
-    _gen_bot_info('bot_running', self.now, task_id='deadbeef').put()
-    _gen_bot_info('bot_quarantined', self.now, quarantined=True).put()
-    _gen_bot_info('bot_dead', self.now - datetime.timedelta(days=365)).put()
-    _gen_bot_info(
-        'bot_maintenance', self.now, state={'maintenance': True}).put()
-    bots_expected = {
-        'bot_ready': 'ready',
-        'bot_running': 'running',
-        'bot_quarantined': 'quarantined',
-        'bot_dead': 'dead',
-        'bot_maintenance': 'maintenance'
-    }
-
-    _gen_bot_info('rbe_bot', self.now, state={
-        'rbe_instance': 'some/inst'
-    }).put()
-
-    ts_mon_metrics.set_global_metrics('jobs')
-    ts_mon_metrics.set_global_metrics('executors')
+    ts_mon_metrics.set_jobs_metrics()
 
     jobs_fields = {
         'project_id': 'test_project',
@@ -270,22 +241,6 @@ class TestMetrics(test_case.TestCase):
         2,
         ts_mon_metrics._jobs_active.get(
             fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
-
-    for bot_id, status in bots_expected.items():
-      target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
-      target_fields['hostname'] = 'autogen:' + bot_id
-      self.assertEqual(
-          status,
-          ts_mon_metrics._executors_status.get(target_fields=target_fields))
-
-      self.assertEqual(
-          'bot_id:%s|os:Linux|os:Ubuntu' % bot_id,
-          ts_mon_metrics._executors_pool.get(target_fields=target_fields))
-
-    self.assertEqual(
-        'some/inst',
-        ts_mon_metrics._executors_rbe.get(target_fields=dict(
-            ts_mon_metrics._TARGET_FIELDS, hostname='autogen:rbe_bot')))
 
   def test_on_task_expired(self):
     tags = [

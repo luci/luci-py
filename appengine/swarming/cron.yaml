@@ -95,11 +95,6 @@ cron:
   schedule: every 1 minutes
   target: backend
 
-- description: Send bot metrics
-  url: /internal/cron/monitoring/tsmon/executors
-  schedule: every 1 minutes
-  target: backend
-
 - description: Send task metrics
   url: /internal/cron/monitoring/tsmon/jobs
   schedule: every 1 minutes

@@ -176,30 +176,6 @@ _jobs_active = gae_ts_mon.GaugeMetric(
     ])
 
 
-# Global metric. Target field: hostname = 'autogen:<executor_id>' (bot id).
-_executors_pool = gae_ts_mon.StringMetric(
-    'executors/pool',
-    'Pool name for a given job executor.',
-    None)
-
-
-# Global metric. Target field: hostname = 'autogen:<executor_id>' (bot id).
-_executors_rbe = gae_ts_mon.StringMetric('executors/rbe',
-                                         'RBE instance of a job executor.',
-                                         None)
-
-
-# Global metric. Target fields:
-# - hostname = 'autogen:<executor_id>' (bot id).
-# Status value must be 'ready', 'running', or anything else, possibly
-# swarming-specific, when it cannot run a job. E.g. 'quarantined' or
-# 'dead'.
-_executors_status = gae_ts_mon.StringMetric(
-    'executors/status',
-    'Status of a job executor.',
-    None)
-
-
 # Instance metric. Metric fields:
 # - auth_method = one of 'luci_token', 'service_account', 'ip_whitelist'.
 # - condition = depends on the auth method (e.g. email for 'service_account').
@@ -314,88 +290,6 @@ _handler_timeouts = gae_ts_mon.CounterMetric(
 ### Private stuff.
 
 
-def _pool_from_dimensions(dimensions):
-  """Return a canonical string of flattened dimensions."""
-  pairs = []
-  for key, values in dimensions.items():
-    if key in _IGNORED_DIMENSIONS:
-      continue
-    # Strip all the prefixes of other values. values is already sorted.
-    for i, value in enumerate(values):
-      if not any(v.startswith(value) for v in values[i+1:]):
-        pairs.append(u'%s:%s' % (key, value))
-  return u'|'.join(sorted(pairs))
-
-
-def _set_jobs_metrics():
-  state_map = {
-      task_result.State.RUNNING: 'running',
-      task_result.State.PENDING: 'pending'
-  }
-  jobs_counts = defaultdict(lambda: 0)
-  jobs_total = 0
-
-  q = task_result.get_result_summaries_query(start=None,
-                                             end=None,
-                                             sort='created_ts',
-                                             state='pending_running',
-                                             tags=None)
-  cursor = None
-  more = True
-  while more:
-    summaries, cursor, more = q.fetch_page(5000, start_cursor=cursor)
-    for summary in summaries:
-      jobs_total += 1
-      status = state_map.get(summary.state, '')
-      tags_dict = _tags_to_dict(summary.tags)
-      fields = _extract_job_fields(tags_dict)
-      fields['status'] = status
-
-      key = tuple(sorted(fields.items()))
-      jobs_counts[key] += 1
-
-    logging.debug('_set_jobs_metrics: processed %d jobs', jobs_total)
-
-  target_fields = dict(_TARGET_FIELDS)
-
-  for key, count in jobs_counts.items():
-    _jobs_active.set(count, target_fields=target_fields, fields=dict(key))
-
-
-def _set_executors_metrics():
-  executors_count = 0
-
-  q = bot_management.BotInfo.query()
-  cursor = None
-  more = True
-  while more:
-    bots, cursor, more = q.fetch_page(5000, start_cursor=cursor)
-    for bot_info in bots:
-      executors_count += 1
-
-      status = 'ready'
-      if bot_info.task_id:
-        status = 'running'
-      elif bot_info.quarantined:
-        status = 'quarantined'
-      elif bot_info.is_dead:
-        status = 'dead'
-      elif bot_info.state and bot_info.state.get('maintenance', False):
-        status = 'maintenance'
-
-      rbe_instance = 'none'
-      if bot_info.state and 'rbe_instance' in bot_info.state:
-        rbe_instance = bot_info.state['rbe_instance'] or 'none'
-
-      target_fields = dict(_TARGET_FIELDS)
-      target_fields['hostname'] = 'autogen:' + bot_info.id
-
-      _executors_status.set(status, target_fields=target_fields)
-      _executors_pool.set(_pool_from_dimensions(bot_info.dimensions),
-                          target_fields=target_fields)
-      _executors_rbe.set(rbe_instance, target_fields=target_fields)
-
-    logging.debug('_set_executors_metrics: processed %d bots', executors_count)
 
 
 def _tags_to_dict(tags):
@@ -524,13 +418,39 @@ def on_bot_auth_success(auth_method, condition):
   })
 
 
-def set_global_metrics(kind):
-  if kind == 'jobs':
-    _set_jobs_metrics()
-  elif kind == 'executors':
-    _set_executors_metrics()
-  else:
-    logging.error('set_global_metrics(kind=%s): unknown kind.', kind)
+def set_jobs_metrics():
+  state_map = {
+      task_result.State.RUNNING: 'running',
+      task_result.State.PENDING: 'pending'
+  }
+  jobs_counts = defaultdict(lambda: 0)
+  jobs_total = 0
+
+  q = task_result.get_result_summaries_query(start=None,
+                                             end=None,
+                                             sort='created_ts',
+                                             state='pending_running',
+                                             tags=None)
+  cursor = None
+  more = True
+  while more:
+    summaries, cursor, more = q.fetch_page(5000, start_cursor=cursor)
+    for summary in summaries:
+      jobs_total += 1
+      status = state_map.get(summary.state, '')
+      tags_dict = _tags_to_dict(summary.tags)
+      fields = _extract_job_fields(tags_dict)
+      fields['status'] = status
+
+      key = tuple(sorted(fields.items()))
+      jobs_counts[key] += 1
+
+    logging.debug('_set_jobs_metrics: processed %d jobs', jobs_total)
+
+  target_fields = dict(_TARGET_FIELDS)
+
+  for key, count in jobs_counts.items():
+    _jobs_active.set(count, target_fields=target_fields, fields=dict(key))
 
 
 def on_task_status_change_pubsub_latency(tags, state, http_status_code,
@@ -596,8 +516,5 @@ def on_handler_timeout(endpoint, stage, exception):
 def initialize():
   # These metrics are the ones that are reset everything they are flushed.
   gae_ts_mon.register_global_metrics([
-      _executors_pool,
-      _executors_rbe,
-      _executors_status,
       _jobs_active,
   ])
