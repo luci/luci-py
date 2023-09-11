@@ -260,7 +260,8 @@ class TestCheckIdenticalRequest(test_case.TestCase):
             parent_run_id='123',
             agent_binary_cipd_filename='agent',
             agent_binary_cipd_pkg='agent/package/${platform}??',
-            agent_binary_cipd_vers='3'),
+            agent_binary_cipd_vers='3',
+            tags=['key:value', 'onlykey', '']),
         swarming_pb2.SwarmingTaskBackendConfig(priority=0)
         ]
     errors = api_helpers.validate_backend_configs(configs)
@@ -273,6 +274,8 @@ class TestCheckIdenticalRequest(test_case.TestCase):
          " string, got u\'bokbok\'")),
         (0, ("agent_binary_cipd_pkg must be a valid CIPD package name"
              " template, got \"agent/package/${platform}??\"")),
+        (0, "tag must be in key:value form, not onlykey"),
+        (0, "tag must be in key:value form, not "),
         (1, "bot_ping_tolerance (0) must range between 60 and 1200"),
         (1, ("agent_binary_cipd_pkg must be a valid CIPD package name"
              " template, got \"\"")),

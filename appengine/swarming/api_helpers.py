@@ -201,4 +201,8 @@ def validate_backend_configs(configs):
     if not cfg.agent_binary_cipd_filename:
       errors.append((i, 'missing `agent_binary_cipd_filename`'))
 
+    for tag in cfg.tags:
+      if ':' not in tag:
+        errors.append((i, 'tag must be in key:value form, not {}'.format(tag)))
+
   return errors

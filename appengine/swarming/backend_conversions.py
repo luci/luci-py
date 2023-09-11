@@ -70,7 +70,9 @@ def compute_task_request(run_task_req):
       priority=backend_config.priority,
       bot_ping_tolerance_secs=backend_config.bot_ping_tolerance,
       service_account=backend_config.service_account,
-      has_build_task=True)
+      has_build_task=True,
+      # backend_config.tags is a list of unicode strings, so convert it.
+      tags=[str(t) for t in backend_config.tags])
 
   parent_id = backend_config.parent_run_id
   if parent_id:

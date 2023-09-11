@@ -80,6 +80,13 @@ class TestBackendConversions(test_case.TestCase):
                 struct_pb2.Value(string_value='agent/package/${platform}'),
                 'agent_binary_cipd_vers':
                 struct_pb2.Value(string_value='latest'),
+                'tags':
+                  struct_pb2.Value(list_value=struct_pb2.ListValue(
+                      values=[
+                          struct_pb2.Value(string_value ='k1:v1'),
+                          struct_pb2.Value(string_value ='k2:v2'),
+                      ],
+                  )),
             }),
         grace_period=duration_pb2.Duration(seconds=grace_secs),
         execution_timeout=duration_pb2.Duration(seconds=exec_secs),
@@ -120,7 +127,9 @@ class TestBackendConversions(test_case.TestCase):
         bot_ping_tolerance_secs=70,
         service_account='who@serviceaccount.com',
         parent_task_id=parent_task_id,
-        has_build_task=True)
+        has_build_task=True,
+        tags=['k1:v1', 'k2:v2']
+    )
 
     expected_sb = task_request.SecretBytes(
         secret_bytes=run_task_req.secrets.SerializeToString())
