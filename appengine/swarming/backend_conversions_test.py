@@ -128,8 +128,7 @@ class TestBackendConversions(test_case.TestCase):
         service_account='who@serviceaccount.com',
         parent_task_id=parent_task_id,
         has_build_task=True,
-        tags=['k1:v1', 'k2:v2']
-    )
+        manual_tags=['k1:v1', 'k2:v2'])
 
     expected_sb = task_request.SecretBytes(
         secret_bytes=run_task_req.secrets.SerializeToString())
