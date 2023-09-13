@@ -850,7 +850,7 @@ class Claim(object):
   __slots__ = ('_key', '_expiry', '_released')
 
   @classmethod
-  def obtain(cls, to_run_key, duration=15):
+  def obtain(cls, to_run_key, duration=60):
     """Atomically marks a TaskToRunShard as "claimed" in the memcache.
 
     Returns a Claim object if TaskToRunShard was claimed by the caller, or None
@@ -945,7 +945,7 @@ def yield_next_available_task_to_dispatch(bot_id, pool, queues,
     for ttr in _yield_potential_tasks(bot_id, pool, queues, stats,
                                       bot_dims_matcher, deadline):
       # Try to claim this TaskToRunShard. Only one bot will pass this. It then
-      # will have ~15s to submit a transaction that assigns the TaskToRunShard
+      # will have ~60s to submit a transaction that assigns the TaskToRunShard
       # to this bot before another bot will be able to try that.
       if Claim.obtain(ttr.key):
         logging.debug(
@@ -953,6 +953,10 @@ def yield_next_available_task_to_dispatch(bot_id, pool, queues,
             bot_id, ttr.task_id)
         stats.visited += 1
         yield ttr
+      else:
+        logging.debug(
+            'yield_next_available_task_to_dispatch(%s): skipping claimed %s',
+            bot_id, ttr.task_id)
   finally:
     logging.debug(
         'yield_next_available_task_to_dispatch(%s) in %.3fs: %s',
