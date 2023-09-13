@@ -262,8 +262,16 @@ class TestCheckIdenticalRequest(test_case.TestCase):
             agent_binary_cipd_pkg='agent/package/${platform}??',
             agent_binary_cipd_vers='3',
             tags=['key:value', 'onlykey', '']),
-        swarming_pb2.SwarmingTaskBackendConfig(priority=0)
-        ]
+        swarming_pb2.SwarmingTaskBackendConfig(
+            priority=0,
+            bot_ping_tolerance=task_request._MIN_BOT_PING_TOLERANCE_SECS - 1,
+        ),
+        swarming_pb2.SwarmingTaskBackendConfig(
+            agent_binary_cipd_pkg='agent/package/${platform}',
+            agent_binary_cipd_vers='latest',
+            agent_binary_cipd_filename='cmd',
+        )
+    ]
     errors = api_helpers.validate_backend_configs(configs)
 
     expected_errors = [
@@ -271,12 +279,12 @@ class TestCheckIdenticalRequest(test_case.TestCase):
         (0, "bot_ping_tolerance (1201) must range between 60 and 1200"),
         (0, "parent_run_id (123) got error: Invalid key u'12'"),
         (0, ("service_account must be an email, \"bot\" or \"none\""
-         " string, got u\'bokbok\'")),
+             " string, got u\'bokbok\'")),
         (0, ("agent_binary_cipd_pkg must be a valid CIPD package name"
              " template, got \"agent/package/${platform}??\"")),
         (0, "tag must be in key:value form, not onlykey"),
         (0, "tag must be in key:value form, not "),
-        (1, "bot_ping_tolerance (0) must range between 60 and 1200"),
+        (1, "bot_ping_tolerance (59) must range between 60 and 1200"),
         (1, ("agent_binary_cipd_pkg must be a valid CIPD package name"
              " template, got \"\"")),
         (1, "agent_binary_cipd_vers must be a valid package version, got \"\""),

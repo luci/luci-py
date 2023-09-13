@@ -167,6 +167,8 @@ def validate_backend_configs(configs):
     except (datastore_errors.BadValueError, TypeError) as e:
       errors.append((i, e.message))
 
+    if cfg.bot_ping_tolerance == 0:
+      cfg.bot_ping_tolerance = task_request.DEFAULT_BOT_PING_TOLERANCE
     try:
       task_request.validate_ping_tolerance(
           'bot_ping_tolerance', cfg.bot_ping_tolerance)
