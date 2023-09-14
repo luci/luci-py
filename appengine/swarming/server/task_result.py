@@ -1745,31 +1745,37 @@ def task_bq_summary(start, end):
 
 
 def fetch_task_results(task_ids):
-  # type: (Sequence[str]) ->
-  #     Sequence[Union[task_result._TaskResultCommon, None]]
   """Returns the task results for the given tasks in the same order.
 
   Raises:
     ValueError if any task_id is in an unexpected format.
   """
-  result_keys = [
+  return fetch_task_result_summaries([
       task_pack.get_request_and_result_keys(task_id)[1] for task_id in task_ids
-  ]
+  ])
+
+
+def fetch_task_result_summaries(keys):
+  """Fetches a bunch of TaskResultSummary given their keys."""
+
+  # TODO(vadimsh): This memcache business is most likely FUD and it would be
+  # sufficient just to do a regular ndb.get_multi(...).
 
   # Hot path. Fetch everything we can from memcache.
-  task_results = ndb.get_multi(result_keys, use_datastore=False)
+  results = ndb.get_multi(keys, use_cache=False, use_datastore=False)
 
-  # Fetch ones in a non-stable state or not in memcache.
-  missing_keys = [
-      result_keys[i]
-      for i, result in enumerate(task_results)
-      if result is None or result.state in State.STATES_RUNNING
-  ]
-  if missing_keys:
-    more_results = ndb.get_multi(
-        missing_keys, use_cache=False, use_memcache=False)
-    for i, result in enumerate(task_results):
-      if result is None or result.state in State.STATES_RUNNING:
-        task_results[i] = more_results.pop(0)
+  # Find which results need to be fetched from the datastore.
+  fetch = []
+  index = []
+  for idx, result in enumerate(results):
+    if result is None or result.state in State.STATES_RUNNING:
+      fetch.append(keys[idx])
+      index.append(idx)
 
-  return task_results
+  # Fetch missing results from datastore in inject into correct positions.
+  if fetch:
+    more = ndb.get_multi(fetch, use_cache=False, use_memcache=False)
+    for idx, result in zip(index, more):
+      results[idx] = result
+
+  return results

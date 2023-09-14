@@ -9,11 +9,13 @@ import logging
 
 from google.appengine.api import datastore_errors
 from google.protobuf import empty_pb2
+from google.rpc import status_pb2
 
 from components import auth
 from components import ereporter2
 from components import prpc
 from components import utils
+from components.prpc import codes
 from proto.api_v2 import swarming_pb2
 from proto.api_v2 import swarming_prpc_pb2
 from proto.internals import rbe_pb2
@@ -21,6 +23,7 @@ from proto.internals import rbe_prpc_pb2
 from server import acl
 from server import bot_code
 from server import config
+from server import task_pack
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
@@ -202,6 +205,78 @@ class TasksService(object):
                                                   api_common.VIEW, False)
     return message_conversion_prpc.task_result_response(
         result, request.include_performance_stats)
+
+  @prpc_helpers.method
+  @auth.require(acl.can_access, log_identity=True)
+  def BatchGetResult(self, request, _context):
+    if not request.task_ids:
+      raise handlers_exceptions.BadRequestException('Task IDs list is empty')
+
+    # Must have no dups.
+    seen = set()
+    for task_id in request.task_ids:
+      if task_id in seen:
+        raise handlers_exceptions.BadRequestException(
+            'Duplicate ID in the task IDs list: %s' % task_id)
+      seen.add(task_id)
+
+    # The response being assembled. Each item is ResultOrError or None.
+    results = [None] * len(request.task_ids)
+
+    # Writes ResultOrError that carries an error.
+    def error(idx, code, message):
+      assert results[idx] is None
+      results[idx] = swarming_pb2.BatchGetResultResponse.ResultOrError(
+          task_id=request.task_ids[idx],
+          error=status_pb2.Status(
+              code=code.value,
+              message=message,
+          ),
+      )
+
+    # Writes ResultOrError that carries a task result.
+    def result(idx, summary):
+      assert results[idx] is None
+      result_pb = message_conversion_prpc.task_result_response(
+          summary, request.include_performance_stats)
+      assert result_pb.task_id == request.task_ids[idx]
+      results[idx] = swarming_pb2.BatchGetResultResponse.ResultOrError(
+          task_id=request.task_ids[idx],
+          result=result_pb)
+
+    # Get TaskResultSummary keys of all recognized task IDs.
+    keys = []
+    indx = []
+    for idx, task_id in enumerate(request.task_ids):
+      try:
+        keys.append(task_pack.unpack_result_summary_key(task_id))
+        indx.append(idx)
+      except ValueError as exc:
+        error(
+            idx, codes.StatusCode.INVALID_ARGUMENT,
+            'Bad task ID "%s": %s' % (task_id, exc))
+
+    # ACL check predicate.
+    if acl.can_view_all_tasks():
+      check_visible = lambda _summary: True
+    else:
+      # TODO(vadimsh): Implement. Depends on propagating `realm` and `pools`
+      # into TaskResultSummary.
+      check_visible = lambda _summary: False
+
+    # Fetch result summaries of all tasks or discover they are missing.
+    summaries = task_result.fetch_task_result_summaries(keys)
+    for idx, summary in zip(indx, summaries):
+      if not summary:
+        error(idx, codes.StatusCode.NOT_FOUND, 'No such task')
+      elif not check_visible(summary):
+        error(
+            idx, codes.StatusCode.PERMISSION_DENIED,
+            'No access to see the status of this task')
+      else:
+        result(idx, summary)
+
+    return swarming_pb2.BatchGetResultResponse(results=results)
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)

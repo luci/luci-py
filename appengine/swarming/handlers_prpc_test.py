@@ -2431,26 +2431,35 @@ class TaskServicePrpcTest(PrpcTest):
     _verify([2, 1, 0])
     _verify([0], tags=["a:1"])
 
-  def test_list_task_states_ok(self):
-    self.set_as_privileged_user()
+  def setup_completed_and_running(self):
     ticker = test_case.Ticker(self.now)
     self.mock_now(ticker())
+
+    self.set_as_privileged_user()
     ntr = self._new_task_request_prpc(use_default_slice=True)
     ntr.tags[:] = ["t:1"]
     ntr.name = "first"
-    _, first_id = self._client_create_task_prpc(ntr)
-    self.mock_now(ticker())
+    _, completed_id = self._client_create_task_prpc(ntr)
+
+    # This should consume and complete completed_id.
     self.set_as_bot()
     self.bot_poll()
     self.bot_run_task()
     self.set_as_privileged_user()
+
+    self.set_as_privileged_user()
     ntr = self._new_task_request_prpc(use_default_slice=True)
     ntr.tags[:] = ["t:2"]
     ntr.name = "second"
-    _, second_id = self._client_create_task_prpc(ntr)
+    _, pending_id = self._client_create_task_prpc(ntr)
+
+    return completed_id, pending_id
+
+  def test_list_task_states_ok(self):
+    completed_id, pending_id = self.setup_completed_and_running()
 
     request = swarming_pb2.TaskStatesRequest(
-        task_id=[first_id, second_id, '1d69b9f088008810'])
+        task_id=[completed_id, pending_id, '1d69b9f088008810'])
     response = self.post_prpc('ListTaskStates', request)
     actual = swarming_pb2.TaskStates()
     _decode(response.body, actual)
@@ -2468,6 +2477,39 @@ class TaskServicePrpcTest(PrpcTest):
     expected_error = cgi.escape("Invalid task_id: Invalid key u'invali'",
                                 quote=True)
     self.assertEqual(expected_error, response.body)
+
+  def test_batch_get_result(self):
+    completed_id, pending_id = self.setup_completed_and_running()
+    run_result_id = completed_id[:-1] + '1'
+
+    request = swarming_pb2.BatchGetResultRequest(
+        task_ids=[
+            completed_id,
+            pending_id,
+            '1d69b9f088008810',
+            run_result_id,  # won't work, need summary ID
+        ])
+    response = self.post_prpc('BatchGetResult', request)
+    actual = swarming_pb2.BatchGetResultResponse()
+    _decode(response.body, actual)
+
+    extract = []
+    for res in actual.results:
+      if res.HasField('error'):
+        extract.append((res.task_id, res.error.message))
+      else:
+        self.assertEqual(res.task_id, res.result.task_id)
+        extract.append((res.task_id, res.result.state))
+
+    self.assertEqual(extract, [
+        (completed_id, swarming_pb2.COMPLETED),
+        (pending_id, swarming_pb2.PENDING),
+        ('1d69b9f088008810', 'No such task'),
+        (run_result_id,
+            'Bad task ID "%s": Can\'t reference to a specific try result.'
+            % run_result_id,
+        ),
+    ])
 
 
 class InternalsServicePrpcTest(PrpcTest):

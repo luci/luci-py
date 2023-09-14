@@ -1295,6 +1295,10 @@ class TaskResultApiTest(TestCase):
         results,
         [running_res, pending_res, running_res_cache, pending_res_cache, None])
 
+  def test_fetch_task_result_summaries(self):
+    # Tested by test_fetch_task_results already.
+    pass
+
 
 class TestOutput(TestCase):
 
