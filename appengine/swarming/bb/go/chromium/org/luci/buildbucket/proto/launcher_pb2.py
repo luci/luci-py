@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n5go.chromium.org/luci/buildbucket/proto/launcher.proto\x12\x0e\x62uildbucket.v2\x1a\x32go.chromium.org/luci/buildbucket/proto/build.proto\"h\n\x0c\x42uildSecrets\x12\x13\n\x0b\x62uild_token\x18\x01 \x01(\t\x12(\n resultdb_invocation_update_token\x18\x02 \x01(\t\x12\x19\n\x11start_build_token\x18\x03 \x01(\t\"\x98\x01\n\x0b\x42\x42\x41gentArgs\x12\x17\n\x0f\x65xecutable_path\x18\x01 \x01(\t\x12\x14\n\x0cpayload_path\x18\x05 \x01(\t\x12\x11\n\tcache_dir\x18\x02 \x01(\t\x12!\n\x19known_public_gerrit_hosts\x18\x03 \x03(\t\x12$\n\x05\x62uild\x18\x04 \x01(\x0b\x32\x15.buildbucket.v2.BuildB6Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
+  serialized_pb=b'\n5go.chromium.org/luci/buildbucket/proto/launcher.proto\x12\x0e\x62uildbucket.v2\x1a\x32go.chromium.org/luci/buildbucket/proto/build.proto\"h\n\x0c\x42uildSecrets\x12\x13\n\x0b\x62uild_token\x18\x01 \x01(\t\x12(\n resultdb_invocation_update_token\x18\x02 \x01(\t\x12\x19\n\x11start_build_token\x18\x03 \x01(\t\"\x98\x01\n\x0b\x42\x42\x41gentArgs\x12\x17\n\x0f\x65xecutable_path\x18\x01 \x01(\t\x12\x14\n\x0cpayload_path\x18\x05 \x01(\t\x12\x11\n\tcache_dir\x18\x02 \x01(\t\x12!\n\x19known_public_gerrit_hosts\x18\x03 \x03(\t\x12$\n\x05\x62uild\x18\x04 \x01(\x0b\x32\x15.buildbucket.v2.Build\"Y\n\x17\x42uildbucketAgentContext\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12-\n\x07secrets\x18\x02 \x01(\x0b\x32\x1c.buildbucket.v2.BuildSecretsB6Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
   ,
   dependencies=[go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_build__pb2.DESCRIPTOR,])
 
@@ -132,9 +132,50 @@ _BBAGENTARGS = _descriptor.Descriptor(
   serialized_end=384,
 )
 
+
+_BUILDBUCKETAGENTCONTEXT = _descriptor.Descriptor(
+  name='BuildbucketAgentContext',
+  full_name='buildbucket.v2.BuildbucketAgentContext',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='task_id', full_name='buildbucket.v2.BuildbucketAgentContext.task_id', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='secrets', full_name='buildbucket.v2.BuildbucketAgentContext.secrets', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=386,
+  serialized_end=475,
+)
+
 _BBAGENTARGS.fields_by_name['build'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_build__pb2._BUILD
+_BUILDBUCKETAGENTCONTEXT.fields_by_name['secrets'].message_type = _BUILDSECRETS
 DESCRIPTOR.message_types_by_name['BuildSecrets'] = _BUILDSECRETS
 DESCRIPTOR.message_types_by_name['BBAgentArgs'] = _BBAGENTARGS
+DESCRIPTOR.message_types_by_name['BuildbucketAgentContext'] = _BUILDBUCKETAGENTCONTEXT
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 BuildSecrets = _reflection.GeneratedProtocolMessageType('BuildSecrets', (_message.Message,), {
@@ -150,6 +191,13 @@ BBAgentArgs = _reflection.GeneratedProtocolMessageType('BBAgentArgs', (_message.
   # @@protoc_insertion_point(class_scope:buildbucket.v2.BBAgentArgs)
   })
 _sym_db.RegisterMessage(BBAgentArgs)
+
+BuildbucketAgentContext = _reflection.GeneratedProtocolMessageType('BuildbucketAgentContext', (_message.Message,), {
+  'DESCRIPTOR' : _BUILDBUCKETAGENTCONTEXT,
+  '__module__' : 'go.chromium.org.luci.buildbucket.proto.launcher_pb2'
+  # @@protoc_insertion_point(class_scope:buildbucket.v2.BuildbucketAgentContext)
+  })
+_sym_db.RegisterMessage(BuildbucketAgentContext)
 
 
 DESCRIPTOR._options = None

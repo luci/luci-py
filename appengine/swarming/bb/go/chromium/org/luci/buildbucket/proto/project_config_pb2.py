@@ -25,7 +25,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb\242\376#B\n@https://luci-config.appspot.com/schemas/projects:buildbucket.cfg',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n;go.chromium.org/luci/buildbucket/proto/project_config.proto\x12\x0b\x62uildbucket\x1a\x1egoogle/protobuf/duration.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a/go.chromium.org/luci/common/proto/options.proto\x1a\x37go.chromium.org/luci/resultdb/proto/v1/invocation.proto\"\x86\x01\n\x03\x41\x63l\x12\'\n\x04role\x18\x01 \x01(\x0e\x32\x15.buildbucket.Acl.RoleB\x02\x18\x01\x12\x11\n\x05group\x18\x02 \x01(\tB\x02\x18\x01\x12\x14\n\x08identity\x18\x03 \x01(\tB\x02\x18\x01\"-\n\x04Role\x12\n\n\x06READER\x10\x00\x12\r\n\tSCHEDULER\x10\x01\x12\n\n\x06WRITER\x10\x02\"\xd0\x10\n\rBuilderConfig\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x33\n\x07\x62\x61\x63kend\x18  \x01(\x0b\x32\".buildbucket.BuilderConfig.Backend\x12\x37\n\x0b\x62\x61\x63kend_alt\x18! \x01(\x0b\x32\".buildbucket.BuilderConfig.Backend\x12\x15\n\rswarming_host\x18\x15 \x01(\t\x12\x10\n\x08\x63\x61tegory\x18\x06 \x01(\t\x12\x15\n\rswarming_tags\x18\x02 \x03(\t\x12\x12\n\ndimensions\x18\x03 \x03(\t\x12\x31\n\x06recipe\x18\x04 \x01(\x0b\x32!.buildbucket.BuilderConfig.Recipe\x12\'\n\x03\x65xe\x18\x17 \x01(\x0b\x32\x1a.buildbucket.v2.Executable\x12\x18\n\nproperties\x18\x18 \x01(\tB\x04\xa8\xfe#\x01\x12\"\n\x1a\x61llowed_property_overrides\x18\" \x03(\t\x12\x10\n\x08priority\x18\x05 \x01(\r\x12\x1e\n\x16\x65xecution_timeout_secs\x18\x07 \x01(\r\x12\x17\n\x0f\x65xpiration_secs\x18\x14 \x01(\r\x12/\n\x0cgrace_period\x18\x1f \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x32\n\x11wait_for_capacity\x18\x1d \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12\x35\n\x06\x63\x61\x63hes\x18\t \x03(\x0b\x32%.buildbucket.BuilderConfig.CacheEntry\x12*\n\rbuild_numbers\x18\x10 \x01(\x0e\x32\x13.buildbucket.Toggle\x12\x17\n\x0fservice_account\x18\x0c \x01(\t\x12\x33\n\x16\x61uto_builder_dimension\x18\x11 \x01(\x0e\x32\x13.buildbucket.Toggle\x12)\n\x0c\x65xperimental\x18\x12 \x01(\x0e\x32\x13.buildbucket.Toggle\x12\x45\n\x1ftask_template_canary_percentage\x18\x16 \x01(\x0b\x32\x1c.google.protobuf.UInt32Value\x12@\n\x0b\x65xperiments\x18\x1c \x03(\x0b\x32+.buildbucket.BuilderConfig.ExperimentsEntry\x12)\n\x08\x63ritical\x18\x19 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12\x35\n\x08resultdb\x18\x1a \x01(\x0b\x32#.buildbucket.BuilderConfig.ResultDB\x12\x18\n\x10\x64\x65scription_html\x18\x1e \x01(\t\x12W\n\x1ashadow_builder_adjustments\x18# \x01(\x0b\x32\x33.buildbucket.BuilderConfig.ShadowBuilderAdjustments\x12*\n\tretriable\x18$ \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12S\n\x1c\x62uilder_health_metrics_links\x18% \x01(\x0b\x32-.buildbucket.BuilderConfig.BuilderHealthLinks\x1a[\n\nCacheEntry\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12 \n\x18wait_for_warm_cache_secs\x18\x03 \x01(\x05\x12\x0f\n\x07\x65nv_var\x18\x04 \x01(\t\x1ar\n\x06Recipe\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x14\n\x0c\x63ipd_package\x18\x06 \x01(\t\x12\x14\n\x0c\x63ipd_version\x18\x05 \x01(\t\x12\x12\n\nproperties\x18\x03 \x03(\t\x12\x14\n\x0cproperties_j\x18\x04 \x03(\tJ\x04\x08\x01\x10\x02\x1a\x8b\x01\n\x08ResultDB\x12\x0e\n\x06\x65nable\x18\x01 \x01(\x08\x12\x34\n\nbq_exports\x18\x02 \x03(\x0b\x32 .luci.resultdb.v1.BigQueryExport\x12\x39\n\x0fhistory_options\x18\x03 \x01(\x0b\x32 .luci.resultdb.v1.HistoryOptions\x1a\x34\n\x07\x42\x61\x63kend\x12\x0e\n\x06target\x18\x01 \x01(\t\x12\x19\n\x0b\x63onfig_json\x18\x02 \x01(\tB\x04\xa8\xfe#\x01\x1a\x32\n\x10\x45xperimentsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x1a[\n\x18ShadowBuilderAdjustments\x12\x17\n\x0fservice_account\x18\x01 \x01(\t\x12\x0c\n\x04pool\x18\x02 \x01(\t\x12\x18\n\nproperties\x18\x03 \x01(\tB\x04\xa8\xfe#\x01\x1a\x99\x02\n\x12\x42uilderHealthLinks\x12N\n\tdoc_links\x18\x01 \x03(\x0b\x32;.buildbucket.BuilderConfig.BuilderHealthLinks.DocLinksEntry\x12P\n\ndata_links\x18\x02 \x03(\x0b\x32<.buildbucket.BuilderConfig.BuilderHealthLinks.DataLinksEntry\x1a/\n\rDocLinksEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x30\n\x0e\x44\x61taLinksEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01J\x04\x08\x08\x10\tJ\x04\x08\x0b\x10\x0cJ\x04\x08\r\x10\x0eJ\x04\x08\x0f\x10\x10J\x04\x08\x13\x10\x14J\x04\x08\x1b\x10\x1cJ\x04\x08\n\x10\x0b\"\x91\x01\n\x08Swarming\x12,\n\x08\x62uilders\x18\x04 \x03(\x0b\x32\x1a.buildbucket.BuilderConfig\x12\x45\n\x1ftask_template_canary_percentage\x18\x05 \x01(\x0b\x32\x1c.google.protobuf.UInt32ValueJ\x04\x08\x01\x10\x02J\x04\x08\x02\x10\x03J\x04\x08\x03\x10\x04\"\xcf\x02\n\x06\x42ucket\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\"\n\x04\x61\x63ls\x18\x02 \x03(\x0b\x32\x10.buildbucket.AclB\x02\x18\x01\x12\'\n\x08swarming\x18\x03 \x01(\x0b\x32\x15.buildbucket.Swarming\x12\x0e\n\x06shadow\x18\x05 \x01(\t\x12\x34\n\x0b\x63onstraints\x18\x06 \x01(\x0b\x32\x1f.buildbucket.Bucket.Constraints\x12L\n\x18\x64ynamic_builder_template\x18\x07 \x01(\x0b\x32*.buildbucket.Bucket.DynamicBuilderTemplate\x1a\x36\n\x0b\x43onstraints\x12\r\n\x05pools\x18\x01 \x03(\t\x12\x18\n\x10service_accounts\x18\x02 \x03(\t\x1a\x18\n\x16\x44ynamicBuilderTemplateJ\x04\x08\x04\x10\x05\"\xa9\x02\n\x0e\x42uildbucketCfg\x12$\n\x07\x62uckets\x18\x01 \x03(\x0b\x32\x13.buildbucket.Bucket\x12?\n\rcommon_config\x18\x05 \x01(\x0b\x32(.buildbucket.BuildbucketCfg.CommonConfig\x1aG\n\x05Topic\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x30\n\x0b\x63ompression\x18\x02 \x01(\x0e\x32\x1b.buildbucket.v2.Compression\x1aU\n\x0c\x43ommonConfig\x12\x45\n\x1a\x62uilds_notification_topics\x18\x01 \x03(\x0b\x32!.buildbucket.BuildbucketCfg.TopicJ\x04\x08\x02\x10\x03J\x04\x08\x03\x10\x04J\x04\x08\x04\x10\x05*$\n\x06Toggle\x12\t\n\x05UNSET\x10\x00\x12\x07\n\x03YES\x10\x01\x12\x06\n\x02NO\x10\x02\x42|Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb\xa2\xfe#B\n@https://luci-config.appspot.com/schemas/projects:buildbucket.cfgb\x06proto3'
+  serialized_pb=b'\n;go.chromium.org/luci/buildbucket/proto/project_config.proto\x12\x0b\x62uildbucket\x1a\x1egoogle/protobuf/duration.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a/go.chromium.org/luci/common/proto/options.proto\x1a\x37go.chromium.org/luci/resultdb/proto/v1/invocation.proto\"\x86\x01\n\x03\x41\x63l\x12\'\n\x04role\x18\x01 \x01(\x0e\x32\x15.buildbucket.Acl.RoleB\x02\x18\x01\x12\x11\n\x05group\x18\x02 \x01(\tB\x02\x18\x01\x12\x14\n\x08identity\x18\x03 \x01(\tB\x02\x18\x01\"-\n\x04Role\x12\n\n\x06READER\x10\x00\x12\r\n\tSCHEDULER\x10\x01\x12\n\n\x06WRITER\x10\x02\"\x80\x11\n\rBuilderConfig\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x33\n\x07\x62\x61\x63kend\x18  \x01(\x0b\x32\".buildbucket.BuilderConfig.Backend\x12\x37\n\x0b\x62\x61\x63kend_alt\x18! \x01(\x0b\x32\".buildbucket.BuilderConfig.Backend\x12\x15\n\rswarming_host\x18\x15 \x01(\t\x12\x10\n\x08\x63\x61tegory\x18\x06 \x01(\t\x12\x15\n\rswarming_tags\x18\x02 \x03(\t\x12\x12\n\ndimensions\x18\x03 \x03(\t\x12\x31\n\x06recipe\x18\x04 \x01(\x0b\x32!.buildbucket.BuilderConfig.Recipe\x12\'\n\x03\x65xe\x18\x17 \x01(\x0b\x32\x1a.buildbucket.v2.Executable\x12\x18\n\nproperties\x18\x18 \x01(\tB\x04\xa8\xfe#\x01\x12\"\n\x1a\x61llowed_property_overrides\x18\" \x03(\t\x12\x10\n\x08priority\x18\x05 \x01(\r\x12\x1e\n\x16\x65xecution_timeout_secs\x18\x07 \x01(\r\x12\x17\n\x0f\x65xpiration_secs\x18\x14 \x01(\r\x12/\n\x0cgrace_period\x18\x1f \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x32\n\x11wait_for_capacity\x18\x1d \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12\x35\n\x06\x63\x61\x63hes\x18\t \x03(\x0b\x32%.buildbucket.BuilderConfig.CacheEntry\x12*\n\rbuild_numbers\x18\x10 \x01(\x0e\x32\x13.buildbucket.Toggle\x12\x17\n\x0fservice_account\x18\x0c \x01(\t\x12\x33\n\x16\x61uto_builder_dimension\x18\x11 \x01(\x0e\x32\x13.buildbucket.Toggle\x12)\n\x0c\x65xperimental\x18\x12 \x01(\x0e\x32\x13.buildbucket.Toggle\x12\x45\n\x1ftask_template_canary_percentage\x18\x16 \x01(\x0b\x32\x1c.google.protobuf.UInt32Value\x12@\n\x0b\x65xperiments\x18\x1c \x03(\x0b\x32+.buildbucket.BuilderConfig.ExperimentsEntry\x12)\n\x08\x63ritical\x18\x19 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12\x35\n\x08resultdb\x18\x1a \x01(\x0b\x32#.buildbucket.BuilderConfig.ResultDB\x12\x18\n\x10\x64\x65scription_html\x18\x1e \x01(\t\x12W\n\x1ashadow_builder_adjustments\x18# \x01(\x0b\x32\x33.buildbucket.BuilderConfig.ShadowBuilderAdjustments\x12*\n\tretriable\x18$ \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12S\n\x1c\x62uilder_health_metrics_links\x18% \x01(\x0b\x32-.buildbucket.BuilderConfig.BuilderHealthLinks\x12\x1a\n\x12\x63ontact_team_email\x18& \x01(\t\x1a[\n\nCacheEntry\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12 \n\x18wait_for_warm_cache_secs\x18\x03 \x01(\x05\x12\x0f\n\x07\x65nv_var\x18\x04 \x01(\t\x1ar\n\x06Recipe\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x14\n\x0c\x63ipd_package\x18\x06 \x01(\t\x12\x14\n\x0c\x63ipd_version\x18\x05 \x01(\t\x12\x12\n\nproperties\x18\x03 \x03(\t\x12\x14\n\x0cproperties_j\x18\x04 \x03(\tJ\x04\x08\x01\x10\x02\x1a\x8b\x01\n\x08ResultDB\x12\x0e\n\x06\x65nable\x18\x01 \x01(\x08\x12\x34\n\nbq_exports\x18\x02 \x03(\x0b\x32 .luci.resultdb.v1.BigQueryExport\x12\x39\n\x0fhistory_options\x18\x03 \x01(\x0b\x32 .luci.resultdb.v1.HistoryOptions\x1a\x34\n\x07\x42\x61\x63kend\x12\x0e\n\x06target\x18\x01 \x01(\t\x12\x19\n\x0b\x63onfig_json\x18\x02 \x01(\tB\x04\xa8\xfe#\x01\x1a\x32\n\x10\x45xperimentsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x1ao\n\x18ShadowBuilderAdjustments\x12\x17\n\x0fservice_account\x18\x01 \x01(\t\x12\x0c\n\x04pool\x18\x02 \x01(\t\x12\x18\n\nproperties\x18\x03 \x01(\tB\x04\xa8\xfe#\x01\x12\x12\n\ndimensions\x18\x04 \x03(\t\x1a\x99\x02\n\x12\x42uilderHealthLinks\x12N\n\tdoc_links\x18\x01 \x03(\x0b\x32;.buildbucket.BuilderConfig.BuilderHealthLinks.DocLinksEntry\x12P\n\ndata_links\x18\x02 \x03(\x0b\x32<.buildbucket.BuilderConfig.BuilderHealthLinks.DataLinksEntry\x1a/\n\rDocLinksEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x30\n\x0e\x44\x61taLinksEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01J\x04\x08\x08\x10\tJ\x04\x08\x0b\x10\x0cJ\x04\x08\r\x10\x0eJ\x04\x08\x0f\x10\x10J\x04\x08\x13\x10\x14J\x04\x08\x1b\x10\x1cJ\x04\x08\n\x10\x0b\"\x91\x01\n\x08Swarming\x12,\n\x08\x62uilders\x18\x04 \x03(\x0b\x32\x1a.buildbucket.BuilderConfig\x12\x45\n\x1ftask_template_canary_percentage\x18\x05 \x01(\x0b\x32\x1c.google.protobuf.UInt32ValueJ\x04\x08\x01\x10\x02J\x04\x08\x02\x10\x03J\x04\x08\x03\x10\x04\"\xcf\x02\n\x06\x42ucket\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\"\n\x04\x61\x63ls\x18\x02 \x03(\x0b\x32\x10.buildbucket.AclB\x02\x18\x01\x12\'\n\x08swarming\x18\x03 \x01(\x0b\x32\x15.buildbucket.Swarming\x12\x0e\n\x06shadow\x18\x05 \x01(\t\x12\x34\n\x0b\x63onstraints\x18\x06 \x01(\x0b\x32\x1f.buildbucket.Bucket.Constraints\x12L\n\x18\x64ynamic_builder_template\x18\x07 \x01(\x0b\x32*.buildbucket.Bucket.DynamicBuilderTemplate\x1a\x36\n\x0b\x43onstraints\x12\r\n\x05pools\x18\x01 \x03(\t\x12\x18\n\x10service_accounts\x18\x02 \x03(\t\x1a\x18\n\x16\x44ynamicBuilderTemplateJ\x04\x08\x04\x10\x05\"\xa9\x02\n\x0e\x42uildbucketCfg\x12$\n\x07\x62uckets\x18\x01 \x03(\x0b\x32\x13.buildbucket.Bucket\x12?\n\rcommon_config\x18\x05 \x01(\x0b\x32(.buildbucket.BuildbucketCfg.CommonConfig\x1aG\n\x05Topic\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x30\n\x0b\x63ompression\x18\x02 \x01(\x0e\x32\x1b.buildbucket.v2.Compression\x1aU\n\x0c\x43ommonConfig\x12\x45\n\x1a\x62uilds_notification_topics\x18\x01 \x03(\x0b\x32!.buildbucket.BuildbucketCfg.TopicJ\x04\x08\x02\x10\x03J\x04\x08\x03\x10\x04J\x04\x08\x04\x10\x05*$\n\x06Toggle\x12\t\n\x05UNSET\x10\x00\x12\x07\n\x03YES\x10\x01\x12\x06\n\x02NO\x10\x02\x42|Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb\xa2\xfe#B\n@https://luci-config.appspot.com/schemas/projects:buildbucket.cfgb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_wrappers__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_common_dot_proto_dot_options__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_resultdb_dot_proto_dot_v1_dot_invocation__pb2.DESCRIPTOR,])
 
@@ -54,8 +54,8 @@ _TOGGLE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=3353,
-  serialized_end=3389,
+  serialized_start=3401,
+  serialized_end=3437,
 )
 _sym_db.RegisterEnumDescriptor(_TOGGLE)
 
@@ -191,8 +191,8 @@ _BUILDERCONFIG_CACHEENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1691,
-  serialized_end=1782,
+  serialized_start=1719,
+  serialized_end=1810,
 )
 
 _BUILDERCONFIG_RECIPE = _descriptor.Descriptor(
@@ -250,8 +250,8 @@ _BUILDERCONFIG_RECIPE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1784,
-  serialized_end=1898,
+  serialized_start=1812,
+  serialized_end=1926,
 )
 
 _BUILDERCONFIG_RESULTDB = _descriptor.Descriptor(
@@ -295,8 +295,8 @@ _BUILDERCONFIG_RESULTDB = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1901,
-  serialized_end=2040,
+  serialized_start=1929,
+  serialized_end=2068,
 )
 
 _BUILDERCONFIG_BACKEND = _descriptor.Descriptor(
@@ -333,8 +333,8 @@ _BUILDERCONFIG_BACKEND = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2042,
-  serialized_end=2094,
+  serialized_start=2070,
+  serialized_end=2122,
 )
 
 _BUILDERCONFIG_EXPERIMENTSENTRY = _descriptor.Descriptor(
@@ -371,8 +371,8 @@ _BUILDERCONFIG_EXPERIMENTSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2096,
-  serialized_end=2146,
+  serialized_start=2124,
+  serialized_end=2174,
 )
 
 _BUILDERCONFIG_SHADOWBUILDERADJUSTMENTS = _descriptor.Descriptor(
@@ -404,6 +404,13 @@ _BUILDERCONFIG_SHADOWBUILDERADJUSTMENTS = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=b'\250\376#\001', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='dimensions', full_name='buildbucket.BuilderConfig.ShadowBuilderAdjustments.dimensions', index=3,
+      number=4, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -416,8 +423,8 @@ _BUILDERCONFIG_SHADOWBUILDERADJUSTMENTS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2148,
-  serialized_end=2239,
+  serialized_start=2176,
+  serialized_end=2287,
 )
 
 _BUILDERCONFIG_BUILDERHEALTHLINKS_DOCLINKSENTRY = _descriptor.Descriptor(
@@ -454,8 +461,8 @@ _BUILDERCONFIG_BUILDERHEALTHLINKS_DOCLINKSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2426,
-  serialized_end=2473,
+  serialized_start=2474,
+  serialized_end=2521,
 )
 
 _BUILDERCONFIG_BUILDERHEALTHLINKS_DATALINKSENTRY = _descriptor.Descriptor(
@@ -492,8 +499,8 @@ _BUILDERCONFIG_BUILDERHEALTHLINKS_DATALINKSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2475,
-  serialized_end=2523,
+  serialized_start=2523,
+  serialized_end=2571,
 )
 
 _BUILDERCONFIG_BUILDERHEALTHLINKS = _descriptor.Descriptor(
@@ -530,8 +537,8 @@ _BUILDERCONFIG_BUILDERHEALTHLINKS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2242,
-  serialized_end=2523,
+  serialized_start=2290,
+  serialized_end=2571,
 )
 
 _BUILDERCONFIG = _descriptor.Descriptor(
@@ -745,6 +752,13 @@ _BUILDERCONFIG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='contact_team_email', full_name='buildbucket.BuilderConfig.contact_team_email', index=29,
+      number=38, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -758,7 +772,7 @@ _BUILDERCONFIG = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=437,
-  serialized_end=2565,
+  serialized_end=2613,
 )
 
 
@@ -796,8 +810,8 @@ _SWARMING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2568,
-  serialized_end=2713,
+  serialized_start=2616,
+  serialized_end=2761,
 )
 
 
@@ -835,8 +849,8 @@ _BUCKET_CONSTRAINTS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2965,
-  serialized_end=3019,
+  serialized_start=3013,
+  serialized_end=3067,
 )
 
 _BUCKET_DYNAMICBUILDERTEMPLATE = _descriptor.Descriptor(
@@ -859,8 +873,8 @@ _BUCKET_DYNAMICBUILDERTEMPLATE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3021,
-  serialized_end=3045,
+  serialized_start=3069,
+  serialized_end=3093,
 )
 
 _BUCKET = _descriptor.Descriptor(
@@ -925,8 +939,8 @@ _BUCKET = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2716,
-  serialized_end=3051,
+  serialized_start=2764,
+  serialized_end=3099,
 )
 
 
@@ -964,8 +978,8 @@ _BUILDBUCKETCFG_TOPIC = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3175,
-  serialized_end=3246,
+  serialized_start=3223,
+  serialized_end=3294,
 )
 
 _BUILDBUCKETCFG_COMMONCONFIG = _descriptor.Descriptor(
@@ -995,8 +1009,8 @@ _BUILDBUCKETCFG_COMMONCONFIG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3248,
-  serialized_end=3333,
+  serialized_start=3296,
+  serialized_end=3381,
 )
 
 _BUILDBUCKETCFG = _descriptor.Descriptor(
@@ -1033,8 +1047,8 @@ _BUILDBUCKETCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3054,
-  serialized_end=3351,
+  serialized_start=3102,
+  serialized_end=3399,
 )
 
 _ACL.fields_by_name['role'].enum_type = _ACL_ROLE
