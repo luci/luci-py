@@ -517,6 +517,21 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                     'agent_binary_cipd_server':
                         struct_pb2.Value(string_value='cipdserver'),
                 })),
+            backend_pb2.ValidateConfigsRequest.ConfigContext(
+                target='the-one-with-empty-bot-ping-tolerance',
+                config_json=struct_pb2.Struct(fields={
+                    'service_account':
+                      struct_pb2.Value(string_value='bot'),
+                    'agent_binary_cipd_filename':
+                      struct_pb2.Value(string_value='agent'),
+                    'agent_binary_cipd_pkg':
+                      struct_pb2.Value(
+                          string_value='agent/package/${platform}'),
+                    'agent_binary_cipd_vers':
+                      struct_pb2.Value(string_value='3'),
+                    'agent_binary_cipd_server':
+                      struct_pb2.Value(string_value='cipdserver'),
+                })),
     ])
 
     raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/ValidateConfigs',

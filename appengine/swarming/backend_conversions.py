@@ -53,7 +53,8 @@ def compute_task_request(run_task_req):
     secret_bytes = task_request.SecretBytes(
         secret_bytes=run_task_req.secrets.SerializeToString())
 
-  backend_config = ingest_backend_config(run_task_req.backend_config)
+  backend_config = ingest_backend_config_with_default(
+      run_task_req.backend_config)
   slices = _compute_task_slices(run_task_req, backend_config,
                                 secret_bytes is not None)
   expiration_ms = sum([s.expiration_secs for s in slices]) * 1000000
@@ -89,6 +90,14 @@ def ingest_backend_config(req_backend_config):
     json_config,
     swarming_pb2.SwarmingTaskBackendConfig()
   )
+
+
+def ingest_backend_config_with_default(req_backend_config):
+  # type: (struct_pb2.Struct) -> swarming_pb2.SwarmingTaskBackendConfig
+  cfg = ingest_backend_config(req_backend_config)
+  if cfg.bot_ping_tolerance == 0:
+    cfg.bot_ping_tolerance = task_request.DEFAULT_BOT_PING_TOLERANCE
+  return cfg
 
 
 def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):

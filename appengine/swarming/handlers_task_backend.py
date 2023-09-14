@@ -60,8 +60,11 @@ class TaskBackendAPIService(object):
     # type: (backend_pb2.RunTaskRequest, context.ServicerContext)
     #     -> backend_pb2.RunTaskResponse
     validate_run_task_request(request)
-    api_helpers.validate_backend_configs(
-        [backend_conversions.ingest_backend_config(request.backend_config)])
+
+    api_helpers.validate_backend_configs([
+        backend_conversions.ingest_backend_config_with_default(
+            request.backend_config)
+    ])
     tr, secret_bytes, build_task = backend_conversions.compute_task_request(
         request)
     caller = auth.get_current_identity().to_bytes()
@@ -160,8 +163,8 @@ class TaskBackendAPIService(object):
     #     -> backend_pb2.ValidateConfigsResponse
 
     configs = [
-        backend_conversions.ingest_backend_config(config.config_json)
-        for config in request.configs
+        backend_conversions.ingest_backend_config_with_default(
+            config.config_json) for config in request.configs
     ]
 
     errors = api_helpers.validate_backend_configs(configs)
