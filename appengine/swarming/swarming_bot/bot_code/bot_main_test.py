@@ -1547,6 +1547,53 @@ class TestBotMain(TestBotBase):
     ])
     self.poll_once()
 
+  def test_rbe_mode_claim_and_crash(self):
+    def run_manifest(_bot, _manifest, _rbe_session):
+      raise Exception('BOOM')
+
+    self.mock(bot_main, '_run_manifest', run_manifest)
+
+    self.mock(self.loop_state, 'on_task_completed',
+              lambda _: self.fail('must not be called'))
+
+    errors = []
+    self.mock(self.bot, 'post_error', errors.append)
+
+    # Switches into the RBE mode, creates and polls the session. Gets a lease
+    # right away, proceeds to claiming it, discovers it is a real task, tries to
+    # execute it and blows up due to a Swarming bot bug.
+    self.expected_requests(
+        self.expected_rbe_poll_and_claim('pt', 'st', 'lease-id', {
+            'cmd': 'run',
+            'manifest': {
+                'fake': 'manifest'
+            },
+        }))
+    try:
+      self.poll_once()
+    except Exception as exc:
+      self.assertEqual(str(exc), 'BOOM')
+
+    # Reports the lease as abandoned.
+    self.expected_requests([
+        self.expected_rbe_update_request(
+            'pt',
+            'st',
+            lease_in={
+                'id': 'lease-id',
+                'result': {
+                    'bot_internal_error':
+                    'Bot crashed before finishing the lease',
+                },
+                'state': 'COMPLETED',
+            },
+        ),
+    ])
+    self.poll_once()
+
+    # Reports the error.
+    self.assertEqual(errors, ['Orphaned RBE lease, bot loop crashing?'])
+
   def test_hybrid_mode_idle(self):
     # Starting in hybrid mode, polling Swarming next.
     self.prep_hybrid_mode({

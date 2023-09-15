@@ -1102,7 +1102,7 @@ def _run_manifest(botobj, manifest, rbe_session):
       try:
         rbe_session.finish_active_lease({}, flush=True)
       except remote_client_errors.RBEServerError as e:
-        botobj.post_error('finish_active_lease failed: %s', e)
+        botobj.post_error('finish_active_lease failed: %s' % e)
     logging.info(
         'calling on_after_task: failure=%s, internal_failure=%s, '
         'task_dimensions=%s, task_result=%s', failure, internal_failure,
@@ -1774,6 +1774,18 @@ class _BotLoopState:
         self.report_exception('Failed to open RBE Session: %s' % e)
         self._rbe_consecutive_errors += 1
         return None
+
+    # This can happen if the loop crashed on the previous iteration before it
+    # could finish the lease. We don't really know what its actual status is.
+    # Need to close it, otherwise update(...) below will perpetually complain
+    # that there's an open lease. This should not really be happening.
+    if self._rbe_session.active_lease:
+      self._rbe_session.finish_active_lease({
+          'bot_internal_error':
+          'Bot crashed before finishing the lease',
+      })
+      self._rbe_consecutive_errors += 1
+      self._bot.post_error('Orphaned RBE lease, bot loop crashing?')
 
     # There's a healthy session, we can update it.
     try:
