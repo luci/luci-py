@@ -429,6 +429,21 @@ def task_access_info_from_request(task_request):
                         submitter=task_request.authenticated)
 
 
+def task_access_info_from_result_summary(result_summary):
+  """Extracts information for task ACL check from TaskResultSummary.
+
+  Raises:
+    ValueError if it doesn't have expected fields populated.
+  """
+  if not result_summary.request_realm:
+    raise ValueError('Unsupported TaskResultSummary entity')
+  return TaskAccessInfo(task_id=result_summary.task_id,
+                        realm=result_summary.request_realm,
+                        pool=result_summary.request_pool,
+                        bot_id=result_summary.request_bot_id,
+                        submitter=result_summary.request_authenticated)
+
+
 def check_task_get_acl(access_info):
   """Checks if the caller is allowed to get the task entities.
 

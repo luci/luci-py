@@ -29,6 +29,7 @@ from server import pools_config
 from server import realms
 from server import service_accounts
 from server import task_request
+from server import task_result
 from server import task_scheduler
 
 _PERM_POOLS_CANCEL_TASK = auth.Permission('swarming.pools.cancelTask')
@@ -88,6 +89,23 @@ class RealmsTest(test_case.TestCase):
   def tearDown(self):
     super(RealmsTest, self).tearDown()
     utils.clear_cache(config.settings)
+
+  def test_task_access_info_from_result_summary(self):
+    request = task_request.TaskRequest(
+        key=task_request.new_request_key(),
+        authenticated=auth.Identity('user', 'someone@example.com'),
+        realm='test:realm',
+        task_slices=[
+            task_request.TaskSlice(properties=task_request.TaskProperties(
+                dimensions_data={
+                    u'pool': [u'some-pool'],
+                    u'id': [u'some-bot'],
+                }, ), ),
+        ],
+    )
+    summary = task_result.new_result_summary(request)
+    self.assertEqual(realms.task_access_info_from_request(request),
+                     realms.task_access_info_from_result_summary(summary))
 
   def test_get_permission(self):
     perm = realms.get_permission(realms_pb2.REALM_PERMISSION_POOLS_CREATE_TASK)

@@ -206,6 +206,14 @@ class TaskResultApiTest(TestCase):
         u'Request name',
         'priority':
         50,
+        'request_authenticated':
+        auth_testing.DEFAULT_MOCKED_IDENTITY,
+        'request_bot_id':
+        None,
+        'request_pool':
+        u'default',
+        'request_realm':
+        None,
         'cas_output_root':
         None,
         'resultdb_info':

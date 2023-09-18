@@ -77,6 +77,7 @@ from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 from google.protobuf import json_format
 
+from components import auth
 from components import datastore_utils
 from components import pubsub
 from components import utils
@@ -1080,8 +1081,9 @@ class TaskResultSummary(_TaskResultCommon):
   recently completed tasks.
   """
   # These properties are directly copied from TaskRequest. They are only copied
-  # here to simplify searches with the Web UI and to enable DB queries based on
-  # both user and results properties (e.g. all requests from X which succeeded).
+  # here to simplify searches with the Web UI, to enable DB queries based on
+  # both user and results properties (e.g. all requests from X which succeeded),
+  # and for ACL checks.
   # They are immutable.
   # TODO(maruel): Investigate what is worth copying over.
   created_ts = ndb.DateTimeProperty(required=True)
@@ -1089,6 +1091,10 @@ class TaskResultSummary(_TaskResultCommon):
   user = ndb.StringProperty()
   tags = ndb.StringProperty(repeated=True)
   priority = ndb.IntegerProperty(indexed=False)
+  request_authenticated = auth.IdentityProperty(indexed=False, required=False)
+  request_realm = ndb.StringProperty(indexed=False, required=False)
+  request_pool = ndb.StringProperty(indexed=False, required=False)
+  request_bot_id = ndb.StringProperty(indexed=False, required=False)
 
   # Value of TaskRequest.properties.properties_hash only when these conditions
   # are met:
@@ -1554,14 +1560,18 @@ def new_result_summary(request):
 
   The caller must save it in the DB.
   """
-  return TaskResultSummary(
-      key=task_pack.request_key_to_result_summary_key(request.key),
-      created_ts=request.created_ts,
-      name=request.name,
-      server_versions=[utils.get_app_version()],
-      user=request.user,
-      tags=request.tags,
-      priority=request.priority)
+  key = task_pack.request_key_to_result_summary_key(request.key)
+  return TaskResultSummary(key=key,
+                           created_ts=request.created_ts,
+                           name=request.name,
+                           server_versions=[utils.get_app_version()],
+                           user=request.user,
+                           tags=request.tags,
+                           priority=request.priority,
+                           request_authenticated=request.authenticated,
+                           request_realm=request.realm,
+                           request_pool=request.pool,
+                           request_bot_id=request.bot_id)
 
 
 def new_run_result(request, to_run, bot_id, bot_details, bot_dimensions,
