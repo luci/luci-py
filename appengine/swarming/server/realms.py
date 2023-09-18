@@ -2,6 +2,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+from collections import namedtuple
 import datetime
 import logging
 
@@ -16,6 +17,25 @@ from server import task_scheduler
 from server import task_queues
 
 _TRACKING_BUG = 'crbug.com/1066839'
+
+
+# Properties of a task that affect who can access it.
+#
+# Extracted either from TaskRequest or from TaskResultSummary.
+TaskAccessInfo = namedtuple(
+    'TaskAccessInfo',
+    [
+        # ID of the task. Only for error messages and logs!
+        'task_id',
+        # The realm the task belongs to, as "<project>:<realm>" string.
+        'realm',
+        # Task's pool as a string.
+        'pool',
+        # The bot ID the task is targeting or None.
+        'bot_id',
+        # auth.Identity of whoever submitted the task.
+        'submitter',
+    ])
 
 
 def get_permission(enum_permission):
@@ -400,10 +420,19 @@ def can_list_bots(pool):
     return False
 
 
-def check_task_get_acl(task_request):
+def task_access_info_from_request(task_request):
+  """Extracts information for task ACL check from TaskRequest."""
+  return TaskAccessInfo(task_id=task_request.task_id,
+                        realm=task_request.realm,
+                        pool=task_request.pool,
+                        bot_id=task_request.bot_id,
+                        submitter=task_request.authenticated)
+
+
+def check_task_get_acl(access_info):
   """Checks if the caller is allowed to get the task entities.
 
-  Checks if the caller has global permission using acl.can_view_task().
+  Checks if the caller has global permission using acl.can_view_all_tasks().
 
   If the caller doesn't have any global permissions, checks if the caller has
   'swarming.tasks.get' in the task realm or 'swarming.pools.listTasks' in a
@@ -411,7 +440,8 @@ def check_task_get_acl(task_request):
   assigned to.
 
   Args:
-    task_request: An instance of TaskRequest.
+    access_info: An instance of TaskAccessInfo extracted from TaskRequest or
+        TaskResultSummary via task_access_info_from_*(...).
 
   Returns:
     None
@@ -419,16 +449,19 @@ def check_task_get_acl(task_request):
   Raises:
     auth.AuthorizationError: if the caller is not allowed.
   """
-  if acl.can_view_task(task_request):
+  assert isinstance(access_info, TaskAccessInfo)
+  if auth.get_current_identity() == access_info.submitter:
     return
-  _check_task_acl(task_request, realms_pb2.REALM_PERMISSION_TASKS_GET,
+  if acl.can_view_all_tasks():
+    return
+  _check_task_acl(access_info, realms_pb2.REALM_PERMISSION_TASKS_GET,
                   realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS)
 
 
-def check_task_cancel_acl(task_request):
+def check_task_cancel_acl(access_info):
   """Checks if the caller is allowed to cancel the task.
 
-  Checks if the caller has global permission using acl.can_edit_task().
+  Checks if the caller has global permission using acl.can_edit_one_task().
 
   If the caller doesn't have any global permissions, checks if the caller has
   'swarming.tasks.cancel' in the task realm or 'swarming.pools.cancelTask' in
@@ -436,7 +469,8 @@ def check_task_cancel_acl(task_request):
   assigned to.
 
   Args:
-    task_request: An instance of TaskRequest.
+    access_info: An instance of TaskAccessInfo extracted from TaskRequest or
+        TaskResultSummary via task_access_info_from_*(...).
 
   Returns:
     None
@@ -444,23 +478,27 @@ def check_task_cancel_acl(task_request):
   Raises:
     auth.AuthorizationError: if the caller is not allowed.
   """
-  if acl.can_edit_task(task_request):
+  assert isinstance(access_info, TaskAccessInfo)
+  if auth.get_current_identity() == access_info.submitter:
     return
-  _check_task_acl(task_request, realms_pb2.REALM_PERMISSION_TASKS_CANCEL,
+  if acl.can_edit_one_task():
+    return
+  _check_task_acl(access_info, realms_pb2.REALM_PERMISSION_TASKS_CANCEL,
                   realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK)
 
 
-def can_cancel_task(task_request):
+def can_cancel_task(access_info):
   """Checks if the caller is allowed to cancel the task.
 
   Args:
-    task_request: An instance of TaskRequest.
+    access_info: An instance of TaskAccessInfo extracted from TaskRequest or
+        TaskResultSummary via task_access_info_from_*(...).
 
   Returns:
     allowed: True if allowed, False otherwise.
   """
   try:
-    check_task_cancel_acl(task_request)
+    check_task_cancel_acl(access_info)
     return True
   except auth.AuthorizationError:
     return False
@@ -653,7 +691,7 @@ def _check_bot_acl(perm_enum, bot_id):
   _check_permission(get_permission(perm_enum), bot_realms)
 
 
-def _check_task_acl(task_request, task_perm_enum, pool_perm_enum):
+def _check_task_acl(access_info, task_perm_enum, pool_perm_enum):
   """Checks if the caller has `task_perm_enum` permission in the task realm or
   `pool_perm_enum` permission in a realm associated with either the task pool
   or a bot pool of the bot the task was assigned to.
@@ -664,7 +702,7 @@ def _check_task_acl(task_request, task_perm_enum, pool_perm_enum):
   they will get access through `pool_perm_enum` in the pool realm.
 
   Args:
-    task_request: An instance of TaskRequest.
+    access_info: An instance of TaskAccessInfo.
     task_perm_enum: realms_pb2.RealmPermission enum value.
     pool_perm_enum: realms_pb2.RealmPermission enum value.
 
@@ -675,28 +713,28 @@ def _check_task_acl(task_request, task_perm_enum, pool_perm_enum):
   pool_perm = get_permission(pool_perm_enum)
 
   # First check the task realm permission, it is the fastest check.
-  task_realm = task_request.realm
+  task_realm = access_info.realm
   if task_realm and auth.has_permission(task_perm, [task_realm]):
     return
 
   # Next check the pool permission of the pool the task was scheduled in. This
   # is also relatively fast, since it hits the local config cache.
-  if task_request.pool:
-    pool_cfg = pools_config.get_pool_config(task_request.pool)
+  if access_info.pool:
+    pool_cfg = pools_config.get_pool_config(access_info.pool)
     if not pool_cfg:
-      logging.warning('Task pool is missing. pool: %s', task_request.pool)
+      logging.warning('Task pool is missing. pool: %s', access_info.pool)
     elif not pool_cfg.realm:
-      logging.warning('Task pool has no realm. pool: %s', task_request.pool)
+      logging.warning('Task pool has no realm. pool: %s', access_info.pool)
     elif auth.has_permission(pool_perm, [pool_cfg.realm]):
       return
 
   # Finally check the pool permission of all the pools (usually one) in bot
   # dimensions. This is slow, since we need to fetch bot dimensions from the
   # datastore. For that reason we do it last.
-  if task_request.bot_id:
-    bot_realms = _bot_pool_realms(task_request.bot_id)
+  if access_info.bot_id:
+    bot_realms = _bot_pool_realms(access_info.bot_id)
     if bot_realms and auth.has_permission(pool_perm, bot_realms):
       return
 
   raise auth.AuthorizationError('Task "%s" is not accessible' %
-                                task_request.task_id)
+                                access_info.task_id)

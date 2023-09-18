@@ -162,24 +162,14 @@ def can_schedule_high_priority_tasks():
   return _is_admin()
 
 
-def can_edit_task(task):
-  """Can 'edit' tasks, like cancelling.
-
-  The account that created a task can cancel it.
-  """
-  return (_is_privileged_user() or
-          auth.get_current_identity() == task.authenticated)
+def can_edit_one_task():
+  """Can 'edit' individual tasks, like cancelling."""
+  return _is_privileged_user()
 
 
 def can_edit_all_tasks():
   """Can 'edit' a batch of tasks, like cancelling."""
   return _is_admin()
-
-
-def can_view_task(task):
-  """Can view a single task."""
-  return (_is_view_all_tasks() or
-          auth.get_current_identity() == task.authenticated)
 
 
 def can_view_all_tasks():

@@ -46,10 +46,6 @@ class AclTest(test_case.TestCase):
             view_all_bots_group='view_all_bots',
             view_all_tasks_group='view_all_tasks'))
     self.mock(config, 'settings', settings)
-    self._task_owned = task_request.TaskRequest(
-        authenticated=auth.get_current_identity())
-    self._task_other = task_request.TaskRequest(
-        authenticated=auth.Identity(auth.IDENTITY_USER, 'larry@localhost'))
 
   @staticmethod
   def _add_to_group(group):
@@ -68,11 +64,8 @@ class AclTest(test_case.TestCase):
     self.assertFalse(acl.can_view_bot())
     self.assertFalse(acl.can_create_task())
     self.assertFalse(acl.can_schedule_high_priority_tasks())
-    self.assertFalse(acl.can_edit_task(self._task_owned))
-    self.assertFalse(acl.can_edit_task(self._task_other))
+    self.assertFalse(acl.can_edit_one_task())
     self.assertFalse(acl.can_edit_all_tasks())
-    self.assertFalse(acl.can_view_task(self._task_owned))
-    self.assertFalse(acl.can_view_task(self._task_other))
     self.assertFalse(acl.can_view_all_tasks())
 
   def test_instance_admin(self):
@@ -87,11 +80,8 @@ class AclTest(test_case.TestCase):
     self.assertTrue(acl.can_view_bot())
     self.assertTrue(acl.can_create_task())
     self.assertTrue(acl.can_schedule_high_priority_tasks())
-    self.assertTrue(acl.can_edit_task(self._task_owned))
-    self.assertTrue(acl.can_edit_task(self._task_other))
+    self.assertTrue(acl.can_edit_one_task())
     self.assertTrue(acl.can_edit_all_tasks())
-    self.assertTrue(acl.can_view_task(self._task_owned))
-    self.assertTrue(acl.can_view_task(self._task_other))
     self.assertTrue(acl.can_view_all_tasks())
 
   def test_ip_whitelisted(self):
@@ -106,11 +96,8 @@ class AclTest(test_case.TestCase):
     self.assertFalse(acl.can_view_bot())
     self.assertFalse(acl.can_create_task())
     self.assertFalse(acl.can_schedule_high_priority_tasks())
-    self.assertTrue(acl.can_edit_task(self._task_owned))
-    self.assertFalse(acl.can_edit_task(self._task_other))
+    self.assertFalse(acl.can_edit_one_task())
     self.assertFalse(acl.can_edit_all_tasks())
-    self.assertTrue(acl.can_view_task(self._task_owned))
-    self.assertFalse(acl.can_view_task(self._task_other))
     self.assertFalse(acl.can_view_all_tasks())
 
   def test_admins(self):
@@ -125,11 +112,8 @@ class AclTest(test_case.TestCase):
     self.assertTrue(acl.can_view_bot())
     self.assertTrue(acl.can_create_task())
     self.assertTrue(acl.can_schedule_high_priority_tasks())
-    self.assertTrue(acl.can_edit_task(self._task_owned))
-    self.assertTrue(acl.can_edit_task(self._task_other))
+    self.assertTrue(acl.can_edit_one_task())
     self.assertTrue(acl.can_edit_all_tasks())
-    self.assertTrue(acl.can_view_task(self._task_owned))
-    self.assertTrue(acl.can_view_task(self._task_other))
     self.assertTrue(acl.can_view_all_tasks())
 
   def test_bot_bootstrap(self):
@@ -144,11 +128,8 @@ class AclTest(test_case.TestCase):
     self.assertFalse(acl.can_view_bot())
     self.assertFalse(acl.can_create_task())
     self.assertFalse(acl.can_schedule_high_priority_tasks())
-    self.assertTrue(acl.can_edit_task(self._task_owned))
-    self.assertFalse(acl.can_edit_task(self._task_other))
+    self.assertFalse(acl.can_edit_one_task())
     self.assertFalse(acl.can_edit_all_tasks())
-    self.assertTrue(acl.can_view_task(self._task_owned))
-    self.assertFalse(acl.can_view_task(self._task_other))
     self.assertFalse(acl.can_view_all_tasks())
 
   def test_privileged_users(self):
@@ -163,11 +144,8 @@ class AclTest(test_case.TestCase):
     self.assertTrue(acl.can_view_bot())
     self.assertTrue(acl.can_create_task())
     self.assertFalse(acl.can_schedule_high_priority_tasks())
-    self.assertTrue(acl.can_edit_task(self._task_owned))
-    self.assertTrue(acl.can_edit_task(self._task_other))
+    self.assertTrue(acl.can_edit_one_task())
     self.assertFalse(acl.can_edit_all_tasks())
-    self.assertTrue(acl.can_view_task(self._task_owned))
-    self.assertTrue(acl.can_view_task(self._task_other))
     self.assertTrue(acl.can_view_all_tasks())
 
   def test_users(self):
@@ -182,11 +160,8 @@ class AclTest(test_case.TestCase):
     self.assertFalse(acl.can_view_bot())
     self.assertTrue(acl.can_create_task())
     self.assertFalse(acl.can_schedule_high_priority_tasks())
-    self.assertTrue(acl.can_edit_task(self._task_owned))
-    self.assertFalse(acl.can_edit_task(self._task_other))
+    self.assertFalse(acl.can_edit_one_task())
     self.assertFalse(acl.can_edit_all_tasks())
-    self.assertTrue(acl.can_view_task(self._task_owned))
-    self.assertFalse(acl.can_view_task(self._task_other))
     self.assertFalse(acl.can_view_all_tasks())
 
   def test_view_all_bots(self):
@@ -201,11 +176,8 @@ class AclTest(test_case.TestCase):
     self.assertTrue(acl.can_view_bot())
     self.assertFalse(acl.can_create_task())
     self.assertFalse(acl.can_schedule_high_priority_tasks())
-    self.assertTrue(acl.can_edit_task(self._task_owned))
-    self.assertFalse(acl.can_edit_task(self._task_other))
+    self.assertFalse(acl.can_edit_one_task())
     self.assertFalse(acl.can_edit_all_tasks())
-    self.assertTrue(acl.can_view_task(self._task_owned))
-    self.assertFalse(acl.can_view_task(self._task_other))
     self.assertFalse(acl.can_view_all_tasks())
 
   def test_view_all_tasks(self):
@@ -220,11 +192,8 @@ class AclTest(test_case.TestCase):
     self.assertFalse(acl.can_view_bot())
     self.assertFalse(acl.can_create_task())
     self.assertFalse(acl.can_schedule_high_priority_tasks())
-    self.assertTrue(acl.can_edit_task(self._task_owned))
-    self.assertFalse(acl.can_edit_task(self._task_other))
+    self.assertFalse(acl.can_edit_one_task())
     self.assertFalse(acl.can_edit_all_tasks())
-    self.assertTrue(acl.can_view_task(self._task_owned))
-    self.assertTrue(acl.can_view_task(self._task_other))
     self.assertTrue(acl.can_view_all_tasks())
 
 

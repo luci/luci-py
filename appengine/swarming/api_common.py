@@ -241,10 +241,11 @@ def get_task_request_async(task_id, request_key, permission):
                                                   (task_id, e))
   if not request:
     raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
+  access_info = realms.task_access_info_from_request(request)
   if permission == VIEW:
-    realms.check_task_get_acl(request)
+    realms.check_task_get_acl(access_info)
   elif permission == CANCEL:
-    realms.check_task_cancel_acl(request)
+    realms.check_task_cancel_acl(access_info)
   else:
     raise handlers_exceptions.InternalException('get_task_request_async()')
   raise ndb.Return(request)
@@ -824,12 +825,12 @@ def _can_cancel_task(task_id):
     # TODO(crbug.com/1066839):
     # This is for the compatibility until Web clients send task_id.
     # return False if task_id is not given.
-    return acl._is_privileged_user()
+    return acl.can_edit_one_task()
   task_key, _ = to_keys(task_id)
   task = task_key.get()
   if not task:
     raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
-  return realms.can_cancel_task(task)
+  return realms.can_cancel_task(realms.task_access_info_from_request(task))
 
 
 def get_permissions(bot_id, task_id, tags):
