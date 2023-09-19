@@ -54,13 +54,13 @@ def _raw_metadata_request(path):
   if not is_gce():
     logging.info('GCE metadata is not available: not on GCE')
     return None
-  url = 'http://metadata.google.internal' + path
+  url = 'http://169.254.169.254' + path
   headers = {'Metadata-Flavor': 'Google'}
-  for i in range(0, 10):
-    time.sleep(i*2)
+  for i in range(0, 6):
+    time.sleep(2**i)
     try:
       resp = urllib.request.urlopen(
-          urllib.request.Request(url, headers=headers), timeout=10)
+          urllib.request.Request(url, headers=headers), timeout=30)
       return resp.read()
     except IOError as e:
       logging.warning(
@@ -98,7 +98,7 @@ def get_metadata_uncached():
 
   To get the at the command line from a GCE VM, use:
     curl --silent \
-      http://metadata.google.internal/computeMetadata/v1/?recursive=true \
+      http://169.254.169.254/computeMetadata/v1/?recursive=true \
       -H "Metadata-Flavor: Google" | python -m json.tool | less
   """
   raw = _raw_metadata_request('/computeMetadata/v1/?recursive=true')
@@ -151,7 +151,7 @@ def oauth2_access_token_with_expiration(account):
     if cached_tok and cached_tok['expiresAt'] >= time.time() + 600:
       return cached_tok['accessToken'], cached_tok['expiresAt']
     # Grab the token.
-    url = ('http://metadata.google.internal/computeMetadata/v1/instance'
+    url = ('http://169.254.169.254/computeMetadata/v1/instance'
            '/service-accounts/%s/token' % account)
     headers = {'Metadata-Flavor': 'Google'}
     access_token, expires_at = oauth.oauth2_access_token_from_url(url, headers)
