@@ -268,6 +268,19 @@ module.exports = (env, argv) => {
     common = demoFinder(dirname, common, demoType);
     common.devtool = "eval-source-map";
     if (demoType === "live") {
+      const credsFilePath = path.join(
+        process.env.HOME,
+        ".config",
+        "chrome_infra",
+        "auth",
+        "creds.json"
+      );
+      if (!fs.existsSync(credsFilePath)) {
+        console.error(
+          `Credentials file not found at path ${credsFilePath}. Did you forget to run "luci-auth login"?`
+        );
+        process.exit(1);
+      }
       common.devServer.proxy = [
         {
           changeOrigin: true,
@@ -276,17 +289,14 @@ module.exports = (env, argv) => {
         },
         {
           changeOrigin: true,
-          context: ["/auth"],
+          context: ["/auth/openid/state"],
           target: "https://chromium-swarm-dev.appspot.com/",
-          bypass: function (req, _res, _proxyOptions) {
-            /* Inject lucisid cookie into requests to auth. This allows
-             * the localhost frontend to authenticate and grab credentials.
-             * Allowing it to talk to swarming-dev.
-             * See README.md for more instructions.
-             **/
-            const sid = process.env.LUCISID;
-            req.headers.cookie = `LUCISID=${sid}`;
-            return null;
+          bypass: function (_req, res, _proxyOptions) {
+            const creds = JSON.parse(fs.readFileSync(credsFilePath));
+            res.send({
+              email: creds.cache[0].email,
+              accessToken: creds.cache[0].token.access_token,
+            });
           },
         },
       ];

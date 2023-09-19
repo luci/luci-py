@@ -62,14 +62,11 @@ The login is mocked so it works w/o an internet connection.
 It's also possible to test using a "live_demo" mode which will pull actual
 data in from `chromium-swarm-dev.appspot.com`.
 
-The are a few hacky steps to enable this:
+The are a few steps to enable this. This assumes `depot_tools` are installed.
 
-1. Navigate to https://chromium-swarm-dev.appspot.com/ and sign in.
-2. Go to the browser network inspector, reload and look for the request https://chromium-swarm-dev.appspot.com/auth/openid/state
-3. In that request, look at the request headers and find the `LUCISID` cookie.
-4. Make that cookie an environment variable in the shell where you wish to run the "live_demo" - IE `export LUCISID=<the_luci_sid_you_intercepted>`
-5. Run `make live_demo`
-6. Navigate to the demo pages normally. They will now use data from the development environment.
+1. Run `luci-auth login`
+2. Run `make live_demo`
+3. Navigate to the demo pages normally. They will now use data from the development environment.
 
 
 ## Running the tests
