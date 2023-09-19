@@ -383,7 +383,7 @@ window.customElements.define(
           };
         },
         /* setState*/ (newState) => {
-          newState = convertFromLegacyState(newState);
+          convertFromLegacyState(newState);
           // default values if not specified.
           this._allStates = newState.at; // default to false
           this._cols = newState.c;

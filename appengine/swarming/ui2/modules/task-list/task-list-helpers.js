@@ -19,6 +19,7 @@ import {
   humanDuration,
   sanitizeAndHumanizeTime,
   taskPageLink,
+  toCamelCase,
 } from "../util";
 import { EXCEPTIONAL_STATES, FILTER_STATES, ONGOING_STATES } from "../task";
 
@@ -676,14 +677,6 @@ function sortableDuration(attr) {
   };
 }
 
-const re = /_[a-zA-Z]/g;
-
-function toCamelCase(str) {
-  return str.replace(re, function (match) {
-    return match.replace("_", "").toUpperCase();
-  });
-}
-
 /**
  * Timestamps in url need to be integers for the `stateReflector` to detect
  * changes in state. Further timestamps have traditionally been used in the url.
@@ -733,6 +726,4 @@ export function convertFromLegacyState(newState) {
   if (newState.s) {
     newState.s = toCamelCase(newState.s);
   }
-
-  return newState;
 }

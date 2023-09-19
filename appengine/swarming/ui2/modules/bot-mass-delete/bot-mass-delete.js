@@ -4,15 +4,12 @@
 
 import { errorMessage } from "elements-sk/errorMessage";
 import { html, render } from "lit-html";
-import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
 import { until } from "lit-html/directives/until";
 
 import { initPropertyFromAttrOrProperty } from "../util";
 
-// query.fromObject is more readable than just 'fromObject'
-import * as query from "common-sk/modules/query";
-
 import "elements-sk/styles/buttons";
+import { BotsService } from "../services/bots";
 
 /**
  * @module swarming-ui/modules/bot-mass-delete
@@ -28,7 +25,7 @@ import "elements-sk/styles/buttons";
  * @fires bots-deleting-finished
  */
 
-const listItem = (dim) => html`<li>${dim}</li>`;
+const listItem = (dim) => html`<li>${dim.key}:${dim.value}</li>`;
 
 const template = (ele) => html`
   <div>
@@ -78,18 +75,32 @@ window.customElements.define(
       this._started = false;
       this._finished = false;
       this._progress = 0;
+      // This is set to undefined so that it picks up the initial
+      // value sent through attributes on the first load.
+      // See initPropertyFromAttrOrProperty
+      this._dimensions = undefined;
     }
 
     connectedCallback() {
       initPropertyFromAttrOrProperty(this, "authHeader");
       initPropertyFromAttrOrProperty(this, "dimensions");
-      // Used for when default was loaded via attribute.
-      if (typeof this.dimensions === "string") {
-        this.dimensions = this.dimensions.split(",");
+      this.render();
+    }
+
+    set dimensions(newVal) {
+      if (typeof newVal === "string") {
+        newVal = newVal.split(",");
       }
       // sort for determinism
-      this.dimensions.sort();
-      this.render();
+      newVal.sort();
+      this._dimensions = newVal.map((dim) => {
+        const [key, value] = dim.split(":");
+        return { key, value };
+      });
+    }
+
+    get dimensions() {
+      return this._dimensions;
     }
 
     _deleteAll() {
@@ -98,44 +109,33 @@ window.customElements.define(
         new CustomEvent("bots-deleting-started", { bubbles: true })
       );
 
-      const queryParams = query.fromObject({
+      const request = {
         dimensions: this.dimensions,
         limit: 200, // see https://crbug.com/908423
-        fields: "cursor,items/bot_id",
         is_dead: "TRUE",
-      });
-
-      const extra = {
-        headers: { authorization: this.authHeader },
       };
 
+      const service = new BotsService(this.authHeader);
       let bots = [];
-      fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          const maybeLoadMore = (json) => {
-            bots = bots.concat(json.items);
+
+      service
+        .list(request)
+        .then((resp) => {
+          const maybeLoadMore = (resp) => {
+            bots = bots.concat(resp.items || []);
             this.render();
-            if (json.cursor) {
-              const queryParams = query.fromObject({
-                cursor: json.cursor,
+            if (resp.cursor) {
+              const request = {
+                cursor: resp.cursor,
                 dimensions: this.dimensions,
                 limit: 200, // see https://crbug.com/908423
-                fields: "cursor,items/bot_id",
                 is_dead: "TRUE",
-              });
-              fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
-                .then(jsonOrThrow)
+              };
+              service
+                .list(request)
                 .then(maybeLoadMore)
                 .catch((e) => fetchError(e, "bot-mass-delete/list (paging)"));
             } else {
-              // Now that we have the complete list of bots (e.g. no paging left)
-              // delete the bots one at a time, updating this._progress to be the
-              // number completed.
-              const post = {
-                headers: { authorization: this.authHeader },
-                method: "POST",
-              };
               const deleteNext = (bots) => {
                 if (!bots.length) {
                   this._finished = true;
@@ -146,10 +146,8 @@ window.customElements.define(
                   return;
                 }
                 const toDelete = bots.pop();
-                fetch(
-                  `/_ah/api/swarming/v1/bot/${toDelete.bot_id}/delete`,
-                  post
-                )
+                service
+                  .delete(toDelete.botId)
                   .then(() => {
                     this._progress++;
                     this.render();
@@ -160,7 +158,7 @@ window.customElements.define(
               deleteNext(bots);
             }
           };
-          maybeLoadMore(json);
+          maybeLoadMore(resp);
         })
         .catch((e) => fetchError(e, "bot-mass-delete/list"));
 
@@ -173,20 +171,13 @@ window.customElements.define(
         console.warn("no authHeader received, try refreshing the page?");
         return;
       }
-      const extra = {
-        headers: { authorization: this.authHeader },
-      };
-      const queryParams = query.fromObject({ dimensions: this.dimensions });
-
-      const countPromise = fetch(
-        `/_ah/api/swarming/v1/bots/count?${queryParams}`,
-        extra
-      )
-        .then(jsonOrThrow)
-        .then((json) => {
+      const service = new BotsService(this.authHeader);
+      const countPromise = service
+        .count(this.dimensions)
+        .then((resp) => {
           this._readyToDelete = true;
           this.render();
-          return parseInt(json.dead);
+          return parseInt(resp.dead || 0);
         })
         .catch((e) => fetchError(e, "bot-mass-delete/count"));
       this._count = html`${until(countPromise, "...")}`;

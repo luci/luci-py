@@ -10,12 +10,11 @@
 // it should go inside the element declaration.
 
 import * as human from "common-sk/modules/human";
-// query.fromObject is more readable than just 'fromObject'
-import * as query from "common-sk/modules/query";
 import { html } from "lit-html";
 import naturalSort from "javascript-natural-sort/naturalSort";
 import {
   compareWithFixedOrder,
+  Humanizer,
   sanitizeAndHumanizeTime,
   taskPageLink,
 } from "../util";
@@ -115,26 +114,26 @@ export function devices(bot) {
 // dimensions and these values.
 export const specialFilters = {
   id: function (bot, id) {
-    return bot.bot_id === id;
+    return bot.botId === id;
   },
   status: function (bot, status) {
     if (status === "quarantined") {
       return bot.quarantined;
     } else if (status === "maintenance") {
-      return !!bot.maintenance_msg;
+      return !!bot.maintenanceMsg;
     } else if (status === "dead") {
-      return bot.is_dead;
+      return bot.isDead;
     } else {
       // Status must be 'alive'.
-      return !bot.is_dead;
+      return !bot.isDead;
     }
   },
   task: function (bot, task) {
     if (task === "idle") {
-      return !bot.task_id;
+      return !bot.taskId;
     }
     // Task must be 'busy'.
-    return !!bot.task_id;
+    return !!bot.taskId;
   },
 };
 
@@ -259,33 +258,33 @@ export function listQueryParams(filters, limit, cursor) {
     const rest = f.substring(col.length + 1);
     if (col === "status") {
       if (rest === "alive") {
-        params["is_dead"] = ["FALSE"];
+        params.is_dead = "FALSE";
       } else if (rest === "quarantined") {
-        params["quarantined"] = ["TRUE"];
+        params.quarantined = "TRUE";
       } else if (rest === "maintenance") {
-        params["in_maintenance"] = ["TRUE"];
+        params.in_maintenance = "TRUE";
       } else if (rest === "dead") {
-        params["is_dead"] = ["TRUE"];
+        params.is_dead = "TRUE";
       }
     } else if (col === "task") {
       if (rest === "busy") {
-        params["is_busy"] = ["TRUE"];
+        params.is_busy = "TRUE";
       } else if (rest === "idle") {
-        params["is_busy"] = ["FALSE"];
+        params.is_busy = "FALSE";
       }
     } else {
       // We can assume dimension here. The only other possibility
       // is that a user has changed their filters w/o using the UI
       // (which checks proper dimensions) and garbage in == garbage out.
-      dims.push(col + ":" + rest);
+      dims.push({ key: col, value: rest });
     }
   }
-  params["dimensions"] = dims;
-  params["limit"] = limit;
+  params.dimensions = dims;
+  params.limit = limit;
   if (cursor) {
-    params["cursor"] = cursor;
+    params.cursor = cursor;
   }
-  return query.fromObject(params);
+  return params;
 }
 
 /** longestOrAll returns the longest (by string length) value of the array
@@ -329,7 +328,7 @@ export function makePossibleColumns(arr) {
   return dims;
 }
 
-const BOT_TIMES = ["first_seen_ts", "last_seen_ts", "lease_expiration_ts"];
+const BOT_TIMES = ["firstSeenTs", "lastSeenTs", "leaseExpirationTs"];
 
 /** processBots processes the array of bots from the server and returns it.
  *  The primary goal is to get the data ready for display.
@@ -342,6 +341,7 @@ export function processBots(arr) {
   }
   for (const bot of arr) {
     bot.state = (bot.state && JSON.parse(bot.state)) || {};
+    bot.humanized = new Humanizer(bot);
     // get the disks in an easier to deal with format, sorted by size.
     const disks = bot.state.disks || {};
     const keys = Object.keys(disks);
@@ -408,13 +408,15 @@ export function processBots(arr) {
  */
 export function processCounts(output, countJSON) {
   // output is expected to be in the order described by countTypes.
-  output[0].value = parseInt(countJSON.count); // All
-  output[1].value = parseInt(countJSON.count) - parseInt(countJSON.dead); // Alive
-  output[2].value = parseInt(countJSON.busy); // Busy
-  output[3].value = parseInt(countJSON.count) - parseInt(countJSON.busy); // Idle
-  output[4].value = parseInt(countJSON.dead); // Dead
-  output[5].value = parseInt(countJSON.quarantined); // Quarantined
-  output[6].value = parseInt(countJSON.maintenance); // Maintenance
+  output[0].value = parseInt(countJSON.count || 0); // All
+  output[1].value =
+    parseInt(countJSON.count || 0) - parseInt(countJSON.dead || 0); // Alive
+  output[2].value = parseInt(countJSON.busy || 0); // Busy
+  output[3].value =
+    parseInt(countJSON.count || 0) - parseInt(countJSON.busy || 0); // Idle
+  output[4].value = parseInt(countJSON.dead || 0); // Dead
+  output[5].value = parseInt(countJSON.quarantined || 0); // Quarantined
+  output[6].value = parseInt(countJSON.maintenance || 0); // Maintenance
   return output;
 }
 
@@ -516,7 +518,7 @@ const naturalSortDims = {
   cpu: true,
   gpu: true,
   "host-cpu": true,
-  machine_type: true,
+  machineType: true,
   os: true,
   python: true,
   xcode_version: true,
@@ -537,16 +539,17 @@ const dimensionsDenylist = ["quarantined", "error", "id"];
  *  that are not dimensions.
 .*/
 const extraKeys = [
+  "task",
+  "externalIp",
+  "lastSeen",
+  "firstSeen",
+  "version",
+  // Derived
   "disk_space",
   "uptime",
   "running_time",
-  "task",
   "status",
-  "version",
-  "external_ip",
   "internal_ip",
-  "last_seen",
-  "first_seen",
   "battery_level",
   "battery_voltage",
   "battery_temperature",
@@ -559,8 +562,14 @@ const extraKeys = [
 
 /** colHeaderMap maps keys to their human readable name.*/
 const colHeaderMap = {
+  // Returned as part of BotInfo
   id: "Bot Id",
   task: "Current Task",
+  externalIp: "External IP",
+  firstSeen: "First Seen",
+  lastSeen: "Last Seen",
+  version: "Client Code Version",
+  // Derived from parsing BotInfo.state
   android_devices: "Android Devices",
   battery_health: "Battery Health",
   battery_level: "Battery Level (%)",
@@ -575,11 +584,8 @@ const colHeaderMap = {
   device_temperature: "Device Temp (°C)",
   device_type: "Device Type",
   disk_space: "Free Space (MB)",
-  external_ip: "External IP",
-  first_seen: "First Seen",
   gpu: "GPU type",
   internal_ip: "Internal or Local IP",
-  last_seen: "Last Seen",
   os: "OS",
   pool: "Pool",
   running_time: "Swarming Uptime",
@@ -587,7 +593,6 @@ const colHeaderMap = {
   status: "Status",
   uptime: "Bot Uptime",
   xcode_version: "XCode Version",
-  version: "Client Code Version",
 };
 
 // Taken from http://developer.android.com/reference/android/os/BatteryManager.html
@@ -610,9 +615,9 @@ const BATTERY_STATUS_ALIASES = {
 };
 
 function getStatusSortIndex(bot) {
-  if (bot.is_dead) return 4;
+  if (bot.isDead) return 4;
   if (bot.quarantined) return 3;
-  if (bot.maintenance_msg) return 2;
+  if (bot.maintenanceMsg) return 2;
 
   // Bot is alive.
   return 1;
@@ -627,11 +632,11 @@ export const forcedColumns = ["id"];
 export const specialSortMap = {
   disk_space: (dir, botA, botB) =>
     dir * naturalSort(botA.disks[0].mb, botB.disks[0].mb),
-  id: (dir, botA, botB) => dir * naturalSort(botA.bot_id, botB.bot_id),
-  first_seen: (dir, botA, botB) =>
-    dir * naturalSort(botA.first_seen_ts, botB.first_seen_ts),
-  last_seen: (dir, botA, botB) =>
-    dir * naturalSort(botA.last_seen_ts, botB.last_seen_ts),
+  id: (dir, botA, botB) => dir * naturalSort(botA.botId, botB.botId),
+  firstSeen: (dir, botA, botB) =>
+    dir * naturalSort(botA.firstSeenTs, botB.firstSeenTs),
+  lastSeen: (dir, botA, botB) =>
+    dir * naturalSort(botA.lastSeenTs, botB.lastSeenTs),
   status: (dir, botA, botB) => {
     const statusIndexA = getStatusSortIndex(botA);
     const statusIndexB = getStatusSortIndex(botB);
@@ -640,8 +645,8 @@ export const specialSortMap = {
     }
 
     // Tiebreakers when in bad states are broken by last seen time.
-    if (botA.is_dead || botA.quarantined || botA.maintenance_msg) {
-      return dir * (botA.last_seen_ts - botB.last_seen_ts);
+    if (botA.isDead || botA.quarantined || botA.maintenanceMsg) {
+      return dir * (botA.lastSeenTs - botB.lastSeenTs);
     }
 
     // When bots are alive, actually tie, and rely on the
@@ -669,6 +674,88 @@ function deviceHelper(callback) {
 }
 
 const colMap = {
+  // Derived from BotInfo returned as part of the request.
+  version: (bot, ele) => {
+    const v = bot.version || "UNKNOWN";
+    if (ele._verbose) {
+      return v;
+    }
+    return v.substring(0, 10);
+  },
+  externalIp: (bot, _ele) => {
+    return bot.externalIp || EMPTY_VAL;
+  },
+  firstSeen: (bot, _ele) => {
+    return bot.humanized.time.firstSeenTs;
+  },
+  id: (bot, _ele) => html`<a
+    target="_blank"
+    rel="noopener"
+    href=${botLink(bot.botId)}
+    >${bot.botId}</a
+  >`,
+  lastSeen: (bot, ele) => {
+    if (ele._verbose) {
+      return human.localeTime(bot.lastSeenTs);
+    }
+    return timeDiffApprox(bot.lastSeenTs) + " ago";
+  },
+  status: (bot, _ele) => {
+    if (bot.isDead) {
+      return `Dead. Last seen ${human.diffDate(bot.lastSeenTs)} ago`;
+    }
+    if (bot.quarantined) {
+      let msg = fromState(bot, "quarantined");
+      if (msg) {
+        msg = msg[0];
+      }
+      // Sometimes, the quarantined message is actually in 'error'.  This
+      // happens when the bot code has thrown an exception.
+      if (!msg || msg === "true" || msg === true) {
+        msg = attribute(bot, "error")[0];
+      }
+      // Other times, the bot has reported it is quarantined by setting the
+      // dimension 'quarantined' to be something.
+      if (msg === "UNKNOWN") {
+        msg = fromDimension(bot, "quarantined") || "UNKNOWN";
+      }
+      const deviceStates = [];
+      // Show all the errors that are active on devices to make it more
+      // clear if this is a transient error (e.g. device is too hot)
+      // or if it is requires human interaction (e.g. device is unauthorized)
+      devices(bot).forEach(function (d) {
+        deviceStates.push(d.state);
+      });
+      if (deviceStates.length) {
+        msg += ` devices: [${deviceStates.join(", ")}]`;
+      }
+      return `Quarantined: ${msg}`;
+    }
+    if (bot.maintenanceMsg) {
+      return `Maintenance: ${bot.maintenanceMsg}`;
+    }
+    return "Alive";
+  },
+  task: (bot, _ele) => {
+    if (!bot.taskId) {
+      return "idle";
+    }
+    let id = bot.taskId;
+    let mouseover = bot.taskName;
+    if (bot.isDead) {
+      id = "[died on task]";
+      mouseover = `Bot ${bot.botId} was last seen running task ${bot.taskId} (${bot.taskName})`;
+    }
+
+    return html`<a
+      target="_blank"
+      rel="noopener"
+      title=${mouseover}
+      href=${taskPageLink(bot.taskId)}
+      >${id}</a
+    >`;
+  },
+  // Derived from parsing botInfo.state
   android_devices: (bot, ele) => {
     const devs = attribute(bot, "android_devices", "0");
     if (ele._verbose) {
@@ -728,28 +815,10 @@ const colMap = {
     }
     return aliased[0];
   },
-  external_ip: (bot, ele) => {
-    return bot.external_ip || EMPTY_VAL;
-  },
-  first_seen: (bot, ele) => {
-    return human.localeTime(bot.first_seen_ts);
-  },
-  id: (bot, ele) => html`<a
-    target="_blank"
-    rel="noopener"
-    href=${botLink(bot.bot_id)}
-    >${bot.bot_id}</a
-  >`,
-  internal_ip: (bot, ele) => {
+  internal_ip: (bot, _ele) => {
     return attribute(bot, "ip", EMPTY_VAL)[0];
   },
-  last_seen: (bot, ele) => {
-    if (ele._verbose) {
-      return human.localeTime(bot.last_seen_ts);
-    }
-    return timeDiffApprox(bot.last_seen_ts) + " ago";
-  },
-  running_time: (bot, ele) => {
+  running_time: (bot, _ele) => {
     const r = fromState(bot, "running_time");
     if (!r) {
       return "UNKNOWN";
@@ -759,73 +828,39 @@ const colMap = {
   serial_number: deviceHelper((device) => {
     return device.serial || "UNKNOWN";
   }),
-  status: (bot, ele) => {
-    if (bot.is_dead) {
-      return `Dead. Last seen ${human.diffDate(bot.last_seen_ts)} ago`;
-    }
-    if (bot.quarantined) {
-      let msg = fromState(bot, "quarantined");
-      if (msg) {
-        msg = msg[0];
-      }
-      // Sometimes, the quarantined message is actually in 'error'.  This
-      // happens when the bot code has thrown an exception.
-      if (!msg || msg === "true" || msg === true) {
-        msg = attribute(bot, "error")[0];
-      }
-      // Other times, the bot has reported it is quarantined by setting the
-      // dimension 'quarantined' to be something.
-      if (msg === "UNKNOWN") {
-        msg = fromDimension(bot, "quarantined") || "UNKNOWN";
-      }
-      const deviceStates = [];
-      // Show all the errors that are active on devices to make it more
-      // clear if this is a transient error (e.g. device is too hot)
-      // or if it is requires human interaction (e.g. device is unauthorized)
-      devices(bot).forEach(function (d) {
-        deviceStates.push(d.state);
-      });
-      if (deviceStates.length) {
-        msg += ` devices: [${deviceStates.join(", ")}]`;
-      }
-      return `Quarantined: ${msg}`;
-    }
-    if (bot.maintenance_msg) {
-      return `Maintenance: ${bot.maintenance_msg}`;
-    }
-    return "Alive";
-  },
-  task: (bot, ele) => {
-    if (!bot.task_id) {
-      return "idle";
-    }
-    let id = bot.task_id;
-    let mouseover = bot.task_name;
-    if (bot.is_dead) {
-      id = "[died on task]";
-      mouseover = `Bot ${bot.bot_id} was last seen running task ${bot.task_id} (${bot.task_name})`;
-    }
-
-    return html`<a
-      target="_blank"
-      rel="noopener"
-      title=${mouseover}
-      href=${taskPageLink(bot.task_id)}
-      >${id}</a
-    >`;
-  },
-  uptime: (bot, ele) => {
+  uptime: (bot, _ele) => {
     const u = fromState(bot, "uptime");
     if (!u) {
       return "UNKNOWN";
     }
     return human.strDuration(u);
   },
-  version: (bot, ele) => {
-    const v = bot.version || "UNKNOWN";
-    if (ele._verbose) {
-      return v;
-    }
-    return v.substring(0, 10);
-  },
 };
+
+/**
+ * Before using the pRPC API, some column names were in snake_case.
+ * Converts state of old links to new state available.
+ * Ensures that we are backwards compatible with old links.
+ *
+ * Modifies the state in place.
+ **/
+export function convertFromLegacyState(state) {
+  // Converts old column names to new ones
+  const legacyColMapping = {
+    last_seen: "lastSeen",
+    first_seen: "firstSeen",
+    external_ip: "externalIp",
+  };
+  state.c = (state.c || []).map((col) => {
+    const mappedColumn = legacyColMapping[col];
+    if (mappedColumn) {
+      return mappedColumn;
+    }
+    return col;
+  });
+  // Convert legacy sort if necessary
+  const mappedSort = legacyColMapping[state.s];
+  if (mappedSort) {
+    state.s = mappedSort;
+  }
+}

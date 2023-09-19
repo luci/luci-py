@@ -109,4 +109,15 @@ export class BotsService extends PrpcService {
   dimensions(pool) {
     return this._call("GetBotDimensions", { pool });
   }
+
+  /**
+   * Fetches a list of bots matching given filters.
+   *
+   * @param {Object} request is a ListBotRequest described here - https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#1063
+   *
+   * @returns {Object} BotInfoListResponse described here - https://chromium.googlesource.com/infra/luci/luci-py/+/ba4f94742a3ce94c49432417fbbe3bf1ef9a1fa0/appengine/swarming/proto/api_v2/swarming.proto#965
+   **/
+  list(request) {
+    return this._call("ListBots", request);
+  }
 }

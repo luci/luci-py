@@ -4,6 +4,8 @@
 
 import "modules/bot-list";
 import fetchMock from "fetch-mock";
+import { eventually, mockUnauthorizedPrpc } from "../test_util";
+import { convertFromLegacyState } from "./bot-list-helpers";
 
 describe("bot-list", function () {
   // Instead of using import, we use require. Otherwise,
@@ -19,6 +21,8 @@ describe("bot-list", function () {
     getChildItemWithText,
     mockAppGETs,
     MATCHED,
+    mockPrpc,
+    createRequestFilter,
   } = require("modules/test_util");
 
   const {
@@ -47,7 +51,7 @@ describe("bot-list", function () {
     );
   });
 
-  beforeEach(function () {
+  function setupFetchMock(includeList = true) {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
     mockAppGETs(fetchMock, {
@@ -55,16 +59,29 @@ describe("bot-list", function () {
     });
 
     fetchMock.get("glob:/_ah/api/swarming/v1/server/permissions*", {});
-    fetchMock.get("glob:/_ah/api/swarming/v1/bots/list?*", bots10);
-    fetchMock.get(
-      "glob:/_ah/api/swarming/v1/bots/dimensions?*",
+    if (includeList) {
+      mockPrpc(fetchMock, "swarming.v2.Bots", "ListBots", bots10);
+    }
+    mockPrpc(
+      fetchMock,
+      "swarming.v2.Bots",
+      "GetBotDimensions",
       fleetDimensions
     );
-    fetchMock.get("/_ah/api/swarming/v1/bots/count", fleetCount);
-    fetchMock.get("glob:/_ah/api/swarming/v1/bots/count?*", queryCount);
+    mockPrpc(fetchMock, "swarming.v2.Bots", "CountBots", fleetCount, (req) => {
+      if ((req.dimensions || []).length <= 0) {
+        return fleetCount;
+      } else {
+        return queryCount;
+      }
+    });
 
     // Everything else
     fetchMock.catch(404);
+  }
+
+  beforeEach(function () {
+    setupFetchMock();
   });
 
   afterEach(function () {
@@ -184,12 +201,8 @@ describe("bot-list", function () {
           },
           { overwriteRoutes: true }
         );
-        fetchMock.get("glob:/_ah/api/swarming/v1/bots/list?*", 403, {
-          overwriteRoutes: true,
-        });
-        fetchMock.get("glob:/_ah/api/swarming/v1/bots/dimensions?*", 403, {
-          overwriteRoutes: true,
-        });
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "ListBots");
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "GetBotDimensions");
       }
 
       beforeEach(notAuthorized);
@@ -211,6 +224,11 @@ describe("bot-list", function () {
           const valueFilters = $(".filter_box .selector.values .item", ele);
           expect(valueFilters).toHaveSize(1);
           expect(valueFilters[0]).toMatchTextContent("pool1");
+
+          // We expect that the filters will be loaded with a specific pool
+          // even if the user is unauthorized.
+          // Therfore we should ignore all unauthorized errors.
+          expect(ele._message).not.toContain("User unauthorized");
 
           done();
         });
@@ -389,7 +407,10 @@ describe("bot-list", function () {
             expect(tds[0].innerHTML).toContain(
               encodeURIComponent("status:alive")
             );
-            expect(tds[1]).toMatchTextContent("429");
+            // No filters are set at this point, therfore
+            // second count request to create "queryCount" is sent without
+            // dimensions, meaning alive=
+            expect(tds[1]).toMatchTextContent("11379", "count=11434 - dead=55");
             const link = $$("a", tds[0]);
             expect(link.href).toContain("f=status%3Aalive");
             // the following happens if links are constructed poorly.
@@ -402,7 +423,8 @@ describe("bot-list", function () {
             expect(tds[0].innerHTML).toContain(
               encodeURIComponent("status:maintenance")
             );
-            expect(tds[1]).toMatchTextContent("0");
+            // See fleetCount.maintenance
+            expect(tds[1]).toMatchTextContent("6");
 
             // by default fleet table should be hidden
             expect(fleetTable.parentElement).toHaveAttribute(
@@ -437,7 +459,7 @@ describe("bot-list", function () {
         ele.render();
 
         const actualOSOrder = ele._bots.map((b) => column("os", b, ele));
-        const actualIDOrder = ele._bots.map((b) => b.bot_id);
+        const actualIDOrder = ele._bots.map((b) => b.botId);
 
         expect(actualOSOrder).toEqual([
           "Android",
@@ -480,7 +502,7 @@ describe("bot-list", function () {
         ele.render();
 
         const actualOSOrder = ele._bots.map((b) => column("os", b, ele));
-        const actualIDOrder = ele._bots.map((b) => b.bot_id);
+        const actualIDOrder = ele._bots.map((b) => b.botId);
 
         expect(actualOSOrder).toEqual([
           "Windows 10 version 1709 (Windows-10-16299.431)",
@@ -513,11 +535,11 @@ describe("bot-list", function () {
     it("can sort times correctly", function (done) {
       loggedInBotlist((ele) => {
         ele._verbose = false;
-        ele._sort = "last_seen";
+        ele._sort = "lastSeen";
         ele._dir = "asc";
         ele.render();
 
-        const actualIDOrder = ele._bots.map((b) => b.bot_id);
+        const actualIDOrder = ele._bots.map((b) => b.botId);
 
         expect(actualIDOrder).toEqual([
           "somebot12-a9",
@@ -852,25 +874,22 @@ describe("bot-list", function () {
 
         expect(ele._bots).toHaveSize(10, "All 10 at the start");
 
-        let wasCalled = false;
-        fetchMock.get(
-          "glob:/_ah/api/swarming/v1/bots/list?*",
-          () => {
-            expect(ele._bots).toHaveSize(5, "5 Linux bots there now.");
-            wasCalled = true;
-            return "[]"; // pretend no bots match
-          },
-          { overwriteRoutes: true }
-        );
+        fetchMock.reset();
+        setupFetchMock(false);
+        mockPrpc(fetchMock, "swarming.v2.Bots", "ListBots", (_body) => {
+          expect(ele._bots).toHaveSize(5, "5 Linux bots there now.");
+          return [];
+        });
 
         ele._addFilter("os:Linux");
         // The true on flush waits for res.json() to resolve too, which
         // is when we know the element has updated the _bots.
         fetchMock.flush(true).then(() => {
-          expect(wasCalled).toBeTruthy();
-          expect(ele._bots).toHaveSize(0, "none were actually returned");
-
-          done();
+          eventually(ele, (ele) => {
+            expectNoUnmatchedCalls(fetchMock);
+            expect(ele._bots).toHaveSize(0, "none were actually returned");
+            done();
+          });
         });
       });
     });
@@ -889,17 +908,16 @@ describe("bot-list", function () {
 
         // Spy on the list call to make sure a request is made with the right filter.
         let calledTimes = 0;
-        fetchMock.get(
-          "glob:/_ah/api/swarming/v1/bots/list?*",
-          (url, _) => {
-            expect(url).toContain(
-              encodeURIComponent("valid:filter:gpu:can:have:many:colons")
-            );
-            calledTimes++;
-            return "[]"; // pretend no bots match
-          },
-          { overwriteRoutes: true }
-        );
+        fetchMock.reset();
+        setupFetchMock(false);
+        mockPrpc(fetchMock, "swarming.v2.Bots", "ListBots", (req) => {
+          calledTimes++;
+          expect(req.dimensions).toContain({
+            key: "valid",
+            value: "filter:gpu:can:have:many:colons",
+          });
+          return [];
+        });
 
         filterInput.value = "valid:filter:gpu:can:have:many:colons";
         ele._filterSearch({ key: "Enter" });
@@ -1080,7 +1098,7 @@ describe("bot-list", function () {
         const prompt = $$("bot-mass-delete", ele);
         expect(prompt).toBeTruthy();
 
-        expect(prompt.dimensions).toEqual(["pool:Skia"]);
+        expect(prompt.dimensions).toEqual([{ key: "pool", value: "Skia" }]);
 
         done();
       });
@@ -1104,14 +1122,12 @@ describe("bot-list", function () {
       });
     });
 
-    function checkAuthorizationAndNoPosts(calls) {
+    function checkAuthorization(calls) {
       // check authorization headers are set
       calls.forEach((c) => {
         expect(c[1].headers).toBeDefined();
         expect(c[1].headers.authorization).toContain("Bearer ");
       });
-      calls = fetchMock.calls(MATCHED, "POST");
-      expect(calls).toHaveSize(0, "no POSTs on bot-list");
 
       expectNoUnmatchedCalls(fetchMock);
     }
@@ -1120,21 +1136,23 @@ describe("bot-list", function () {
       loggedInBotlist((ele) => {
         const calls = fetchMock.calls(MATCHED, "GET");
         expect(calls).toHaveSize(
-          2 + 5,
-          "2 GETs from swarming-app, 5 from bot-list"
+          3,
+          "2 GETs from swarming-app, 1 from bot-list for permissions"
         );
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        const gets = calls.map((c) => c[0]);
+        const posts = fetchMock.calls(MATCHED, "POST");
+        const listCheck = createRequestFilter("swarming.v2.Bots", "ListBots", {
+          dimensions: [],
+          limit: 100,
+        });
+        expect(posts.filter(listCheck)).toHaveSize(1);
+        expect(
+          posts.filter(createRequestFilter("swarming.v2.Bots", "CountBots"))
+        ).toHaveSize(2);
 
-        // limit=100 comes from the default limit value.
-        expect(gets).toContainRegex(
-          /\/_ah\/api\/swarming\/v1\/bots\/list.+limit=100.*/
-        );
-        expect(gets).toContain("/_ah/api/swarming/v1/bots/count");
-
-        checkAuthorizationAndNoPosts(calls);
+        checkAuthorization(calls);
         done();
       });
     });
@@ -1144,38 +1162,36 @@ describe("bot-list", function () {
         fetchMock.resetHistory();
         ele._addFilter("alpha:beta");
 
-        let calls = fetchMock.calls(MATCHED, "GET");
-        expect(calls).toHaveSize(
-          4,
-          "1 for the bots, 1 for the count, 1 for the permissions, " +
-            "1 for the dimensions"
-        );
+        const calls = fetchMock.calls(MATCHED, "GET");
+        expect(calls).toHaveSize(1, "1 for the dimensions");
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        let gets = calls.map((c) => c[0]);
-
-        expect(gets).toContainRegex(
-          /\/_ah\/api\/swarming\/v1\/bots\/list.+dimensions=alpha%3Abeta.*/
+        let posts = fetchMock.calls(MATCHED, "POST");
+        const listCheck = createRequestFilter("swarming.v2.Bots", "ListBots", {
+          dimensions: [{ key: "alpha", value: "beta" }],
+          limit: 100,
+        });
+        expect(posts.filter(listCheck)).toHaveSize(1);
+        const countsCheck = createRequestFilter(
+          "swarming.v2.Bots",
+          "CountBots",
+          {
+            dimensions: [{ key: "alpha", value: "beta" }],
+          }
         );
-        expect(gets).toContainRegex(
-          /\/_ah\/api\/swarming\/v1\/bots\/count.+dimensions=alpha%3Abeta.*/
-        );
-        checkAuthorizationAndNoPosts(calls);
+        expect(posts.filter(countsCheck)).toHaveSize(1);
+        checkAuthorization(calls);
 
         fetchMock.resetHistory();
         ele._removeFilter("alpha:beta");
 
-        calls = fetchMock.calls(MATCHED, "GET");
-        gets = calls.map((c) => c[0]);
-        expect(gets).not.toContainRegex(
-          /\/_ah\/api\/swarming\/v1\/bots\/list.+alpha%3Abeta.*/
-        );
-        expect(gets).not.toContainRegex(
-          /\/_ah\/api\/swarming\/v1\/bots\/count.+alpha%3Abeta.*/
-        );
+        posts = fetchMock.calls(MATCHED, "POST");
 
-        checkAuthorizationAndNoPosts(calls);
+        expect(posts.filter(listCheck)).toBeLessThan(1);
+        expect(posts.filter(countsCheck)).toBeLessThan(1);
+
+        checkAuthorization(calls);
         done();
       });
     });
@@ -1218,7 +1234,7 @@ describe("bot-list", function () {
     it("turns the dates into DateObjects", function () {
       // Make a copy of the object because _processBots will modify it in place.
       const bots = processBots([deepCopy(LINUX_BOT)]);
-      const ts = bots[0].first_seen_ts;
+      const ts = bots[0].firstSeenTs;
       expect(ts).toBeTruthy();
       expect(ts instanceof Date).toBeTruthy("Should be a date object");
     });
@@ -1249,7 +1265,7 @@ describe("bot-list", function () {
     it("turns the dimension map into a list", function () {
       // makePossibleColumns may modify the passed in variable.
       const possibleCols = makePossibleColumns(
-        deepCopy(fleetDimensions.bots_dimensions)
+        deepCopy(fleetDimensions.botsDimensions)
       );
 
       expect(possibleCols).toBeTruthy();
@@ -1277,7 +1293,7 @@ describe("bot-list", function () {
 
     it("extracts the key->value map", function () {
       // makePossibleColumns may modify the passed in variable.
-      const pMap = processPrimaryMap(deepCopy(fleetDimensions.bots_dimensions));
+      const pMap = processPrimaryMap(deepCopy(fleetDimensions.botsDimensions));
 
       expect(pMap).toBeTruthy();
       // Note this list doesn't include the keys in the denylist.
@@ -1331,7 +1347,7 @@ describe("bot-list", function () {
 
       let filtered = filterBots(["status:quarantined"], bots);
       expect(filtered).toHaveSize(1);
-      expect(filtered[0].bot_id).toEqual("somebot11-a9");
+      expect(filtered[0].botId).toEqual("somebot11-a9");
 
       filtered = filterBots(["task:busy"], bots);
       expect(filtered).toHaveSize(4);
@@ -1341,7 +1357,7 @@ describe("bot-list", function () {
         "somebot17-a9",
         "somebot77-a3",
       ];
-      const actualIds = filtered.map((bot) => bot.bot_id);
+      const actualIds = filtered.map((bot) => bot.botId);
       actualIds.sort();
       expect(actualIds).toEqual(expectedIds);
     });
@@ -1361,9 +1377,21 @@ describe("bot-list", function () {
         "somebot15-a9",
         "somebot77-a3",
       ];
-      const actualIds = filtered.map((bot) => bot.bot_id);
+      const actualIds = filtered.map((bot) => bot.botId);
       actualIds.sort();
       expect(actualIds).toEqual(expectedIds);
+    });
+
+    it("correctly converts legacy url from old state", function () {
+      const state = {
+        c: ["last_seen", "first_seen", "external_ip"],
+        s: "last_seen",
+      };
+      convertFromLegacyState(state);
+      expect(state).toEqual({
+        c: ["lastSeen", "firstSeen", "externalIp"],
+        s: "lastSeen",
+      });
     });
 
     it("correctly makes query params from filters", function () {
@@ -1374,21 +1402,33 @@ describe("bot-list", function () {
           // basic 'alive'
           limit: 256,
           filters: ["pool:Skia", "os:Android", "status:alive"],
-          output:
-            "dimensions=pool%3ASkia&dimensions=os%3AAndroid" +
-            "&is_dead=FALSE&limit=256",
+          output: {
+            dimensions: [
+              { key: "pool", value: "Skia" },
+              { key: "os", value: "Android" },
+            ],
+            is_dead: "FALSE",
+            limit: 256,
+          },
         },
         {
           // no filters
           limit: 123,
           filters: [],
-          output: "limit=123",
+          output: {
+            limit: 123,
+            dimensions: [],
+          },
         },
         {
           // dead
           limit: 456,
           filters: ["status:dead", "device_type:bullhead"],
-          output: "dimensions=device_type%3Abullhead&is_dead=TRUE&limit=456",
+          output: {
+            dimensions: [{ key: "device_type", value: "bullhead" }],
+            is_dead: "TRUE",
+            limit: 456,
+          },
         },
         {
           // multiple of a filter
@@ -1398,15 +1438,24 @@ describe("bot-list", function () {
             "device_type:bullhead",
             "device_type:marlin",
           ],
-          output:
-            "dimensions=device_type%3Abullhead&dimensions=device_type%3Amarlin" +
-            "&in_maintenance=TRUE&limit=789",
+          output: {
+            dimensions: [
+              { key: "device_type", value: "bullhead" },
+              { key: "device_type", value: "marlin" },
+            ],
+            in_maintenance: "TRUE",
+            limit: 789,
+          },
         },
         {
           // is_busy
           limit: 7,
           filters: ["task:busy"],
-          output: "is_busy=TRUE&limit=7",
+          output: {
+            is_busy: "TRUE",
+            limit: 7,
+            dimensions: [],
+          },
         },
       ];
 
@@ -1421,7 +1470,7 @@ describe("bot-list", function () {
         testcase.limit,
         "mock_cursor12345"
       );
-      expect(qp).toEqual("cursor=mock_cursor12345&" + testcase.output);
+      expect(qp).toEqual({ ...testcase.output, cursor: "mock_cursor12345" });
     });
   }); // end describe('data parsing')
 });

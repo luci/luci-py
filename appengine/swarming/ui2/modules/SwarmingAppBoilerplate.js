@@ -129,15 +129,23 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
       @param {boolean} ignoreAuthError - A flag to ignore 403 error.
    */
   prpcError(e, loadingWhat, ignoreAuthError) {
-    if (e.codeName === "PERMISSION_DENIED") {
+    if (e.codeName === "PERMISSION_DENIED" && !ignoreAuthError) {
       this._message =
         "User unauthorized - try logging in " + "with a different account";
       this._notAuthorized = true;
       this.render();
-      this._app.finishedTask();
-    } else {
-      this.fetchError(e, loadingWhat, ignoreAuthError);
+    } else if (e.name !== "AbortError") {
+      // We can ignore AbortError since they fire anytime a filter is added
+      // or removed (even for fetch promises that have already been resolved).
+      // Chrome and Firefox report a DOMException in this case:
+      // https://developer.mozilla.org/en-US/docs/Web/API/DOMException
+      console.error(e);
+      errorMessage(
+        `Unexpected error loading ${loadingWhat}: ${e.message}`,
+        5000
+      );
     }
+    this._app.finishedTask();
   }
 
   /** Handles a fetch error, possibly signaling the user isn't authorized to

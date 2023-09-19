@@ -213,6 +213,11 @@ describe("task-list", function () {
           expect(valueFilters).toHaveSize(1);
           expect(valueFilters[0]).toMatchTextContent("pool1");
 
+          // We expect that the filters will be loaded with a specific pool
+          // even if the user is unauthorized.
+          // Therfore we should ignore all unauthorized errors.
+          expect(ele._message).not.toContain("User unauthorized");
+
           done();
         });
       });

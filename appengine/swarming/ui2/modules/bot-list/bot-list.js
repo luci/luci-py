@@ -19,7 +19,6 @@ import { $$ } from "common-sk/modules/dom";
 import { errorMessage } from "elements-sk/errorMessage";
 import { html } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined";
-import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
 import naturalSort from "javascript-natural-sort/naturalSort";
 import * as query from "common-sk/modules/query";
 import { stateReflector } from "common-sk/modules/stateReflector";
@@ -54,6 +53,7 @@ import {
   specialFilters,
   specialSortMap,
   useNaturalSort,
+  convertFromLegacyState,
 } from "./bot-list-helpers";
 import {
   filterPossibleColumns,
@@ -65,6 +65,7 @@ import { moreOrLess } from "../templates";
 import { taskListLink } from "../util";
 
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
+import { BotsService } from "../services/bots";
 
 const colHead = (col, ele) => html` <th>
   ${getColHeader(col)}
@@ -379,6 +380,7 @@ window.customElements.define(
         },
         /* setState*/ (newState) => {
           // default values if not specified.
+          convertFromLegacyState(newState);
           this._cols = newState.c;
           if (!newState.c.length) {
             this._cols = ["id", "task", "os", "status"];
@@ -500,13 +502,13 @@ window.customElements.define(
 
     _botClass(bot) {
       let classes = "";
-      if (bot.is_dead) {
+      if (bot.isDead) {
         classes += "dead ";
       }
       if (bot.quarantined) {
         classes += "quarantined ";
       }
-      if (bot.maintenance_msg) {
+      if (bot.maintenanceMsg) {
         classes += "maintenance ";
       }
       if (bot.version !== this.serverDetails.bot_version) {
@@ -567,81 +569,77 @@ window.customElements.define(
         this._filteredPrimaryArr = this._primaryArr.slice();
         this._refilterPossibleColumns(); // calls render
       });
+      const service = this._createBotService();
       // Fetch the bots
       this.app.addBusyTasks(1);
-      let queryParams = listQueryParams(this._filters, this._limit);
-      fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
+      let listRequest = listQueryParams(this._filters, this._limit);
+      service
+        .list(listRequest)
+        .then((resp) => {
           this._bots = [];
-          const maybeLoadMore = (json) => {
-            this._bots = this._bots.concat(processBots(json.items));
+          const maybeLoadMore = (resp) => {
+            this._bots = this._bots.concat(processBots(resp.items));
             this.render();
             // Special case: Don't load all the bots when filters is empty to avoid
             // loading many many bots unintentionally. A user can over-ride this
             // with the showAll button.
-            if ((this._filters.length || this._showAll) && json.cursor) {
+            if ((this._filters.length || this._showAll) && resp.cursor) {
               this._limit = BATCH_LOAD;
-              queryParams = listQueryParams(
+              listRequest = listQueryParams(
                 this._filters,
                 this._limit,
-                json.cursor
+                resp.cursor
               );
-              fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
-                .then(jsonOrThrow)
+              service
+                .list(listRequest)
                 .then(maybeLoadMore)
-                .catch((e) => this.fetchError(e, "bots/list (paging)", true));
+                .catch((e) => this.prpcError(e, "bots/list (paging)", true));
             } else {
               this.app.finishedTask();
             }
           };
-          maybeLoadMore(json);
+          maybeLoadMore(resp);
         })
-        .catch((e) => this.fetchError(e, "bots/list", true));
+        .catch((e) => this.prpcError(e, "bots/list", true));
 
       this.app.addBusyTasks(1);
       // We can re-use the query params from listQueryParams because
       // the backend will ignore those it doesn't understand (e.g limit
       // and is_dead, etc).
-      fetch("/_ah/api/swarming/v1/bots/count?" + queryParams, extra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._queryCounts = processCounts(this._queryCounts, json);
+      service
+        .count(listRequest.dimensions)
+        .then((resp) => {
+          this._queryCounts = processCounts(this._queryCounts, resp);
           this.render();
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, "bots/count (query)", true));
+        .catch((e) => this.prpcError(e, "bots/count (query)", true));
 
       // We only need to do this once, because we don't expect it to
       // change (much) after the page has been loaded.
       if (!this._fleetCounts._queried) {
         this._fleetCounts._queried = true;
         this.app.addBusyTasks(1);
-        fetch("/_ah/api/swarming/v1/bots/count", extra)
-          .then(jsonOrThrow)
-          .then((json) => {
-            this._fleetCounts = processCounts(this._fleetCounts, json);
+        service
+          .count([])
+          .then((resp) => {
+            this._fleetCounts = processCounts(this._fleetCounts, resp);
             this.render();
             this.app.finishedTask();
           })
-          .catch((e) => this.fetchError(e, "bots/count (fleet)", true));
+          .catch((e) => this.prpcError(e, "bots/count (fleet)", true));
       }
 
       this.app.addBusyTasks(1);
-      const extraNoSignal = {
-        headers: { authorization: this.authHeader },
-        // No signal here because we shouldn't need to abort it.
-        // This request does not depend on the filters.
-      };
       const pool =
         this._filters
           .filter((f) => f.startsWith("pool:"))
           .map((f) => f.replace("pool:", ""))[0] || "";
-      fetch(`/_ah/api/swarming/v1/bots/dimensions?pool=${pool}`, extraNoSignal)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._primaryMap = processPrimaryMap(json.bots_dimensions);
-          this._possibleColumns = makePossibleColumns(json.bots_dimensions);
+      new BotsService(this.authHeader)
+        .dimensions(pool)
+        .then((resp) => {
+          this._primaryMap = processPrimaryMap(resp.botsDimensions);
+          this._possibleColumns = makePossibleColumns(resp.botsDimensions);
           this._filteredPossibleColumns = this._possibleColumns.slice();
           this._primaryArr = Object.keys(this._primaryMap);
           this._primaryArr.sort();
@@ -649,7 +647,7 @@ window.customElements.define(
           this._refilterPossibleColumns(); // calls render
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, "bots/dimensions", true));
+        .catch((e) => this.prpcError(e, "bots/dimensions", true));
     }
 
     _filterSearch(e) {
@@ -716,7 +714,7 @@ window.customElements.define(
     }
 
     _matchingTasksLink() {
-      const cols = ["name", "state", "created_ts"];
+      const cols = ["name", "state", "createdTs"];
       const dimensionFilters = this._filters.filter((f) => {
         // Strip out non-dimensions like "status"
         return !specialFilters[f.split(":")[0]];
@@ -737,7 +735,7 @@ window.customElements.define(
       this.render();
     }
 
-    _promptMassDelete(e) {
+    _promptMassDelete(_e) {
       $$("bot-mass-delete", this).show();
       $$("dialog-pop-over", this).show();
       $$("dialog-pop-over button.goback", this).focus();

@@ -391,3 +391,16 @@ export function deepEquals(obja, objb) {
 
   return false;
 }
+
+/**
+ * Creates a function which will match a `fetchMock` call to a pRPC
+ * rpc request.
+ */
+export function createRequestFilter(service, rpc, data) {
+  return (call) => {
+    if (!call[0].endsWith(`${service}/${rpc}`)) return false;
+    if (typeof data === "undefined") return true;
+    const request = JSON.parse(call[1].body);
+    return deepEquals(request, data);
+  };
+}

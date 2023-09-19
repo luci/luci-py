@@ -4,6 +4,7 @@
 
 import "modules/bot-mass-delete";
 import fetchMock from "fetch-mock";
+import { mockPrpc, deepEquals } from "../test_util";
 
 describe("bot-mass-delete", function () {
   // Instead of using import, we use require. Otherwise,
@@ -52,8 +53,8 @@ describe("bot-mass-delete", function () {
   it("can read in attributes", function (done) {
     createElement((ele) => {
       expect(ele.dimensions).toHaveSize(2);
-      expect(ele.dimensions).toContain("pool:Chrome");
-      expect(ele.dimensions).toContain("os:Android");
+      expect(ele.dimensions).toContain({ key: "pool", value: "Chrome" });
+      expect(ele.dimensions).toContain({ key: "os", value: "Android" });
       expect(ele.authHeader).toBe("fake");
       done();
     });
@@ -77,10 +78,16 @@ describe("bot-mass-delete", function () {
 
   it("makes an API call to count when loading", function (done) {
     createElement((ele) => {
-      fetchMock.get(
-        "/_ah/api/swarming/v1/bots/count?dimensions=os%3AAndroid" +
-          "&dimensions=pool%3AChrome",
-        { dead: 532 }
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Bots",
+        "CountBots",
+        { dead: 532 },
+        (req) =>
+          deepEquals(req.dimensions, [
+            { key: "os", value: "Android" },
+            { key: "pool", value: "Chrome" },
+          ])
       );
 
       ele.show();
@@ -88,7 +95,7 @@ describe("bot-mass-delete", function () {
       // is when we know the element has updated the _tasks.
       fetchMock.flush(true).then(() => {
         expectNoUnmatchedCalls(fetchMock);
-        const calls = fetchMock.calls(MATCHED, "GET");
+        const calls = fetchMock.calls(MATCHED, "POST");
         expect(calls).toHaveSize(1);
         done();
       });
@@ -98,21 +105,34 @@ describe("bot-mass-delete", function () {
   it("makes an API call to list after clicking, then deletes", function (done) {
     createElement((ele) => {
       // create a shortened version of the returned data
-      fetchMock.getOnce(
-        "/_ah/api/swarming/v1/bots/list?dimensions=os%3AAndroid" +
-          "&dimensions=pool%3AChrome&fields=cursor%2Citems%2Fbot_id&is_dead=TRUE&limit=200",
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Bots",
+        "ListBots",
         {
-          items: [
-            { bot_id: "bot-1" },
-            { bot_id: "bot-2" },
-            { bot_id: "bot-3" },
-          ],
+          items: [{ botId: "bot-1" }, { botId: "bot-2" }, { botId: "bot-3" }],
+        },
+        (req) => {
+          return (
+            deepEquals(req.dimensions, [
+              { key: "os", value: "Android" },
+              { key: "pool", value: "Chrome" },
+            ]) &&
+            req.limit === 200 &&
+            req.is_dead === "TRUE"
+          );
         }
       );
 
-      fetchMock.post("/_ah/api/swarming/v1/bot/bot-1/delete", 200);
-      fetchMock.post("/_ah/api/swarming/v1/bot/bot-2/delete", 200);
-      fetchMock.post("/_ah/api/swarming/v1/bot/bot-3/delete", 200);
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Bots",
+        "DeleteBot",
+        { deleted: true },
+        (req) => {
+          return ["bot-1", "bot-2", "bot-3"].includes(req.bot_id);
+        }
+      );
 
       let sawStartEvent = false;
       ele.addEventListener("bots-deleting-started", () => {
@@ -122,11 +142,8 @@ describe("bot-mass-delete", function () {
       ele.addEventListener("bots-deleting-finished", () => {
         expect(sawStartEvent).toBeTruthy();
         expectNoUnmatchedCalls(fetchMock);
-        let calls = fetchMock.calls(MATCHED, "GET");
-        expect(calls).toHaveSize(1, "1 from list (ele.show() was not called)");
-
-        calls = fetchMock.calls(MATCHED, "POST");
-        expect(calls).toHaveSize(3, "3 to delete");
+        const calls = fetchMock.calls(MATCHED, "POST");
+        expect(calls).toHaveSize(4, "1 to get, 3 to delete");
         done();
       });
 
@@ -140,27 +157,45 @@ describe("bot-mass-delete", function () {
   it("pages the bot list calls before deleting", function (done) {
     createElement((ele) => {
       // create a shortened version of the returned data
-      fetchMock.getOnce(
-        "/_ah/api/swarming/v1/bots/list?dimensions=os%3AAndroid" +
-          "&dimensions=pool%3AChrome&fields=cursor%2Citems%2Fbot_id&" +
-          "is_dead=TRUE&limit=200",
-        {
-          items: [{ bot_id: "bot-1" }],
-          cursor: "alpha",
-        }
-      );
-      fetchMock.getOnce(
-        "/_ah/api/swarming/v1/bots/list?cursor=alpha&dimensions=os%3AAndroid" +
-          "&dimensions=pool%3AChrome&fields=cursor%2Citems%2Fbot_id" +
-          "&is_dead=TRUE&limit=200",
-        {
-          items: [{ bot_id: "bot-2" }, { bot_id: "bot-3" }],
+      let first = true;
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Bots",
+        "ListBots",
+        (_req) => {
+          if (first) {
+            first = false;
+            return {
+              items: [{ botId: "bot-1" }],
+              cursor: "alpha",
+            };
+          } else {
+            return {
+              items: [{ botId: "bot-2" }, { botId: "bot-3" }],
+            };
+          }
+        },
+        (req) => {
+          return (
+            deepEquals(req.dimensions, [
+              { key: "os", value: "Android" },
+              { key: "pool", value: "Chrome" },
+            ]) &&
+            req.limit === 200 &&
+            req.is_dead === "TRUE"
+          );
         }
       );
 
-      fetchMock.post("/_ah/api/swarming/v1/bot/bot-1/delete", 200);
-      fetchMock.post("/_ah/api/swarming/v1/bot/bot-2/delete", 200);
-      fetchMock.post("/_ah/api/swarming/v1/bot/bot-3/delete", 200);
+      mockPrpc(
+        fetchMock,
+        "swarming.v2.Bots",
+        "DeleteBot",
+        { deleted: true },
+        (req) => {
+          return ["bot-1", "bot-2", "bot-3"].includes(req.bot_id);
+        }
+      );
 
       let sawStartEvent = false;
       ele.addEventListener("bots-deleting-started", () => {
@@ -170,11 +205,8 @@ describe("bot-mass-delete", function () {
       ele.addEventListener("bots-deleting-finished", () => {
         expect(sawStartEvent).toBeTruthy();
         expectNoUnmatchedCalls(fetchMock);
-        let calls = fetchMock.calls(MATCHED, "GET");
-        expect(calls).toHaveSize(2, "2 from list (ele.show() was not called)");
-
-        calls = fetchMock.calls(MATCHED, "POST");
-        expect(calls).toHaveSize(3, "3 to delete");
+        const calls = fetchMock.calls(MATCHED, "POST");
+        expect(calls).toHaveSize(3 + 2, "3 to delete, 2 from list");
         done();
       });
 

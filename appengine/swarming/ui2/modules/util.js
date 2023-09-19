@@ -83,7 +83,7 @@ export function compareWithFixedOrder(fixedOrder) {
 
 /** humanDuration formats a duration to be more human readable.
  *
- * @param {Number} timeInSecs - The duration to be formatted.
+ * @param {Number|String} timeInSecs - The duration to be formatted.
  */
 export function humanDuration(timeInSecs) {
   // If the timeInSecs is 0 (e.g. duration of Terminate bot tasks), we
@@ -175,6 +175,7 @@ export function parseDuration(duration) {
  *  human.localeTime.
  */
 export function sanitizeAndHumanizeTime(obj, key) {
+  // TODO(jonahhooper) replace this method in all places with the `humanize` mixin...
   obj["human_" + key] = "--";
   if (obj[key]) {
     if (obj[key].endsWith && !obj[key].endsWith("Z")) {
@@ -316,4 +317,66 @@ export function b64toUtf8(str) {
  **/
 export function utf8tob64(str) {
   return _bytesToBase64(new TextEncoder().encode(str));
+}
+
+const re = /_[a-zA-Z]/g;
+
+/**
+ * Converts a string from snake_case to camelCase
+ **/
+export function toCamelCase(str) {
+  return str.replace(re, function (match) {
+    return match.substring(1).charAt(0).toUpperCase() + match.substring(2);
+  });
+}
+
+/**
+ * Provides a human view on time and duration.
+ * For example:
+ *
+ * baseObject.humanized.time.fieldName
+ * or
+ * baseObject.humanized.duration.fieldName
+ *
+ * Can be attached to any object as a mixin.
+ *
+ * baseObject.humanized = new Humanizer(baseObject)
+ **/
+export class Humanizer {
+  constructor(base) {
+    this._time = new Proxy(base, {
+      get(target, prop, receiver) {
+        let value = Reflect.get(target, prop, receiver);
+        if (typeof value === "undefined") {
+          return value;
+        }
+        if (typeof value === "string") {
+          value = new Date(value);
+        }
+        // Hack to get a string representation of the timezone.
+        // Borrowed from the old code and probably the best approach without using
+        // an external library...
+        const str = value.toString();
+        const timezone = str.substring(str.indexOf("("));
+        return `${value.toLocaleString()} ${timezone}`;
+      },
+    });
+    this._duration = new Proxy(base, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (typeof value === "undefined") {
+          return value;
+        }
+        return humanDuration(value);
+      },
+    });
+  }
+
+  get time() {
+    return this._time;
+  }
+
+  get duration() {
+    return this._duration;
+  }
 }
