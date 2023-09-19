@@ -2,23 +2,18 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import "modules/bot-mass-delete";
+import "./bot-mass-delete";
 import fetchMock from "fetch-mock";
 import { mockPrpc, deepEquals } from "../test_util";
+import { $, $$ } from "common-sk/modules/dom";
+import {
+  customMatchers,
+  expectNoUnmatchedCalls,
+  mockAppGETs,
+  MATCHED,
+} from "../test_util";
 
 describe("bot-mass-delete", function () {
-  // Instead of using import, we use require. Otherwise,
-  // the concatenation trick we do doesn't play well with webpack, which would
-  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
-  // try to import things multiple times.
-  const { $, $$ } = require("common-sk/modules/dom");
-  const {
-    customMatchers,
-    expectNoUnmatchedCalls,
-    mockAppGETs,
-    MATCHED,
-  } = require("modules/test_util");
-
   // A reusable HTML element in which we create our element under test.
   const container = document.createElement("div");
   document.body.appendChild(container);

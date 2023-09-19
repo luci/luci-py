@@ -2,20 +2,11 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import "modules/swarming-index";
+import "./swarming-index";
 import fetchMock from "fetch-mock";
+import { expectNoUnmatchedCalls, mockAppGETs, MATCHED } from "../test_util";
 
 describe("swarming-index", function () {
-  // Instead of using import, we use require. Otherwise,
-  // the concatenation trick we do doesn't play well with webpack, which would
-  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
-  // try to import things multiple times.
-  const {
-    expectNoUnmatchedCalls,
-    mockAppGETs,
-    MATCHED,
-  } = require("modules/test_util");
-
   beforeEach(function () {
     // These are the default responses to the expected API calls (aka 'matched')
     // They can be overridden for specific tests, if needed.

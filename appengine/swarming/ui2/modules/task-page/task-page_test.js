@@ -2,10 +2,20 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import "modules/task-page";
+import "./task-page";
 import fetchMock from "fetch-mock";
 import { utf8tob64 } from "../util";
-import { mockUnauthorizedPrpc } from "../test_util";
+import { $, $$ } from "common-sk/modules/dom";
+import {
+  mockUnauthorizedPrpc,
+  customMatchers,
+  expectNoUnmatchedCalls,
+  mockAppGETs,
+  MATCHED,
+  mockPrpc,
+} from "../test_util";
+import { taskOutput, taskResults, taskRequests } from "./test_data";
+import { richLogsLink } from "./task-page-helpers";
 
 // Tip from https://stackoverflow.com/a/37348710
 // for catching "full page reload" errors.
@@ -24,21 +34,6 @@ describe("task-page", function () {
   // the concatenation trick we do doesn't play well with webpack, which would
   // leak dependencies (e.g. bot-list's 'column' function to task-list) and
   // try to import things multiple times.
-  const { $, $$ } = require("common-sk/modules/dom");
-  const {
-    customMatchers,
-    expectNoUnmatchedCalls,
-    mockAppGETs,
-    MATCHED,
-    mockPrpc,
-  } = require("modules/test_util");
-  const {
-    taskOutput,
-    taskResults,
-    taskRequests,
-  } = require("modules/task-page/test_data");
-  const { richLogsLink } = require("modules/task-page/task-page-helpers");
-
   const TEST_TASK_ID = "test0b3c0fac7810";
   const checkOffset = (offset, length) => {
     return function (body) {

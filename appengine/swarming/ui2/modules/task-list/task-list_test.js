@@ -2,37 +2,32 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import "modules/task-list";
+import "./task-list";
 import fetchMock from "fetch-mock";
 import { deepEquals, mockUnauthorizedPrpc } from "../test_util";
 import { convertFromLegacyState, Timestamp } from "./task-list-helpers";
+import { deepCopy } from "common-sk/modules/object";
+import { $, $$ } from "common-sk/modules/dom";
+import {
+  childrenAsArray,
+  customMatchers,
+  expectNoUnmatchedCalls,
+  getChildItemWithText,
+  mockAppGETs,
+  MATCHED,
+  mockPrpc,
+  eventually,
+} from "../test_util";
+import {
+  column,
+  filterTasks,
+  getColHeader,
+  listQueryParams,
+  processTasks,
+} from "./task-list-helpers";
+import { tasks22, fleetDimensions } from "./test_data";
 
 describe("task-list", function () {
-  // Instead of using import, we use require. Otherwise,
-  // the concatenation trick we do doesn't play well with webpack, which would
-  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
-  // try to import things multiple times.
-  const { deepCopy } = require("common-sk/modules/object");
-  const { $, $$ } = require("common-sk/modules/dom");
-  const {
-    childrenAsArray,
-    customMatchers,
-    expectNoUnmatchedCalls,
-    getChildItemWithText,
-    mockAppGETs,
-    MATCHED,
-    mockPrpc,
-    eventually,
-  } = require("modules/test_util");
-  const {
-    column,
-    filterTasks,
-    getColHeader,
-    listQueryParams,
-    processTasks,
-  } = require("modules/task-list/task-list-helpers");
-  const { tasks22, fleetDimensions } = require("modules/task-list/test_data");
-
   beforeEach(function () {
     jasmine.addMatchers(customMatchers);
     // Clear out any query params we might have to not mess with our current state.

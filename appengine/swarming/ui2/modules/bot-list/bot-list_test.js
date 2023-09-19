@@ -2,45 +2,35 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import "modules/bot-list";
+import "./bot-list";
 import fetchMock from "fetch-mock";
 import { eventually, mockUnauthorizedPrpc } from "../test_util";
 import { convertFromLegacyState } from "./bot-list-helpers";
+import { deepCopy } from "common-sk/modules/object";
+import { $, $$ } from "common-sk/modules/dom";
+import {
+  childrenAsArray,
+  customMatchers,
+  expectNoUnmatchedCalls,
+  getChildItemWithText,
+  mockAppGETs,
+  MATCHED,
+  mockPrpc,
+  createRequestFilter,
+} from "../test_util";
+
+import {
+  column,
+  filterBots,
+  getColHeader,
+  listQueryParams,
+  processBots,
+  makePossibleColumns,
+  processPrimaryMap,
+} from "./bot-list-helpers";
+import { bots10, fleetCount, fleetDimensions, queryCount } from "./test_data";
 
 describe("bot-list", function () {
-  // Instead of using import, we use require. Otherwise,
-  // the concatenation trick we do doesn't play well with webpack, which would
-  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
-  // try to import things multiple times.
-  const { deepCopy } = require("common-sk/modules/object");
-  const { $, $$ } = require("common-sk/modules/dom");
-  const {
-    childrenAsArray,
-    customMatchers,
-    expectNoUnmatchedCalls,
-    getChildItemWithText,
-    mockAppGETs,
-    MATCHED,
-    mockPrpc,
-    createRequestFilter,
-  } = require("modules/test_util");
-
-  const {
-    column,
-    filterBots,
-    getColHeader,
-    listQueryParams,
-    processBots,
-    makePossibleColumns,
-    processPrimaryMap,
-  } = require("modules/bot-list/bot-list-helpers");
-  const {
-    bots10,
-    fleetCount,
-    fleetDimensions,
-    queryCount,
-  } = require("modules/bot-list/test_data");
-
   beforeEach(function () {
     jasmine.addMatchers(customMatchers);
     // Clear out any query params we might have to not mess with our current state.

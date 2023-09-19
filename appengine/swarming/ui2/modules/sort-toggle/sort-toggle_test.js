@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import "modules/sort-toggle";
+import "./sort-toggle";
 
 describe("sort-toggle", function () {
   // A reusable HTML element in which we create our element under test.

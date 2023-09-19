@@ -5,6 +5,8 @@ env:
 extends:
   - google
   - plugin:prettier/recommended
+  - plugin:import/errors
+  - plugin:import/warnings
 parserOptions:
   ecmaVersion: 2020
   sourceType: module

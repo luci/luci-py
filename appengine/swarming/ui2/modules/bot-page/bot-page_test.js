@@ -2,30 +2,21 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import "modules/bot-page";
+import "./bot-page";
 import fetchMock from "fetch-mock";
 import { mockUnauthorizedPrpc } from "../test_util";
+import { $, $$ } from "common-sk/modules/dom";
+import {
+  customMatchers,
+  expectNoUnmatchedCalls,
+  mockAppGETs,
+  MATCHED,
+  mockPrpc,
+  eventually,
+} from "../test_util";
+import { botDataMap, eventsMap, tasksMap } from "./test_data";
 
 describe("bot-page", function () {
-  // Instead of using import, we use require. Otherwise,
-  // the concatenation trick we do doesn't play well with webpack, which would
-  // leak dependencies (e.g. bot-list's 'column' function to task-list) and
-  // try to import things multiple times.
-  const { $, $$ } = require("common-sk/modules/dom");
-  const {
-    customMatchers,
-    expectNoUnmatchedCalls,
-    mockAppGETs,
-    MATCHED,
-    mockPrpc,
-    eventually,
-  } = require("modules/test_util");
-  const {
-    botDataMap,
-    eventsMap,
-    tasksMap,
-  } = require("modules/bot-page/test_data");
-
   const TEST_BOT_ID = "example-gce-001";
 
   // "deterministically" set the ordering of the keys in json object.
