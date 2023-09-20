@@ -42,6 +42,7 @@ class TestOsUtilities(auto_stub.TestCase):
     cases = [
         ('openbsd7', 'openbsd'),
         ('netbsd9', 'netbsd'),
+        ('sunos5', 'Solaris'),
     ]
     for pform, result in cases:
       self.mock(sys, "platform", pform)
@@ -52,6 +53,7 @@ class TestOsUtilities(auto_stub.TestCase):
         ('x86_64', 'amd64', 'x86'),
         ('amd64', 'amd64', 'x86'),
         ('i686', 'i686', 'x86'),
+        ('i86pc', None, 'x86'),
         ('aarch64', 'arm64', 'arm64'),
         ('mips64', None, 'mips'),
         ('arm64', None, 'arm64'),
@@ -79,6 +81,7 @@ class TestOsUtilities(auto_stub.TestCase):
         ('openbsd7', '7.2', ['openbsd', 'openbsd-7', 'openbsd-7.2']),
         ('netbsd9', '9.3_STABLE',
          ['netbsd', 'netbsd-9', 'netbsd-9.3', 'netbsd-9.3_STABLE']),
+        ('sunos5', '5.11', ['Solaris', 'Solaris-5', 'Solaris-5.11']),
     ]
     for pform, rel, result in cases:
       self.mock(sys, "platform", pform)
@@ -204,8 +207,8 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.discard('windows_client_version')
 
     expected = {
-        'cores', 'cpu', 'gce', 'gpu', 'id', 'inside_docker', 'os', 'pool',
-        'python'
+        'cipd_platform', 'cores', 'cpu', 'gce', 'gpu', 'id', 'inside_docker',
+        'os', 'pool', 'python'
     }
     if platforms.is_gce():
       expected.add('gcp')

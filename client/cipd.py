@@ -272,11 +272,12 @@ class CipdClient:
 
 def get_platform():
   """Returns ${platform} parameter value."""
-  # linux, mac or windows. See also os_utilities.get_cipd_os().
+  # Specifically known OSes. See also os_utilities.get_cipd_os().
   os_name = {
       'darwin': 'mac',
       'linux': 'linux',
       'win32': 'windows',
+      'sunos5': 'solaris',
   }.get(sys.platform)
   if not os_name:
     os_name = sys.platform.lower().rstrip('0123456789.-_')
@@ -285,6 +286,8 @@ def get_platform():
   arch_override = os.getenv('CIPD_ARCHITECTURE')
   if arch_override:
     return '%s-%s' % (os_name, arch_override)
+
+  python_bits = 64 if sys.maxsize > 2**32 else 32
 
   # Normalize machine architecture. Some architectures are identical or
   # compatible with others. We collapse them into one.
@@ -298,6 +301,8 @@ def get_platform():
     arch = 'amd64'
   elif arch in ('i386', 'i686', 'x86'):
     arch = '386'
+  elif arch == 'i86pc':  # Solaris doesn't distinguish between 64 and 32-bit.
+    arch = '386' if python_bits == 32 else 'amd64'
   elif not arch and os_name == 'windows':
     # On some 32bit Windows7, platform.machine() returns None.
     # Fallback to 386 in that case.
@@ -307,7 +312,6 @@ def get_platform():
 
   # If using a 32-bit python on x86_64 kernel on Linux, "downgrade" the arch to
   # 32-bit too (this is the bitness of the userland).
-  python_bits = 64 if sys.maxsize > 2**32 else 32
   if os_name == 'linux' and arch == 'amd64' and python_bits == 32:
     arch = '386'
 

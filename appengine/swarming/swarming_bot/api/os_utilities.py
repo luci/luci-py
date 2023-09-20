@@ -214,6 +214,7 @@ def get_os_name():
       # TODO(maruel): 'Mac' is an historical accident, it should be named 'OSX'.
       'darwin': 'Mac',
       'win32': 'Windows',
+      'sunos5': 'Solaris',
   }.get(sys.platform)
   if value:
     return value
@@ -245,7 +246,7 @@ def get_cpu_type():
     if cpu_type:
       return cpu_type  # e.g. `arm64`
   machine = platform.machine().lower()
-  if machine in ('amd64', 'x86_64', 'i386', 'i686'):
+  if machine in ('amd64', 'x86_64', 'i386', 'i686', 'i86pc'):
     return 'x86'
   if machine == 'aarch64':
     return 'arm64'
@@ -293,6 +294,7 @@ def get_cipd_os():
       'darwin': 'mac',
       'linux': 'linux',
       'win32': 'windows',
+      'sunos5': 'solaris',
   }.get(sys.platform)
   if not os_name:
     os_name = sys.platform.lower().rstrip('0123456789.-_')
@@ -993,6 +995,7 @@ def get_state_all_devices_android(devices):
 def get_dimensions():
   """Returns the default dimensions."""
   dimensions = {
+      'cipd_platform': ['%s-%s' % (get_cipd_os(), get_cipd_architecture())],
       'cores': [str(get_num_processors())],
       'cpu': get_cpu_dimensions(),
       'gpu': get_gpu()[0],
