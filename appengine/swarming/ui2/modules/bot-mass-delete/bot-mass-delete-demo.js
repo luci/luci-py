@@ -3,12 +3,12 @@
 // that can be found in the LICENSE file.
 import "./index.js";
 
-import { requireLogin, mockAuthdAppGETs } from "../test_util";
+import { requireLogin, mockAuthorizedSwarmingService } from "../test_util";
 import { $$ } from "common-sk/modules/dom";
 import fetchMock from "fetch-mock";
 
 (function () {
-  mockAuthdAppGETs(fetchMock, { delete_bot: true });
+  mockAuthorizedSwarmingService(fetchMock, { delete_bot: true });
 
   fetchMock.get(
     "glob:/_ah/api/swarming/v1/bots/count?*",

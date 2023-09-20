@@ -4,17 +4,23 @@
 
 import "./swarming-index";
 import fetchMock from "fetch-mock";
-import { expectNoUnmatchedCalls, mockAppGETs, MATCHED } from "../test_util";
+import {
+  expectNoUnmatchedCalls,
+  mockUnauthorizedSwarmingService,
+  MATCHED,
+  mockUnauthorizedPrpc,
+  mockPrpc,
+} from "../test_util";
 
 describe("swarming-index", function () {
   beforeEach(function () {
     // These are the default responses to the expected API calls (aka 'matched')
     // They can be overridden for specific tests, if needed.
-    mockAppGETs(fetchMock, {
-      get_bootstrap_token: false,
+    mockUnauthorizedSwarmingService(fetchMock, {
+      getBootstrapToken: false,
     });
 
-    fetchMock.post("/_ah/api/swarming/v1/server/token", 403);
+    mockUnauthorizedPrpc(fetchMock, "swarming.v2.Swarming", "GetToken");
 
     // Everything else
     fetchMock.catch(404);
@@ -50,7 +56,7 @@ describe("swarming-index", function () {
     // The swarming-app emits the 'busy-end' event when all pending
     // fetches (and renders) have resolved.
     let ran = false;
-    ele.addEventListener("busy-end", (e) => {
+    ele.addEventListener("busy-end", (_e) => {
       if (!ran) {
         callback();
       }
@@ -65,19 +71,23 @@ describe("swarming-index", function () {
   function becomeAdmin() {
     // overwrite the default fetchMock behaviors for this run to return
     // what an admin would see.
-    fetchMock.get(
-      "/_ah/api/swarming/v1/server/permissions",
-      {
-        get_bootstrap_token: true,
-      },
-      { overwriteRoutes: true }
+    mockPrpc(
+      fetchMock,
+      "swarming.v2.Swarming",
+      "GetPermissions",
+      { getBootstrapToken: true },
+      undefined,
+      true
     );
-    fetchMock.post(
-      "/_ah/api/swarming/v1/server/token",
+    mockPrpc(
+      fetchMock,
+      "swarming.v2.Swarming",
+      "GetToken",
       {
-        bootstrap_token: "8675309JennyDontChangeYourNumber8675309",
+        bootstrapToken: "8675309JennyDontChangeYourNumber8675309",
       },
-      { overwriteRoutes: true }
+      undefined,
+      true
     );
   }
 
@@ -116,13 +126,14 @@ describe("swarming-index", function () {
     describe("when logged in as unauthorized user", function () {
       function notAuthorized() {
         // overwrite the default fetchMock behaviors to have everything return 403.
-        fetchMock.get("/_ah/api/swarming/v1/server/details", 403, {
-          overwriteRoutes: true,
-        });
-        fetchMock.get(
-          "/_ah/api/swarming/v1/server/permissions",
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Swarming", "GetDetails");
+        mockPrpc(
+          fetchMock,
+          "swarming.v2.Swarming",
+          "GetPermissions",
           {},
-          { overwriteRoutes: true }
+          undefined,
+          true
         );
       }
 
@@ -254,9 +265,11 @@ describe("swarming-index", function () {
     it("does not request a token when a normal user logs in", function (done) {
       createElement((ele) => {
         userLogsIn(ele, () => {
-          // swarming-app makes some GETs and swarming-app_test.js tests that.
           const calls = fetchMock.calls(MATCHED, "POST");
-          expect(calls).toHaveSize(0);
+          expect(calls).toHaveSize(
+            2,
+            "2 from swarming-app (GetPermissions, GetDetails)"
+          );
 
           expectNoUnmatchedCalls(fetchMock);
           done();
@@ -268,12 +281,16 @@ describe("swarming-index", function () {
       becomeAdmin();
       createElement((ele) => {
         userLogsIn(ele, () => {
-          // swarming-app makes the GETs and swarming-app_test.js tests that.
-
           const calls = fetchMock.calls(MATCHED, "POST");
           const posts = calls.map((c) => c[0]);
-          expect(calls).toHaveSize(1);
-          expect(posts).toContain("/_ah/api/swarming/v1/server/token");
+          expect(calls).toHaveSize(
+            3,
+            "2 from swarming-app (GetPermissions, GetDetails), 1 GetToken"
+          );
+          // Only call is `GetToken`
+          expect(
+            posts.filter((c) => c.endsWith("swarming.v2.Swarming/GetToken"))
+          ).toHaveSize(1);
 
           // check authorization headers are set
           calls.forEach((c) => {

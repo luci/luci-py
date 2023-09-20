@@ -79,14 +79,14 @@ const statusAndTask = (ele, bot) => {
         <button
           class="shut_down ${!bot.isDead && bot.firstSeenTs ? "" : "hidden"}"
           ?hidden=${bot.isDead}
-          ?disabled=${!ele.permissions.terminate_bot}
+          ?disabled=${!ele.permissions.terminateBot}
           @click=${ele._promptShutdown}
         >
           Stop the bot gracefully
         </button>
         <button
           class="delete ${bot.isDead && !bot.deleted ? "" : "hidden"}"
-          ?disabled=${!ele.permissions.delete_bot}
+          ?disabled=${!ele.permissions.deleteBot}
           @click=${ele._promptDelete}
         >
           Delete
@@ -122,7 +122,7 @@ const statusAndTask = (ele, bot) => {
         <button
           class="kill"
           ?hidden=${!bot.taskId || bot.isDead}
-          ?disabled=${!ele.permissions.cancel_task}
+          ?disabled=${!ele.permissions.cancelTask}
           @click=${ele._promptKill}
         >
           Kill task
@@ -155,7 +155,7 @@ const dataAndMPBlock = (ele, bot) => html`
     </td>
   </tr>
   <tr
-    class=${ele.serverDetails.bot_version === bot.version ? "" : "old_version"}
+    class=${ele.serverDetails.botVersion === bot.version ? "" : "old_version"}
     title="Version is based on the content of swarming_bot.zip which is the swarming bot code.
            The bot won't update if quarantined, dead, or busy."
   >
@@ -165,8 +165,8 @@ const dataAndMPBlock = (ele, bot) => html`
   <tr title="The version the server expects the bot to be using.">
     <td>Expected Bot Version</td>
     <td colspan="2">
-      ${ele.serverDetails.bot_version &&
-      ele.serverDetails.bot_version.substring(0, 10)}
+      ${ele.serverDetails.botVersion &&
+      ele.serverDetails.botVersion.substring(0, 10)}
     </td>
   </tr>
   <tr title="First time ever a bot with this id contacted the server.">
@@ -304,7 +304,7 @@ const eventsTable = (ele, events) => {
       </thead>
       <tbody>
         ${events.map((event) =>
-          eventRow(event, ele._showAll, ele.serverDetails.bot_version)
+          eventRow(event, ele._showAll, ele.serverDetails.botVersion)
         )}
       </tbody>
     </table>
@@ -513,11 +513,11 @@ window.customElements.define(
       // cannot be re-used once aborted.
       this._fetchController = new AbortController();
       const extra = {
-        headers: { authorization: this.authHeader },
+        authHeader: this.authHeader,
         signal: this._fetchController.signal,
       };
       // re-fetch permissions with the bot ID.
-      this.app._fetchPermissions(extra, { bot_id: this._botId });
+      this.app._fetchPermissions(extra, { botId: this._botId });
       this.app.addBusyTasks(1);
       const botService = this._createBotService();
       botService

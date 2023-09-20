@@ -13,7 +13,7 @@ import {
   customMatchers,
   expectNoUnmatchedCalls,
   getChildItemWithText,
-  mockAppGETs,
+  mockUnauthorizedSwarmingService,
   MATCHED,
   mockPrpc,
   eventually,
@@ -41,7 +41,7 @@ describe("task-list", function () {
   const mockOutRpcsWithFetchMock = (excludeListTasks = false) => {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
-    mockAppGETs(fetchMock, {});
+    mockUnauthorizedSwarmingService(fetchMock, {});
     fetchMock.get("glob:/_ah/api/swarming/v1/server/permissions*", {
       cancel_task: false,
     });
@@ -173,16 +173,15 @@ describe("task-list", function () {
     describe("when logged in as unauthorized user", function () {
       function notAuthorized() {
         // overwrite the default fetchMock behaviors to have everything return 403.
-        fetchMock.get("/_ah/api/swarming/v1/server/details", 403, {
-          overwriteRoutes: true,
-        });
-        fetchMock.get(
-          "/_ah/api/swarming/v1/server/permissions",
-          {
-            list_tasks: ["pool1"],
-          },
-          { overwriteRoutes: true }
+        mockPrpc(
+          fetchMock,
+          "swarming.v2.Swarming",
+          "GetPermissions",
+          { listTasks: ["pool1"] },
+          undefined,
+          true
         );
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Swarming", "GetDetails");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "ListTasks");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "GetBotDimensions");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "CountTasks");
@@ -1130,7 +1129,7 @@ describe("task-list", function () {
 
     it("only tries to cancel all tasks based on tags", function (done) {
       loggedInTasklist((ele) => {
-        ele.permissions.cancel_task = true;
+        ele.permissions.cancelTask = true;
         ele._filters = ["pool-tag:Skia", "state:PENDING", "os-tag:Windows"];
         ele.render();
 
@@ -1153,11 +1152,7 @@ describe("task-list", function () {
     it("makes no API calls when not logged in", function (done) {
       createElement((ele) => {
         fetchMock.flush(true).then(() => {
-          // MATCHED calls are calls that we expect and specified in the
-          // beforeEach at the top of this file.
-          let calls = fetchMock.calls(MATCHED, "GET");
-          expect(calls).toHaveSize(0);
-          calls = fetchMock.calls(MATCHED, "POST");
+          const calls = fetchMock.calls(MATCHED, "POST");
           expect(calls).toHaveSize(0);
 
           expectNoUnmatchedCalls(fetchMock);
@@ -1177,18 +1172,13 @@ describe("task-list", function () {
 
     it("makes auth'd API calls when a logged in user views landing page", function (done) {
       loggedInTasklist((ele) => {
-        const protorpc = fetchMock.calls(MATCHED, "GET");
-        expect(protorpc).toHaveSize(
-          2 + 1,
-          "2 GETs from swarming-app, 1 from task-list-page for permsissions"
-        );
-        const prpc = fetchMock.calls(MATCHED, "POST");
-        expect(prpc).toHaveSize(
-          1 + 1 + 13,
-          "1 call to GetTasks, 1 to GetBotDimensions, 13 to TaskCounts"
+        const calls = fetchMock.calls(MATCHED, "POST");
+        expect(calls).toHaveSize(
+          1 + 1 + 13 + 2 + 1,
+          "1 to GetTasks, 1 to GetBotDimensions, 13 to TaskCounts, 2 from swarming-app (GetPermissions, GetDetails), 1 GetPermissions (for tasks)"
         );
 
-        checkAuthorization(protorpc);
+        checkAuthorization(calls);
         done();
       });
     });
@@ -1201,8 +1191,8 @@ describe("task-list", function () {
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, "POST");
           expect(calls).toHaveSize(
-            2 + 13,
-            "1 to get dimensions, 1 to list tasks, 13 counts"
+            1 + 2 + 13,
+            "1 GetPermissions, 1 to GetBotDimensions, 1 to ListTasks, 13 CountTasks"
           );
 
           const prpc = calls
@@ -1224,10 +1214,17 @@ describe("task-list", function () {
         ele._addFilter("state:QUERY_PENDING_RUNNING");
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, "POST");
-          expect(calls).toHaveSize(3 + 12, "2 from task-list and 13 counts");
+          expect(calls).toHaveSize(
+            1 + 1 + 1 + 13,
+            "1 for GetBotDimensions, 1 for TaskList, 1 for GetPermissions, 13 for TaskCount"
+          );
 
           const prpc = calls
-            .filter((c) => !c[0].includes("GetBotDimensions"))
+            .filter(
+              (c) =>
+                !c[0].includes("GetBotDimensions") &&
+                !c[0].includes("GetPermissions")
+            )
             .map((c) => c[1]);
           for (const rpc of prpc) {
             expect(rpc.body).toContain("state");
@@ -1240,7 +1237,7 @@ describe("task-list", function () {
     it("counts correctly when preparing to cancel", function (done) {
       loggedInTasklist((ele) => {
         ele._filters = ["pool-tag:Chrome"];
-        ele.permissions.cancel_task = true;
+        ele.permissions.cancelTask = true;
         ele.render();
         fetchMock.resetHistory();
         const showBtn = $$("#cancel_all");
@@ -1295,7 +1292,7 @@ describe("task-list", function () {
       mockPrpc(fetchMock, "swarming.v2.Tasks", "CancelTasks", { matched: 10 });
       loggedInTasklist((ele) => {
         ele._filters = ["pool-tag:Chrome"];
-        ele.permissions.cancel_task = true;
+        ele.permissions.cancelTask = true;
         ele.render();
         const showBtn = $$("#cancel_all");
         expect(showBtn).toBeTruthy("show button should exist");

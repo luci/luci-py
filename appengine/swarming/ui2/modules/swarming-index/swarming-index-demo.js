@@ -3,23 +3,18 @@
 // that can be found in the LICENSE file.
 
 import "./index.js";
-import { requireLogin, mockAuthdAppGETs } from "../test_util";
+import { mockAuthorizedSwarmingService, mockPrpc } from "../test_util";
 import fetchMock from "fetch-mock";
 
 (function () {
-  mockAuthdAppGETs(fetchMock, {
-    get_bootstrap_token: true,
+  mockAuthorizedSwarmingService(fetchMock, {
+    getBootstrapToken: true,
   });
 
   const loggedInToken = {
-    bootstrap_token: "8675309JennyDontChangeYourNumber8675309",
+    bootstrapToken: "8675309JennyDontChangeYourNumber8675309",
   };
-
-  fetchMock.post(
-    "/_ah/api/swarming/v1/server/token",
-    requireLogin(loggedInToken, 1500)
-  );
-
+  mockPrpc(fetchMock, "swarming.v2.Swarming", "GetToken", loggedInToken);
   // Everything else
   fetchMock.catch(404);
 })();

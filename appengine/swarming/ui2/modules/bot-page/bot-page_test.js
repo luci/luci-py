@@ -9,7 +9,7 @@ import { $, $$ } from "common-sk/modules/dom";
 import {
   customMatchers,
   expectNoUnmatchedCalls,
-  mockAppGETs,
+  mockUnauthorizedSwarmingService,
   MATCHED,
   mockPrpc,
   eventually,
@@ -50,7 +50,7 @@ describe("bot-page", function () {
   beforeEach(function () {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
-    mockAppGETs(
+    mockUnauthorizedSwarmingService(
       fetchMock,
       {
         cancel_task: false,
@@ -138,10 +138,13 @@ describe("bot-page", function () {
     const bot = botDataMap[botName];
     const events = { items: eventsMap["SkiaGPU"] };
     const tasks = { items: tasksMap["SkiaGPU"] };
-
-    fetchMock.get(
-      new RegExp("/_ah/api/swarming/v1/server/permissions??.*"),
-      {}
+    mockPrpc(
+      fetchMock,
+      "swarming.v2.Swarming",
+      "GetPermissions",
+      {},
+      undefined,
+      true
     );
     mockGetBot(bot);
     mockListBotTasks(tasks);
@@ -200,16 +203,21 @@ describe("bot-page", function () {
 
     describe("when logged in as unauthorized user", function () {
       function notAuthorized() {
-        // overwrite the default fetchMock behaviors to have everything return 403.
-        fetchMock.get("/_ah/api/swarming/v1/server/details", 403, {
-          overwriteRoutes: true,
-        });
-        fetchMock.get(
-          "/_ah/api/swarming/v1/server/permissions",
+        mockPrpc(
+          fetchMock,
+          "swarming.v2.Swarming",
+          "GetPermissions",
           {},
-          { overwriteRoutes: true }
+          undefined,
+          true
         );
-
+        mockUnauthorizedPrpc(
+          fetchMock,
+          "swarming.v2.Swarming",
+          "GetDetails",
+          undefined,
+          true
+        );
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "GetBot");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "ListBotTasks");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "ListBotEvents");
@@ -413,9 +421,9 @@ describe("bot-page", function () {
 
       it("disables buttons for unprivileged users", function (done) {
         loggedInBotPage((ele) => {
-          ele.permissions.cancel_task = false;
-          ele.permissions.delete_bot = false;
-          ele.permissions.terminate_bot = false;
+          ele.permissions.cancelTask = false;
+          ele.permissions.deleteBot = false;
+          ele.permissions.terminateBot = false;
           ele.render();
           const killBtn = $$("main button.kill", ele);
           expect(killBtn).toBeTruthy();
@@ -435,9 +443,9 @@ describe("bot-page", function () {
 
       it("enables buttons for privileged users", function (done) {
         loggedInBotPage((ele) => {
-          ele.permissions.cancel_task = true;
-          ele.permissions.delete_bot = true;
-          ele.permissions.terminate_bot = true;
+          ele.permissions.cancelTask = true;
+          ele.permissions.deleteBot = true;
+          ele.permissions.terminateBot = true;
           ele.render();
           const killBtn = $$("main button.kill", ele);
           expect(killBtn).toBeTruthy();
@@ -658,18 +666,11 @@ describe("bot-page", function () {
     it("makes auth'd API calls when a logged in user views landing page", function (done) {
       serveBot("running");
       loggedInBotPage((ele) => {
-        // fetchMock.calls is an array of 2-length arrays with the first element
-        // being the string of the url and the second element being
-        // the options that were passed in
-        const protoRpcCalls = fetchMock.calls(MATCHED, "GET");
-        expect(protoRpcCalls).toHaveSize(
-          2 + 1,
-          "2 GETs from swarming-app, 3 from bot-page"
-        );
-        checkAuthorization(protoRpcCalls);
-        // At the moment, only GetBot and ListBotTasks are used.
         const prpcCalls = fetchMock.calls(MATCHED, "POST");
-        expect(prpcCalls).toHaveSize(3);
+        expect(prpcCalls).toHaveSize(
+          2 + 1 + 3,
+          "2 from swarming-app, 1 for permissions, 3 for events, tasks and botInfo"
+        );
 
         const getBotsReq = { bot_id: TEST_BOT_ID };
         const getBotsCall = prpcCalls.filter(
@@ -724,7 +725,7 @@ describe("bot-page", function () {
     it("can kill a running task", function (done) {
       serveBot("running");
       loggedInBotPage((ele) => {
-        ele.permissions.cancel_task = true;
+        ele.permissions.cancelTask = true;
         ele.render();
         fetchMock.resetHistory();
         // This is the task_id on the 'running' bot.
@@ -767,7 +768,7 @@ describe("bot-page", function () {
     it("can terminate a non-dead bot", function (done) {
       serveBot("running");
       loggedInBotPage((ele) => {
-        ele.permissions.terminate_bot = true;
+        ele.permissions.terminateBot = true;
         ele.render();
         fetchMock.resetHistory();
         // This is the task_id on the 'running' bot.
@@ -810,7 +811,7 @@ describe("bot-page", function () {
     it("can delete a dead bot", function (done) {
       serveBot("dead");
       loggedInBotPage((ele) => {
-        ele.permissions.delete_bot = true;
+        ele.permissions.deleteBot = true;
         ele.render();
         fetchMock.resetHistory();
         // This is the task_id on the 'running' bot.
@@ -961,10 +962,8 @@ describe("bot-page", function () {
           // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
           expectNoUnmatchedCalls(fetchMock);
-          const protoRpcCalls = fetchMock.calls(MATCHED, "GET");
-          expect(protoRpcCalls).toHaveSize(1);
           const prpcCalls = fetchMock.calls(MATCHED, "POST");
-          expect(prpcCalls).toHaveSize(3);
+          expect(prpcCalls).toHaveSize(4);
 
           done();
         });

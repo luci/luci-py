@@ -10,7 +10,7 @@ import { $, $$ } from "common-sk/modules/dom";
 import {
   customMatchers,
   expectNoUnmatchedCalls,
-  mockAppGETs,
+  mockUnauthorizedSwarmingService,
   MATCHED,
 } from "../test_util";
 
@@ -22,7 +22,7 @@ describe("task-mass-cancel", function () {
   beforeEach(function () {
     jasmine.addMatchers(customMatchers);
 
-    mockAppGETs(fetchMock, { delete_bot: true });
+    mockUnauthorizedSwarmingService(fetchMock, { delete_bot: true });
 
     mockPrpc(fetchMock, "swarming.v2.Tasks", "CountTasks", { count: 17 });
 

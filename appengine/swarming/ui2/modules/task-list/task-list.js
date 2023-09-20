@@ -226,7 +226,7 @@ const options = (ele) => html`
   <a href=${ele._matchingBotsLink()}>View Matching Bots</a>
   <!-- TODO(jwata): change to permissions.cancel_tasks -->
   <button id=cancel_all
-      ?disabled=${!ele.permissions.cancel_task}
+      ?disabled=${!ele.permissions.cancelTask}
       @click=${ele._promptMassCancel}>
     CANCEL ALL TASKS
   </button>
@@ -544,7 +544,7 @@ window.customElements.define(
       // cannot be re-used once aborted.
       this._fetchController = new AbortController();
       const extra = {
-        headers: { authorization: this.authHeader },
+        authHeader: this.authHeader,
         signal: this._fetchController.signal,
       };
       // Re-checks permissions with tags.
@@ -556,7 +556,7 @@ window.customElements.define(
         const dims = [
           {
             key: "pool",
-            value: this.permissions.list_tasks || [],
+            value: this.permissions.listTasks || [],
           },
         ];
         appendPossibleColumns(this._possibleColumns, dims);

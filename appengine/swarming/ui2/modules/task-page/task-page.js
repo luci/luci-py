@@ -155,11 +155,11 @@ const idAndButtons = (ele) => {
           @click=${ele._promptDebug} class=debug>debug</button>
   <button title="Cancel a pending task, so it does not start"
           ?hidden=${ele._result.state !== "PENDING"}
-          ?disabled=${!ele.permissions.cancel_task}
+          ?disabled=${!ele.permissions.cancelTask}
           @click=${ele._promptCancel} class=cancel>cancel</button>
   <button title="Kill a running task, so it stops as soon as possible"
           ?hidden=${ele._result.state !== "RUNNING"}
-          ?disabled=${!ele.permissions.cancel_task}
+          ?disabled=${!ele.permissions.cancelTask}
           @click=${ele._promptCancel} class=kill>kill</button>
 </div>`;
 };
@@ -206,7 +206,7 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
         ${dimensionBlock(currentSlice.properties.dimensions || [])}
         ${casBlock(
           "CAS Inputs",
-          ele._app._server_details.cas_viewer_server,
+          ele._app._serverDetails.casViewerServer,
           currentSlice.properties.casInputRoot || {}
         )}
         <tr ?hidden=${!result.resultdbInfo}>
@@ -782,7 +782,7 @@ const logsSection = (ele, request, result) => {
             <td>
               <a
                 href=${serverTaskLogsURL(
-                  ele._project_id,
+                  ele._projectId,
                   ele._taskId,
                   request,
                   result
@@ -797,7 +797,7 @@ const logsSection = (ele, request, result) => {
             <td>Bot related server Logs</td>
             <td>
               <a
-                href=${serverBotLogsURL(ele._project_id, request, result)}
+                href=${serverBotLogsURL(ele._projectId, request, result)}
                 target="_blank"
                 ?hidden=${!result.botId}
               >
@@ -920,13 +920,13 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   </tr>
   ${missingCasBlock(
     "Missing CAS Input(s)",
-    ele._app._server_details.cas_viewer_server,
+    ele._app._serverDetails.casViewerServer,
     result.missingCas
   )}
   ${missingCipdBlock("Missing CIPD Package(s)", result.missingCipd)}
   ${casBlock(
     "CAS Outputs",
-    ele._app._server_details.cas_viewer_server,
+    ele._app._serverDetails.casViewerServer,
     result.casOutputRoot || {}
   )}
   <tr>
@@ -1259,7 +1259,7 @@ window.customElements.define(
       this._wideLogs = false;
       this._urlParamsLoaded = false;
       const idx = location.hostname.indexOf(".appspot.com");
-      this._project_id = location.hostname.substring(0, idx);
+      this._projectId = location.hostname.substring(0, idx);
 
       this._stateChanged = stateReflector(
         /* getState*/ () => {
@@ -1467,7 +1467,7 @@ time.sleep(${leaseDuration})`,
       // cannot be re-used once aborted.
       this._fetchController = new AbortController();
       const extra = {
-        headers: { authorization: this.authHeader },
+        authHeader: this.authHeader,
         signal: this._fetchController.signal,
       };
       // re-fetch permissions with the task ID.

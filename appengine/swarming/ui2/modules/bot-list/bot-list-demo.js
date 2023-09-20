@@ -5,7 +5,7 @@
 import "./index.js";
 
 import { bots10, fleetCount, fleetDimensions, queryCount } from "./test_data";
-import { requireLogin, mockAuthdAppGETs } from "../test_util";
+import { requireLogin, mockAuthorizedSwarmingService } from "../test_util";
 import fetchMock from "fetch-mock";
 
 (function () {
@@ -23,7 +23,7 @@ import fetchMock from "fetch-mock";
   // bots_10.items.push(...bots_10.items);
   // bots_10.items.push(...bots_10.items);
 
-  mockAuthdAppGETs(fetchMock, {
+  mockAuthorizedSwarmingService(fetchMock, {
     delete_bot: true,
     list_bots: ["Chrome"],
   });

@@ -34,11 +34,10 @@ import "elements-sk/icon/menu-icon-sk";
 import "elements-sk/spinner-sk";
 import "../oauth-login";
 
-import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
-import * as query from "common-sk/modules/query";
 import { errorMessage } from "elements-sk/errorMessage";
 import { upgradeProperty } from "elements-sk/upgradeProperty";
 import { html, render } from "lit-html";
+import { SwarmingService } from "../services/swarming";
 
 const buttonTemplate = document.createElement("template");
 buttonTemplate.innerHTML = `
@@ -65,29 +64,29 @@ const versionFilterPostfix =
 const versionDefault = "You must log in to see more details";
 
 function serverLink(projectId, details) {
-  if (!details || !details.server_version) {
+  if (!details || !details.serverVersion) {
     return versionDefault;
   }
   return html`<a
     href=${pantheonUrl.concat(
       projectId,
       versionFilterPrefix,
-      details.server_version,
+      details.serverVersion,
       versionFilterPostfix
     )}
   >
-    ${details.server_version}</a
+    ${details.serverVersion}</a
   >`;
 }
 
 function gitLink(details) {
-  if (!details || !details.server_version) {
+  if (!details || !details.serverVersion) {
     return "";
   }
 
-  const split = details.server_version.split("-");
+  const split = details.serverVersion.split("-");
   if (split.length >= 3) {
-    console.error(`Invalid Git version. version=${details.server_version}`);
+    console.error(`Invalid Git version. version=${details.serverVersion}`);
     return "";
   }
   const version = split.length == 2 ? split[1] : split[0];
@@ -95,8 +94,8 @@ function gitLink(details) {
 }
 
 const dynamicContentTemplate = (ele) => html` <div class="server-version">
-    AppEngine version: ${serverLink(ele._project_id, ele._server_details)} Git
-    version:${gitLink(ele._server_details)}
+    AppEngine version: ${serverLink(ele._projectId, ele._serverDetails)} Git
+    version:${gitLink(ele._serverDetails)}
   </div>
   <oauth-login ?testing_offline=${ele.testing_offline}> </oauth-login>`;
 
@@ -117,13 +116,13 @@ window.customElements.define(
       this._dynamicEle = null;
       this._auth_header = "";
       this._profile = {};
-      this._server_details = {
-        server_version: versionDefault,
-        bot_version: "",
-        cas_viewer_server: "",
+      this._serverDetails = {
+        serverVersion: versionDefault,
+        botVersion: "",
+        casViewerServer: "",
       };
       const idx = location.hostname.indexOf(".appspot.com");
-      this._project_id = location.hostname.substring(0, idx);
+      this._projectId = location.hostname.substring(0, idx);
       this._permissions = {};
     }
 
@@ -168,7 +167,7 @@ window.customElements.define(
                      placeholder object if the user is not logged in or
    *                 not authorized. Read-only. */
     get serverDetails() {
-      return this._server_details;
+      return this._serverDetails;
     }
 
     /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
@@ -284,18 +283,18 @@ window.customElements.define(
       if (!this._auth_header) {
         return;
       }
-      this._server_details = {
-        server_version: "<loading>",
-        bot_version: "<loading>",
+      this._serverDetails = {
+        serverVersion: "<loading>",
+        botVersion: "<loading>",
       };
       const auth = {
-        headers: { authorization: this._auth_header },
+        authHeader: this._auth_header,
       };
       this.addBusyTasks(1);
-      fetch("/_ah/api/swarming/v1/server/details", auth)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._server_details = json;
+      new SwarmingService(auth.authHeader)
+        .details()
+        .then((resp) => {
+          this._serverDetails = resp;
           this.render();
           this.dispatchEvent(
             new CustomEvent("server-details-loaded", { bubbles: true })
@@ -303,9 +302,9 @@ window.customElements.define(
           this.finishedTask();
         })
         .catch((e) => {
-          if (e.status === 403) {
-            this._server_details = {
-              server_version:
+          if (e.codeName === "PERMISSION_DENIED") {
+            this._serverDetails = {
+              serverVersion:
                 "User unauthorized - try logging in " +
                 "with a different account",
               bot_version: "",
@@ -323,14 +322,18 @@ window.customElements.define(
       this._fetchPermissions(auth);
     }
 
+    /**
+     * Fetches permissions available for given parameters and renders the resulting permissions.
+     *
+     * @param {Object} auth object with the shape { authHeader: string, signal: AbortSignal }
+     * @param {Object} params see documentation of SwarmingService
+     */
     _fetchPermissions(auth, params) {
       this.addBusyTasks(1);
-      let url = "/_ah/api/swarming/v1/server/permissions";
-      if (params) url += `?${query.fromObject(params)}`;
-      return fetch(url, auth)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._permissions = json;
+      return new SwarmingService(auth.authHeader, auth.signal)
+        .permissions(params || {})
+        .then((resp) => {
+          this._permissions = resp;
           this.render();
           this.dispatchEvent(
             new CustomEvent("permissions-loaded", { bubbles: true })

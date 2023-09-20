@@ -4,14 +4,14 @@
 import "./index.js";
 
 import { taskOutput, taskResult, taskRequest } from "./test_data";
-import { requireLogin, mockAuthdAppGETs } from "../test_util";
+import { requireLogin, mockAuthorizedSwarmingService } from "../test_util";
 import { $$ } from "common-sk/modules/dom";
 import fetchMock from "fetch-mock";
 
 (function () {
   const PERF_TEST_LOGS = true;
 
-  mockAuthdAppGETs(fetchMock, {});
+  mockAuthorizedSwarmingService(fetchMock, {});
 
   fetchMock.get(
     "glob:/_ah/api/swarming/v1/server/permissions?task_id=*",

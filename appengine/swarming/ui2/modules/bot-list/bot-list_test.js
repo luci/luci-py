@@ -13,7 +13,7 @@ import {
   customMatchers,
   expectNoUnmatchedCalls,
   getChildItemWithText,
-  mockAppGETs,
+  mockUnauthorizedSwarmingService,
   MATCHED,
   mockPrpc,
   createRequestFilter,
@@ -44,7 +44,7 @@ describe("bot-list", function () {
   function setupFetchMock(includeList = true) {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
-    mockAppGETs(fetchMock, {
+    mockUnauthorizedSwarmingService(fetchMock, {
       delete_bot: true,
     });
 
@@ -181,16 +181,15 @@ describe("bot-list", function () {
     describe("when logged in as unauthorized user", function () {
       function notAuthorized() {
         // overwrite the default fetchMock behaviors to have everything return 403.
-        fetchMock.get("/_ah/api/swarming/v1/server/details", 403, {
-          overwriteRoutes: true,
-        });
-        fetchMock.get(
-          "/_ah/api/swarming/v1/server/permissions",
-          {
-            list_bots: ["pool1"],
-          },
-          { overwriteRoutes: true }
+        mockPrpc(
+          fetchMock,
+          "swarming.v2.Swarming",
+          "GetPermissions",
+          { listBots: ["pool1"] },
+          undefined,
+          true
         );
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Swarming", "GetDetails");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "ListBots");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "GetBotDimensions");
       }
@@ -1124,10 +1123,10 @@ describe("bot-list", function () {
 
     it("makes auth'd API calls when a logged in user views landing page", function (done) {
       loggedInBotlist((ele) => {
-        const calls = fetchMock.calls(MATCHED, "GET");
+        const calls = fetchMock.calls(MATCHED, "POST");
         expect(calls).toHaveSize(
-          3,
-          "2 GETs from swarming-app, 1 from bot-list for permissions"
+          2 + 1 + 2 + 1 + 1,
+          "2 POSTs from swarming-app, 1 from bot-list for permissions, 2 CountBots, 1 ListBot, 1 GetBotDimensions"
         );
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
@@ -1152,17 +1151,15 @@ describe("bot-list", function () {
         fetchMock.resetHistory();
         ele._addFilter("alpha:beta");
 
-        const calls = fetchMock.calls(MATCHED, "GET");
-        expect(calls).toHaveSize(1, "1 for the dimensions");
         // calls is an array of 2-length arrays with the first element
         // being the string of the url and the second element being
         // the options that were passed in
-        let posts = fetchMock.calls(MATCHED, "POST");
+        let calls = fetchMock.calls(MATCHED, "POST");
         const listCheck = createRequestFilter("swarming.v2.Bots", "ListBots", {
           dimensions: [{ key: "alpha", value: "beta" }],
           limit: 100,
         });
-        expect(posts.filter(listCheck)).toHaveSize(1);
+        expect(calls.filter(listCheck)).toHaveSize(1);
         const countsCheck = createRequestFilter(
           "swarming.v2.Bots",
           "CountBots",
@@ -1170,16 +1167,16 @@ describe("bot-list", function () {
             dimensions: [{ key: "alpha", value: "beta" }],
           }
         );
-        expect(posts.filter(countsCheck)).toHaveSize(1);
+        expect(calls.filter(countsCheck)).toHaveSize(1);
         checkAuthorization(calls);
 
         fetchMock.resetHistory();
         ele._removeFilter("alpha:beta");
 
-        posts = fetchMock.calls(MATCHED, "POST");
+        calls = fetchMock.calls(MATCHED, "POST");
 
-        expect(posts.filter(listCheck)).toBeLessThan(1);
-        expect(posts.filter(countsCheck)).toBeLessThan(1);
+        expect(calls.filter(listCheck)).toBeLessThan(1);
+        expect(calls.filter(countsCheck)).toBeLessThan(1);
 
         checkAuthorization(calls);
         done();

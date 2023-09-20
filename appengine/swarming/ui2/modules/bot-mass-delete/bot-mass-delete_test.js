@@ -9,7 +9,7 @@ import { $, $$ } from "common-sk/modules/dom";
 import {
   customMatchers,
   expectNoUnmatchedCalls,
-  mockAppGETs,
+  mockUnauthorizedSwarmingService,
   MATCHED,
 } from "../test_util";
 
@@ -21,7 +21,7 @@ describe("bot-mass-delete", function () {
   beforeEach(function () {
     jasmine.addMatchers(customMatchers);
 
-    mockAppGETs(fetchMock, { delete_bot: true });
+    mockUnauthorizedSwarmingService(fetchMock, { delete_bot: true });
 
     // Everything else
     fetchMock.catch(404);

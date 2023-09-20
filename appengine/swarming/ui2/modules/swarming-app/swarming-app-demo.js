@@ -5,11 +5,11 @@
 import "elements-sk/error-toast-sk";
 
 import "./index.js";
-import { mockAuthdAppGETs } from "../test_util";
+import { mockAuthorizedSwarmingService } from "../test_util";
 import fetchMock from "fetch-mock";
 
 (function () {
-  mockAuthdAppGETs(fetchMock, {
+  mockAuthorizedSwarmingService(fetchMock, {
     can_pet_dogs: true,
   });
 

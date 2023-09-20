@@ -100,24 +100,33 @@ function isElement(ele) {
   return ele instanceof Element || ele instanceof HTMLDocument;
 }
 
-export function mockAppGETs(fetchMock, permissions, serverDetails = {}) {
+export function mockUnauthorizedSwarmingService(
+  fetchMock,
+  permissions,
+  serverDetails = {}
+) {
   fetchMock.get("/auth/openid/state", {
     identity: "anonymous:anonymous",
   });
 
-  fetchMock.get("/_ah/api/swarming/v1/server/details", {
-    server_version: serverDetails.serverVersion || "1234-abcdefg",
-    bot_version: serverDetails.botVersion || "abcdoeraymeyouandme",
-    machine_provider_template:
-      serverDetails.machineProviderTemplate || "https://example.com/leases/%s",
-    display_server_url_template:
-      serverDetails.displayServerUrlTemplate || "https://example.com#id=%s",
+  const defaultServerDetails = {
+    serverVersion: "1234-abcdefg",
+    botVersion: "abcdoeraymeyouandme",
+    machineProviderTemplate: "https://example.com/leases/%s",
+    displayServerUrlTemplate: "https://example.com#id=%s",
+  };
+  mockPrpc(fetchMock, "swarming.v2.Swarming", "GetDetails", {
+    ...defaultServerDetails,
+    ...serverDetails,
   });
-
-  fetchMock.get("/_ah/api/swarming/v1/server/permissions", permissions);
+  mockPrpc(fetchMock, "swarming.v2.Swarming", "GetPermissions", permissions);
 }
 
-export function mockAuthdAppGETs(fetchMock, permissions, serverDetails = {}) {
+export function mockAuthorizedSwarmingService(
+  fetchMock,
+  permissions,
+  serverDetails = {}
+) {
   fetchMock.get("/auth/openid/state", {
     identity: "user:someone@example.com",
     email: "someone@example.com",
@@ -125,25 +134,17 @@ export function mockAuthdAppGETs(fetchMock, permissions, serverDetails = {}) {
     accessToken: "12345-zzzzzz",
   });
 
-  fetchMock.get(
-    "/_ah/api/swarming/v1/server/details",
-    requireLogin({
-      server_version: serverDetails.serverVersion || "1234-abcdefg",
-      bot_version: serverDetails.botVersion || "abcdoeraymeyouandme",
-      machine_provider_template:
-        serverDetails.machineProviderTemplate ||
-        "https://example.com/leases/%s",
-      display_server_url_template:
-        serverDetails.displayServerUrlTemplate || "https://example.com#id=%s",
-      cas_viewer_server:
-        serverDetails.casViewerServer || "https://cas-viewer-dev.appspot.com",
-    })
-  );
-
-  fetchMock.get(
-    "/_ah/api/swarming/v1/server/permissions",
-    requireLogin(permissions)
-  );
+  const defaultServerDetails = {
+    serverVersion: "1234-abcdefg",
+    botVersion: "abcdoeraymeyouandme",
+    machineProviderTemplate: "https://example.com/leases/%s",
+    displayServerUrlTemplate: "https://example.com#id=%s",
+  };
+  mockPrpc(fetchMock, "swarming.v2.Swarming", "GetDetails", {
+    ...defaultServerDetails,
+    ...serverDetails,
+  });
+  mockPrpc(fetchMock, "swarming.v2.Swarming", "GetPermissions", permissions);
 }
 
 export function requireLogin(loggedIn, delay = 100) {

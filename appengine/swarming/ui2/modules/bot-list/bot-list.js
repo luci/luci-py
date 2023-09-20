@@ -147,7 +147,7 @@ const options = (ele) => html` <div class="options">
   <a href=${ele._matchingTasksLink()}>View Matching Tasks</a>
   <button
     id="delete_all"
-    ?disabled=${!ele.permissions.delete_bots}
+    ?disabled=${!ele.permissions.deleteBots}
     @click=${ele._promptMassDelete}
   >
     DELETE ALL DEAD BOTS
@@ -511,7 +511,7 @@ window.customElements.define(
       if (bot.maintenanceMsg) {
         classes += "maintenance ";
       }
-      if (bot.version !== this.serverDetails.bot_version) {
+      if (bot.version !== this.serverDetails.botVersion) {
         classes += "old_version";
       }
       return classes;
@@ -558,13 +558,13 @@ window.customElements.define(
       // cannot be re-used once aborted.
       this._fetchController = new AbortController();
       const extra = {
-        headers: { authorization: this.authHeader },
+        authHeader: this.authHeader,
         signal: this._fetchController.signal,
       };
       // Re-checks permissions with tags.
       this.app._fetchPermissions(extra, { tags: this._filters }).then(() => {
         // Users can select only pool dimension at this point.
-        this._primaryMap = { pool: this.permissions.list_bots || [] };
+        this._primaryMap = { pool: this.permissions.listBots || [] };
         this._primaryArr = ["pool"];
         this._filteredPrimaryArr = this._primaryArr.slice();
         this._refilterPossibleColumns(); // calls render

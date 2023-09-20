@@ -4,13 +4,17 @@
 
 import "./swarming-app";
 import fetchMock from "fetch-mock";
-import { expectNoUnmatchedCalls, mockAppGETs, MATCHED } from "../test_util";
+import {
+  expectNoUnmatchedCalls,
+  mockUnauthorizedSwarmingService,
+  MATCHED,
+} from "../test_util";
 
 describe("swarming-app", function () {
   beforeEach(function () {
     // These are the default responses to the expected API calls (aka 'matched')
     // They can be overridden for specific tests, if needed.
-    mockAppGETs(fetchMock, {
+    mockUnauthorizedSwarmingService(fetchMock, {
       can_like_dogs: true,
       can_like_cats: true,
     });
@@ -226,14 +230,20 @@ describe("swarming-app", function () {
       it("makes authenticated calls when a user logs in", function (done) {
         createElement((ele) => {
           userLogsIn(ele, () => {
-            const calls = fetchMock.calls(MATCHED, "GET");
+            const calls = fetchMock.calls(MATCHED, "POST");
             expect(calls).toHaveSize(2);
             // calls is an array of 2-length arrays with the first element
             // being the string of the url and the second element being
             // the options that were passed in
-            const gets = calls.map((c) => c[0]);
-            expect(gets).toContain("/_ah/api/swarming/v1/server/details");
-            expect(gets).toContain("/_ah/api/swarming/v1/server/permissions");
+            const posts = calls.map((c) => c[0]);
+            expect(
+              posts.filter((c) => c.endsWith("swarming.v2.Swarming/GetDetails"))
+            ).toHaveSize(1);
+            expect(
+              posts.filter((c) =>
+                c.endsWith("swarming.v2.Swarming/GetPermissions")
+              )
+            ).toHaveSize(1);
 
             // check authorization headers are set
             calls.forEach((c) => {
@@ -267,10 +277,10 @@ describe("swarming-app", function () {
           ele.addEventListener("server-details-loaded", (e) => {
             e.stopPropagation();
             expect(ele.serverDetails).toBeTruthy();
-            expect(ele.serverDetails.server_version).toBe("1234-abcdefg");
+            expect(ele.serverDetails.serverVersion).toBe("1234-abcdefg");
             done();
           });
-          expect(ele.serverDetails.server_version).toContain("must log in");
+          expect(ele.serverDetails.serverVersion).toContain("must log in");
           userLogsIn(ele, () => {});
         });
       });

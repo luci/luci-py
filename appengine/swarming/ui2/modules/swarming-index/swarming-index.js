@@ -16,17 +16,17 @@
  */
 
 import { html } from "lit-html";
-import { jsonOrThrow } from "common-sk/modules/jsonOrThrow";
 
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 
 import "../swarming-app";
+import { SwarmingService } from "../services/swarming";
 
 // Don't use html for a straight string template, otherwise, it shows up
 // as [object Object] when used as the href attribute.
 const instancesURL = (ele) =>
   `https://console.cloud.google.com/appengine/instances?` +
-  `project=${ele._project_id}&versionId=${ele.serverDetails.server_version}`;
+  `project=${ele._projectId}&versionId=${ele.serverDetails.serverVersion}`;
 
 const errorsURL = (projectId) =>
   `https://console.cloud.google.com/errors?project=${projectId}`;
@@ -44,7 +44,7 @@ const bootstrapTemplate = (ele) => html`
       <li>
         <strong> TL;DR; </strong>
         <pre class="command">
-python3 -c "import urllib.request; exec(urllib.request.urlopen('${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}').read())"</pre
+python3 -c "import urllib.request; exec(urllib.request.urlopen('${ele._host_url}/bootstrap?tok=${ele._bootstrapToken}').read())"</pre
         >
       </li>
       <li>
@@ -57,7 +57,7 @@ python3 -c "import urllib.request; exec(urllib.request.urlopen('${ele._host_url}
         Manually:
         <pre class="command">
 mkdir bot; cd bot
-rm -f swarming_bot.zip; curl -sSLOJ ${ele._host_url}/bot_code?tok=${ele._bootstrap_token}
+rm -f swarming_bot.zip; curl -sSLOJ ${ele._host_url}/bot_code?tok=${ele._bootstrapToken}
 python3 swarming_bot.zip</pre
         >
       </li>
@@ -83,9 +83,9 @@ const template = (ele) => html`
 
     <h2>Service Status</h2>
     <div>Server Version:
-      <span class=server_version> ${ele.serverDetails.server_version}</span>
+      <span class=server_version> ${ele.serverDetails.serverVersion}</span>
     </div>
-    <div>Bot Version: ${ele.serverDetails.bot_version} </div>
+    <div>Bot Version: ${ele.serverDetails.botVersion} </div>
     <ul>
       <li>
         <a href=${instancesURL(
@@ -94,12 +94,12 @@ const template = (ele) => html`
       </li>
       <li>
         <a href=${errorsURL(
-          ele._project_id
+          ele._projectId
         )}>View server errors on Cloud Console</a>
       </li>
       <li>
         <a href=${logsURL(
-          ele._project_id
+          ele._projectId
         )}>View logs for HTTP 5xx on Cloud Console</a>
       </li>
       <li>
@@ -123,7 +123,7 @@ const template = (ele) => html`
         <a href="/auth/groups">View/edit user groups</a>
       </li>
     </ul>
-    ${ele.permissions.get_bootstrap_token ? bootstrapTemplate(ele) : ""}
+    ${ele.permissions.getBootstrapToken ? bootstrapTemplate(ele) : ""}
   </main>
   <footer></footer>
 </swarming-app>`;
@@ -133,9 +133,9 @@ window.customElements.define(
   class extends SwarmingAppBoilerplate {
     constructor() {
       super(template);
-      this._bootstrap_token = "...";
+      this._bootstrapToken = "...";
       const idx = location.hostname.indexOf(".appspot.com");
-      this._project_id = location.hostname.substring(0, idx) || "not_found";
+      this._projectId = location.hostname.substring(0, idx) || "not_found";
       this._host_url = location.origin;
     }
 
@@ -143,7 +143,7 @@ window.customElements.define(
       super.connectedCallback();
 
       this.addEventListener("permissions-loaded", (e) => {
-        if (this.permissions.get_bootstrap_token) {
+        if (this.permissions.getBootstrapToken) {
           this._fetchToken();
         }
         this.render();
@@ -157,19 +157,15 @@ window.customElements.define(
     }
 
     _fetchToken() {
-      const postExtra = {
-        headers: { authorization: this.authHeader },
-        method: "POST",
-      };
       this.app.addBusyTasks(1);
-      fetch("/_ah/api/swarming/v1/server/token", postExtra)
-        .then(jsonOrThrow)
-        .then((json) => {
-          this._bootstrap_token = json.bootstrap_token;
+      new SwarmingService(this.authHeader)
+        .token()
+        .then((resp) => {
+          this._bootstrapToken = resp.bootstrapToken;
           this.render();
           this.app.finishedTask();
         })
-        .catch((e) => this.fetchError(e, "token"));
+        .catch((e) => this.prpcError(e, "token"));
     }
   }
 );

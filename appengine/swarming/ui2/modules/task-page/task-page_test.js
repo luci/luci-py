@@ -10,7 +10,7 @@ import {
   mockUnauthorizedPrpc,
   customMatchers,
   expectNoUnmatchedCalls,
-  mockAppGETs,
+  mockUnauthorizedSwarmingService,
   MATCHED,
   mockPrpc,
 } from "../test_util";
@@ -54,13 +54,14 @@ describe("task-page", function () {
   beforeEach(function () {
     // These are the default responses to the expected API calls (aka 'matched').
     // They can be overridden for specific tests, if needed.
-    mockAppGETs(fetchMock, {});
-    fetchMock.get(new RegExp("/_ah/api/swarming/v1/server/permissions??.*"), {
-      cancel_task: false,
-    });
-
-    // By default, don't have any handlers mocked out - this requires
-    // tests to opt-in to wanting certain request data.
+    mockUnauthorizedSwarmingService(fetchMock, {});
+    mockPrpc(
+      fetchMock,
+      "swarming.v2.Swarming",
+      "GetPermissions",
+      { cancelTask: false },
+      (body) => !deepEquals(body, {})
+    );
 
     // Everything else
     fetchMock.catch(404);
@@ -230,15 +231,15 @@ describe("task-page", function () {
 
     describe("when logged in as unauthorized user", function () {
       function notAuthorized() {
-        // overwrite the default fetchMock behaviors to have everything return 403.
-        fetchMock.get("/_ah/api/swarming/v1/server/details", 403, {
-          overwriteRoutes: true,
-        });
-        fetchMock.get(
-          "/_ah/api/swarming/v1/server/permissions",
+        mockPrpc(
+          fetchMock,
+          "swarming.v2.Swarming",
+          "GetPermissions",
           {},
-          { overwriteRoutes: true }
+          undefined,
+          true
         );
+        mockUnauthorizedPrpc(fetchMock, "swarming.v2.Swarming", "GetDetails");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "GetRequest");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "GetResult");
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Tasks", "GetStdout");
@@ -567,7 +568,7 @@ describe("task-page", function () {
 
       it("shows a cancel button", function (done) {
         loggedInTaskPage((ele) => {
-          ele.permissions.cancel_task = true;
+          ele.permissions.cancelTask = true;
           ele.render();
           const cancelBtn = $$(".id_buttons button.cancel", ele);
           expect(cancelBtn).toBeTruthy();
@@ -585,7 +586,7 @@ describe("task-page", function () {
           // Kill is only for running tasks.
           expect(killBtn).toHaveAttribute("hidden", "Kill should be hidden");
 
-          ele.permissions.cancel_task = false;
+          ele.permissions.cancelTask = false;
           ele.render();
           expect(cancelBtn).not.toHaveAttribute(
             "hidden",
@@ -800,19 +801,11 @@ describe("task-page", function () {
     it("makes auth'd API calls when a logged in user views landing page", function (done) {
       serveTask(1, "Completed task with 2 slices");
       loggedInTaskPage((ele) => {
-        const protorpc = fetchMock.calls(MATCHED, "GET");
-        expect(protorpc).toHaveSize(
-          2 + 1,
-          "2 GETs from swarming-app, 1 from task-page "
+        const calls = fetchMock.calls(MATCHED, "POST");
+        expect(calls).toHaveSize(
+          2 * 3 + 3 + 2 + 1,
+          "2 swarming-app (GetDetails, GetPermissions), 1 GetPermissions, 1 GetResult, 1 GetStdout and 1 GetRequest per slice (2)"
         );
-
-        const prpc = fetchMock.calls(MATCHED, "POST");
-        // Number of calls expected:
-        // 1 GetRequest, 1 GetResult and 1 GetStout
-        // For each slice
-        // # BotCount = 1
-        // # TaskCount = 2
-        expect(prpc).toHaveSize(2 * 3 + 3);
 
         // spot check one of the counts
         let expectedDims = {
@@ -825,7 +818,7 @@ describe("task-page", function () {
           ],
         };
         expectedDims = JSON.stringify(expectedDims);
-        const countCalls = prpc.filter((call) => {
+        const countCalls = calls.filter((call) => {
           const url = call[0];
           if (!url.endsWith("CountBots")) {
             return false;
@@ -833,7 +826,7 @@ describe("task-page", function () {
           return call[1].body === expectedDims;
         });
         expect(countCalls.length).toBeGreaterThan(0);
-        checkAuthorization(protorpc.concat(prpc));
+        checkAuthorization(calls);
         done();
       });
     });
@@ -844,14 +837,10 @@ describe("task-page", function () {
         // prpc calls count
         const prpc = fetchMock.calls(MATCHED, "POST");
         // There are 6 prpc calls here.
-        expect(prpc).toHaveSize(6);
-
-        const protorpc = fetchMock.calls(MATCHED, "GET");
-        expect(protorpc).toHaveSize(
-          2 + 1,
-          "2 GETs from swarming-app, 1 from task-page"
+        expect(prpc).toHaveSize(
+          2 + 1 + 6,
+          "6 calls from task-page, 2 GETs from swarming-app, 1 from task-page for permissions"
         );
-
         let expectedBody = {
           tags: [
             "device_os:N",
@@ -872,7 +861,7 @@ describe("task-page", function () {
         });
 
         expect(countCalls.length).toBeGreaterThan(0);
-        checkAuthorization(prpc.concat(protorpc));
+        checkAuthorization(prpc);
         done();
       });
     });
@@ -984,7 +973,7 @@ describe("task-page", function () {
     it("makes a post to cancel a pending job", function (done) {
       serveTask(2, "Pending task - 1 slice - no rich logs");
       loggedInTaskPage((ele) => {
-        ele.permissions.cancel_task = true;
+        ele.permissions.cancelTask = true;
         ele.render();
         fetchMock.resetHistory();
         mockPrpc(fetchMock, "swarming.v2.Tasks", "CancelTask", {
@@ -1028,7 +1017,7 @@ describe("task-page", function () {
     it("makes a post to kill a running job", function (done) {
       serveTask(0, "running task on try number 3");
       loggedInTaskPage((ele) => {
-        ele.permissions.cancel_task = true;
+        ele.permissions.cancelTask = true;
         ele.render();
         fetchMock.resetHistory();
         mockPrpc(fetchMock, "swarming.v2.Tasks", "CancelTask", {
