@@ -12,6 +12,7 @@ https://github.com/grpc/grpc/tree/master/src/python/grpcio/grpc
 
 import collections
 import logging
+import traceback
 
 from google.protobuf import symbol_database
 
@@ -50,7 +51,7 @@ class ServerBase(object):
   provides a simpler interface via add_service and get_routes.
   """
 
-  def __init__(self, allow_cors=True, allowed_origins=None):
+  def __init__(self, allow_cors=True, allowed_origins=None, debug=False):
     """Initializes a new Server.
 
     Args:
@@ -58,6 +59,7 @@ class ServerBase(object):
       allowed_origins: optional collection of allowed origins. Only used
         when cors is allowed. If empty, all origins will be allowed, otherwise
         only listed origins will be allowed.
+      debug: if True, write exception tracebacks into the response body.
 
     """
     self._services = {}
@@ -66,6 +68,7 @@ class ServerBase(object):
     self.add_service(self._discovery_service)
     self.allow_cors = allow_cors
     self.allowed_origins = set(allowed_origins or [])
+    self.debug = debug
 
   def add_interceptor(self, interceptor):
     """Adds an interceptor to the interceptor chain.
@@ -174,8 +177,7 @@ class ServerBase(object):
       context._response_encoding = parsed_headers.accept
     except ValueError as e:
       logging.warning('Error parsing headers: %s', e)
-      context.set_code(StatusCode.INVALID_ARGUMENT)
-      context.set_details(str(e))
+      self._write_exc(context, StatusCode.INVALID_ARGUMENT, str(e))
       return None
 
     if service not in self._services:
@@ -201,8 +203,8 @@ class ServerBase(object):
 
     except Exception as e:
       logging.warning('Failed to decode request: %s', e, exc_info=True)
-      context.set_code(StatusCode.INVALID_ARGUMENT)
-      context.set_details('Error parsing request: %s' % str(e))
+      self._write_exc(context, StatusCode.INVALID_ARGUMENT,
+                      'Error parsing request: %s' % str(e))
       return None
 
     context._timeout = parsed_headers.timeout
@@ -225,8 +227,8 @@ class ServerBase(object):
                                         0)
     except Exception:
       logging.exception('Service implementation threw an exception')
-      context.set_code(StatusCode.INTERNAL)
-      context.set_details('Service implementation threw an exception')
+      self._write_exc(context, StatusCode.INTERNAL,
+                      'Service implementation threw an exception')
       return None
 
     if response is None:
@@ -246,11 +248,19 @@ class ServerBase(object):
       content = encoder(response)
     except Exception:
       logging.exception('Failed to encode response')
-      context.set_code(StatusCode.INTERNAL)
-      context.set_details('Error serializing response')
+      self._write_exc(context, StatusCode.INTERNAL,
+                      'Error serializing response')
       return None
 
     return content
+
+  def _write_exc(self, context, code, message):
+    """Populates `context` with error info and, potentially, traceback."""
+    context.set_code(code)
+    if self.debug:
+      context.set_details(message + '\n' + traceback.format_exc())
+    else:
+      context.set_details(message)
 
   def _options_handler(self, request, response):
     """Sends an empty response with CORS headers for origins, if allowed."""

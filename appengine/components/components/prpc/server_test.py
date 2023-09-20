@@ -51,6 +51,9 @@ class TestServicer(object):
     return test_pb2.EchoResponse(response=['hello!', str(request.r.m)])
 
 
+EXCEPTION_MESSAGE = "Look at me, I'm bad."
+
+
 class BadTestServicer(object):
   """BadTestServicer implements the Test service in test.proto, but poorly."""
 
@@ -60,7 +63,7 @@ class BadTestServicer(object):
     return 5
 
   def Take(self, _request, _context):
-    raise Exception("Look at me, I'm bad.")
+    raise Exception(EXCEPTION_MESSAGE)
 
   def Echo(self, request, _context):
     return None  # no respose and no status code
@@ -273,6 +276,7 @@ class PRPCServerTestCaseBase(test_case.TestCase):
     self.assertEqual(self.get_response_status(resp),
                      httplib.INTERNAL_SERVER_ERROR)
     self.check_headers(resp.headers, server_base.StatusCode.INTERNAL)
+    self.assertIn(EXCEPTION_MESSAGE, self.get_response_body(resp))
 
     req = test_pb2.EchoRequest()
     resp = self.get_post_response(
@@ -398,7 +402,7 @@ class PRPCWebapp2ServerTestCase(PRPCServerTestCaseBase):
         extra_environ={'REMOTE_ADDR': '127.0.0.1'},
     )
 
-    bad_s = webapp2_server.Webapp2Server()
+    bad_s = webapp2_server.Webapp2Server(debug=True)
     bad_s.add_service(BadTestServicer())
     real_bad_app = webapp2.WSGIApplication(bad_s.get_routes(), debug=True)
     self.bad_app = webtest.TestApp(
@@ -577,7 +581,7 @@ class PRPCFlaskServerTestCase(PRPCServerTestCaseBase):
     for route in routes:
       self.app.add_url_rule(route[0], view_func=route[1], methods=route[2])
 
-    bad_s = flask_server.FlaskServer()
+    bad_s = flask_server.FlaskServer(debug=True)
     bad_s.add_service(BadTestServicer())
     bad_s_routes = bad_s.get_routes()
     self.bad_app = flask.Flask('test_bad_app')

@@ -499,8 +499,8 @@ class SwarmingService(object):
         list_tasks=perms.list_tasks)
 
 
-def get_routes():
-  s = prpc.Server()
+def get_routes(debug=False):
+  s = prpc.Server(debug=debug)
   s.add_service(BotsService())
   s.add_service(TaskBackendAPIService())
   s.add_service(TasksService())

@@ -154,7 +154,7 @@ class PrpcTest(test_env_handlers.AppTestBase):
 
   def setUp(self):
     super(PrpcTest, self).setUp()
-    routes = handlers_prpc.get_routes() + handlers_bot.get_routes()
+    routes = handlers_prpc.get_routes(debug=True) + handlers_bot.get_routes()
     self.app = webtest.TestApp(
         webapp2.WSGIApplication(routes, debug=True),
         extra_environ={
