@@ -293,13 +293,22 @@ class PrpcTest(test_env_handlers.AppTestBase):
       ntr.ClearField('expiration_secs')
     return ntr
 
-  def _client_create_task_prpc(self, request=None):
-    """Creates a minimal task request via the Cloud Endpoints API."""
-    request = request or self._new_task_request_prpc()
-    response = self.post_prpc('NewTask', request, service="swarming.v2.Tasks")
+  def _client_create_task_prpc(self, request):
+    """Creates a task via the pRPC API."""
+    response = self.post_prpc('NewTask', request, service='swarming.v2.Tasks')
     actual = swarming_pb2.TaskRequestMetadataResponse()
     _decode(response.body, actual)
     return actual, actual.task_id
+
+  def _client_cancel_task_prpc(self, task_id):
+    """Cancels a pending task via pRPC API."""
+    response = self.post_prpc('CancelTask',
+                              swarming_pb2.TaskCancelRequest(
+                                  task_id=task_id, kill_running=False),
+                              service='swarming.v2.Tasks')
+    actual = swarming_pb2.CancelResponse()
+    _decode(response.body, actual)
+    self.assertTrue(actual.canceled)
 
   def post_prpc(self, rpc, request, expect_errors=False, service=None):
     if not service:
@@ -2431,41 +2440,22 @@ class TaskServicePrpcTest(PrpcTest):
     _verify([2, 1, 0])
     _verify([0], tags=["a:1"])
 
-  def setup_completed_and_running(self):
-    ticker = test_case.Ticker(self.now)
-    self.mock_now(ticker())
-
-    self.set_as_privileged_user()
-    ntr = self._new_task_request_prpc(use_default_slice=True)
-    ntr.tags[:] = ["t:1"]
-    ntr.name = "first"
-    _, completed_id = self._client_create_task_prpc(ntr)
-
-    # This should consume and complete completed_id.
-    self.set_as_bot()
-    self.bot_poll()
-    self.bot_run_task()
-    self.set_as_privileged_user()
-
-    self.set_as_privileged_user()
-    ntr = self._new_task_request_prpc(use_default_slice=True)
-    ntr.tags[:] = ["t:2"]
-    ntr.name = "second"
-    _, pending_id = self._client_create_task_prpc(ntr)
-
-    return completed_id, pending_id
-
   def test_list_task_states_ok(self):
-    completed_id, pending_id = self.setup_completed_and_running()
+    self.set_as_privileged_user()
+
+    ntr = self._new_task_request_prpc(use_default_slice=True)
+    _, pending_id = self._client_create_task_prpc(ntr)
+    _, canceled_id = self._client_create_task_prpc(ntr)
+    self._client_cancel_task_prpc(canceled_id)
 
     request = swarming_pb2.TaskStatesRequest(
-        task_id=[completed_id, pending_id, '1d69b9f088008810'])
+        task_id=[canceled_id, pending_id, '1d69b9f088008810'])
     response = self.post_prpc('ListTaskStates', request)
     actual = swarming_pb2.TaskStates()
     _decode(response.body, actual)
 
     expected = swarming_pb2.TaskStates(states=[
-        swarming_pb2.COMPLETED, swarming_pb2.PENDING, swarming_pb2.PENDING
+        swarming_pb2.CANCELED, swarming_pb2.PENDING, swarming_pb2.PENDING
     ])
     self.assertEqual(expected, actual)
 
@@ -2479,16 +2469,44 @@ class TaskServicePrpcTest(PrpcTest):
     self.assertEqual(expected_error, response.body)
 
   def test_batch_get_result(self):
-    completed_id, pending_id = self.setup_completed_and_running()
-    run_result_id = completed_id[:-1] + '1'
+    self.set_as_privileged_user()
 
-    request = swarming_pb2.BatchGetResultRequest(
-        task_ids=[
-            completed_id,
-            pending_id,
-            '1d69b9f088008810',
-            run_result_id,  # won't work, need summary ID
-        ])
+    def create_task(realm):
+      perms = [
+          auth.Permission('swarming.pools.createTask'),
+          auth.Permission('swarming.tasks.createInRealm'),
+      ]
+      self.mock_auth_db(perms, task_realm=realm)
+      ntr = self._new_task_request_prpc(use_default_slice=True)
+      ntr.realm = realm
+      return self._client_create_task_prpc(ntr)[1]
+
+    invisible_pending_id = create_task('test:invisible')
+    invisible_canceled_id = create_task('test:invisible')
+    self._client_cancel_task_prpc(invisible_canceled_id)
+
+    visible_pending_id = create_task('test:visible')
+    visible_canceled_id = create_task('test:visible')
+    self._client_cancel_task_prpc(visible_canceled_id)
+
+    run_result_id = visible_pending_id[:-1] + '1'
+    missing_id = '1d69b9f088008810'
+
+    # Need to switch to a different user, otherwise all tasks will be visible,
+    # since whoever created the task is always allowed to see it. Also need
+    # a non-privileged user that doesn't have acl.can_view_all_tasks() perm.
+    self.set_as_user()
+    self.mock_auth_db([auth.Permission('swarming.tasks.get')],
+                      task_realm='test:visible')
+
+    request = swarming_pb2.BatchGetResultRequest(task_ids=[
+        visible_pending_id,
+        visible_canceled_id,
+        invisible_pending_id,
+        invisible_canceled_id,
+        run_result_id,  # won't work, need summary ID
+        missing_id,
+    ])
     response = self.post_prpc('BatchGetResult', request)
     actual = swarming_pb2.BatchGetResultResponse()
     _decode(response.body, actual)
@@ -2502,13 +2520,16 @@ class TaskServicePrpcTest(PrpcTest):
         extract.append((res.task_id, res.result.state))
 
     self.assertEqual(extract, [
-        (completed_id, swarming_pb2.COMPLETED),
-        (pending_id, swarming_pb2.PENDING),
-        ('1d69b9f088008810', 'No such task'),
-        (run_result_id,
-            'Bad task ID "%s": Can\'t reference to a specific try result.'
-            % run_result_id,
+        (visible_pending_id, swarming_pb2.PENDING),
+        (visible_canceled_id, swarming_pb2.CANCELED),
+        (invisible_pending_id, u'No access to see the status of this task'),
+        (invisible_canceled_id, u'No access to see the status of this task'),
+        (
+            run_result_id,
+            u'Bad task ID "%s": Can\'t reference to a specific try result.' %
+            run_result_id,
         ),
+        (missing_id, u'No such task'),
     ])
 
 

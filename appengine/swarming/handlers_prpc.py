@@ -23,6 +23,7 @@ from proto.internals import rbe_prpc_pb2
 from server import acl
 from server import bot_code
 from server import config
+from server import realms
 from server import task_pack
 from server import task_result
 from server import task_scheduler
@@ -256,25 +257,48 @@ class TasksService(object):
             idx, codes.StatusCode.INVALID_ARGUMENT,
             'Bad task ID "%s": %s' % (task_id, exc))
 
-    # ACL check predicate.
+    # ACL check predicate. Returns (<check_performed>, <outcome>).
     if acl.can_view_all_tasks():
-      check_visible = lambda _summary: True
+      # Skip detailed check, the caller sees everything already.
+      def check_visible(_summary):
+        return True, True
     else:
-      # TODO(vadimsh): Implement. Depends on propagating `realm` and `pools`
-      # into TaskResultSummary.
-      check_visible = lambda _summary: False
+      cached = {}
+
+      def check_visible(summary):
+        try:
+          info = realms.task_access_info_from_result_summary(summary)
+        except ValueError:
+          return False, False
+
+        key = info._replace(task_id=None)
+        if key in cached:
+          return True, cached[key]
+
+        visible = True
+        try:
+          realms.check_task_get_acl(info)
+        except auth.AuthorizationError:
+          visible = False
+
+        cached[key] = visible
+        return True, visible
 
     # Fetch result summaries of all tasks or discover they are missing.
     summaries = task_result.fetch_task_result_summaries(keys)
     for idx, summary in zip(indx, summaries):
       if not summary:
         error(idx, codes.StatusCode.NOT_FOUND, 'No such task')
-      elif not check_visible(summary):
-        error(
-            idx, codes.StatusCode.PERMISSION_DENIED,
-            'No access to see the status of this task')
       else:
-        result(idx, summary)
+        checked, visible = check_visible(summary)
+        if not checked:
+          error(idx, codes.StatusCode.FAILED_PRECONDITION,
+                'The task is too old and has no required fields')
+        elif not visible:
+          error(idx, codes.StatusCode.PERMISSION_DENIED,
+                'No access to see the status of this task')
+        else:
+          result(idx, summary)
 
     return swarming_pb2.BatchGetResultResponse(results=results)
 

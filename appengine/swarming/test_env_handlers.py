@@ -300,33 +300,40 @@ class AppTestBase(test_case.TestCase):
 
     self.mock(pools_config, '_fetch_pools_config', mocked_fetch_pools_config)
 
-  def mock_auth_db(self, permissions):
+  def mock_auth_db(self, permissions, pool_realm=None, task_realm=None):
     peer_identity = auth.get_peer_identity()
     cache_mock = mock.Mock(
-        auth_db=self.auth_db(permissions),
+        auth_db=self.auth_db(permissions, pool_realm, task_realm),
         peer_identity=peer_identity,
     )
     self.mock(auth_api, 'get_request_cache', lambda: cache_mock)
 
   @staticmethod
-  def auth_db(permissions):
+  def auth_db(permissions, pool_realm=None, task_realm=None):
+    pool_realm = pool_realm or 'test:pool/default'
+    task_realm = task_realm or 'test:task_realm'
+    assert pool_realm.startswith('test:'), pool_realm
+    assert task_realm.startswith('test:'), task_realm
     return auth_api.AuthDB.from_proto(
         replication_state=auth_model.AuthReplicationState(),
         auth_db=replication_pb2.AuthDB(
             groups=[{
-                'name': 'test_users_group',
+                'name':
+                'test_users_group',
                 'members': [
                     'user:super-admin@example.com',
                     'user:admin@example.com',
                     'user:priv@example.com',
                     'user:user@example.com',
                 ],
-                'created_by': 'user:zzz@example.com',
-                'modified_by': 'user:zzz@example.com',
+                'created_by':
+                'user:zzz@example.com',
+                'modified_by':
+                'user:zzz@example.com',
             }],
             realms={
                 'api_version':
-                    auth_realms.API_VERSION,
+                auth_realms.API_VERSION,
                 'permissions': [{
                     'name': p.name
                 } for p in _ALL_PERMS],
@@ -336,26 +343,22 @@ class AppTestBase(test_case.TestCase):
                     },
                     {
                         'name':
-                            'test:pool/default',
+                        pool_realm,
                         'bindings': [{
-                            'permissions': [
-                                _ALL_PERMS.index(p) for p in permissions
-                            ],
-                            'principals': [
-                                auth.get_current_identity().to_bytes()
-                            ],
+                            'permissions':
+                            [_ALL_PERMS.index(p) for p in permissions],
+                            'principals':
+                            [auth.get_current_identity().to_bytes()],
                         }],
                     },
                     {
                         'name':
-                            'test:task_realm',
+                        task_realm,
                         'bindings': [{
-                            'permissions': [
-                                _ALL_PERMS.index(p) for p in permissions
-                            ],
-                            'principals': [
-                                auth.get_current_identity().to_bytes()
-                            ],
+                            'permissions':
+                            [_ALL_PERMS.index(p) for p in permissions],
+                            'principals':
+                            [auth.get_current_identity().to_bytes()],
                         }, {
                             'permissions': [
                                 _ALL_PERMS.index(
