@@ -1823,7 +1823,8 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
       ),
                               update_id=int(utils.time_time() * 1e9),
                               details=task_details_struct)
-      backend_conversions.convert_task_state_to_status(run_result_state, False,
+      backend_conversions.convert_task_state_to_status(run_result_state,
+                                                       run_result.failure,
                                                        bb_task)
       update_buildbucket_pubsub_success = _maybe_pubsub_send_build_task_update(
           bb_task, build_task)

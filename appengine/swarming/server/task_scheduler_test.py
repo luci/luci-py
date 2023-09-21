@@ -55,6 +55,7 @@ from proto.api import plugin_pb2
 from proto.config import pools_pb2
 
 from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import task_pb2
 
 # pylint: disable=W0212,W0612
 
@@ -1886,6 +1887,31 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, len(pub_sub_calls))  # notification is sent
     self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
     self.assertEqual(1, self.execute_tasks())
+
+    result = task_pb2.BuildTaskUpdate()
+    result.ParseFromString(pub_sub_calls[0][1]['message'])
+    self.assertEqual(result.task.status, common_pb2.SUCCESS)
+
+  def test_bot_update_buildbucket_pubsub_ok_failed_task(self):
+    self.mock(utils, "time_time", lambda: 12345678)
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(
+        has_build_task=True,
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic"))
+    self.assertEqual(
+        State.COMPLETED,
+        _bot_update_task(run_result.key, exit_code=1, duration=0.1))
+    self.assertEqual(1, len(pub_sub_calls))  # notification is sent
+    self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
+    self.assertEqual(1, self.execute_tasks())
+
+    result = task_pb2.BuildTaskUpdate()
+    result.ParseFromString(pub_sub_calls[0][1]['message'])
+    self.assertEqual(result.task.status, common_pb2.FAILURE)
 
   def _bot_update_timeouts(self, hard, io):
     run_result = self._quick_reap()
