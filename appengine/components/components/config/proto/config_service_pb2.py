@@ -24,7 +24,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z2go.chromium.org/luci/config_service/proto;configpb\220\001\001',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n,components/config/proto/config_service.proto\x12\x11\x63onfig.service.v2\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a,components/config/proto/service_config.proto\"x\n\x10GetConfigRequest\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x16\n\x0e\x63ontent_sha256\x18\x03 \x01(\t\x12*\n\x06\x66ields\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\"\x99\x01\n\x06\x43onfig\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x15\n\x0braw_content\x18\x03 \x01(\x0cH\x00\x12\x14\n\nsigned_url\x18\x04 \x01(\tH\x00\x12\x16\n\x0e\x63ontent_sha256\x18\x05 \x01(\t\x12\x10\n\x08revision\x18\x06 \x01(\t\x12\x0b\n\x03url\x18\x07 \x01(\tB\t\n\x07\x63ontent\"T\n\x18GetProjectConfigsRequest\x12\x0c\n\x04path\x18\x01 \x01(\t\x12*\n\x06\x66ields\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\"G\n\x19GetProjectConfigsResponse\x12*\n\x07\x63onfigs\x18\x01 \x03(\x0b\x32\x19.config.service.v2.Config\"\x9f\x01\n\x16ValidateConfigsRequest\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12G\n\x0b\x66ile_hashes\x18\x02 \x03(\x0b\x32\x32.config.service.v2.ValidateConfigsRequest.FileHash\x1a(\n\x08\x46ileHash\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0e\n\x06sha256\x18\x02 \x01(\t\"\xd4\x01\n\x1b\x42\x61\x64ValidationRequestFixInfo\x12O\n\x0cupload_files\x18\x01 \x03(\x0b\x32\x39.config.service.v2.BadValidationRequestFixInfo.UploadFile\x12\x1b\n\x13unvalidatable_files\x18\x02 \x03(\t\x1aG\n\nUploadFile\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x12\n\nsigned_url\x18\x02 \x01(\t\x12\x17\n\x0fmax_config_size\x18\x03 \x01(\x03\"\xc3\x01\n\x15ListConfigSetsRequest\x12H\n\x06\x64omain\x18\x01 \x01(\x0e\x32\x38.config.service.v2.ListConfigSetsRequest.ConfigSetDomain\x12*\n\x06\x66ields\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\"4\n\x0f\x43onfigSetDomain\x12\x07\n\x03\x41LL\x10\x00\x12\x0b\n\x07SERVICE\x10\x01\x12\x0b\n\x07PROJECT\x10\x02\"K\n\x16ListConfigSetsResponse\x12\x31\n\x0b\x63onfig_sets\x18\x01 \x03(\x0b\x32\x1c.config.service.v2.ConfigSet\"\xb9\x03\n\tConfigSet\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\x12\x37\n\x08revision\x18\x03 \x01(\x0b\x32%.config.service.v2.ConfigSet.Revision\x12\x12\n\nfile_paths\x18\x04 \x03(\t\x12\x41\n\x13last_import_attempt\x18\x05 \x01(\x0b\x32$.config.service.v2.ConfigSet.Attempt\x1ak\n\x08Revision\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\x12\x17\n\x0f\x63ommitter_email\x18\x03 \x01(\t\x12-\n\ttimestamp\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x1a\x93\x01\n\x07\x41ttempt\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x37\n\x08revision\x18\x03 \x01(\x0b\x32%.config.service.v2.ConfigSet.Revision\x12-\n\ttimestamp\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"U\n\x13GetConfigSetRequest\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12*\n\x06\x66ields\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask2\xe5\x03\n\x07\x43onfigs\x12M\n\tGetConfig\x12#.config.service.v2.GetConfigRequest\x1a\x19.config.service.v2.Config\"\x00\x12p\n\x11GetProjectConfigs\x12+.config.service.v2.GetProjectConfigsRequest\x1a,.config.service.v2.GetProjectConfigsResponse\"\x00\x12g\n\x0eListConfigSets\x12(.config.service.v2.ListConfigSetsRequest\x1a).config.service.v2.ListConfigSetsResponse\"\x00\x12V\n\x0cGetConfigSet\x12&.config.service.v2.GetConfigSetRequest\x1a\x1c.config.service.v2.ConfigSet\"\x00\x12X\n\x0fValidateConfigs\x12).config.service.v2.ValidateConfigsRequest\x1a\x18.config.ValidationResult\"\x00\x42\x37Z2go.chromium.org/luci/config_service/proto;configpb\x90\x01\x01\x62\x06proto3'
+  serialized_pb=b'\n,components/config/proto/config_service.proto\x12\x11\x63onfig.service.v2\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a,components/config/proto/service_config.proto\"x\n\x10GetConfigRequest\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x16\n\x0e\x63ontent_sha256\x18\x03 \x01(\t\x12*\n\x06\x66ields\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\"\x99\x01\n\x06\x43onfig\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x15\n\x0braw_content\x18\x03 \x01(\x0cH\x00\x12\x14\n\nsigned_url\x18\x04 \x01(\tH\x00\x12\x16\n\x0e\x63ontent_sha256\x18\x05 \x01(\t\x12\x10\n\x08revision\x18\x06 \x01(\t\x12\x0b\n\x03url\x18\x07 \x01(\tB\t\n\x07\x63ontent\"T\n\x18GetProjectConfigsRequest\x12\x0c\n\x04path\x18\x01 \x01(\t\x12*\n\x06\x66ields\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\"G\n\x19GetProjectConfigsResponse\x12*\n\x07\x63onfigs\x18\x01 \x03(\x0b\x32\x19.config.service.v2.Config\"\x9f\x01\n\x16ValidateConfigsRequest\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12G\n\x0b\x66ile_hashes\x18\x02 \x03(\x0b\x32\x32.config.service.v2.ValidateConfigsRequest.FileHash\x1a(\n\x08\x46ileHash\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0e\n\x06sha256\x18\x02 \x01(\t\"\xd4\x01\n\x1b\x42\x61\x64ValidationRequestFixInfo\x12O\n\x0cupload_files\x18\x01 \x03(\x0b\x32\x39.config.service.v2.BadValidationRequestFixInfo.UploadFile\x12\x1b\n\x13unvalidatable_files\x18\x02 \x03(\t\x1aG\n\nUploadFile\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x12\n\nsigned_url\x18\x02 \x01(\t\x12\x17\n\x0fmax_config_size\x18\x03 \x01(\x03\"\xc3\x01\n\x15ListConfigSetsRequest\x12H\n\x06\x64omain\x18\x01 \x01(\x0e\x32\x38.config.service.v2.ListConfigSetsRequest.ConfigSetDomain\x12*\n\x06\x66ields\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\"4\n\x0f\x43onfigSetDomain\x12\x07\n\x03\x41LL\x10\x00\x12\x0b\n\x07SERVICE\x10\x01\x12\x0b\n\x07PROJECT\x10\x02\"K\n\x16ListConfigSetsResponse\x12\x31\n\x0b\x63onfig_sets\x18\x01 \x03(\x0b\x32\x1c.config.service.v2.ConfigSet\"\xd0\x03\n\tConfigSet\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\x12\x37\n\x08revision\x18\x03 \x01(\x0b\x32%.config.service.v2.ConfigSet.Revision\x12\x12\n\nfile_paths\x18\x04 \x03(\t\x12\x41\n\x13last_import_attempt\x18\x05 \x01(\x0b\x32$.config.service.v2.ConfigSet.Attempt\x1a\x81\x01\n\x08Revision\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\x12\x17\n\x0f\x63ommitter_email\x18\x03 \x01(\t\x12\x14\n\x0c\x61uthor_email\x18\x05 \x01(\t\x12-\n\ttimestamp\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x1a\x93\x01\n\x07\x41ttempt\x12\x0f\n\x07message\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x37\n\x08revision\x18\x03 \x01(\x0b\x32%.config.service.v2.ConfigSet.Revision\x12-\n\ttimestamp\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"U\n\x13GetConfigSetRequest\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12*\n\x06\x66ields\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask2\xe5\x03\n\x07\x43onfigs\x12M\n\tGetConfig\x12#.config.service.v2.GetConfigRequest\x1a\x19.config.service.v2.Config\"\x00\x12p\n\x11GetProjectConfigs\x12+.config.service.v2.GetProjectConfigsRequest\x1a,.config.service.v2.GetProjectConfigsResponse\"\x00\x12g\n\x0eListConfigSets\x12(.config.service.v2.ListConfigSetsRequest\x1a).config.service.v2.ListConfigSetsResponse\"\x00\x12V\n\x0cGetConfigSet\x12&.config.service.v2.GetConfigSetRequest\x1a\x1c.config.service.v2.ConfigSet\"\x00\x12X\n\x0fValidateConfigs\x12).config.service.v2.ValidateConfigsRequest\x1a\x18.config.ValidationResult\"\x00\x42\x37Z2go.chromium.org/luci/config_service/proto;configpb\x90\x01\x01\x62\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_field__mask__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,components_dot_config_dot_proto_dot_service__config__pb2.DESCRIPTOR,])
 
@@ -527,7 +527,14 @@ _CONFIGSET_REVISION = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='timestamp', full_name='config.service.v2.ConfigSet.Revision.timestamp', index=3,
+      name='author_email', full_name='config.service.v2.ConfigSet.Revision.author_email', index=3,
+      number=5, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='timestamp', full_name='config.service.v2.ConfigSet.Revision.timestamp', index=4,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -545,8 +552,8 @@ _CONFIGSET_REVISION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1454,
-  serialized_end=1561,
+  serialized_start=1455,
+  serialized_end=1584,
 )
 
 _CONFIGSET_ATTEMPT = _descriptor.Descriptor(
@@ -597,8 +604,8 @@ _CONFIGSET_ATTEMPT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1564,
-  serialized_end=1711,
+  serialized_start=1587,
+  serialized_end=1734,
 )
 
 _CONFIGSET = _descriptor.Descriptor(
@@ -657,7 +664,7 @@ _CONFIGSET = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=1270,
-  serialized_end=1711,
+  serialized_end=1734,
 )
 
 
@@ -695,8 +702,8 @@ _GETCONFIGSETREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1713,
-  serialized_end=1798,
+  serialized_start=1736,
+  serialized_end=1821,
 )
 
 _GETCONFIGREQUEST.fields_by_name['fields'].message_type = google_dot_protobuf_dot_field__mask__pb2._FIELDMASK
@@ -848,8 +855,8 @@ _CONFIGS = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1801,
-  serialized_end=2286,
+  serialized_start=1824,
+  serialized_end=2309,
   methods=[
   _descriptor.MethodDescriptor(
     name='GetConfig',
