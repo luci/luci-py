@@ -141,6 +141,7 @@ class RemoteTestCase(test_case.TestCase):
         ),
         mock.call(
             config_service_pb2.GetConfigRequest(
+                config_set="services/foo",
                 content_sha256='sha256hash',
                 fields=field_mask_pb2.FieldMask(paths=['content']),
             ),
@@ -191,6 +192,7 @@ class RemoteTestCase(test_case.TestCase):
         ),
         mock.call(
             config_service_pb2.GetConfigRequest(
+                config_set="services/foo",
                 content_sha256='sha256hash',
                 fields=field_mask_pb2.FieldMask(paths=['content']),
             ),
@@ -377,6 +379,7 @@ class RemoteTestCase(test_case.TestCase):
     )
     self.v2_cient_mock.GetConfigAsync.assert_called_once_with(
         config_service_pb2.GetConfigRequest(
+            config_set="projects/chromium",
             content_sha256='deadbeef',
             fields=field_mask_pb2.FieldMask(paths=['content'])),
         credentials=mock.ANY,

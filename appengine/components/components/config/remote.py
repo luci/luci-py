@@ -156,7 +156,7 @@ class Provider(object):
     return content_hash.startswith('v1:') if self._is_v1_host() else True
 
   @ndb.tasklet
-  def get_config_by_hash_async(self, content_hash):
+  def get_config_by_hash_async(self, content_hash, config_set):
     """Returns a config blob by its hash. Memcaches results."""
     assert content_hash
     cache_key = '%sconfig_by_hash/%s' % (MEMCACHE_PREFIX, content_hash)
@@ -169,8 +169,10 @@ class Provider(object):
       res = yield self._api_call_async('config/%s' % content_hash)
       content = base64.b64decode(res.get('content')) if res else None
     else:
+      assert config_set
       res = yield self._get_config_v2_async(
           config_service_pb2.GetConfigRequest(
+              config_set=config_set,
               content_sha256=content_hash,
               fields=field_mask_pb2.FieldMask(paths=['content']),
           ))
@@ -247,7 +249,7 @@ class Provider(object):
         config_set, path, revision=revision)
     content = None
     if content_hash:
-      content = yield self.get_config_by_hash_async(content_hash)
+      content = yield self.get_config_by_hash_async(content_hash, config_set)
     config = common._convert_config(content, dest_type)
     raise ndb.Return(revision, config)
 
@@ -290,7 +292,7 @@ class Provider(object):
     for cfg in configs:
       cfg['project_id'] = cfg['config_set'].split('/', 1)[1]
       cfg['get_content_future'] = self.get_config_by_hash_async(
-          cfg['content_hash'])
+          cfg['content_hash'], cfg['config_set'])
 
     for cfg in configs:
       cfg['content'] = yield cfg['get_content_future']
@@ -404,7 +406,7 @@ class Provider(object):
 
     content = None
     if current.content_hash != content_hash:
-      content = yield self.get_config_by_hash_async(content_hash)
+      content = yield self.get_config_by_hash_async(content_hash, config_set)
       if content is None:
         logging.warning(
             'Could not fetch config content %s by hash %s',
