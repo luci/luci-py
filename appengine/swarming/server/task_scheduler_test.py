@@ -1880,7 +1880,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             build_id="1234",
             buildbucket_host="buildbucket_host",
             latest_task_status=task_result.State.PENDING,
-            pubsub_topic="backend_pubsub_topic"))
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
     self.assertEqual(
         State.COMPLETED,
         _bot_update_task(run_result.key, exit_code=0, duration=0.1))
@@ -1901,7 +1902,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             build_id="1234",
             buildbucket_host="buildbucket_host",
             latest_task_status=task_result.State.PENDING,
-            pubsub_topic="backend_pubsub_topic"))
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
     self.assertEqual(
         State.COMPLETED,
         _bot_update_task(run_result.key, exit_code=1, duration=0.1))

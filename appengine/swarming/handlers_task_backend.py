@@ -81,7 +81,7 @@ class TaskBackendAPIService(object):
     task = task_pb2.Task(id=task_pb2.TaskID(id=task_id, target=request.target),
                          link="https://%s/task?id=%s&o=true&w=true" %
                          (hostname, task_id),
-                         update_id=int(utils.time_time() * 1e9))
+                         update_id=build_task.update_id)
     backend_conversions.convert_task_state_to_status(result_summary.state,
                                                      result_summary.failure,
                                                      task)

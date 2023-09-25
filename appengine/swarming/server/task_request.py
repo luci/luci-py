@@ -622,6 +622,9 @@ class BuildTask(ndb.Model):
   _use_memcache = False
   build_id = ndb.StringProperty(required=True, indexed=False)
   buildbucket_host = ndb.StringProperty(required=True, indexed=False)
+  # A monotonically increasing integer that is used to compare when updates
+  # (state changes) have occured. A timestamp measured in ms is used.
+  update_id = ndb.IntegerProperty(required=True, indexed=False)
   # A TaskResult.State that will keep the latest task status
   # that has been converted to a common_pb2.Status sent to buildbucket.
   latest_task_status = ndb.IntegerProperty(required=True, indexed=False)
