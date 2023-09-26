@@ -163,6 +163,11 @@ def time_time():
   return (utcnow() - EPOCH).total_seconds()
 
 
+def time_time_ns():
+  """Returns the equivalent of time.time_ns() as mocked if applicable."""
+  return int((utcnow() - EPOCH).total_seconds() * 1e9)
+
+
 def milliseconds_since_epoch(now=None):
   """Returns the number of milliseconds since unix epoch as an int."""
   now = now or utcnow()

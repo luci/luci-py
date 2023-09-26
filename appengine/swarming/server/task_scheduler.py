@@ -633,7 +633,7 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
     payload = {
         'task_id': task_id,
         'state': result_summary.state,
-        'update_id': int(utils.time_time() * 1e9)
+        'update_id': utils.time_time_ns()
     }
     ok = utils.enqueue_task(
         '/internal/taskqueue/important/buildbucket/notify-task/%s' % task_id,
@@ -1867,7 +1867,7 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
   if run_result.killing:
     run_result_state = task_result.State.KILLED
   if request.has_build_task:
-    update_id = int(utils.time_time() * 1e9)
+    update_id = utils.time_time_ns()
     if not _buildbucket_update(request.key, run_result_state, update_id):
       return None
   return run_result_state
