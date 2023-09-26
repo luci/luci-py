@@ -153,7 +153,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                              _encode(request), self._headers)
     actual_resp = backend_pb2.RunTaskResponse()
     _decode(raw_resp.body, actual_resp)
-    expected_task_id = '4225526b80008611'
+    expected_task_id = '4225526b80008610'
     l = 'https://test-swarming.appspot.com/task?id=%s&o=true&w=true'
     expected_response = backend_pb2.RunTaskResponse(
         task=task_pb2.Task(id=task_pb2.TaskID(
@@ -189,7 +189,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
                              _encode(request), self._headers)
     actual_resp = backend_pb2.RunTaskResponse()
     _decode(raw_resp.body, actual_resp)
-    new_expected_task_id = '4225526b80008711'
+    new_expected_task_id = '4225526b80008710'
     expected_response = backend_pb2.RunTaskResponse(
         task=task_pb2.Task(id=task_pb2.TaskID(
             id=new_expected_task_id, target='swarming://test-swarming'),

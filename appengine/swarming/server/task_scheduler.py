@@ -656,8 +656,6 @@ def _buildbucket_update(request_key, run_result_state, update_id):
     bool. False if there was a transient error. This will allow the caller of
       the function to be able to retry. True otherwise.
   """
-  task_id = task_pack.pack_run_result_key(
-      task_pack.request_key_to_run_result_key(request_key))
   build_task = task_pack.request_key_to_build_task_key(request_key).get()
   # Returning early if we shouldn't make the update.
   if build_task.update_id > update_id:
@@ -678,6 +676,8 @@ def _buildbucket_update(request_key, run_result_state, update_id):
   if bot_dimensions:
     json_format.ParseDict({"bot_dimensions": bot_dimensions},
                           task_details_struct)
+  task_id = task_pack.pack_result_summary_key(
+      task_pack.request_key_to_result_summary_key(request_key))
   bb_task = task_pb2.Task(id=task_pb2.TaskID(
       id=task_id,
       target="swarming://%s" % app_identity.get_application_id(),
