@@ -18,7 +18,6 @@ import urlparse
 import uuid
 
 from google.appengine.api import app_identity
-from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.protobuf import struct_pb2, json_format
 
@@ -549,16 +548,24 @@ def _maybe_pubsub_notify_now(result_summary, request):
   return True
 
 
-def _maybe_pubsub_send_build_task_update(task, build_task):
+def _maybe_pubsub_send_build_task_update(bb_task, build_id, pubsub_topic):
   """Sends an update message to buildbucket about the task's current status.
-  type: task_pb2.Task, BuildTask -> None
+
+  Arguments:
+    bb_task task_pb2.Task: Created by caller of this funciton to send to
+      Buildbucket.
+    build_id string: buildbucket build id provided by buildbucket.
+    pubsub_topic string: pubsub topic to publish to. Provided by buildbucket.
+
+  Returns:
+    bool: False if there was a pubsub.TransientError, True otherwise. If False,
+      then the function may be retried.
   """
   assert not ndb.in_transaction()
-  assert isinstance(task, task_pb2.Task), task
-  assert isinstance(build_task, task_request.BuildTask), build_task
-  msg = task_pb2.BuildTaskUpdate(build_id=build_task.build_id, task=task)
+  assert isinstance(bb_task, task_pb2.Task), bb_task
+  msg = task_pb2.BuildTaskUpdate(build_id=build_id, task=bb_task)
   try:
-    pubsub.publish(topic=build_task.pubsub_topic,
+    pubsub.publish(topic=pubsub_topic,
                    message=msg.SerializeToString(),
                    attributes=None)
   except pubsub.TransientError as e:
@@ -597,8 +604,8 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
   assert isinstance(result_summary,
                     task_result.TaskResultSummary), result_summary
   assert isinstance(request, task_request.TaskRequest), request
+  task_id = task_pack.pack_result_summary_key(result_summary.key)
   if request.pubsub_topic:
-    task_id = task_pack.pack_result_summary_key(result_summary.key)
     payload = {
         'task_id': task_id,
         'topic': request.pubsub_topic,
@@ -623,14 +630,75 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
         es_cfg, [(request, result_summary)], True, False)
 
   if request.has_build_task:
-    task_id = task_pack.pack_result_summary_key(result_summary.key)
+    payload = {
+        'task_id': task_id,
+        'state': result_summary.state,
+        'update_id': int(utils.time_time() * 1e9)
+    }
     ok = utils.enqueue_task(
         '/internal/taskqueue/important/buildbucket/notify-task/%s' % task_id,
         'buildbucket-notify',
-        transactional=transactional)
+        transactional=transactional,
+        payload=utils.encode_to_json(payload))
     if not ok:
       raise datastore_utils.CommitError(
           'Failed to enqueue buildbucket notify task')
+
+
+def _buildbucket_update(request_key, run_result_state, update_id):
+  """Handles sending a pubsub update to buildbucket or not.
+  Arguments:
+    request_key: ndb.Key for a task_request.TaskRequest object.
+    run_result_state: task_result.State enum.
+    update_id: int timestamp for when the update was made. Used by buildbucket
+      to only accept the most up to date updates.
+  Returns:
+    bool. False if there was a transient error. This will allow the caller of
+      the function to be able to retry. True otherwise.
+  """
+  task_id = task_pack.pack_run_result_key(
+      task_pack.request_key_to_run_result_key(request_key))
+  build_task = task_pack.request_key_to_build_task_key(request_key).get()
+  # Returning early if we shouldn't make the update.
+  if build_task.update_id > update_id:
+    return True
+  if run_result_state == build_task.latest_task_status:
+    return True
+
+  result_summary = task_pack.request_key_to_result_summary_key(
+      request_key).get()
+  # Need to try to get bot_dimensions from build_task first, if not get it
+  # from result_summary.
+  if build_task.bot_dimensions:
+    bot_dimensions = build_task.bot_dimensions
+  else:
+    bot_dimensions = result_summary.bot_dimensions
+
+  task_details_struct = struct_pb2.Struct()
+  if bot_dimensions:
+    json_format.ParseDict({"bot_dimensions": bot_dimensions},
+                          task_details_struct)
+  bb_task = task_pb2.Task(id=task_pb2.TaskID(
+      id=task_id,
+      target="swarming://%s" % app_identity.get_application_id(),
+  ),
+                          update_id=update_id,
+                          details=task_details_struct)
+  backend_conversions.convert_task_state_to_status(run_result_state,
+                                                   result_summary.failure,
+                                                   bb_task)
+  update_buildbucket_pubsub_success = _maybe_pubsub_send_build_task_update(
+      bb_task, build_task.build_id, build_task.pubsub_topic)
+  # Caller must retry if PubSub enqueue fails with a transient error.
+  if not update_buildbucket_pubsub_success:
+    return False
+  build_task.latest_task_status = run_result_state
+  build_task.update_id = update_id
+  # If build_task doesn't have bot_dimensions, add it.
+  if not build_task.bot_dimensions:
+    build_task.bot_dimensions = bot_dimensions
+  build_task.put()
+  return True
 
 
 def _pubsub_notify(task_id, topic, auth_token, userdata, tags, state,
@@ -1347,7 +1415,6 @@ def schedule_request(request,
       # No available capacity for any slice. Fail the task right away.
       to_run = None
       secret_bytes = None
-      build_task = None
       result_summary.abandoned_ts = result_summary.created_ts
       result_summary.completed_ts = result_summary.created_ts
       result_summary.state = task_result.State.NO_RESOURCE
@@ -1800,42 +1867,9 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
   if run_result.killing:
     run_result_state = task_result.State.KILLED
   if request.has_build_task:
-    build_task = request.build_task_key.get()
-    if run_result_state != build_task.latest_task_status:
-      task_id = task_pack.pack_run_result_key(
-          task_pack.result_summary_key_to_run_result_key(result_summary_key))
-
-      task_details_struct = struct_pb2.Struct()
-
-      # Need to try to get bot_dimensions from build_task first, if not get it
-      # from result_summary.
-      if build_task.bot_dimensions:
-        bot_dimensions = build_task.bot_dimensions
-      else:
-        result_summary = result_summary_key.get()
-        bot_dimensions = result_summary.bot_dimensions
-
-      json_format.ParseDict({"bot_dimensions": bot_dimensions},
-                            task_details_struct)
-      bb_task = task_pb2.Task(id=task_pb2.TaskID(
-          id=task_id,
-          target="swarming://%s" % app_identity.get_application_id(),
-      ),
-                              update_id=int(utils.time_time() * 1e9),
-                              details=task_details_struct)
-      backend_conversions.convert_task_state_to_status(run_result_state,
-                                                       run_result.failure,
-                                                       bb_task)
-      update_buildbucket_pubsub_success = _maybe_pubsub_send_build_task_update(
-          bb_task, build_task)
-      # Caller must retry if PubSub enqueue fails.
-      if not update_buildbucket_pubsub_success:
-        return None
-      build_task.latest_task_status = run_result_state
-      # If build_task doesn't have bot_dimensions, add it.
-      if not build_task.bot_dimensions:
-        build_task.bot_dimensions = bot_dimensions
-      build_task.put()
+    update_id = int(utils.time_time() * 1e9)
+    if not _buildbucket_update(request.key, run_result_state, update_id):
+      return None
   return run_result_state
 
 
@@ -2361,3 +2395,18 @@ def task_cancel_running_children_tasks(parent_result_summary_id):
       raise Error(
           'Failed to enqueue task to cancel queue; version: %s, payload: %s' % (
             version, payload))
+
+
+def task_buildbucket_update(payload):
+  """Handles sending a pubsub update to buildbucket or not.
+  """
+  request_key = task_pack.result_summary_key_to_request_key(
+      task_pack.unpack_result_summary_key(payload["task_id"]))
+  state = payload["state"]
+  update_id = payload['update_id']
+  if not _buildbucket_update(request_key, state, update_id):
+    logging.exception(
+        'Fatal error when sending buildbucket update notification')
+    raise Error(
+        'Transient pubsub error. Failed to update buildbucket with payload %s' %
+        payload)

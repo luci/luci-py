@@ -42,7 +42,6 @@ from server import config
 from server import external_scheduler
 from server import pools_config
 from server import rbe
-from server import resultdb
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -56,6 +55,7 @@ from proto.config import pools_pb2
 
 from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
 from bb.go.chromium.org.luci.buildbucket.proto import task_pb2
+
 
 # pylint: disable=W0212,W0612
 
@@ -396,6 +396,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     expected.update(**kwargs)
     return expected
 
+  def _assert_buildbucket_update_status(self, pubsub_msg, expected_status):
+    # Checks that the BuildTaskUpdate message sent in pubsub_msg has the
+    # expected status provided.
+    result = task_pb2.BuildTaskUpdate()
+    result.ParseFromString(pubsub_msg)
+    self.assertEqual(result.task.status, expected_status)
+
   def _quick_schedule(self, request_id=None, secret_bytes=None, **kwargs):
     """Schedules a task.
 
@@ -488,13 +495,34 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_reap_task(self):
     # Essentially check _quick_reap() works.
-    run_result = self._quick_reap(has_build_task=True)
+    run_result = self._quick_reap()
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(1, run_result.try_number)
     to_run_key = task_to_run.request_to_task_to_run_key(
         run_result.request_key.get(), 0)
     self.assertIsNone(to_run_key.get().queue_number)
     self.assertIsNone(to_run_key.get().expiration_ts)
+
+  def test_bot_reap_build_task(self):
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(
+        has_build_task=True,
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
+    self.assertEqual('localhost', run_result.bot_id)
+    self.assertEqual(1, run_result.try_number)
+    to_run_key = task_to_run.request_to_task_to_run_key(
+        run_result.request_key.get(), 0)
+    self.assertIsNone(to_run_key.get().queue_number)
+    self.assertIsNone(to_run_key.get().expiration_ts)
+    self.assertEqual(1, len(pub_sub_calls))
+    self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
+    self._assert_buildbucket_update_status(pub_sub_calls[0][1]['message'],
+                                           common_pb2.STARTED)
 
   @parameterized.expand([
       ({
@@ -751,6 +779,38 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ),
     ]
     self.assertEqual(expected, pub_sub_calls)
+    status = State.to_string(State.NO_RESOURCE)
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
+
+  def test_schedule_request_no_capacity_backend_task(self):
+    # No capacity, denied. That's the default.
+    pub_sub_calls = self.mock_pub_sub()
+    self.mock(utils, "time_time", lambda: 12345678)
+    request = _gen_request_slices(pubsub_topic='projects/abc/topics/def',
+                                  has_build_task=True,
+                                  created_ts=(self.now -
+                                              datetime.timedelta(seconds=1)))
+    result_summary = task_scheduler.schedule_request(
+        request,
+        request_id="1234",
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
+    self.assertEqual(State.NO_RESOURCE, result_summary.state)
+    self.execute_tasks()
+
+    self.assertEqual(2, len(pub_sub_calls))
+    self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
+    self._assert_buildbucket_update_status(pub_sub_calls[0][1]['message'],
+                                           common_pb2.INFRA_FAILURE)
+    self.assertEqual(pub_sub_calls[1][1]["topic"], "projects/abc/topics/def")
     status = State.to_string(State.NO_RESOURCE)
     self.assertLessEqual(
         0,
@@ -1885,13 +1945,19 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         State.COMPLETED,
         _bot_update_task(run_result.key, exit_code=0, duration=0.1))
-    self.assertEqual(1, len(pub_sub_calls))  # notification is sent
-    self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
+    # 2 calls because _quick_reap sends one and _bot_update_task sends another
+    self.assertEqual(2, len(pub_sub_calls))
     self.assertEqual(1, self.execute_tasks())
 
-    result = task_pb2.BuildTaskUpdate()
-    result.ParseFromString(pub_sub_calls[0][1]['message'])
-    self.assertEqual(result.task.status, common_pb2.SUCCESS)
+    # Asserting that first pubsub call sent a STARTED status (_quick_reap ran)
+    self._assert_buildbucket_update_status(pub_sub_calls[0][1]['message'],
+                                           common_pb2.STARTED)
+    self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
+
+    # Asserting that second pubsub call sent a SUCCESS status
+    self._assert_buildbucket_update_status(pub_sub_calls[1][1]['message'],
+                                           common_pb2.SUCCESS)
+    self.assertEqual(pub_sub_calls[1][1]["topic"], "backend_pubsub_topic")
 
   def test_bot_update_buildbucket_pubsub_ok_failed_task(self):
     self.mock(utils, "time_time", lambda: 12345678)
@@ -1907,13 +1973,79 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         State.COMPLETED,
         _bot_update_task(run_result.key, exit_code=1, duration=0.1))
-    self.assertEqual(1, len(pub_sub_calls))  # notification is sent
-    self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
+    self.assertEqual(2, len(pub_sub_calls))  # notification is sent
     self.assertEqual(1, self.execute_tasks())
 
-    result = task_pb2.BuildTaskUpdate()
-    result.ParseFromString(pub_sub_calls[0][1]['message'])
-    self.assertEqual(result.task.status, common_pb2.FAILURE)
+    self._assert_buildbucket_update_status(pub_sub_calls[0][1]['message'],
+                                           common_pb2.STARTED)
+    self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
+
+    self._assert_buildbucket_update_status(pub_sub_calls[1][1]['message'],
+                                           common_pb2.FAILURE)
+    self.assertEqual(pub_sub_calls[1][1]["topic"], "backend_pubsub_topic")
+
+  def test_task_buildbucket_update(self):
+    self.mock(utils, "time_time", lambda: 12345678)
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(
+        has_build_task=True,
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
+    self.assertEqual(1, len(pub_sub_calls))  # notification is sent
+
+    # Check that an update is not sent due to no change of state
+    task_scheduler.task_buildbucket_update({
+        "task_id":
+        task_pack.pack_result_summary_key(run_result.result_summary_key),
+        "state":
+        task_result.State.RUNNING,
+        'update_id':
+        12345678000000002
+    })
+    self.assertEqual(1, len(pub_sub_calls))
+    self._assert_buildbucket_update_status(pub_sub_calls[0][1]['message'],
+                                           common_pb2.STARTED)
+
+    # Check that an update is sent due to change of state
+    task_scheduler.task_buildbucket_update({
+        "task_id":
+        task_pack.pack_result_summary_key(run_result.result_summary_key),
+        "state":
+        task_result.State.BOT_DIED,
+        'update_id':
+        12345678000000003
+    })
+    self.assertEqual(2, len(pub_sub_calls))
+    self._assert_buildbucket_update_status(pub_sub_calls[1][1]['message'],
+                                           common_pb2.INFRA_FAILURE)
+
+    # Check that no update was made due to prior update_id
+    task_scheduler.task_buildbucket_update({
+        "task_id":
+        task_pack.pack_result_summary_key(run_result.result_summary_key),
+        "state":
+        task_result.State.CLIENT_ERROR,
+        'update_id':
+        12345678000000001
+    })
+    self.assertEqual(2, len(pub_sub_calls))
+
+    # Check that an update was not sent due to pubsub transient error
+    self.publish_successful = False
+    with self.assertRaises(task_scheduler.Error):
+      task_scheduler.task_buildbucket_update({
+          "task_id":
+          task_pack.pack_result_summary_key(run_result.result_summary_key),
+          "state":
+          task_result.State.CANCELED,
+          'update_id':
+          12345678000000004
+      })
+    self.assertEqual(2, len(pub_sub_calls))
 
   def _bot_update_timeouts(self, hard, io):
     run_result = self._quick_reap()
@@ -2098,6 +2230,58 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, run_result.key.get().to_dict())
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls))  # RUNNING -> BOT_DIED
+    status = State.to_string(State.BOT_DIED)
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
+
+  def test_bot_terminate_backend_task(self):
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(
+        pubsub_topic='projects/abc/topics/def',
+        task_slices=[
+            task_request.TaskSlice(expiration_secs=1200,
+                                   properties=_gen_properties(idempotent=True),
+                                   wait_for_capacity=False),
+        ],
+        has_build_task=True,
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
+    self.assertEqual(2, len(pub_sub_calls))  # PENDING -> RUNNING
+    self._assert_buildbucket_update_status(pub_sub_calls[0][1]['message'],
+                                           common_pb2.STARTED)
+
+    self.assertEqual(
+        None,
+        task_scheduler.bot_terminate_task(run_result.key, 'localhost', self.now,
+                                          {
+                                              'missing_cas': None,
+                                              'missing_cipd': []
+                                          }))
+    expected = self._gen_result_summary_reaped(abandoned_ts=self.now,
+                                               completed_ts=self.now,
+                                               costs_usd=[0.],
+                                               id='1d69b9f088008910',
+                                               internal_failure=True,
+                                               started_ts=self.now,
+                                               state=State.BOT_DIED)
+    self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
+    expected = self._gen_run_result(abandoned_ts=self.now,
+                                    completed_ts=self.now,
+                                    id='1d69b9f088008911',
+                                    internal_failure=True,
+                                    state=State.BOT_DIED)
+    self.assertEqual(expected, run_result.key.get().to_dict())
+    self.assertEqual(2, self.execute_tasks())
+    self.assertEqual(4, len(pub_sub_calls))  # RUNNING -> BOT_DIED
+    self._assert_buildbucket_update_status(pub_sub_calls[2][1]['message'],
+                                           common_pb2.INFRA_FAILURE)
     status = State.to_string(State.BOT_DIED)
     self.assertLessEqual(
         0,
@@ -2322,6 +2506,42 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     result_summary = result_summary.key.get()
     self.assertEqual(State.CANCELED, result_summary.state)
     self.assertEqual(1, len(pub_sub_calls))  # No other message.
+
+    status = State.to_string(State.CANCELED)
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
+
+  def test_cancel_task_backend_task(self):
+    # Cancel a pending task.
+    pub_sub_calls = self.mock_pub_sub()
+
+    self._register_bot(self.bot_dimensions)
+    result_summary = self._quick_schedule(
+        pubsub_topic='projects/abc/topics/def',
+        has_build_task=True,
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
+    self.assertEqual(0, len(pub_sub_calls))  # Nothing yet.
+
+    ok, was_running = task_scheduler.cancel_task(
+        result_summary.request_key.get(), result_summary.key, False, None)
+    self.assertEqual(True, ok)
+    self.assertEqual(False, was_running)
+    # 2 because both pubsub-notify and bb update
+    self.assertEqual(2, self.execute_tasks())
+    self.assertEqual(2, len(pub_sub_calls))  # CANCELED
+    self._assert_buildbucket_update_status(pub_sub_calls[0][1]['message'],
+                                           common_pb2.CANCELED)
+
+    result_summary = result_summary.key.get()
+    self.assertEqual(State.CANCELED, result_summary.state)
 
     status = State.to_string(State.CANCELED)
     self.assertLessEqual(
@@ -2698,6 +2918,83 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Didn't enqueues any new RBE tasks.
     self.assertFalse(enqueued)
 
+  def test_expire_slice_backend_task(self):
+    enqueued = self.mock_enqueue_rbe_task()
+    pub_sub_calls = self.mock_pub_sub()
+
+    # Scheduler RBE task with two slices.
+    request = _gen_request_slices(
+        rbe_instance='some-instance',
+        has_build_task=True,
+        task_slices=[
+            task_request.TaskSlice(expiration_secs=180,
+                                   properties=_gen_properties(dimensions={
+                                       u'prop': [u'a'],
+                                       u'pool': [u'default'],
+                                   }),
+                                   wait_for_capacity=False),
+            task_request.TaskSlice(expiration_secs=180,
+                                   properties=_gen_properties(dimensions={
+                                       u'prop': [u'b'],
+                                       u'pool': [u'default'],
+                                   }),
+                                   wait_for_capacity=False),
+        ],
+    )
+
+    # The first slice is pending now.
+    result_summary = task_scheduler.schedule_request(
+        request,
+        request_id="1234",
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
+    self.assertEqual(result_summary.state, State.PENDING)
+    self.assertEqual(result_summary.current_task_slice, 0)
+    self.assertEqual(len(pub_sub_calls), 0)
+
+    # The first slice was submitted to RBE.
+    self.assertEqual(len(enqueued), 1)
+    ttr = enqueued[0][1]
+    self.assertEqual(ttr.task_slice_index, 0)
+    self.assertEqual(ttr.dimensions, {u'pool': [u'default'], u'prop': [u'a']})
+    del enqueued[:]
+
+    # Expire this pending slice.
+    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE)
+    # The second slice is pending now.
+    result_summary = result_summary.key.get()
+    self.assertEqual(result_summary.state, State.PENDING)
+    self.assertEqual(result_summary.current_task_slice, 1)
+
+    # The second slice was submitted to RBE.
+    self.assertEqual(len(enqueued), 1)
+    ttr = enqueued[0][1]
+    self.assertEqual(ttr.task_slice_index, 1)
+    self.assertEqual(ttr.dimensions, {u'pool': [u'default'], u'prop': [u'b']})
+    del enqueued[:]
+
+    # Expire this pending slice as well.
+    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE)
+
+    # The task is fully expired now.
+    result_summary = result_summary.key.get()
+    self.assertEqual(result_summary.state, State.NO_RESOURCE)
+    # 2 tasks because one from each expire_slice call
+    self.assertEqual(2, self.execute_tasks())
+    # one pubsub because state change only happened when the second slice
+    # was expired.
+    self.assertEqual(len(pub_sub_calls), 1)
+    self.assertEqual(pub_sub_calls[0][1]["topic"], "backend_pubsub_topic")
+    self._assert_buildbucket_update_status(pub_sub_calls[0][1]['message'],
+                                           common_pb2.INFRA_FAILURE)
+
+    # Didn't enqueues any new RBE tasks.
+    self.assertFalse(enqueued)
+
   def test_cron_abort_expired_task_to_run(self):
 
     pub_sub_calls = self.mock_pub_sub()
@@ -2924,6 +3221,82 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         internal_failure=True,
         modified_ts=now_1,
         state=State.BOT_DIED)
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._dead_task_detection_latencies.get(fields={
+            'pool': 'default',
+            'cron': True,
+        }).sum)
+    self.assertEqual(expected, run_result.key.get().to_dict())
+
+    self.assertEqual(0, self.execute_tasks())
+
+  def test_cron_handle_bot_died_backend_task(self):
+    # This test is similar to test_cron_handle_bot_died, but asserts
+    # that the normal swarming notification behavior works in parallel with
+    # updating buildbucket via pubsub.
+    pub_sub_calls = self.mock_pub_sub()
+
+    # This task will be marked as bot died.
+    run_result = self._quick_reap(
+        pubsub_topic='projects/abc/topics/def',
+        task_slices=[
+            task_request.TaskSlice(expiration_secs=1200,
+                                   properties=_gen_properties(idempotent=True),
+                                   wait_for_capacity=False),
+        ],
+        has_build_task=True,
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
+    # 2 because pubsub_nofity + bb update
+    self.assertEqual(2, len(pub_sub_calls))  # PENDING -> RUNNING
+    self._assert_buildbucket_update_status(pub_sub_calls[0][1]['message'],
+                                           common_pb2.STARTED)
+    request = run_result.request_key.get()
+
+    key = task_to_run.request_to_task_to_run_key(request, 0)
+    self.assertEqual(True, task_to_run.Claim.check(key))  # Was just reaped.
+
+    now_0 = self.now
+    now_1 = self.mock_now(
+        self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs),
+        1)
+    self.assertEqual(([run_result.task_id], 0),
+                     task_scheduler.cron_handle_bot_died())
+    #2 because pubsub_nofity + bb update TQ tasks were executed
+    self.assertEqual(2, self.execute_tasks())
+    self.assertEqual(4, len(pub_sub_calls))  # RUNNING -> COMPLETED
+    self._assert_buildbucket_update_status(pub_sub_calls[2][1]['message'],
+                                           common_pb2.INFRA_FAILURE)
+    self.assertEqual(False, task_to_run.Claim.check(key))
+    status = State.to_string(State.BOT_DIED)
+    self.assertLessEqual(
+        0,
+        ts_mon_metrics._task_state_change_pubsub_notify_latencies.get(
+            fields=_update_fields_pubsub(status=status,
+                                         http_status_code=200)).sum)
+
+    # Refresh and compare:
+    expected = self._gen_result_summary_reaped(abandoned_ts=now_1,
+                                               completed_ts=now_1,
+                                               costs_usd=[0.],
+                                               id='1d69b9f088008910',
+                                               internal_failure=True,
+                                               modified_ts=now_1,
+                                               started_ts=now_0,
+                                               state=State.BOT_DIED,
+                                               try_number=1)
+    self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
+    expected = self._gen_run_result(abandoned_ts=now_1,
+                                    completed_ts=now_1,
+                                    id='1d69b9f088008911',
+                                    internal_failure=True,
+                                    modified_ts=now_1,
+                                    state=State.BOT_DIED)
     self.assertLessEqual(
         0,
         ts_mon_metrics._dead_task_detection_latencies.get(fields={
