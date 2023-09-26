@@ -26,6 +26,8 @@ def _parse_media_type(media_type):
     return encoding.Encoding.JSON
   if media_type == 'application/json':
     return encoding.Encoding.JSON
+  if media_type.startswith('application/json;'):  # e.g. '...; charset=utf-8'
+    return encoding.Encoding.JSON
   if media_type == 'application/prpc; encoding=text':
     return encoding.Encoding.TEXT
   raise ValueError('Invalid media type "%s"' % media_type)
