@@ -21,8 +21,12 @@ import os
 import random
 import signal
 import sys
+import tempfile
 import time
 import traceback
+
+from google.protobuf.json_format import MessageToJson
+from google.protobuf.message import DecodeError
 
 from api import os_utilities
 from bot_code import bot_auth
@@ -33,6 +37,8 @@ from utils import net
 from utils import on_error
 from utils import subprocess42
 from utils import zip_package
+
+from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2
 
 # Path to this file or the zip containing this file.
 THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
@@ -271,6 +277,31 @@ class InternalError(Exception):
   """Raised on unrecoverable errors that abort task with 'internal error'."""
 
 
+def tmp_bb_agent_context_file(secret_bytes, task_id, workdir):
+  if secret_bytes is None:
+    logging.error(
+        'Failed to create BuildbucketAgentContext file. secret_bytes is None.')
+    raise InternalError("secret_bytes is None")
+
+  tf = tempfile.NamedTemporaryFile(mode='w',
+                                   prefix='bb_agent_ctx.',
+                                   suffix='.json',
+                                   delete=True,
+                                   dir=workdir)
+  logging.debug('Writing BuildbuckerAgentContext file %r', tf.name)
+  try:
+    secrets = launcher_pb2.BuildSecrets()
+    secrets.ParseFromString(secret_bytes)
+  except TypeError:
+    raise InternalError("secret_bytes should be a a bytes-like object")
+  except DecodeError:
+    raise InternalError("could not decode secret_bytes")
+  content = launcher_pb2.BuildbucketAgentContext(task_id=task_id,
+                                                 secrets=secrets)
+  tf.write(MessageToJson(content))
+  return tf
+
+
 def load_and_run(in_file, swarming_server, default_swarming_server,
                  cost_usd_hour, start, out_file, run_isolated_flags, bot_file,
                  auth_params_file, rbe_session_state):
@@ -281,6 +312,7 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
   'failure' from a TaskRunResult standpoint.
   """
   auth_system = None
+  bb_ctx_tf = None
   local_auth_context = None
   rbe_session = None
   task_result = None
@@ -329,6 +361,7 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
         },
       }
 
+      # TODO (randymaldonado): remove swarming from LUCI_CONTEXT
       # Override LUCI_CONTEXT['swarming'].
       bot_dimensions = []
       for k, vs in task_details.bot_dimensions.items():
@@ -387,6 +420,14 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
       if auth_system:
         auth_system.set_remote_client(remote)
 
+      # If the build is using a buildbucket agent, we must write the custom
+      # context file for the agent to use.
+      if '${BUILDBUCKET_AGENT_CONTEXT_FILE}' in task_details.command:
+        bb_ctx_tf = tmp_bb_agent_context_file(task_details.secret_bytes,
+                                              task_details.task_id, work_dir)
+        idx = task_details.command.index('${BUILDBUCKET_AGENT_CONTEXT_FILE}')
+        task_details.command[idx] = bb_ctx_tf.name
+
       # Auth environment is up, start the command. task_result is dumped to
       # disk in 'finally' block.
       with luci_context.stage(_tmpdir=work_dir, **context_edits) as ctx_file:
@@ -408,6 +449,13 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
           'version': OUT_VERSION,
       }
   finally:
+    # If the task is using a buildbucket agent, close the temp context file.
+    if bb_ctx_tf:
+      try:
+        bb_ctx_tf.close()
+      except Exception as ex:
+        logging.exception("could not close buildbucket context file. %s" %
+                          str(ex))
     # We've found tests to delete the working directory work_dir when quitting,
     # causing an exception here. Try to recreate the directory if necessary.
     if not os.path.isdir(work_dir):

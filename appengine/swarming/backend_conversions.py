@@ -142,6 +142,8 @@ def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
   for key, values in base_dims.iteritems():
     values.sort()
 
+  cmd = [backend_config.agent_binary_cipd_filename] + run_task_req.agent_args[:]
+
   base_slice = task_request.TaskSlice(
       # In bb-on-swarming, `wait_for_capacity` is only used for the last slice
       # (base_slice) to give named caches some time to show up.
@@ -158,8 +160,7 @@ def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
           dimensions_data=base_dims,
           execution_timeout_secs=run_task_req.execution_timeout.seconds,
           grace_period_secs=run_task_req.grace_period.seconds,
-          command=_compute_command(run_task_req,
-                                   backend_config.agent_binary_cipd_filename),
+          command=cmd,
           has_secret_bytes=has_secret_bytes,
           cipd_input=task_request.CipdInput(packages=[
               task_request.CipdPackage(
@@ -202,13 +203,6 @@ def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
   task_slices.append(base_slice)
 
   return task_slices
-
-
-def _compute_command(run_task_req, agent_binary_name):
-  # type: (backend_pb2.RunTaskRequest, str) -> Sequence[str]
-  args = [agent_binary_name] + run_task_req.agent_args[:]
-  args.extend(['-cache-base', _CACHE_DIR, '-task-id', '${SWARMING_TASK_ID}'])
-  return args
 
 
 def convert_results_to_tasks(task_results, task_ids):

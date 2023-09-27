@@ -51,6 +51,9 @@ import cas_util
 import local_caching
 import swarmingserver_bot_fake
 
+from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2
+
+
 def to_native_eol(s):
   if sys.platform == 'win32':
     return s.replace('\n', '\r\n')
@@ -1557,6 +1560,190 @@ class TaskRunnerNoServer(auto_stub.TestCase):
         'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, actual)
+
+  def test_load_and_run_raw_with_bb_agent_ctx_ok(self):
+    local_auth_ctx = {
+        'accounts': [{
+            'id': 'a'
+        }, {
+            'id': 'b'
+        }],
+        'default_account_id': 'a',
+        'rpc_port': 123,
+        'secret': 'abcdef',
+    }
+    realm_ctx = {'name': 'test:realm'}
+
+    def _run_command(remote, rbe_session, task_details, work_dir, cost_usd_hour,
+                     start, run_isolated_flags, bot_file, ctx_file):
+      self.assertTrue('bb_agent_ctx.' in task_details.command[2])
+      self.assertTrue(task_details.command[2].endswith('.json'))
+      self.assertTrue(remote.uses_auth)  # mainly to avoid "unused arg" warning
+      self.assertIsNone(rbe_session)
+      self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
+      # Necessary for OSX.
+      self.assertEqual(os.path.realpath(self.root_dir),
+                       os.path.realpath(work_dir))
+      self.assertEqual(3600., cost_usd_hour)
+      self.assertGreaterEqual(time.time(), start)
+      self.assertEqual(['--min-free-space', '1'] + DISABLE_CIPD_FOR_TESTS,
+                       run_isolated_flags)
+      self.assertEqual(None, bot_file)
+      with open(ctx_file, 'r') as f:
+        ctx = json.load(f)
+        self.assertDictEqual(local_auth_ctx, ctx['local_auth'])
+        self.assertDictEqual(realm_ctx, ctx['realm'])
+      return {
+          'exit_code': 0,
+          'hard_timeout': False,
+          'io_timeout': False,
+          'internal_error': None,
+          'internal_error_reported': False,
+          'version': task_runner.OUT_VERSION,
+      }
+
+    self.mock(task_runner, 'run_command', _run_command)
+    manifest = get_manifest()
+    FakeAuthSystem.local_auth_context = local_auth_ctx
+    task_details = get_task_details(
+        command=[
+            'bbagent', '-context-file', '${BUILDBUCKET_AGENT_CONTEXT_FILE}'
+        ],
+        realm=realm_ctx,
+        secret_bytes=launcher_pb2.BuildSecrets(
+            start_build_token="123").SerializeToString())
+    try:
+      self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
+      with mock.patch('%s.TaskDetails.load' % task_runner.__name__,
+                      mock.Mock(return_value=task_details)):
+        actual = load_and_run('http://localhost:1', self.root_dir, manifest,
+                              '/path/to/auth-params-file')
+    finally:
+      FakeAuthSystem.local_auth_context = None
+    expected = {
+        'exit_code': 0,
+        'hard_timeout': False,
+        'io_timeout': False,
+        'internal_error': None,
+        'internal_error_reported': False,
+        'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual(expected, actual)
+
+  def test_load_and_run_raw_with_bb_agent_ctx_secret_bytes_is_none(self):
+    local_auth_ctx = {
+        'accounts': [{
+            'id': 'a'
+        }, {
+            'id': 'b'
+        }],
+        'default_account_id': 'a',
+        'rpc_port': 123,
+        'secret': 'abcdef',
+    }
+    self.mock(task_runner, 'run_command', mock.Mock(return_value=None))
+    manifest = get_manifest()
+    FakeAuthSystem.local_auth_context = local_auth_ctx
+    # Error is reaised because secret_bytes is None.
+    task_details = get_task_details(command=[
+        'bbagent', '-context-file', '${BUILDBUCKET_AGENT_CONTEXT_FILE}'
+    ],
+                                    realm={'name': 'test:realm'})
+    try:
+      self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
+      with mock.patch('%s.TaskDetails.load' % task_runner.__name__,
+                      mock.Mock(return_value=task_details)):
+        actual = load_and_run('http://localhost:1', self.root_dir, manifest,
+                              '/path/to/auth-params-file')
+    finally:
+      FakeAuthSystem.local_auth_context = None
+    expected = {
+        'exit_code': -1,
+        'hard_timeout': False,
+        'io_timeout': False,
+        'internal_error': 'secret_bytes is None',
+        'internal_error_reported': False,
+        'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual(actual, expected)
+
+  def test_load_and_run_raw_with_bb_agent_ctx_secret_bytes_is_string(self):
+    local_auth_ctx = {
+        'accounts': [{
+            'id': 'a'
+        }, {
+            'id': 'b'
+        }],
+        'default_account_id': 'a',
+        'rpc_port': 123,
+        'secret': 'abcdef',
+    }
+    self.mock(task_runner, 'run_command', mock.Mock(return_value=None))
+    manifest = get_manifest()
+    FakeAuthSystem.local_auth_context = local_auth_ctx
+    # Error is reaised because secret_bytes is None.
+    task_details = get_task_details(
+        command=[
+            'bbagent', '-context-file', '${BUILDBUCKET_AGENT_CONTEXT_FILE}'
+        ],
+        realm={'name': 'test:realm'},
+        secret_bytes="this is not supposed to be a string.")
+    try:
+      self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
+      with mock.patch('%s.TaskDetails.load' % task_runner.__name__,
+                      mock.Mock(return_value=task_details)):
+        actual = load_and_run('http://localhost:1', self.root_dir, manifest,
+                              '/path/to/auth-params-file')
+    finally:
+      FakeAuthSystem.local_auth_context = None
+    expected = {
+        'exit_code': -1,
+        'hard_timeout': False,
+        'io_timeout': False,
+        'internal_error': 'secret_bytes should be a a bytes-like object',
+        'internal_error_reported': False,
+        'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual(actual, expected)
+
+  def test_load_and_run_raw_with_bb_agent_ctx_secret_bytes_is_bad_byte(self):
+    local_auth_ctx = {
+        'accounts': [{
+            'id': 'a'
+        }, {
+            'id': 'b'
+        }],
+        'default_account_id': 'a',
+        'rpc_port': 123,
+        'secret': 'abcdef',
+    }
+    self.mock(task_runner, 'run_command', mock.Mock(return_value=None))
+    manifest = get_manifest()
+    FakeAuthSystem.local_auth_context = local_auth_ctx
+    # Error is reaised because secret_bytes is None.
+    task_details = get_task_details(
+        command=[
+            'bbagent', '-context-file', '${BUILDBUCKET_AGENT_CONTEXT_FILE}'
+        ],
+        realm={'name': 'test:realm'},
+        secret_bytes=b"this is not supposed to be a string.")
+    try:
+      self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
+      with mock.patch('%s.TaskDetails.load' % task_runner.__name__,
+                      mock.Mock(return_value=task_details)):
+        actual = load_and_run('http://localhost:1', self.root_dir, manifest,
+                              '/path/to/auth-params-file')
+    finally:
+      FakeAuthSystem.local_auth_context = None
+    expected = {
+        'exit_code': -1,
+        'hard_timeout': False,
+        'io_timeout': False,
+        'internal_error': 'could not decode secret_bytes',
+        'internal_error_reported': False,
+        'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual(actual, expected)
 
 
 if __name__ == '__main__':
