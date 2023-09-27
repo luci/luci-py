@@ -649,11 +649,16 @@ class RemoteClientNative(object):
     if not isinstance(resp, dict):
       raise RBEServerError('Unexpected response: %s' % (resp, ))
 
-    def get_str(key):
+    def get_str(key, optional=False):
       val = resp.get(key)
+      if val is None and optional:
+        return None
       if not isinstance(val, str) or not val:
         raise RBEServerError('Missing or incorrect `%s` in %s' % (key, resp))
       return val
+
+    # Session token may be missing if the session has expired already.
+    session_token = get_str('session_token', optional=True)
 
     try:
       status = RBESessionStatus[get_str('status')]
@@ -667,7 +672,7 @@ class RemoteClientNative(object):
       except (ValueError, TypeError):
         raise RBEServerError('Invalid `lease` in %s' % (resp, ))
 
-    return RBEUpdateSessionResponse(session_token=get_str('session_token'),
+    return RBEUpdateSessionResponse(session_token=session_token,
                                     status=status,
                                     lease=lease)
 
@@ -720,7 +725,8 @@ RBEUpdateSessionResponse = collections.namedtuple(
     'RBEUpdateSessionResponse',
     [
         # An up-to-date session token which should be passed to the next
-        # rbe_update_session(...) call.
+        # rbe_update_session(...) call. Might be missing if the session has
+        # expired already.
         'session_token',
 
         # The bot session status as the RBE backend sees it.
@@ -1264,7 +1270,10 @@ class RBESession:
         blocking,
         retry_transient,
     )
-    self._session_token = resp.session_token
+
+    # Switch to a newer session token if it was refreshed.
+    if resp.session_token:
+      self._session_token = resp.session_token
 
     if resp.status != RBESessionStatus.OK:
       # The server told us the session is gone.

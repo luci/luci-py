@@ -348,6 +348,42 @@ class TestRemoteClient(auto_stub.TestCase):
                      resp.status)
     self.assertIsNone(resp.lease)
 
+  def test_rbe_update_session_expired_session(self):
+    c = remote_client.RemoteClientNative('http://localhost:1', None,
+                                         'localhost', '/')
+
+    def mocked_call(_url, data, retry_transient):
+      self.assertEqual(
+          {
+              'session_token': 'session_tok',
+              'status': 'OK',
+              'dimensions': {
+                  'dim': ['v1', 'v2']
+              },
+          }, data)
+      self.assertFalse(retry_transient)
+      return {
+          'status': 'BOT_TERMINATING',
+      }
+
+    self.mock(c, '_url_read_json', mocked_call)
+
+    resp = c.rbe_update_session(
+        'session_tok',
+        remote_client.RBESessionStatus.OK,
+        {'dim': ['v1', 'v2']},
+        None,
+        None,
+        None,
+        True,
+        False,
+    )
+
+    self.assertIsNone(resp.session_token)
+    self.assertEqual(remote_client.RBESessionStatus.BOT_TERMINATING,
+                     resp.status)
+    self.assertIsNone(resp.lease)
+
   @parameterized.expand([
       (None, ),
       ('not a dict', ),
@@ -356,14 +392,7 @@ class TestRemoteClient(auto_stub.TestCase):
           'status': 'OK',
       }, ),
       ({
-          'session_token': None,
-          'status': 'OK',
-      }, ),
-      ({
           'session_token': '',
-          'status': 'OK',
-      }, ),
-      ({
           'status': 'OK',
       }, ),
       ({
