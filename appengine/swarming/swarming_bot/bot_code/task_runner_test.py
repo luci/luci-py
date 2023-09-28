@@ -35,6 +35,8 @@ LUCI_GO_CLIENT_DIR = os.path.join(ROOT_DIR, 'luci-go')
 # Needed for local_caching, and others on Windows when symlinks are not enabled.
 sys.path.insert(0, CLIENT_DIR)
 
+import google.protobuf.json_format as json_format
+
 from bot_code import bot_auth
 from bot_code import remote_client
 from bot_code import task_runner
@@ -1576,8 +1578,15 @@ class TaskRunnerNoServer(auto_stub.TestCase):
 
     def _run_command(remote, rbe_session, task_details, work_dir, cost_usd_hour,
                      start, run_isolated_flags, bot_file, ctx_file):
+      # asserting that the bb_agent_ctx file is created and readable with the
+      # correct info.
       self.assertTrue('bb_agent_ctx.' in task_details.command[2])
       self.assertTrue(task_details.command[2].endswith('.json'))
+      with open(task_details.command[2], 'rb') as bb_ctx_file:
+        bb_ctx = launcher_pb2.BuildbucketAgentContext()
+        json_format.Parse(bb_ctx_file.read().decode('utf-8'), bb_ctx)
+        self.assertEqual(bb_ctx.secrets.build_token, "tok")
+        self.assertEqual(bb_ctx.task_id, "4b23423f0")
       self.assertTrue(remote.uses_auth)  # mainly to avoid "unused arg" warning
       self.assertIsNone(rbe_session)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
@@ -1605,13 +1614,22 @@ class TaskRunnerNoServer(auto_stub.TestCase):
     self.mock(task_runner, 'run_command', _run_command)
     manifest = get_manifest()
     FakeAuthSystem.local_auth_context = local_auth_ctx
-    task_details = get_task_details(
-        command=[
-            'bbagent', '-context-file', '${BUILDBUCKET_AGENT_CONTEXT_FILE}'
-        ],
-        realm=realm_ctx,
-        secret_bytes=launcher_pb2.BuildSecrets(
-            start_build_token="123").SerializeToString())
+
+    # secret_bytes is derived from the following code:
+    #   secret_bytes = task_request.SecretBytes(
+    #       secret_bytes=launcher_pb2.BuildSecrets(
+    #         build_token='tok').SerializeToString())
+    #   secret_bytes = secret_bytes.secret_bytes.encode("base64")
+    #
+    # This is a reflection of what will be sent in prepare_manifest on
+    # the server.
+    secret_bytes = "CgN0b2s="
+    task_details = get_task_details(command=[
+        'bbagent', '-context-file', '${BUILDBUCKET_AGENT_CONTEXT_FILE}'
+    ],
+                                    task_id='4b23423f1',
+                                    realm=realm_ctx,
+                                    secret_bytes=secret_bytes)
     try:
       self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
       with mock.patch('%s.TaskDetails.load' % task_runner.__name__,
@@ -1700,7 +1718,7 @@ class TaskRunnerNoServer(auto_stub.TestCase):
         'exit_code': -1,
         'hard_timeout': False,
         'io_timeout': False,
-        'internal_error': 'secret_bytes should be a a bytes-like object',
+        'internal_error': 'could not decode secret_bytes',
         'internal_error_reported': False,
         'version': task_runner.OUT_VERSION,
     }

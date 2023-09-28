@@ -14,6 +14,7 @@ up to the calling process (bot_main.py) to signal that there was an internal
 failure and to cancel this task run and ask the server to retry it.
 """
 
+import base64
 import json
 import logging
 import optparse
@@ -283,22 +284,21 @@ def tmp_bb_agent_context_file(secret_bytes, task_id, workdir):
         'Failed to create BuildbucketAgentContext file. secret_bytes is None.')
     raise InternalError("secret_bytes is None")
 
-  tf = tempfile.NamedTemporaryFile(mode='w',
+  tf = tempfile.NamedTemporaryFile(mode='w+b',
                                    prefix='bb_agent_ctx.',
                                    suffix='.json',
-                                   delete=True,
+                                   delete=False,
                                    dir=workdir)
   logging.debug('Writing BuildbuckerAgentContext file %r', tf.name)
   try:
     secrets = launcher_pb2.BuildSecrets()
-    secrets.ParseFromString(secret_bytes)
-  except TypeError:
-    raise InternalError("secret_bytes should be a a bytes-like object")
-  except DecodeError:
+    secrets.ParseFromString(base64.b64decode(secret_bytes))
+  except (DecodeError, TypeError):
     raise InternalError("could not decode secret_bytes")
   content = launcher_pb2.BuildbucketAgentContext(task_id=task_id,
                                                  secrets=secrets)
-  tf.write(MessageToJson(content))
+  tf.write(MessageToJson(content).encode("utf-8"))
+  tf.flush()
   return tf
 
 
@@ -367,11 +367,12 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
       for k, vs in task_details.bot_dimensions.items():
         bot_dimensions.extend('%s:%s' % (k, v) for v in vs)
       bot_dimensions.sort()
+      result_summary_id = task_details.task_id[:-1] + '0'
       swarming = {
           'task': {
               'server': default_swarming_server,
-              # Uses the task_id instead of run_id in the context.
-              'task_id': task_details.task_id[:-1] + '0',
+              # Uses the result_summary_id instead of run_id in the context.
+              'task_id': result_summary_id,
               'bot_dimensions': bot_dimensions,
           },
       }
@@ -424,7 +425,7 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
       # context file for the agent to use.
       if '${BUILDBUCKET_AGENT_CONTEXT_FILE}' in task_details.command:
         bb_ctx_tf = tmp_bb_agent_context_file(task_details.secret_bytes,
-                                              task_details.task_id, work_dir)
+                                              result_summary_id, work_dir)
         idx = task_details.command.index('${BUILDBUCKET_AGENT_CONTEXT_FILE}')
         task_details.command[idx] = bb_ctx_tf.name
 
@@ -453,6 +454,7 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
     if bb_ctx_tf:
       try:
         bb_ctx_tf.close()
+        os.unlink(bb_ctx_tf.name)
       except Exception as ex:
         logging.exception("could not close buildbucket context file. %s" %
                           str(ex))
