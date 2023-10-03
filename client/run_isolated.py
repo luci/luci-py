@@ -886,6 +886,7 @@ def map_and_run(data, constant_run_path):
             kvs_dir=data.cas_kvs,
             tmp_dir=tmp_dir)
         isolated_stats['download'].update(stats)
+        logging_utils.user_logs('Fetched CAS inputs')
 
       if not command:
         # Handle this as a task failure, not an internal failure.
@@ -912,6 +913,7 @@ def map_and_run(data, constant_run_path):
         file_path.create_directories(run_dir, data.outputs)
 
       with data.install_named_caches(run_dir, result['stats']['named_caches']):
+        logging_utils.user_logs('Installed named caches')
         sys.stdout.flush()
         start = time.time()
         try:
@@ -1204,27 +1206,31 @@ def install_client_and_packages(run_dir, packages, service_url,
                                    client_version)
 
   with client_manager as client:
+    logging_utils.user_logs('Installed CIPD client')
     get_client_duration = time.time() - get_client_start
 
     package_pins = []
     if packages:
       package_pins = _install_packages(run_dir, cipd_cache_dir, client,
                                        packages)
+      logging_utils.user_logs('Installed task packages')
 
     # Install cas client to |cas_dir|.
     _install_packages(cas_dir, cipd_cache_dir, client,
                       [('', _CAS_PACKAGE, _LUCI_GO_REVISION)])
+    logging_utils.user_logs('Installed CAS client')
 
     # Install nsjail to |nsjail_dir|.
     if nsjail_dir is not None:
       _install_packages(nsjail_dir, cipd_cache_dir, client,
                         [('', _NSJAIL_PACKAGE, _NSJAIL_VERSION)])
+      logging_utils.user_logs('Installed nsjail')
 
     file_path.make_tree_files_read_only(run_dir)
 
     total_duration = time.time() - start
-    logging.info('Installing CIPD client and packages took %d seconds',
-                 total_duration)
+    logging_utils.user_logs(
+        'Installing CIPD client and packages took %d seconds', total_duration)
 
     yield CipdInfo(
         client=client,
