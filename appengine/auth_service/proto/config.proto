@@ -1,17 +1,27 @@
-// Copyright 2015 The LUCI Authors. All rights reserved.
-// Use of this source code is governed under the Apache License, Version 2.0
-// that can be found in the LICENSE file.
-
-// Configuration schema for configs fetched via a config service.
+// Copyright 2022 The LUCI Authors.
 //
-// See also //components/auth/proto/security_config.proto for the schema of
-// 'security.cfg', which is distributed to all linked services as is as part
-// of AuthDB proto.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 syntax = "proto3";
 
 package auth_service;
 
+import "components/auth/proto/realms.proto";
+
+option go_package = "go.chromium.org/luci/auth_service/api/configspb";
+
+// NOTE: This file is replicated in luci-py here: https://chromium.googlesource.com/infra/luci/luci-py/+/refs/heads/main/appengine/auth_service/proto/config.proto
+// Be sure to use the respective import_luci_go.sh when making changes here to reflect those changes in luci-py.
 
 // Auth service configuration that applies specifically to the service, not to
 // any linked services.
@@ -44,7 +54,6 @@ message SettingsCfg {
   string auth_db_gs_path = 2;
 }
 
-
 // Configuration of groups imported from external sources.
 //
 // Provided via 'imports.cfg' config file.
@@ -58,7 +67,7 @@ message GroupImporterConfig {
     // Email domain to append to imported identities.
     string domain = 3;
     // List of group systems expected to be found in the archive. They act as
-    // prefixes to group names, e.g 'ldap'. Each system corresponds to
+    // prefixes to group names, e.g. 'ldap'. Each system corresponds to
     // a subdirectory in the tarball. Each tarball may have groups from multiple
     // external systems, but groups from some external system must not be split
     // between multiple tarballs. When importer sees <group system name>/* in
@@ -71,7 +80,6 @@ message GroupImporterConfig {
     // the tarball.
     repeated string groups = 5;
   }
-
   // Accept a tarball upload from some external service.
   //
   // Same as 'TarballEntry', except the tarball is pushed to the service (via
@@ -89,7 +97,6 @@ message GroupImporterConfig {
     // List of groups to import from the tarball.
     repeated string groups = 5;
   }
-
   // Periodically fetch a single group stored as a plain list of identities.
   message PlainlistEntry {
     // Where to import data from.
@@ -101,29 +108,10 @@ message GroupImporterConfig {
     // A name of imported group. The full group name will be 'external/<group>'.
     string group = 4;
   }
-
   repeated TarballEntry tarball = 1;
   repeated PlainlistEntry plainlist = 2;
   repeated TarballUploadEntry tarball_upload = 3;
 }
-
-
-// Global config. Includes OAuth client_id allowlist and token server URL.
-//
-// Provided via 'oauth.cfg' config file.
-message OAuthConfig {
-  // ClientID returned by /auth/api/v1/server/oauth_config endpoint to clients.
-  string primary_client_id = 1;
-  // Client secret (that's not really a secret, since it is visible) returned
-  // by /auth/api/v1/server/oauth_config endpoint to clients. Corresponding
-  // callback URL must be localhost or urn:ietf:wg:oauth:2.0:oob.
-  string primary_client_secret = 2;
-  // Allowlist of all accepted client_ids (in addition to the primary one).
-  repeated string client_ids = 3;
-  // URL of a token server to use to generate delegation tokens.
-  string token_server_url = 4;
-}
-
 
 // IP allowlists config: a set of named IP allowlists and a mapping between
 // identity name -> IP allowlist to restrict it to.
@@ -148,4 +136,58 @@ message IPAllowlistConfig {
   repeated IPAllowlist ip_allowlists = 1;
   // A mapping "identity name -> IP allowlist name".
   repeated Assignment assignments = 2;
+}
+
+// Legacy config, this is maintained to support clients still utilizing
+// https://crsrc.org/i/luci/client/utils/oauth.py;l=419;drc=173496da114efb94dceedb58e588b9c58dabc5e9
+//
+// Global config. Includes OAuth client_id allowlist and token server URL.
+//
+// Provided via 'oauth.cfg' config file.
+message OAuthConfig {
+  // ClientID returned by /auth/api/v1/server/oauth_config endpoint to clients.
+  string primary_client_id = 1;
+  // Client secret (that's not really a secret, since it is visible) returned
+  // by /auth/api/v1/server/oauth_config endpoint to clients. Corresponding
+  // callback URL must be localhost or urn:ietf:wg:oauth:2.0:oob.
+  string primary_client_secret = 2;
+  // Allowlist of all accepted client_ids (in addition to the primary one).
+  repeated string client_ids = 3;
+  // URL of a token server to use to generate delegation tokens.
+  string token_server_url = 4;
+}
+
+// Provided via 'permissions.cfg' config file.
+// Defines the list of roles and their respective permissions.
+message PermissionsConfig {
+  // Defines a role that includes given permissions and other roles.
+  // The role should not have been defined before. To include this role into another
+  // role, you can specify this role by name.
+  message Role {
+    // Identifier for a role, will have the form <prefix><project>.<noun>
+    //  examples:
+    //    "role/exampleproject.reader"
+    //    "role/exampleproject.owner"
+    //
+    // Prefixes:
+    //  "role/" -- role names defined in Auth service code.
+    //  "customRole/" -- role names that can be defined in user-supplied realms.cfg.
+    //  "role/luci.internal." -- interally used roles that are forbidden in realms.cfg.
+    string name = 1;
+
+    // List of permissions associated with this role, same permission may not be
+    // declared more than once per role.
+    // Permissions should be of the form: <service>.<subject>.<verb>
+    repeated components.auth.realms.Permission permissions = 2;
+
+    // List of other roles to include in this role, includes all the permissions
+    // that the included role contains. The referenced role should be defined already.
+    repeated string includes = 3;
+  }
+
+  // Representation of all defined roles.
+  repeated Role role = 1;
+
+  // Defines attributes that can be referenced in certain conditions.
+  repeated string attribute = 2;
 }
