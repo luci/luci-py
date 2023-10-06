@@ -162,6 +162,8 @@ def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
   else:
     # There's no fallback, giving up.
     result_summary.state = terminal_state
+    result_summary.internal_failure = (
+        terminal_state == task_result.State.BOT_DIED)
     result_summary.modified_ts = now
     result_summary.abandoned_ts = now
     result_summary.completed_ts = now
