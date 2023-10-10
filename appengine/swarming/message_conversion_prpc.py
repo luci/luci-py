@@ -610,6 +610,7 @@ def new_task_request_from_rpc(request):
 
   out = task_request.TaskRequest(
       name=request.name,
+      parent_task_id=request.parent_task_id,
       created_ts=utils.utcnow(),
       task_slices=slices,
       # 'tags' is now generated from manual_tags plus automatic tags.
@@ -618,14 +619,11 @@ def new_task_request_from_rpc(request):
       priority=request.priority,
       realm=request.realm,
       service_account=request.service_account,
-      # prefer to unset this if protobuf default value is used.
-      # ndb has its own default of 1200.
+      pubsub_auth_token=request.pubsub_auth_token,
+      pubsub_topic=request.pubsub_topic,
+      pubsub_userdata=request.pubsub_userdata,
       bot_ping_tolerance_secs=request.bot_ping_tolerance_secs
       or task_request.DEFAULT_BOT_PING_TOLERANCE,
-      resultdb=_resultdb_from_rpc(request),
-      has_build_task=False,
-      scheduling_algorithm=None,
-      rbe_instance=None,
-      txn_uuid=None)
+      resultdb=_resultdb_from_rpc(request))
 
   return out, secret_bytes, template_apply
