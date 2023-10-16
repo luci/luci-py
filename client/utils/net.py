@@ -809,7 +809,7 @@ class RequestsLibEngine:
     super(RequestsLibEngine, self).__init__()
     self.session = requests.Session()
     # Configure session.
-    self.session.trust_env = False
+    self.session.trust_env = True
     self.session.verify = tools.get_cacerts_bundle()
     # Configure connection pools.
     for protocol in ('https://', 'http://'):
