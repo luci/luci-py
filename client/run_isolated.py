@@ -715,6 +715,8 @@ def upload_outdir(cas_client, cas_instance, outdir, tmp_dir):
     cmd = [
         cas_client,
         'archive',
+        '-log-level',
+        'debug',
         '-paths',
         # Format: <working directory>:<relative path to dir>
         outdir + ':',
@@ -738,10 +740,6 @@ def upload_outdir(cas_client, cas_instance, outdir, tmp_dir):
         '-cas-instance',
         cas_instance
       ])
-
-    if sys.platform == 'linux':
-      # TODO(crbug.com/1243194): remove this after investigation.
-      cmd.extend(['-log-level', 'debug'])
 
     start = time.time()
 
