@@ -46,6 +46,11 @@ Role = collections.namedtuple(
     ])
 
 
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# This file is getting deprecated and is frozen, if making changes to
+# permissionsDB, please make the same change in permissions.cfg found
+# at configs/chrome-infra-auth-dev/permissions.cfg.
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 @utils.cache
 def db():
   """Returns the current set of all permissions and roles as DB object.
@@ -554,7 +559,6 @@ def db():
 
 class Builder(object):
   """Builder is used internally by db() to assemble the permissions DB."""
-
   PermRef = collections.namedtuple('PermRef', ['name'])
   RoleRef = collections.namedtuple('RoleRef', ['name'])
 
