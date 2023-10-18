@@ -29,9 +29,6 @@ from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
-from protorpc import messages
-from protorpc.remote import protojson
-
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -728,10 +725,19 @@ def enqueue_task(*args, **kwargs):
 
 ## JSON
 
+try:
+  # protorpc is an ancient and deprecated library, but to_json_encodable is used
+  # in many places. Make to_json_encodable gracefully degrade when protorpc is
+  # missing.
+  from protorpc import messages
+  from protorpc.remote import protojson
+except ImportError:
+  messages = None
+
 
 def to_json_encodable(data):
   """Converts data into json-compatible data."""
-  if isinstance(data, messages.Message):
+  if messages and isinstance(data, messages.Message):
     # protojson.encode_message returns a string that is already encoded json.
     # Load it back into a json-compatible representation of the data.
     return json.loads(protojson.encode_message(data))
