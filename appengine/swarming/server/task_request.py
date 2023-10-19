@@ -635,7 +635,6 @@ class BuildTask(ndb.Model):
   # a task backend build, thus that bot_update_task does not have to make any
   # more extra datastore calls in subsequent bot_update_task calls.
   bot_dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict,
-                                                             compressed=True,
                                                              required=False)
 
 
@@ -1180,12 +1179,11 @@ class TaskRequest(ndb.Model):
 
   # The TaskSlice describes what to run. When the list has more than one item,
   # this is to enable task fallback.
-  task_slices = ndb.LocalStructuredProperty(
-      TaskSlice, compressed=True, repeated=True)
+  task_slices = ndb.LocalStructuredProperty(TaskSlice, repeated=True)
   # Old way of specifying task properties. Only one of properties or
   # task_slices can be set.
   properties_old = ndb.LocalStructuredProperty(
-      TaskProperties, compressed=True, name='properties')
+      TaskProperties, name='properties')
 
   # If the task request is not scheduled by this moment, it will be aborted by a
   # cron job. It is saved instead of scheduling_expiration_secs so finding
@@ -1279,7 +1277,7 @@ class TaskRequest(ndb.Model):
   realms_enabled = ndb.BooleanProperty(default=False, indexed=False)
 
   # ResultDB property in task new request.
-  resultdb = ndb.LocalStructuredProperty(ResultDBCfg, compressed=True)
+  resultdb = ndb.LocalStructuredProperty(ResultDBCfg)
 
   # If True, the TaskRequest has an associated BuildTask.
   has_build_task = ndb.BooleanProperty(default=False, indexed=False)

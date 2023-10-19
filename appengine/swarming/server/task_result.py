@@ -500,8 +500,7 @@ class _TaskResultCommon(ndb.Model):
   bot_version = ndb.StringProperty()
 
   # Bot dimensions at the moment the bot reaped the task. Not set for old tasks.
-  bot_dimensions = datastore_utils.DeterministicJsonProperty(
-      json_type=dict, compressed=True)
+  bot_dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict)
 
   # Time when the bot becomes available. This will be used to calculate
   # overhead.
