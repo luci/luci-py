@@ -143,6 +143,7 @@ class TaskBackendAPIService(object):
         task_pack.get_request_and_result_keys(task_id)[0]
         for task_id in requested_task_ids
     ]
+
     pools = []
     for tr in ndb.get_multi(request_keys):
       if tr:
@@ -151,9 +152,16 @@ class TaskBackendAPIService(object):
 
     task_results = task_result.fetch_task_results(requested_task_ids)
 
-    return backend_pb2.FetchTasksResponse(
-        tasks=backend_conversions.convert_results_to_tasks(
-            task_results, requested_task_ids))
+    build_task_keys = [
+        task_pack.request_key_to_build_task_key(request_key)
+        for request_key in request_keys
+    ]
+    build_tasks = ndb.get_multi(build_task_keys)
+
+    res = backend_pb2.FetchTasksResponse(
+        responses=backend_conversions.convert_results_to_fetch_tasks_responses(
+            task_results, build_tasks, requested_task_ids))
+    return res
 
   @prpc_helpers.method
   @auth.require(acl.can_use_task_backend, log_identity=True)

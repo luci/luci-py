@@ -21,6 +21,7 @@ import webtest
 from google.appengine.api import app_identity
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
+from google.rpc import status_pb2
 
 from google.protobuf import struct_pb2
 from google.protobuf import timestamp_pb2
@@ -31,7 +32,10 @@ from test_support import test_case
 from components import auth
 from components import utils
 from components import prpc
+from components.prpc import codes
 from components.prpc import encoding
+from server import task_pack
+from server import task_result
 
 from bb.go.chromium.org.luci.buildbucket.proto import backend_pb2
 from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
@@ -133,6 +137,17 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         buildbucket_host='cow-buildbucket.appspot.com',
         pubsub_topic="my_topic")
 
+  def _client_run_task(self, request):
+    self.mock(realms, 'check_tasks_create_in_realm', lambda *_: True)
+    self.mock(realms, 'check_pools_create_task', lambda *_: True)
+    self.mock(realms, 'check_tasks_act_as', lambda *_: True)
+    self.mock(service_accounts, 'has_token_server', lambda: True)
+
+    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
+                             _encode(request), self._headers)
+    actual_resp = backend_pb2.RunTaskResponse()
+    _decode(raw_resp.body, actual_resp)
+    return actual_resp
   # Tests
   def test_run_task(self):
     self.set_as_project()
@@ -149,10 +164,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     request.build_id = "8783198670850745761"
     self.mock(random, 'getrandbits', lambda _: 0x86)
     self.mock(utils, 'time_time_ns', lambda: 1546398020)
-    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
-                             _encode(request), self._headers)
-    actual_resp = backend_pb2.RunTaskResponse()
-    _decode(raw_resp.body, actual_resp)
+    actual_resp = self._client_run_task(request)
     expected_task_id = '4225526b80008610'
     l = 'https://test-swarming.appspot.com/task?id=%s&o=true&w=true'
     expected_response = backend_pb2.RunTaskResponse(
@@ -167,10 +179,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, task_request.SecretBytes.query().count())
 
     # Test requests are correctly deduped if `request_id` matches.
-    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
-                             _encode(request), self._headers)
-    actual_resp = backend_pb2.RunTaskResponse()
-    _decode(raw_resp.body, actual_resp)
+    actual_resp = self._client_run_task(request)
     expected_response = backend_pb2.RunTaskResponse(
         task=task_pb2.Task(id=task_pb2.TaskID(
             id=expected_task_id, target='swarming://test-swarming'),
@@ -185,10 +194,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     # Test tasks with different `build_id`s are not deduped.
     request.build_id = '23895823794242'
     self.mock(random, 'getrandbits', lambda _: 0x87)
-    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/RunTask',
-                             _encode(request), self._headers)
-    actual_resp = backend_pb2.RunTaskResponse()
-    _decode(raw_resp.body, actual_resp)
+    actual_resp = self._client_run_task(request)
     new_expected_task_id = '4225526b80008710'
     expected_response = backend_pb2.RunTaskResponse(
         task=task_pb2.Task(id=task_pb2.TaskID(
@@ -395,43 +401,50 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.set_as_bot()
     self.bot_poll()
 
-    # Create two tasks, one COMPLETED, one PENDING
-    self.set_as_user()
-    # first request
-    _, first_id = self.client_create_task_raw(
-        name='first',
-        tags=['project:yay', 'commit:post'],
-        properties=dict(idempotent=True))
-    self.set_as_bot()
-    self.bot_run_task()
+    # Create two tasks.
+    self.set_as_project()
+    request = self._basic_run_task_request()
+    request.build_id = "8783198670850745761"
+    self.mock(random, 'getrandbits', lambda _: 0x86)
+    self.mock(utils, 'time_time_ns', lambda: 1546398020)
+    actual_resp = self._client_run_task(request)
+    first_id = actual_resp.task.id.id
 
     # Clear cache to test fetching from datastore path.
     ndb.get_context().clear_cache()
     memcache.flush_all()
 
     # second request
-    self.set_as_user()
-    _, second_id = self.client_create_task_raw(
-        name='second',
-        user='jack@localhost',
-        tags=['project:yay', 'commit:pre'])
+    request.build_id = '23895823794242'
+    self.mock(random, 'getrandbits', lambda _: 0x87)
+    self.mock(utils, 'time_time_ns', lambda: 1646398020)
+    actual_resp = self._client_run_task(request)
+    second_id = actual_resp.task.id.id
 
-    self.set_as_project()
     request = backend_pb2.FetchTasksRequest(task_ids=[
-        task_pb2.TaskID(id=str(first_id)),
-        task_pb2.TaskID(id=str(second_id)),
+        task_pb2.TaskID(id=first_id),
+        task_pb2.TaskID(id=second_id),
         task_pb2.TaskID(id='1d69b9f088008810'),  # Does not exist.
     ])
 
     target = 'swarming://%s' % app_identity.get_application_id()
-    expected_response = backend_pb2.FetchTasksResponse(tasks=[
-        task_pb2.Task(id=task_pb2.TaskID(target=target, id=first_id),
-                      status=common_pb2.SUCCESS),
-        task_pb2.Task(id=task_pb2.TaskID(target=target, id=second_id),
-                      status=common_pb2.SCHEDULED),
-        task_pb2.Task(id=task_pb2.TaskID(target=target, id='1d69b9f088008810'),
-                      summary_html='Swarming task 1d69b9f088008810 not found',
-                      status=common_pb2.INFRA_FAILURE),
+    expected_response = backend_pb2.FetchTasksResponse(responses=[
+        backend_pb2.FetchTasksResponse.Response(task=task_pb2.Task(
+            id=task_pb2.TaskID(target=target, id=first_id),
+            status=common_pb2.SCHEDULED,
+            update_id=1546398020,
+            details=struct_pb2.Struct(),
+        ), ),
+        backend_pb2.FetchTasksResponse.Response(task=task_pb2.Task(
+            id=task_pb2.TaskID(target=target, id=second_id),
+            status=common_pb2.SCHEDULED,
+            update_id=1646398020,
+            details=struct_pb2.Struct(),
+        ), ),
+        backend_pb2.FetchTasksResponse.Response(error=status_pb2.Status(
+            code=codes.StatusCode.NOT_FOUND.value,
+            message='Swarming task 1d69b9f088008810 not found',
+        ), ),
     ])
 
     self.mock_auth_db([auth.Permission('swarming.pools.listTasks')])

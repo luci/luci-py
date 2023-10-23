@@ -22,7 +22,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n1go.chromium.org/luci/buildbucket/proto/task.proto\x12\x0e\x62uildbucket.v2\x1a\x1cgoogle/protobuf/struct.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a\x39go.chromium.org/luci/buildbucket/proto/field_option.proto\"\xf2\x01\n\x04Task\x12*\n\x02id\x18\x01 \x01(\x0b\x32\x16.buildbucket.v2.TaskIDB\x06\x92\xc3\x1a\x02\x08\x02\x12\x0c\n\x04link\x18\x02 \x01(\t\x12&\n\x06status\x18\x03 \x01(\x0e\x32\x16.buildbucket.v2.Status\x12\x35\n\x0estatus_details\x18\x04 \x01(\x0b\x32\x1d.buildbucket.v2.StatusDetails\x12\x14\n\x0csummary_html\x18\x05 \x01(\t\x12(\n\x07\x64\x65tails\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x11\n\tupdate_id\x18\x07 \x01(\x03\":\n\x06TaskID\x12\x1c\n\x06target\x18\x01 \x01(\tB\x0c\x8a\xc3\x1a\x02\x08\x02\x92\xc3\x1a\x02\x08\x02\x12\x12\n\x02id\x18\x02 \x01(\tB\x06\x92\xc3\x1a\x02\x08\x02\"G\n\x0f\x42uildTaskUpdate\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12\"\n\x04task\x18\x02 \x01(\x0b\x32\x14.buildbucket.v2.TaskB6Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
+  serialized_pb=b'\n1go.chromium.org/luci/buildbucket/proto/task.proto\x12\x0e\x62uildbucket.v2\x1a\x1cgoogle/protobuf/struct.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a\x39go.chromium.org/luci/buildbucket/proto/field_option.proto\"\x82\x02\n\x04Task\x12*\n\x02id\x18\x01 \x01(\x0b\x32\x16.buildbucket.v2.TaskIDB\x06\x92\xc3\x1a\x02\x08\x02\x12\x0c\n\x04link\x18\x02 \x01(\t\x12.\n\x06status\x18\x03 \x01(\x0e\x32\x16.buildbucket.v2.StatusB\x06\x92\xc3\x1a\x02\x08\x02\x12\x35\n\x0estatus_details\x18\x04 \x01(\x0b\x32\x1d.buildbucket.v2.StatusDetails\x12\x14\n\x0csummary_html\x18\x05 \x01(\t\x12(\n\x07\x64\x65tails\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x19\n\tupdate_id\x18\x07 \x01(\x03\x42\x06\x92\xc3\x1a\x02\x08\x02\":\n\x06TaskID\x12\x1c\n\x06target\x18\x01 \x01(\tB\x0c\x8a\xc3\x1a\x02\x08\x02\x92\xc3\x1a\x02\x08\x02\x12\x12\n\x02id\x18\x02 \x01(\tB\x06\x92\xc3\x1a\x02\x08\x02\"G\n\x0f\x42uildTaskUpdate\x12\x10\n\x08\x62uild_id\x18\x01 \x01(\t\x12\"\n\x04task\x18\x02 \x01(\x0b\x32\x14.buildbucket.v2.TaskB6Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_field__option__pb2.DESCRIPTOR,])
 
@@ -57,7 +57,7 @@ _TASK = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+      serialized_options=b'\222\303\032\002\010\002', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='status_details', full_name='buildbucket.v2.Task.status_details', index=3,
       number=4, type=11, cpp_type=10, label=1,
@@ -85,7 +85,7 @@ _TASK = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+      serialized_options=b'\222\303\032\002\010\002', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -99,7 +99,7 @@ _TASK = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=212,
-  serialized_end=454,
+  serialized_end=470,
 )
 
 
@@ -137,8 +137,8 @@ _TASKID = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=456,
-  serialized_end=514,
+  serialized_start=472,
+  serialized_end=530,
 )
 
 
@@ -176,8 +176,8 @@ _BUILDTASKUPDATE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=516,
-  serialized_end=587,
+  serialized_start=532,
+  serialized_end=603,
 )
 
 _TASK.fields_by_name['id'].message_type = _TASKID
@@ -214,6 +214,8 @@ _sym_db.RegisterMessage(BuildTaskUpdate)
 
 DESCRIPTOR._options = None
 _TASK.fields_by_name['id']._options = None
+_TASK.fields_by_name['status']._options = None
+_TASK.fields_by_name['update_id']._options = None
 _TASKID.fields_by_name['target']._options = None
 _TASKID.fields_by_name['id']._options = None
 # @@protoc_insertion_point(module_scope)

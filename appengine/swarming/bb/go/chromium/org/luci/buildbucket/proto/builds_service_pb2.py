@@ -19,6 +19,7 @@ from google.rpc import status_pb2 as google_dot_rpc_dot_status__pb2
 from bb.go.chromium.org.luci.buildbucket.proto import build_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_build__pb2
 from bb.go.chromium.org.luci.buildbucket.proto import builder_common_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_builder__common__pb2
 from bb.go.chromium.org.luci.buildbucket.proto import common_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2
+from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_launcher__pb2
 from bb.go.chromium.org.luci.buildbucket.proto import notification_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_notification__pb2
 from bb.go.chromium.org.luci.buildbucket.proto import task_pb2 as go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2
 from bb.go.chromium.org.luci.common.proto.structmask import structmask_pb2 as go_dot_chromium_dot_org_dot_luci_dot_common_dot_proto_dot_structmask_dot_structmask__pb2
@@ -30,9 +31,9 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z4go.chromium.org/luci/buildbucket/proto;buildbucketpb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n;go.chromium.org/luci/buildbucket/proto/builds_service.proto\x12\x0e\x62uildbucket.v2\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x17google/rpc/status.proto\x1a\x32go.chromium.org/luci/buildbucket/proto/build.proto\x1a;go.chromium.org/luci/buildbucket/proto/builder_common.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a\x39go.chromium.org/luci/buildbucket/proto/notification.proto\x1a\x31go.chromium.org/luci/buildbucket/proto/task.proto\x1a=go.chromium.org/luci/common/proto/structmask/structmask.proto\"\xb8\x01\n\x0fGetBuildRequest\x12\n\n\x02id\x18\x01 \x01(\x03\x12*\n\x07\x62uilder\x18\x02 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12\x14\n\x0c\x62uild_number\x18\x03 \x01(\x05\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18\x65 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\"\xc8\x01\n\x13SearchBuildsRequest\x12\x31\n\tpredicate\x18\x01 \x01(\x0b\x32\x1e.buildbucket.v2.BuildPredicate\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18g \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\x12\x11\n\tpage_size\x18\x65 \x01(\x05\x12\x12\n\npage_token\x18\x66 \x01(\t\"V\n\x14SearchBuildsResponse\x12%\n\x06\x62uilds\x18\x01 \x03(\x0b\x32\x15.buildbucket.v2.Build\x12\x17\n\x0fnext_page_token\x18\x64 \x01(\t\"\x90\x03\n\x0c\x42\x61tchRequest\x12\x36\n\x08requests\x18\x01 \x03(\x0b\x32$.buildbucket.v2.BatchRequest.Request\x1a\xc7\x02\n\x07Request\x12\x34\n\tget_build\x18\x01 \x01(\x0b\x32\x1f.buildbucket.v2.GetBuildRequestH\x00\x12<\n\rsearch_builds\x18\x02 \x01(\x0b\x32#.buildbucket.v2.SearchBuildsRequestH\x00\x12>\n\x0eschedule_build\x18\x03 \x01(\x0b\x32$.buildbucket.v2.ScheduleBuildRequestH\x00\x12:\n\x0c\x63\x61ncel_build\x18\x04 \x01(\x0b\x32\".buildbucket.v2.CancelBuildRequestH\x00\x12\x41\n\x10get_build_status\x18\x05 \x01(\x0b\x32%.buildbucket.v2.GetBuildStatusRequestH\x00\x42\t\n\x07request\"\x86\x03\n\rBatchResponse\x12\x39\n\tresponses\x18\x01 \x03(\x0b\x32&.buildbucket.v2.BatchResponse.Response\x1a\xb9\x02\n\x08Response\x12*\n\tget_build\x18\x01 \x01(\x0b\x32\x15.buildbucket.v2.BuildH\x00\x12=\n\rsearch_builds\x18\x02 \x01(\x0b\x32$.buildbucket.v2.SearchBuildsResponseH\x00\x12/\n\x0eschedule_build\x18\x03 \x01(\x0b\x32\x15.buildbucket.v2.BuildH\x00\x12-\n\x0c\x63\x61ncel_build\x18\x04 \x01(\x0b\x32\x15.buildbucket.v2.BuildH\x00\x12\x31\n\x10get_build_status\x18\x05 \x01(\x0b\x32\x15.buildbucket.v2.BuildH\x00\x12#\n\x05\x65rror\x18\x64 \x01(\x0b\x32\x12.google.rpc.StatusH\x00\x42\n\n\x08response\"\xc4\x01\n\x12UpdateBuildRequest\x12$\n\x05\x62uild\x18\x01 \x01(\x0b\x32\x15.buildbucket.v2.Build\x12/\n\x0bupdate_mask\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18\x65 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\"\xac\t\n\x14ScheduleBuildRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x19\n\x11template_build_id\x18\x02 \x01(\x03\x12*\n\x07\x62uilder\x18\x03 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12\'\n\x06\x63\x61nary\x18\x04 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12-\n\x0c\x65xperimental\x18\x05 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12J\n\x0b\x65xperiments\x18\x10 \x03(\x0b\x32\x35.buildbucket.v2.ScheduleBuildRequest.ExperimentsEntry\x12+\n\nproperties\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x35\n\x0egitiles_commit\x18\x07 \x01(\x0b\x32\x1d.buildbucket.v2.GitilesCommit\x12\x34\n\x0egerrit_changes\x18\x08 \x03(\x0b\x32\x1c.buildbucket.v2.GerritChange\x12(\n\x04tags\x18\t \x03(\x0b\x32\x1a.buildbucket.v2.StringPair\x12\x36\n\ndimensions\x18\n \x03(\x0b\x32\".buildbucket.v2.RequestedDimension\x12\x10\n\x08priority\x18\x0b \x01(\x05\x12\x32\n\x06notify\x18\x0c \x01(\x0b\x32\".buildbucket.v2.NotificationConfig\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18\x65 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\x12)\n\x08\x63ritical\x18\r \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12\'\n\x03\x65xe\x18\x0e \x01(\x0b\x32\x1a.buildbucket.v2.Executable\x12?\n\x08swarming\x18\x0f \x01(\x0b\x32-.buildbucket.v2.ScheduleBuildRequest.Swarming\x12\x35\n\x12scheduling_timeout\x18\x11 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x34\n\x11\x65xecution_timeout\x18\x12 \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x13 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x0f\n\x07\x64ry_run\x18\x14 \x01(\x08\x12\x33\n\x12\x63\x61n_outlive_parent\x18\x15 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12*\n\tretriable\x18\x16 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x1a\x32\n\x10\x45xperimentsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x08:\x02\x38\x01\x1a!\n\x08Swarming\x12\x15\n\rparent_run_id\x18\x01 \x01(\t\"\x93\x01\n\x12\x43\x61ncelBuildRequest\x12\n\n\x02id\x18\x01 \x01(\x03\x12\x18\n\x10summary_markdown\x18\x02 \x01(\t\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18\x65 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\"|\n\x12\x43reateBuildRequest\x12)\n\x05\x62uild\x18\x01 \x01(\x0b\x32\x15.buildbucket.v2.BuildB\x03\xe0\x41\x02\x12\x12\n\nrequest_id\x18\x02 \x01(\t\x12\'\n\x04mask\x18\x03 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\"\xe1\x01\n\x16SynthesizeBuildRequest\x12\x19\n\x11template_build_id\x18\x01 \x01(\x03\x12*\n\x07\x62uilder\x18\x02 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12L\n\x0b\x65xperiments\x18\x03 \x03(\x0b\x32\x37.buildbucket.v2.SynthesizeBuildRequest.ExperimentsEntry\x1a\x32\n\x10\x45xperimentsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x08:\x02\x38\x01\"Y\n\x11StartBuildRequest\x12\x17\n\nrequest_id\x18\x01 \x01(\tB\x03\xe0\x41\x02\x12\x15\n\x08\x62uild_id\x18\x02 \x01(\x03\x42\x03\xe0\x41\x02\x12\x14\n\x07task_id\x18\x03 \x01(\tB\x03\xe0\x41\x02\"V\n\x12StartBuildResponse\x12$\n\x05\x62uild\x18\x01 \x01(\x0b\x32\x15.buildbucket.v2.Build\x12\x1a\n\x12update_build_token\x18\x02 \x01(\t\"e\n\x15GetBuildStatusRequest\x12\n\n\x02id\x18\x01 \x01(\x03\x12*\n\x07\x62uilder\x18\x02 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12\x14\n\x0c\x62uild_number\x18\x03 \x01(\x05\"\x93\x02\n\tBuildMask\x12*\n\x06\x66ields\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\x12\x30\n\x10input_properties\x18\x02 \x03(\x0b\x32\x16.structmask.StructMask\x12\x31\n\x11output_properties\x18\x03 \x03(\x0b\x32\x16.structmask.StructMask\x12\x34\n\x14requested_properties\x18\x04 \x03(\x0b\x32\x16.structmask.StructMask\x12\x12\n\nall_fields\x18\x05 \x01(\x08\x12+\n\x0bstep_status\x18\x06 \x03(\x0e\x32\x16.buildbucket.v2.Status\"\xf6\x03\n\x0e\x42uildPredicate\x12*\n\x07\x62uilder\x18\x01 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12&\n\x06status\x18\x02 \x01(\x0e\x32\x16.buildbucket.v2.Status\x12\x34\n\x0egerrit_changes\x18\x03 \x03(\x0b\x32\x1c.buildbucket.v2.GerritChange\x12<\n\x15output_gitiles_commit\x18\x04 \x01(\x0b\x32\x1d.buildbucket.v2.GitilesCommit\x12\x12\n\ncreated_by\x18\x05 \x01(\t\x12(\n\x04tags\x18\x06 \x03(\x0b\x32\x1a.buildbucket.v2.StringPair\x12.\n\x0b\x63reate_time\x18\x07 \x01(\x0b\x32\x19.buildbucket.v2.TimeRange\x12\x1c\n\x14include_experimental\x18\x08 \x01(\x08\x12)\n\x05\x62uild\x18\t \x01(\x0b\x32\x1a.buildbucket.v2.BuildRange\x12\'\n\x06\x63\x61nary\x18\n \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12\x13\n\x0b\x65xperiments\x18\x0b \x03(\t\x12\x15\n\rdescendant_of\x18\x0c \x01(\x03\x12\x10\n\x08\x63hild_of\x18\r \x01(\x03\":\n\nBuildRange\x12\x16\n\x0estart_build_id\x18\x01 \x01(\x03\x12\x14\n\x0c\x65nd_build_id\x18\x02 \x01(\x03\"s\n\x18RegisterBuildTaskRequest\x12\x17\n\nrequest_id\x18\x01 \x01(\tB\x03\xe0\x41\x02\x12\x15\n\x08\x62uild_id\x18\x02 \x01(\x03\x42\x03\xe0\x41\x02\x12\'\n\x04task\x18\x03 \x01(\x0b\x32\x14.buildbucket.v2.TaskB\x03\xe0\x41\x02\"<\n\x19RegisterBuildTaskResponse\x12\x1f\n\x17update_build_task_token\x18\x01 \x01(\t2\x90\x07\n\x06\x42uilds\x12\x44\n\x08GetBuild\x12\x1f.buildbucket.v2.GetBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12[\n\x0cSearchBuilds\x12#.buildbucket.v2.SearchBuildsRequest\x1a$.buildbucket.v2.SearchBuildsResponse\"\x00\x12J\n\x0bUpdateBuild\x12\".buildbucket.v2.UpdateBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12N\n\rScheduleBuild\x12$.buildbucket.v2.ScheduleBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12J\n\x0b\x43\x61ncelBuild\x12\".buildbucket.v2.CancelBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12\x46\n\x05\x42\x61tch\x12\x1c.buildbucket.v2.BatchRequest\x1a\x1d.buildbucket.v2.BatchResponse\"\x00\x12J\n\x0b\x43reateBuild\x12\".buildbucket.v2.CreateBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12R\n\x0fSynthesizeBuild\x12&.buildbucket.v2.SynthesizeBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12P\n\x0eGetBuildStatus\x12%.buildbucket.v2.GetBuildStatusRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12U\n\nStartBuild\x12!.buildbucket.v2.StartBuildRequest\x1a\".buildbucket.v2.StartBuildResponse\"\x00\x12j\n\x11RegisterBuildTask\x12(.buildbucket.v2.RegisterBuildTaskRequest\x1a).buildbucket.v2.RegisterBuildTaskResponse\"\x00\x42\x36Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
+  serialized_pb=b'\n;go.chromium.org/luci/buildbucket/proto/builds_service.proto\x12\x0e\x62uildbucket.v2\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a google/protobuf/field_mask.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x17google/rpc/status.proto\x1a\x32go.chromium.org/luci/buildbucket/proto/build.proto\x1a;go.chromium.org/luci/buildbucket/proto/builder_common.proto\x1a\x33go.chromium.org/luci/buildbucket/proto/common.proto\x1a\x35go.chromium.org/luci/buildbucket/proto/launcher.proto\x1a\x39go.chromium.org/luci/buildbucket/proto/notification.proto\x1a\x31go.chromium.org/luci/buildbucket/proto/task.proto\x1a=go.chromium.org/luci/common/proto/structmask/structmask.proto\"\xb8\x01\n\x0fGetBuildRequest\x12\n\n\x02id\x18\x01 \x01(\x03\x12*\n\x07\x62uilder\x18\x02 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12\x14\n\x0c\x62uild_number\x18\x03 \x01(\x05\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18\x65 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\"\xc8\x01\n\x13SearchBuildsRequest\x12\x31\n\tpredicate\x18\x01 \x01(\x0b\x32\x1e.buildbucket.v2.BuildPredicate\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18g \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\x12\x11\n\tpage_size\x18\x65 \x01(\x05\x12\x12\n\npage_token\x18\x66 \x01(\t\"V\n\x14SearchBuildsResponse\x12%\n\x06\x62uilds\x18\x01 \x03(\x0b\x32\x15.buildbucket.v2.Build\x12\x17\n\x0fnext_page_token\x18\x64 \x01(\t\"\x90\x03\n\x0c\x42\x61tchRequest\x12\x36\n\x08requests\x18\x01 \x03(\x0b\x32$.buildbucket.v2.BatchRequest.Request\x1a\xc7\x02\n\x07Request\x12\x34\n\tget_build\x18\x01 \x01(\x0b\x32\x1f.buildbucket.v2.GetBuildRequestH\x00\x12<\n\rsearch_builds\x18\x02 \x01(\x0b\x32#.buildbucket.v2.SearchBuildsRequestH\x00\x12>\n\x0eschedule_build\x18\x03 \x01(\x0b\x32$.buildbucket.v2.ScheduleBuildRequestH\x00\x12:\n\x0c\x63\x61ncel_build\x18\x04 \x01(\x0b\x32\".buildbucket.v2.CancelBuildRequestH\x00\x12\x41\n\x10get_build_status\x18\x05 \x01(\x0b\x32%.buildbucket.v2.GetBuildStatusRequestH\x00\x42\t\n\x07request\"\x86\x03\n\rBatchResponse\x12\x39\n\tresponses\x18\x01 \x03(\x0b\x32&.buildbucket.v2.BatchResponse.Response\x1a\xb9\x02\n\x08Response\x12*\n\tget_build\x18\x01 \x01(\x0b\x32\x15.buildbucket.v2.BuildH\x00\x12=\n\rsearch_builds\x18\x02 \x01(\x0b\x32$.buildbucket.v2.SearchBuildsResponseH\x00\x12/\n\x0eschedule_build\x18\x03 \x01(\x0b\x32\x15.buildbucket.v2.BuildH\x00\x12-\n\x0c\x63\x61ncel_build\x18\x04 \x01(\x0b\x32\x15.buildbucket.v2.BuildH\x00\x12\x31\n\x10get_build_status\x18\x05 \x01(\x0b\x32\x15.buildbucket.v2.BuildH\x00\x12#\n\x05\x65rror\x18\x64 \x01(\x0b\x32\x12.google.rpc.StatusH\x00\x42\n\n\x08response\"\xc4\x01\n\x12UpdateBuildRequest\x12$\n\x05\x62uild\x18\x01 \x01(\x0b\x32\x15.buildbucket.v2.Build\x12/\n\x0bupdate_mask\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18\x65 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\"\x83\n\n\x14ScheduleBuildRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x19\n\x11template_build_id\x18\x02 \x01(\x03\x12*\n\x07\x62uilder\x18\x03 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12\'\n\x06\x63\x61nary\x18\x04 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12-\n\x0c\x65xperimental\x18\x05 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12J\n\x0b\x65xperiments\x18\x10 \x03(\x0b\x32\x35.buildbucket.v2.ScheduleBuildRequest.ExperimentsEntry\x12+\n\nproperties\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x35\n\x0egitiles_commit\x18\x07 \x01(\x0b\x32\x1d.buildbucket.v2.GitilesCommit\x12\x34\n\x0egerrit_changes\x18\x08 \x03(\x0b\x32\x1c.buildbucket.v2.GerritChange\x12(\n\x04tags\x18\t \x03(\x0b\x32\x1a.buildbucket.v2.StringPair\x12\x36\n\ndimensions\x18\n \x03(\x0b\x32\".buildbucket.v2.RequestedDimension\x12\x10\n\x08priority\x18\x0b \x01(\x05\x12\x32\n\x06notify\x18\x0c \x01(\x0b\x32\".buildbucket.v2.NotificationConfig\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18\x65 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\x12)\n\x08\x63ritical\x18\r \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12\'\n\x03\x65xe\x18\x0e \x01(\x0b\x32\x1a.buildbucket.v2.Executable\x12?\n\x08swarming\x18\x0f \x01(\x0b\x32-.buildbucket.v2.ScheduleBuildRequest.Swarming\x12\x35\n\x12scheduling_timeout\x18\x11 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x34\n\x11\x65xecution_timeout\x18\x12 \x01(\x0b\x32\x19.google.protobuf.Duration\x12/\n\x0cgrace_period\x18\x13 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x0f\n\x07\x64ry_run\x18\x14 \x01(\x08\x12\x33\n\x12\x63\x61n_outlive_parent\x18\x15 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12*\n\tretriable\x18\x16 \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12\x46\n\x0cshadow_input\x18\x17 \x01(\x0b\x32\x30.buildbucket.v2.ScheduleBuildRequest.ShadowInput\x1a\x32\n\x10\x45xperimentsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x08:\x02\x38\x01\x1a!\n\x08Swarming\x12\x15\n\rparent_run_id\x18\x01 \x01(\t\x1a\r\n\x0bShadowInput\"\x93\x01\n\x12\x43\x61ncelBuildRequest\x12\n\n\x02id\x18\x01 \x01(\x03\x12\x18\n\x10summary_markdown\x18\x02 \x01(\t\x12.\n\x06\x66ields\x18\x64 \x01(\x0b\x32\x1a.google.protobuf.FieldMaskB\x02\x18\x01\x12\'\n\x04mask\x18\x65 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\"|\n\x12\x43reateBuildRequest\x12)\n\x05\x62uild\x18\x01 \x01(\x0b\x32\x15.buildbucket.v2.BuildB\x03\xe0\x41\x02\x12\x12\n\nrequest_id\x18\x02 \x01(\t\x12\'\n\x04mask\x18\x03 \x01(\x0b\x32\x19.buildbucket.v2.BuildMask\"\xe1\x01\n\x16SynthesizeBuildRequest\x12\x19\n\x11template_build_id\x18\x01 \x01(\x03\x12*\n\x07\x62uilder\x18\x02 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12L\n\x0b\x65xperiments\x18\x03 \x03(\x0b\x32\x37.buildbucket.v2.SynthesizeBuildRequest.ExperimentsEntry\x1a\x32\n\x10\x45xperimentsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x08:\x02\x38\x01\"Y\n\x11StartBuildRequest\x12\x17\n\nrequest_id\x18\x01 \x01(\tB\x03\xe0\x41\x02\x12\x15\n\x08\x62uild_id\x18\x02 \x01(\x03\x42\x03\xe0\x41\x02\x12\x14\n\x07task_id\x18\x03 \x01(\tB\x03\xe0\x41\x02\"V\n\x12StartBuildResponse\x12$\n\x05\x62uild\x18\x01 \x01(\x0b\x32\x15.buildbucket.v2.Build\x12\x1a\n\x12update_build_token\x18\x02 \x01(\t\"e\n\x15GetBuildStatusRequest\x12\n\n\x02id\x18\x01 \x01(\x03\x12*\n\x07\x62uilder\x18\x02 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12\x14\n\x0c\x62uild_number\x18\x03 \x01(\x05\"\x93\x02\n\tBuildMask\x12*\n\x06\x66ields\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.FieldMask\x12\x30\n\x10input_properties\x18\x02 \x03(\x0b\x32\x16.structmask.StructMask\x12\x31\n\x11output_properties\x18\x03 \x03(\x0b\x32\x16.structmask.StructMask\x12\x34\n\x14requested_properties\x18\x04 \x03(\x0b\x32\x16.structmask.StructMask\x12\x12\n\nall_fields\x18\x05 \x01(\x08\x12+\n\x0bstep_status\x18\x06 \x03(\x0e\x32\x16.buildbucket.v2.Status\"\xf6\x03\n\x0e\x42uildPredicate\x12*\n\x07\x62uilder\x18\x01 \x01(\x0b\x32\x19.buildbucket.v2.BuilderID\x12&\n\x06status\x18\x02 \x01(\x0e\x32\x16.buildbucket.v2.Status\x12\x34\n\x0egerrit_changes\x18\x03 \x03(\x0b\x32\x1c.buildbucket.v2.GerritChange\x12<\n\x15output_gitiles_commit\x18\x04 \x01(\x0b\x32\x1d.buildbucket.v2.GitilesCommit\x12\x12\n\ncreated_by\x18\x05 \x01(\t\x12(\n\x04tags\x18\x06 \x03(\x0b\x32\x1a.buildbucket.v2.StringPair\x12.\n\x0b\x63reate_time\x18\x07 \x01(\x0b\x32\x19.buildbucket.v2.TimeRange\x12\x1c\n\x14include_experimental\x18\x08 \x01(\x08\x12)\n\x05\x62uild\x18\t \x01(\x0b\x32\x1a.buildbucket.v2.BuildRange\x12\'\n\x06\x63\x61nary\x18\n \x01(\x0e\x32\x17.buildbucket.v2.Trinary\x12\x13\n\x0b\x65xperiments\x18\x0b \x03(\t\x12\x15\n\rdescendant_of\x18\x0c \x01(\x03\x12\x10\n\x08\x63hild_of\x18\r \x01(\x03\":\n\nBuildRange\x12\x16\n\x0estart_build_id\x18\x01 \x01(\x03\x12\x14\n\x0c\x65nd_build_id\x18\x02 \x01(\x03\"p\n\x15StartBuildTaskRequest\x12\x17\n\nrequest_id\x18\x01 \x01(\tB\x03\xe0\x41\x02\x12\x15\n\x08\x62uild_id\x18\x02 \x01(\x03\x42\x03\xe0\x41\x02\x12\'\n\x04task\x18\x03 \x01(\x0b\x32\x14.buildbucket.v2.TaskB\x03\xe0\x41\x02\"]\n\x16StartBuildTaskResponse\x12-\n\x07secrets\x18\x01 \x01(\x0b\x32\x1c.buildbucket.v2.BuildSecrets\x12\x14\n\x0cpubsub_topic\x18\x02 \x01(\t2\x87\x07\n\x06\x42uilds\x12\x44\n\x08GetBuild\x12\x1f.buildbucket.v2.GetBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12[\n\x0cSearchBuilds\x12#.buildbucket.v2.SearchBuildsRequest\x1a$.buildbucket.v2.SearchBuildsResponse\"\x00\x12J\n\x0bUpdateBuild\x12\".buildbucket.v2.UpdateBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12N\n\rScheduleBuild\x12$.buildbucket.v2.ScheduleBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12J\n\x0b\x43\x61ncelBuild\x12\".buildbucket.v2.CancelBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12\x46\n\x05\x42\x61tch\x12\x1c.buildbucket.v2.BatchRequest\x1a\x1d.buildbucket.v2.BatchResponse\"\x00\x12J\n\x0b\x43reateBuild\x12\".buildbucket.v2.CreateBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12R\n\x0fSynthesizeBuild\x12&.buildbucket.v2.SynthesizeBuildRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12P\n\x0eGetBuildStatus\x12%.buildbucket.v2.GetBuildStatusRequest\x1a\x15.buildbucket.v2.Build\"\x00\x12U\n\nStartBuild\x12!.buildbucket.v2.StartBuildRequest\x1a\".buildbucket.v2.StartBuildResponse\"\x00\x12\x61\n\x0eStartBuildTask\x12%.buildbucket.v2.StartBuildTaskRequest\x1a&.buildbucket.v2.StartBuildTaskResponse\"\x00\x42\x36Z4go.chromium.org/luci/buildbucket/proto;buildbucketpbb\x06proto3'
   ,
-  dependencies=[google_dot_api_dot_field__behavior__pb2.DESCRIPTOR,google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_field__mask__pb2.DESCRIPTOR,google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,google_dot_rpc_dot_status__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_build__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_builder__common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_notification__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_common_dot_proto_dot_structmask_dot_structmask__pb2.DESCRIPTOR,])
+  dependencies=[google_dot_api_dot_field__behavior__pb2.DESCRIPTOR,google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_field__mask__pb2.DESCRIPTOR,google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,google_dot_rpc_dot_status__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_build__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_builder__common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_launcher__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_notification__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2.DESCRIPTOR,go_dot_chromium_dot_org_dot_luci_dot_common_dot_proto_dot_structmask_dot_structmask__pb2.DESCRIPTOR,])
 
 
 
@@ -92,8 +93,8 @@ _GETBUILDREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=573,
-  serialized_end=757,
+  serialized_start=628,
+  serialized_end=812,
 )
 
 
@@ -152,8 +153,8 @@ _SEARCHBUILDSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=760,
-  serialized_end=960,
+  serialized_start=815,
+  serialized_end=1015,
 )
 
 
@@ -191,8 +192,8 @@ _SEARCHBUILDSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=962,
-  serialized_end=1048,
+  serialized_start=1017,
+  serialized_end=1103,
 )
 
 
@@ -256,8 +257,8 @@ _BATCHREQUEST_REQUEST = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=1124,
-  serialized_end=1451,
+  serialized_start=1179,
+  serialized_end=1506,
 )
 
 _BATCHREQUEST = _descriptor.Descriptor(
@@ -287,8 +288,8 @@ _BATCHREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1051,
-  serialized_end=1451,
+  serialized_start=1106,
+  serialized_end=1506,
 )
 
 
@@ -359,8 +360,8 @@ _BATCHRESPONSE_RESPONSE = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=1531,
-  serialized_end=1844,
+  serialized_start=1586,
+  serialized_end=1899,
 )
 
 _BATCHRESPONSE = _descriptor.Descriptor(
@@ -390,8 +391,8 @@ _BATCHRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1454,
-  serialized_end=1844,
+  serialized_start=1509,
+  serialized_end=1899,
 )
 
 
@@ -443,8 +444,8 @@ _UPDATEBUILDREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1847,
-  serialized_end=2043,
+  serialized_start=1902,
+  serialized_end=2098,
 )
 
 
@@ -482,8 +483,8 @@ _SCHEDULEBUILDREQUEST_EXPERIMENTSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3157,
-  serialized_end=3207,
+  serialized_start=3284,
+  serialized_end=3334,
 )
 
 _SCHEDULEBUILDREQUEST_SWARMING = _descriptor.Descriptor(
@@ -513,8 +514,32 @@ _SCHEDULEBUILDREQUEST_SWARMING = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3209,
-  serialized_end=3242,
+  serialized_start=3336,
+  serialized_end=3369,
+)
+
+_SCHEDULEBUILDREQUEST_SHADOWINPUT = _descriptor.Descriptor(
+  name='ShadowInput',
+  full_name='buildbucket.v2.ScheduleBuildRequest.ShadowInput',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=3371,
+  serialized_end=3384,
 )
 
 _SCHEDULEBUILDREQUEST = _descriptor.Descriptor(
@@ -693,10 +718,17 @@ _SCHEDULEBUILDREQUEST = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='shadow_input', full_name='buildbucket.v2.ScheduleBuildRequest.shadow_input', index=24,
+      number=23, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
-  nested_types=[_SCHEDULEBUILDREQUEST_EXPERIMENTSENTRY, _SCHEDULEBUILDREQUEST_SWARMING, ],
+  nested_types=[_SCHEDULEBUILDREQUEST_EXPERIMENTSENTRY, _SCHEDULEBUILDREQUEST_SWARMING, _SCHEDULEBUILDREQUEST_SHADOWINPUT, ],
   enum_types=[
   ],
   serialized_options=None,
@@ -705,8 +737,8 @@ _SCHEDULEBUILDREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=2046,
-  serialized_end=3242,
+  serialized_start=2101,
+  serialized_end=3384,
 )
 
 
@@ -758,8 +790,8 @@ _CANCELBUILDREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3245,
-  serialized_end=3392,
+  serialized_start=3387,
+  serialized_end=3534,
 )
 
 
@@ -804,8 +836,8 @@ _CREATEBUILDREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3394,
-  serialized_end=3518,
+  serialized_start=3536,
+  serialized_end=3660,
 )
 
 
@@ -843,8 +875,8 @@ _SYNTHESIZEBUILDREQUEST_EXPERIMENTSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3157,
-  serialized_end=3207,
+  serialized_start=3284,
+  serialized_end=3334,
 )
 
 _SYNTHESIZEBUILDREQUEST = _descriptor.Descriptor(
@@ -888,8 +920,8 @@ _SYNTHESIZEBUILDREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3521,
-  serialized_end=3746,
+  serialized_start=3663,
+  serialized_end=3888,
 )
 
 
@@ -934,8 +966,8 @@ _STARTBUILDREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3748,
-  serialized_end=3837,
+  serialized_start=3890,
+  serialized_end=3979,
 )
 
 
@@ -973,8 +1005,8 @@ _STARTBUILDRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3839,
-  serialized_end=3925,
+  serialized_start=3981,
+  serialized_end=4067,
 )
 
 
@@ -1019,8 +1051,8 @@ _GETBUILDSTATUSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=3927,
-  serialized_end=4028,
+  serialized_start=4069,
+  serialized_end=4170,
 )
 
 
@@ -1086,8 +1118,8 @@ _BUILDMASK = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4031,
-  serialized_end=4306,
+  serialized_start=4173,
+  serialized_end=4448,
 )
 
 
@@ -1202,8 +1234,8 @@ _BUILDPREDICATE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4309,
-  serialized_end=4811,
+  serialized_start=4451,
+  serialized_end=4953,
 )
 
 
@@ -1241,35 +1273,35 @@ _BUILDRANGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4813,
-  serialized_end=4871,
+  serialized_start=4955,
+  serialized_end=5013,
 )
 
 
-_REGISTERBUILDTASKREQUEST = _descriptor.Descriptor(
-  name='RegisterBuildTaskRequest',
-  full_name='buildbucket.v2.RegisterBuildTaskRequest',
+_STARTBUILDTASKREQUEST = _descriptor.Descriptor(
+  name='StartBuildTaskRequest',
+  full_name='buildbucket.v2.StartBuildTaskRequest',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='request_id', full_name='buildbucket.v2.RegisterBuildTaskRequest.request_id', index=0,
+      name='request_id', full_name='buildbucket.v2.StartBuildTaskRequest.request_id', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=b'\340A\002', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='build_id', full_name='buildbucket.v2.RegisterBuildTaskRequest.build_id', index=1,
+      name='build_id', full_name='buildbucket.v2.StartBuildTaskRequest.build_id', index=1,
       number=2, type=3, cpp_type=2, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=b'\340A\002', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='task', full_name='buildbucket.v2.RegisterBuildTaskRequest.task', index=2,
+      name='task', full_name='buildbucket.v2.StartBuildTaskRequest.task', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -1287,22 +1319,29 @@ _REGISTERBUILDTASKREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4873,
-  serialized_end=4988,
+  serialized_start=5015,
+  serialized_end=5127,
 )
 
 
-_REGISTERBUILDTASKRESPONSE = _descriptor.Descriptor(
-  name='RegisterBuildTaskResponse',
-  full_name='buildbucket.v2.RegisterBuildTaskResponse',
+_STARTBUILDTASKRESPONSE = _descriptor.Descriptor(
+  name='StartBuildTaskResponse',
+  full_name='buildbucket.v2.StartBuildTaskResponse',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='update_build_task_token', full_name='buildbucket.v2.RegisterBuildTaskResponse.update_build_task_token', index=0,
-      number=1, type=9, cpp_type=9, label=1,
+      name='secrets', full_name='buildbucket.v2.StartBuildTaskResponse.secrets', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='pubsub_topic', full_name='buildbucket.v2.StartBuildTaskResponse.pubsub_topic', index=1,
+      number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -1319,8 +1358,8 @@ _REGISTERBUILDTASKRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=4990,
-  serialized_end=5050,
+  serialized_start=5129,
+  serialized_end=5222,
 )
 
 _GETBUILDREQUEST.fields_by_name['builder'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_builder__common__pb2._BUILDERID
@@ -1384,6 +1423,7 @@ _UPDATEBUILDREQUEST.fields_by_name['fields'].message_type = google_dot_protobuf_
 _UPDATEBUILDREQUEST.fields_by_name['mask'].message_type = _BUILDMASK
 _SCHEDULEBUILDREQUEST_EXPERIMENTSENTRY.containing_type = _SCHEDULEBUILDREQUEST
 _SCHEDULEBUILDREQUEST_SWARMING.containing_type = _SCHEDULEBUILDREQUEST
+_SCHEDULEBUILDREQUEST_SHADOWINPUT.containing_type = _SCHEDULEBUILDREQUEST
 _SCHEDULEBUILDREQUEST.fields_by_name['builder'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_builder__common__pb2._BUILDERID
 _SCHEDULEBUILDREQUEST.fields_by_name['canary'].enum_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2._TRINARY
 _SCHEDULEBUILDREQUEST.fields_by_name['experimental'].enum_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2._TRINARY
@@ -1404,6 +1444,7 @@ _SCHEDULEBUILDREQUEST.fields_by_name['execution_timeout'].message_type = google_
 _SCHEDULEBUILDREQUEST.fields_by_name['grace_period'].message_type = google_dot_protobuf_dot_duration__pb2._DURATION
 _SCHEDULEBUILDREQUEST.fields_by_name['can_outlive_parent'].enum_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2._TRINARY
 _SCHEDULEBUILDREQUEST.fields_by_name['retriable'].enum_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2._TRINARY
+_SCHEDULEBUILDREQUEST.fields_by_name['shadow_input'].message_type = _SCHEDULEBUILDREQUEST_SHADOWINPUT
 _CANCELBUILDREQUEST.fields_by_name['fields'].message_type = google_dot_protobuf_dot_field__mask__pb2._FIELDMASK
 _CANCELBUILDREQUEST.fields_by_name['mask'].message_type = _BUILDMASK
 _CREATEBUILDREQUEST.fields_by_name['build'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_build__pb2._BUILD
@@ -1426,7 +1467,8 @@ _BUILDPREDICATE.fields_by_name['tags'].message_type = go_dot_chromium_dot_org_do
 _BUILDPREDICATE.fields_by_name['create_time'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2._TIMERANGE
 _BUILDPREDICATE.fields_by_name['build'].message_type = _BUILDRANGE
 _BUILDPREDICATE.fields_by_name['canary'].enum_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_common__pb2._TRINARY
-_REGISTERBUILDTASKREQUEST.fields_by_name['task'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2._TASK
+_STARTBUILDTASKREQUEST.fields_by_name['task'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_task__pb2._TASK
+_STARTBUILDTASKRESPONSE.fields_by_name['secrets'].message_type = go_dot_chromium_dot_org_dot_luci_dot_buildbucket_dot_proto_dot_launcher__pb2._BUILDSECRETS
 DESCRIPTOR.message_types_by_name['GetBuildRequest'] = _GETBUILDREQUEST
 DESCRIPTOR.message_types_by_name['SearchBuildsRequest'] = _SEARCHBUILDSREQUEST
 DESCRIPTOR.message_types_by_name['SearchBuildsResponse'] = _SEARCHBUILDSRESPONSE
@@ -1443,8 +1485,8 @@ DESCRIPTOR.message_types_by_name['GetBuildStatusRequest'] = _GETBUILDSTATUSREQUE
 DESCRIPTOR.message_types_by_name['BuildMask'] = _BUILDMASK
 DESCRIPTOR.message_types_by_name['BuildPredicate'] = _BUILDPREDICATE
 DESCRIPTOR.message_types_by_name['BuildRange'] = _BUILDRANGE
-DESCRIPTOR.message_types_by_name['RegisterBuildTaskRequest'] = _REGISTERBUILDTASKREQUEST
-DESCRIPTOR.message_types_by_name['RegisterBuildTaskResponse'] = _REGISTERBUILDTASKRESPONSE
+DESCRIPTOR.message_types_by_name['StartBuildTaskRequest'] = _STARTBUILDTASKREQUEST
+DESCRIPTOR.message_types_by_name['StartBuildTaskResponse'] = _STARTBUILDTASKRESPONSE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 GetBuildRequest = _reflection.GeneratedProtocolMessageType('GetBuildRequest', (_message.Message,), {
@@ -1520,6 +1562,13 @@ ScheduleBuildRequest = _reflection.GeneratedProtocolMessageType('ScheduleBuildRe
     # @@protoc_insertion_point(class_scope:buildbucket.v2.ScheduleBuildRequest.Swarming)
     })
   ,
+
+  'ShadowInput' : _reflection.GeneratedProtocolMessageType('ShadowInput', (_message.Message,), {
+    'DESCRIPTOR' : _SCHEDULEBUILDREQUEST_SHADOWINPUT,
+    '__module__' : 'go.chromium.org.luci.buildbucket.proto.builds_service_pb2'
+    # @@protoc_insertion_point(class_scope:buildbucket.v2.ScheduleBuildRequest.ShadowInput)
+    })
+  ,
   'DESCRIPTOR' : _SCHEDULEBUILDREQUEST,
   '__module__' : 'go.chromium.org.luci.buildbucket.proto.builds_service_pb2'
   # @@protoc_insertion_point(class_scope:buildbucket.v2.ScheduleBuildRequest)
@@ -1527,6 +1576,7 @@ ScheduleBuildRequest = _reflection.GeneratedProtocolMessageType('ScheduleBuildRe
 _sym_db.RegisterMessage(ScheduleBuildRequest)
 _sym_db.RegisterMessage(ScheduleBuildRequest.ExperimentsEntry)
 _sym_db.RegisterMessage(ScheduleBuildRequest.Swarming)
+_sym_db.RegisterMessage(ScheduleBuildRequest.ShadowInput)
 
 CancelBuildRequest = _reflection.GeneratedProtocolMessageType('CancelBuildRequest', (_message.Message,), {
   'DESCRIPTOR' : _CANCELBUILDREQUEST,
@@ -1599,19 +1649,19 @@ BuildRange = _reflection.GeneratedProtocolMessageType('BuildRange', (_message.Me
   })
 _sym_db.RegisterMessage(BuildRange)
 
-RegisterBuildTaskRequest = _reflection.GeneratedProtocolMessageType('RegisterBuildTaskRequest', (_message.Message,), {
-  'DESCRIPTOR' : _REGISTERBUILDTASKREQUEST,
+StartBuildTaskRequest = _reflection.GeneratedProtocolMessageType('StartBuildTaskRequest', (_message.Message,), {
+  'DESCRIPTOR' : _STARTBUILDTASKREQUEST,
   '__module__' : 'go.chromium.org.luci.buildbucket.proto.builds_service_pb2'
-  # @@protoc_insertion_point(class_scope:buildbucket.v2.RegisterBuildTaskRequest)
+  # @@protoc_insertion_point(class_scope:buildbucket.v2.StartBuildTaskRequest)
   })
-_sym_db.RegisterMessage(RegisterBuildTaskRequest)
+_sym_db.RegisterMessage(StartBuildTaskRequest)
 
-RegisterBuildTaskResponse = _reflection.GeneratedProtocolMessageType('RegisterBuildTaskResponse', (_message.Message,), {
-  'DESCRIPTOR' : _REGISTERBUILDTASKRESPONSE,
+StartBuildTaskResponse = _reflection.GeneratedProtocolMessageType('StartBuildTaskResponse', (_message.Message,), {
+  'DESCRIPTOR' : _STARTBUILDTASKRESPONSE,
   '__module__' : 'go.chromium.org.luci.buildbucket.proto.builds_service_pb2'
-  # @@protoc_insertion_point(class_scope:buildbucket.v2.RegisterBuildTaskResponse)
+  # @@protoc_insertion_point(class_scope:buildbucket.v2.StartBuildTaskResponse)
   })
-_sym_db.RegisterMessage(RegisterBuildTaskResponse)
+_sym_db.RegisterMessage(StartBuildTaskResponse)
 
 
 DESCRIPTOR._options = None
@@ -1626,9 +1676,9 @@ _SYNTHESIZEBUILDREQUEST_EXPERIMENTSENTRY._options = None
 _STARTBUILDREQUEST.fields_by_name['request_id']._options = None
 _STARTBUILDREQUEST.fields_by_name['build_id']._options = None
 _STARTBUILDREQUEST.fields_by_name['task_id']._options = None
-_REGISTERBUILDTASKREQUEST.fields_by_name['request_id']._options = None
-_REGISTERBUILDTASKREQUEST.fields_by_name['build_id']._options = None
-_REGISTERBUILDTASKREQUEST.fields_by_name['task']._options = None
+_STARTBUILDTASKREQUEST.fields_by_name['request_id']._options = None
+_STARTBUILDTASKREQUEST.fields_by_name['build_id']._options = None
+_STARTBUILDTASKREQUEST.fields_by_name['task']._options = None
 
 _BUILDS = _descriptor.ServiceDescriptor(
   name='Builds',
@@ -1637,8 +1687,8 @@ _BUILDS = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=5053,
-  serialized_end=5965,
+  serialized_start=5225,
+  serialized_end=6128,
   methods=[
   _descriptor.MethodDescriptor(
     name='GetBuild',
@@ -1741,12 +1791,12 @@ _BUILDS = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
-    name='RegisterBuildTask',
-    full_name='buildbucket.v2.Builds.RegisterBuildTask',
+    name='StartBuildTask',
+    full_name='buildbucket.v2.Builds.StartBuildTask',
     index=10,
     containing_service=None,
-    input_type=_REGISTERBUILDTASKREQUEST,
-    output_type=_REGISTERBUILDTASKRESPONSE,
+    input_type=_STARTBUILDTASKREQUEST,
+    output_type=_STARTBUILDTASKRESPONSE,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),

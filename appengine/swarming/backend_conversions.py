@@ -10,10 +10,12 @@ import logging
 
 from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
-from google.protobuf import json_format
+from google.protobuf import struct_pb2, json_format
+from google.rpc import status_pb2
 
 import handlers_exceptions
 from components import utils
+from components.prpc import codes
 from server import task_request
 from server import task_result
 
@@ -240,6 +242,91 @@ def convert_results_to_tasks(task_results, task_ids):
     # TODO(crbug/1236848): Fill Task.details.
     tasks.append(task)
   return tasks
+
+
+def convert_backend_task_details(bot_dimensions):
+  # type: dict -> struct_pb2.Struct
+  """Converts bot_dimensions to task_pb2.Task.Details"""
+  task_details_struct = struct_pb2.Struct()
+  if bot_dimensions:
+    json_format.ParseDict({"bot_dimensions": bot_dimensions},
+                          task_details_struct)
+  return task_details_struct
+
+
+def convert_results_to_fetch_tasks_responses(task_results, build_tasks,
+                                             task_ids):
+  # type: (
+  #     Sequence[Union[task_result._TaskResultCommon, None]],
+  #     Sequence[Union[task_request.BuildTask, None]],
+  #     Sequence[str],
+  # )
+  #     -> (Sequence[backend_pb2.FetchTasksResponse.Response]
+  """Converts the given task results to FetchTasksResponse.Responses.
+
+  The length and order of `responses` is expected to match those of
+  `task_ids`.
+
+  Raises:
+    handlers_exceptions.InternalException if task_results and build_tasks have
+    different lengths.
+  """
+  if len(task_results) != len(build_tasks):
+    logging.error('got %d task_results while %d build_tasks', len(task_results),
+                  len(build_tasks))
+    raise handlers_exceptions.InternalException(
+        'task results and build tasks mismatch')
+
+  responses = []
+
+  for i, result in enumerate(task_results):
+    if result is None:
+      response = backend_pb2.FetchTasksResponse.Response(
+          error=status_pb2.Status(
+              code=codes.StatusCode.NOT_FOUND.value,
+              message='Swarming task %s not found' % task_ids[i],
+          ), )
+      responses.append(response)
+      continue
+
+    build_task = build_tasks[i]
+    if build_task is None:
+      response = backend_pb2.FetchTasksResponse.Response(
+          error=status_pb2.Status(
+              code=codes.StatusCode.NOT_FOUND.value,
+              message='Backend task %s not found' % task_ids[i],
+          ), )
+      responses.append(response)
+      continue
+
+    # Need to try to get bot_dimensions from build_task first, if not get it
+    # from result.
+    if build_task.bot_dimensions:
+      bot_dimensions = build_task.bot_dimensions
+    else:
+      bot_dimensions = result.bot_dimensions
+
+    task = task_pb2.Task(
+        id=task_pb2.TaskID(
+            target='swarming://%s' % app_identity.get_application_id(),
+            id=task_ids[i],
+        ),
+        update_id=build_task.update_id,
+        details=convert_backend_task_details(bot_dimensions),
+    )
+    convert_task_state_to_status(result.state, result.failure, task)
+
+    if task.status == common_pb2.STATUS_UNSPECIFIED:
+      response = backend_pb2.FetchTasksResponse.Response(
+          error=status_pb2.Status(
+              code=codes.StatusCode.INTERNAL.value,
+              message='Unexpected state for task %s' % task_ids[i],
+          ), )
+    else:
+      response = backend_pb2.FetchTasksResponse.Response(task=task)
+
+    responses.append(response)
+  return responses
 
 
 def convert_task_state_to_status(state, failure, task):

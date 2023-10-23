@@ -19,7 +19,6 @@ import uuid
 
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
-from google.protobuf import struct_pb2, json_format
 
 from components import auth
 from components import datastore_utils
@@ -674,18 +673,15 @@ def _buildbucket_update(request_key, run_result_state, update_id):
   else:
     bot_dimensions = result_summary.bot_dimensions
 
-  task_details_struct = struct_pb2.Struct()
-  if bot_dimensions:
-    json_format.ParseDict({"bot_dimensions": bot_dimensions},
-                          task_details_struct)
   task_id = task_pack.pack_result_summary_key(
       task_pack.request_key_to_result_summary_key(request_key))
-  bb_task = task_pb2.Task(id=task_pb2.TaskID(
-      id=task_id,
-      target="swarming://%s" % app_identity.get_application_id(),
-  ),
-                          update_id=update_id,
-                          details=task_details_struct)
+  bb_task = task_pb2.Task(
+      id=task_pb2.TaskID(id=task_id,
+                         target="swarming://%s" %
+                         app_identity.get_application_id()),
+      update_id=update_id,
+      details=backend_conversions.convert_backend_task_details(bot_dimensions),
+  )
   backend_conversions.convert_task_state_to_status(run_result_state,
                                                    result_summary.failure,
                                                    bb_task)
