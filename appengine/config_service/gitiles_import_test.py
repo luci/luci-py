@@ -27,7 +27,6 @@ from test_support import test_case
 
 import admin
 import gitiles_import
-import notifications
 import projects
 import storage
 import validation
@@ -176,7 +175,6 @@ class GitilesImportTestCase(test_case.TestCase):
 
   def test_import_invalid_revision(self):
     self.mock_get_archive()
-    self.mock(notifications, 'notify_gitiles_rejection', mock.Mock())
 
     def validate_config(config_set, filename, content, ctx):
       _, _ = config_set, content
