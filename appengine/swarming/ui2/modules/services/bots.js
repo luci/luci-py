@@ -22,7 +22,7 @@ export class BotsService extends PrpcService {
    *
    *  @returns {Object} object with information about the bot in question.
    */
-  getBot(botId) {
+  bot(botId) {
     return this._call("GetBot", { bot_id: botId });
   }
 
@@ -34,7 +34,7 @@ export class BotsService extends PrpcService {
    *
    *  @returns {Object} object containing both items and cursor fields. `items` contains a list of tasks associated with the Bot and `cursor` is a db cursor from the previous request.
    */
-  getTasks(botId, cursor) {
+  tasks(botId, cursor) {
     const request = {
       sort: QUERY_START_TS,
       state: QUERY_ALL,

@@ -24,7 +24,7 @@ import {
   siblingBotsLink,
 } from "./bot-page-helpers";
 import { stateClass as taskClass } from "../task-page/task-page-helpers";
-import { timeDiffApprox, timeDiffExact, taskPageLink } from "../util";
+import { timeDiffApprox, timeDiffExact, taskPageLink, humanize } from "../util";
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 
 /**
@@ -72,7 +72,7 @@ const statusAndTask = (ele, bot) => {
     </tr>
     <tr class=${bot.isDead ? "dead" : ""}>
       <td>Last Seen</td>
-      <td title=${bot.human_lastSeenTs}>
+      <td title=${bot.humanized.lastSeenTs}>
         ${timeDiffExact(bot.lastSeenTs)} ago
       </td>
       <td>
@@ -171,7 +171,7 @@ const dataAndMPBlock = (ele, bot) => html`
   </tr>
   <tr title="First time ever a bot with this id contacted the server.">
     <td>First seen</td>
-    <td colspan="2" title=${bot.human_firstSeenTs}>
+    <td colspan="2" title=${bot.humanized.firstSeenTs}>
       ${timeDiffApprox(bot.firstSeenTs)} ago
     </td>
   </tr>
@@ -271,9 +271,9 @@ const taskRow = (task) => html`
         ${task.name}
       </a>
     </td>
-    <td>${task.human_startedTs}</td>
-    <td title=${task.human_completedTs}>${task.human_total_duration}</td>
-    <td>${task.human_state}</td>
+    <td>${task.humanized.time.startedTs}</td>
+    <td title=${task.humanized.time.completedTs}>${task.humanTotalDuration}</td>
+    <td>${task.humanState}</td>
   </tr>
 `;
 
@@ -329,7 +329,7 @@ const eventRow = (event, showAll, serverVersion) => {
   return html` <tr>
     <td class="message">${msg}</td>
     <td>${event.eventType}</td>
-    <td>${event.human_ts}</td>
+    <td>${event.humanized.time.ts}</td>
     <td>
       <a target="_blank" rel="noopener" href=${taskPageLink(event.taskId)}>
         ${event.taskId}
@@ -447,7 +447,7 @@ window.customElements.define(
         }
       );
 
-      this._bot = {};
+      this._bot = humanize({});
       this._notFound = false;
       this._tasks = [];
       this._events = [];
@@ -521,7 +521,7 @@ window.customElements.define(
       this.app.addBusyTasks(1);
       const botService = this._createBotService();
       botService
-        .getBot(this._botId)
+        .bot(this._botId)
         .then((resp) => {
           this._notFound = false;
           this._bot = parseBotData(resp);
@@ -530,7 +530,7 @@ window.customElements.define(
         })
         .catch((e) => {
           if (e.codeName === "NOT_FOUND") {
-            this._bot = {};
+            this._bot = humanize({});
             this._notFound = true;
             this.render();
           }
@@ -539,7 +539,7 @@ window.customElements.define(
       if (!this._taskCursor) {
         this.app.addBusyTasks(1);
         botService
-          .getTasks(this._botId, this._taskCursor)
+          .tasks(this._botId, this._taskCursor)
           .then((resp) => {
             this._taskCursor = resp.cursor;
             this._tasks = parseTasks(resp.items);
@@ -602,7 +602,7 @@ window.customElements.define(
       }
       this.app.addBusyTasks(1);
       this._createBotService()
-        .getTasks(this._botId, this._taskCursor)
+        .tasks(this._botId, this._taskCursor)
         .then((resp) => {
           this._taskCursor = resp.cursor;
           this._tasks.push(...parseTasks(resp.items));

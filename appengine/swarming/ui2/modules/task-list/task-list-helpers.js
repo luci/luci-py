@@ -324,6 +324,7 @@ export function processTasks(arr, existingTags) {
   const now = new Date();
 
   for (const task of arr) {
+    sanitizeAndHumanizeTime(task, TASK_TIMES);
     const tagMap = {};
     task.tags = task.tags || [];
     for (const tag of task.tags) {
@@ -355,32 +356,28 @@ export function processTasks(arr, existingTags) {
       task.costSavedUsd = "-$" + task.costSavedUsd.toFixed(4);
     }
 
-    for (const time of TASK_TIMES) {
-      sanitizeAndHumanizeTime(task, time);
+    // Running tasks have no duration set, so we can figure it out.
+    if (!task.duration && task.state === "RUNNING" && task.startedTs) {
+      task.duration = (now - task.startedTs) / 1000;
+    }
+    // Make the duration human readable
+    task.humanDuration = humanDuration(task.duration);
+    if (task.state === "RUNNING" && task.startedTs) {
+      task.humanDuration = task.humanDuration + "*";
+    }
 
-      // Running tasks have no duration set, so we can figure it out.
-      if (!task.duration && task.state === "RUNNING" && task.startedTs) {
-        task.duration = (now - task.startedTs) / 1000;
-      }
-      // Make the duration human readable
-      task.human_duration = humanDuration(task.duration);
-      if (task.state === "RUNNING" && task.startedTs) {
-        task.human_duration = task.human_duration + "*";
-      }
+    // Deduplicated tasks usually have tasks that ended before they were
+    // created, so we need to account for that.
+    const et = task.startedTs || task.abandonedTs || new Date();
+    const deduped = task.createdTs && et < task.createdTs;
 
-      // Deduplicated tasks usually have tasks that ended before they were
-      // created, so we need to account for that.
-      const et = task.startedTs || task.abandonedTs || new Date();
-      const deduped = task.createdTs && et < task.createdTs;
-
-      task.pendingTime = undefined;
-      if (!deduped && task.createdTs) {
-        task.pendingTime = (et - task.createdTs) / 1000;
-      }
-      task.human_pendingTime = humanDuration(task.pendingTime);
-      if (!deduped && task.createdTs && !task.startedTs && !task.abandonedTs) {
-        task.human_pendingTime = task.human_pendingTime + "*";
-      }
+    task.pendingTime = undefined;
+    if (!deduped && task.createdTs) {
+      task.pendingTime = (et - task.createdTs) / 1000;
+    }
+    task.humanPendingTime = humanDuration(task.pendingTime);
+    if (!deduped && task.createdTs && !task.startedTs && !task.abandonedTs) {
+      task.humanPendingTime = task.humanPendingTime + "*";
     }
   }
   return arr;
@@ -559,7 +556,7 @@ const STILL_RUNNING_MSG =
   "and thus the time is dynamic.";
 
 const colMap = {
-  abandonedTs: (task) => task.human_abandonedTs,
+  abandonedTs: (task) => task.humanized.time.abandonedTs,
   bot: (task) => {
     const id = task.botId;
     if (id) {
@@ -569,24 +566,24 @@ const colMap = {
     }
     return EMPTY_VAL;
   },
-  completedTs: (task) => task.human_completedTs,
+  completedTs: (task) => task.humanized.time.completedTs,
   costsUsd: function (task) {
     if (task.costSavedUsd) {
       return task.costSavedUsd;
     }
     return task.costsUsd;
   },
-  createdTs: (task) => task.human_createdTs,
+  createdTs: (task) => task.humanized.time.createdTs,
   duration: (task) => {
-    if (task.human_duration.indexOf("*")) {
+    if (task.humanDuration.indexOf("*")) {
       return html`<span title=${STILL_RUNNING_MSG}
-        >${task.human_duration}</span
+        >${task.humanDuration}</span
       >`;
     }
-    return task.human_duration;
+    return task.humanDuration;
   },
   exitCode: (task) => task.exitCode || "--",
-  modifiedTs: (task) => task.human_modifiedTs,
+  modifiedTs: (task) => task.humanized.time.modifiedTs,
   name: (task, ele) => {
     let name = task.name;
     if (!ele._verbose && task.name.length > 70) {
@@ -601,18 +598,18 @@ const colMap = {
     >`;
   },
   pendingTime: (task) => {
-    if (task.human_pendingTime.indexOf("*")) {
+    if (task.humanPendingTime.indexOf("*")) {
       return html`<span title=${STILL_RUNNING_MSG}
-        >${task.human_pendingTime}</span
+        >${task.humanPendingTime}</span
       >`;
     }
-    return task.human_pendingTime;
+    return task.humanPendingTime;
   },
   sourceRevision: (task) => {
     const r = task.sourceRevision;
     return r.substring(0, 8);
   },
-  startedTs: (task) => task.human_startedTs,
+  startedTs: (task) => task.humanized.time.startedTs,
   state: (task) => {
     const state = task.state;
     if (state === "COMPLETED") {

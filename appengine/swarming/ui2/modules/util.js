@@ -166,37 +166,6 @@ export function parseDuration(duration) {
   return number;
 }
 
-/** sanitizeAndHumanizeTime parses a date string or ms_since_epoch into a JS
- *  Date object, assuming UTC time. It also creates a human readable form in
- *  the obj under a key with a human_ prefix.  E.g.
- *  sanitizeAndHumanizeTime(foo, 'some_ts')
- *  parses the string/int at foo['some_ts'] such that foo['some_ts'] is now a
- *  Date object and foo['human_some_ts'] is the human formated version from
- *  human.localeTime.
- */
-export function sanitizeAndHumanizeTime(obj, key) {
-  // TODO(jonahhooper) replace this method in all places with the `humanize` mixin...
-  obj["human_" + key] = "--";
-  if (obj[key]) {
-    if (obj[key].endsWith && !obj[key].endsWith("Z")) {
-      // Timestamps from the server are missing the 'Z' that specifies Zulu
-      // (UTC) time. If that's not the case, add the Z. Otherwise, some
-      // browsers interpret this as local time, which throws off everything.
-      // TODO(kjlubick): Should the server output milliseconds since the
-      // epoch?  That would be more consistent.
-      // See http://crbug.com/714599
-      obj[key] += "Z";
-    }
-    obj[key] = new Date(obj[key]);
-
-    // Extract the timezone.
-    const str = obj[key].toString();
-    const timezone = str.substring(str.indexOf("("));
-
-    obj["human_" + key] = obj[key].toLocaleString() + " " + timezone;
-  }
-}
-
 /** taskListLink creates a link to a task list with the preloaded
  *  filters and columns.
  *  @param {Array<String|Object> filters - If Array<Object>, Object
@@ -331,12 +300,11 @@ export function toCamelCase(str) {
 }
 
 /**
- * Provides a human view on time and duration.
+ * Provides a human view on time.
  * For example:
  *
- * baseObject.humanized.time.fieldName
- * or
- * baseObject.humanized.duration.fieldName
+ * baseObject.humanized.time.fieldName will produce a string representation of fieldName
+ * if fieldName is a date.
  *
  * Can be attached to any object as a mixin.
  *
@@ -361,22 +329,34 @@ export class Humanizer {
         return `${value.toLocaleString()} ${timezone}`;
       },
     });
-    this._duration = new Proxy(base, {
-      get(target, prop, receiver) {
-        const value = Reflect.get(target, prop, receiver);
-        if (typeof value === "undefined") {
-          return value;
-        }
-        return humanDuration(value);
-      },
-    });
   }
 
   get time() {
     return this._time;
   }
+}
 
-  get duration() {
-    return this._duration;
+/**
+ * Adds `baseObject.humanize.time.timeField` using the humanizer mixin and converts all time columns to dates.
+ **/
+export function sanitizeAndHumanizeTime(obj, timeFields) {
+  // Gracefully handle an undefined object to be safe.
+  if (typeof obj === "undefined") {
+    return;
   }
+  for (const field of timeFields) {
+    const value = obj[field];
+    if (typeof value === "string") {
+      obj[field] = new Date(value);
+    }
+  }
+  obj.humanized = new Humanizer(obj);
+}
+
+export function humanize(obj) {
+  if (typeof obj === "undefined") {
+    return;
+  }
+  obj.humanized = new Humanizer(obj);
+  return obj;
 }

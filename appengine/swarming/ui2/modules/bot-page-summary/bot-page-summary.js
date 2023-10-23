@@ -276,7 +276,7 @@ window.customElements.define(
         }
         // Look for total_duration (which is computed in bot-page-helpers
         // to include overhead), and fall back to normal duration otherwise.
-        const duration = t.total_duration || t.duration || 0;
+        const duration = t.totalDuration || t.duration || 0;
         totalStats.total_time += duration;
         taskAgg[name].total_time += duration;
         totalStats.total_overhead += t.total_overhead || 0;

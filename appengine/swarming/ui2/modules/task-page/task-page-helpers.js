@@ -5,7 +5,12 @@
 import * as human from "common-sk/modules/human";
 
 import { EXCEPTIONAL_STATES, ONGOING_STATES } from "../task";
-import { humanDuration, sanitizeAndHumanizeTime, timeDiffExact } from "../util";
+import {
+  humanDuration,
+  humanize,
+  sanitizeAndHumanizeTime,
+  timeDiffExact,
+} from "../util";
 
 /** canRetry returns if the given task can be retried.
  *  See https://crbug.com/936530 for one case in which it should not.
@@ -135,8 +140,9 @@ export function isSummaryTask(id) {
  */
 export function parseRequest(request) {
   if (!request) {
-    return {};
+    return humanize({});
   }
+  sanitizeAndHumanizeTime(request, TASK_TIMES);
   request.tagMap = {};
   request.tags = request.tags || [];
   for (const tag of request.tags) {
@@ -145,10 +151,6 @@ export function parseRequest(request) {
     const rest = tag.substring(key.length + 1);
     request.tagMap[key] = rest;
   }
-
-  TASK_TIMES.forEach((time) => {
-    sanitizeAndHumanizeTime(request, time);
-  });
   return request;
 }
 
@@ -156,12 +158,9 @@ export function parseRequest(request) {
  */
 export function parseResult(result) {
   if (!result) {
-    return {};
+    return humanize({});
   }
-  TASK_TIMES.forEach((time) => {
-    sanitizeAndHumanizeTime(result, time);
-  });
-
+  sanitizeAndHumanizeTime(result, TASK_TIMES);
   const now = new Date();
   // Running and bot_died tasks have no duration set, so we can figure it out.
   if (!result.duration && result.state === "RUNNING" && result.startedTs) {
@@ -175,25 +174,25 @@ export function parseResult(result) {
     result.duration = (result.abandonedTs - result.startedTs) / 1000;
   }
   // Make the duration human readable
-  result.human_duration = humanDuration(result.duration);
+  result.humanDuration = humanDuration(result.duration);
   if (result.state === "RUNNING") {
-    result.human_duration += "*";
+    result.humanDuration += "*";
   } else if (result.state === "BOT_DIED") {
-    result.human_duration += " -- died";
+    result.humanDuration += " -- died";
   }
 
   const end = result.startedTs || result.abandonedTs || new Date();
   if (!result.createdTs) {
     // This should never happen
     result.pending = 0;
-    result.human_pending = "";
+    result.humanPending = "";
   } else if (end <= result.createdTs) {
     // In the case of deduplicated tasks, started_ts comes before the task.
     result.pending = 0;
-    result.human_pending = "0s";
+    result.humanPending = "0s";
   } else {
     result.pending = (end - result.createdTs) / 1000; // convert to seconds.
-    result.human_pending = timeDiffExact(result.createdTs, end);
+    result.humanPending = timeDiffExact(result.createdTs, end);
   }
   result.currentTaskSlice = parseInt(result.currentTaskSlice) || 0;
   return result;

@@ -14,7 +14,6 @@ import { html } from "lit-html";
 import naturalSort from "javascript-natural-sort/naturalSort";
 import {
   compareWithFixedOrder,
-  Humanizer,
   sanitizeAndHumanizeTime,
   taskPageLink,
 } from "../util";
@@ -341,7 +340,7 @@ export function processBots(arr) {
   }
   for (const bot of arr) {
     bot.state = (bot.state && JSON.parse(bot.state)) || {};
-    bot.humanized = new Humanizer(bot);
+    sanitizeAndHumanizeTime(bot, BOT_TIMES);
     // get the disks in an easier to deal with format, sorted by size.
     const disks = bot.state.disks || {};
     const keys = Object.keys(disks);
@@ -394,10 +393,6 @@ export function processBots(arr) {
       return 0;
     });
     bot.state.devices = devices;
-
-    for (const time of BOT_TIMES) {
-      sanitizeAndHumanizeTime(bot, time);
-    }
   }
 
   return arr;

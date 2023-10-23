@@ -17,6 +17,7 @@ export function parseBotData(bot) {
   if (!bot) {
     return {};
   }
+  sanitizeAndHumanizeTime(bot, BOT_TIMES);
   bot.state = bot.state || "{}";
   bot.state = JSON.parse(bot.state) || {};
 
@@ -54,9 +55,6 @@ export function parseBotData(bot) {
     }
   }
 
-  for (const time of BOT_TIMES) {
-    sanitizeAndHumanizeTime(bot, time);
-  }
   return bot;
 }
 
@@ -68,7 +66,7 @@ export function parseEvents(events) {
     return [];
   }
   for (const event of events) {
-    sanitizeAndHumanizeTime(event, "ts");
+    sanitizeAndHumanizeTime(event, ["ts"]);
     event.state = event.state ? JSON.parse(event.state) : {};
   }
 
@@ -108,32 +106,30 @@ export function parseTasks(tasks) {
     return [];
   }
   for (const task of tasks) {
-    for (const time of TASK_TIMES) {
-      sanitizeAndHumanizeTime(task, time);
-    }
+    sanitizeAndHumanizeTime(task, TASK_TIMES);
     if (task.duration) {
       // Task is finished
-      task.human_duration = humanDuration(task.duration);
+      task.humanDuration = humanDuration(task.duration);
     } else {
       const end = getEnd(task);
-      task.human_duration = timeDiffExact(task.startedTs, end);
+      task.humanDuration = timeDiffExact(task.startedTs, end);
       task.duration = (end.getTime() - task.startedTs) / 1000;
     }
     const totalOverhead =
       (task.performanceStats && task.performanceStats.botOverhead) || 0;
     // total_duration includes overhead, to give a better sense of the bot
     // being 'busy', e.g. when uploading isolated outputs.
-    task.total_duration = task.duration + totalOverhead;
-    task.human_total_duration = humanDuration(task.total_duration);
+    task.totalDuration = task.duration + totalOverhead;
+    task.humanTotalDuration = humanDuration(task.totalDuration);
     task.total_overhead = totalOverhead;
 
-    task.human_state = task.state || "UNKNOWN";
+    task.humanState = task.state || "UNKNOWN";
     if (task.state === "COMPLETED") {
       // use SUCCESS or FAILURE in ambiguous COMPLETED case.
       if (task.failure) {
-        task.human_state = "FAILURE";
+        task.humanState = "FAILURE";
       } else if (task.state !== "RUNNING") {
-        task.human_state = "SUCCESS";
+        task.humanState = "SUCCESS";
       }
     }
   }

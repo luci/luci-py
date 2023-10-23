@@ -46,6 +46,7 @@ import {
   taskListLink,
   taskPageLink,
   b64toUtf8,
+  humanize,
 } from "../util";
 
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
@@ -289,7 +290,7 @@ const stateLoadBlock = (ele, request, result) =>
     </tr>
     <tr ?hidden=${!result.dedupedFrom}>
       <td>Deduped On</td>
-      <td title=${request.createdTs}>${request.human_createdTs}</td>
+      <td title=${request.createdTs}>${request.humanized.time.createdTs}</td>
     </tr>
   `;
 const countBlocks = (
@@ -693,11 +694,15 @@ const taskTimingSection = (ele, request, result) => {
         <tbody>
           <tr>
             <td>Created</td>
-            <td title=${request.createdTs}>${request.human_createdTs}</td>
+            <td title=${request.createdTs}>
+              ${request.humanized.time.createdTs}
+            </td>
           </tr>
           <tr ?hidden=${!wasPickedUp(result)}>
             <td>Started</td>
-            <td title=${result.startedTs}>${result.human_startedTs}</td>
+            <td title=${result.startedTs}>
+              ${result.humanized.time.startedTs}
+            </td>
           </tr>
           <tr>
             <td>Scheduling Deadline</td>
@@ -705,19 +710,25 @@ const taskTimingSection = (ele, request, result) => {
           </tr>
           <tr ?hidden=${!result.completedTs}>
             <td>Completed</td>
-            <td title=${result.completedTs}>${result.human_completedTs}</td>
+            <td title=${result.completedTs}>
+              ${result.humanized.time.completedTs}
+            </td>
           </tr>
           <tr ?hidden=${!result.abandonedTs}>
             <td>Abandoned</td>
-            <td title=${result.abandonedTs}>${result.human_abandonedTs}</td>
+            <td title=${result.abandonedTs}>
+              ${result.humanized.time.abandonedTs}
+            </td>
           </tr>
           <tr>
             <td>Last updated</td>
-            <td title=${result.modifiedTs}>${result.human_modifiedTs}</td>
+            <td title=${result.modifiedTs}>
+              ${result.humanized.time.modifiedTs}
+            </td>
           </tr>
           <tr>
             <td>Pending Time</td>
-            <td class="pending">${result.human_pending}</td>
+            <td class="pending">${result.humanPending}</td>
           </tr>
           <tr>
             <td>Total Overhead</td>
@@ -731,7 +742,7 @@ const taskTimingSection = (ele, request, result) => {
               class="running"
               title="An asterisk indicates the task is still running and thus the time is dynamic."
             >
-              ${result.human_duration}
+              ${result.humanDuration}
             </td>
           </tr>
         </tbody>
@@ -892,7 +903,7 @@ const taskExecutionSection = (ele, request, result, currentSlice) => {
   </tr>
   <tr>
     <td>Bot idle since</td>
-    <td>${result.human_botIdleSinceTs}</td>
+    <td>${result.humanized.time.botIdleSinceTs}</td>
   </tr>
   <tr>
     <td rowspan=${botDimensions.length + 1}>
@@ -1281,8 +1292,8 @@ window.customElements.define(
         }
       );
 
-      this._request = {};
-      this._result = {};
+      this._request = humanize({});
+      this._result = humanize({});
       // For performance of rendering, we keep the stdout as an array
       // of strings that are drawn in individual divs. This has a large
       // performance boost over than the naive approach of drawing
@@ -1499,7 +1510,7 @@ time.sleep(${leaseDuration})`,
         })
         .catch((e) => {
           if (e.status === 404) {
-            this._request = {};
+            this._request = humanize({});
             this._notFound = true;
             this.render();
           }

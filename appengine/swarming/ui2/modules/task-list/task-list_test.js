@@ -518,7 +518,7 @@ describe("task-list", function () {
         ele.render();
 
         const actualDurationsOrder = ele._tasks.map((t) =>
-          t.human_duration.trim()
+          t.humanDuration.trim()
         );
         expect(actualDurationsOrder).toEqual([
           "0.62s",
@@ -551,7 +551,7 @@ describe("task-list", function () {
         ele.render();
 
         const actualPendingOrder = ele._tasks.map((t) =>
-          t.human_pendingTime.trim()
+          t.humanPendingTime.trim()
         );
         expect(actualPendingOrder).toEqual([
           "0s",
@@ -1347,9 +1347,9 @@ describe("task-list", function () {
       expect(task.createdTs instanceof Date).toBeTruthy(
         "Should be a date object"
       );
-      expect(task.human_createdTs).toBeTruthy();
+      expect(task.humanized.time.createdTs).toBeTruthy();
       expect(task.pendingTime).toBeTruthy();
-      expect(task.human_pendingTime).toBeTruthy();
+      expect(task.humanPendingTime).toBeTruthy();
     });
 
     it("gracefully handles null data", function () {
