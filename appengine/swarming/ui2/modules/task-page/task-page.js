@@ -1418,12 +1418,24 @@ window.customElements.define(
     }
 
     _debugTask() {
+      // this._currentSlice.properties is rendered with the UI2
+      // Unfortunately, that means if we modify it directly then an incorrect
+      // value will be rerendered. So make a copy only when the debug task
+      // is created so that this does not happen.
+      const newProperties = JSON.parse(
+        JSON.stringify(this._currentSlice.properties)
+      );
+
+      // Set io_timeout_secs to expirationSecs so that sleep task is not killed
+      // if it does not output for some time.
+      // See https://crbug.com/1492327
+      newProperties.io_timeout_secs = this._request.expirationSecs;
       const newTask = {
         expiration_secs: this._request.expirationSecs,
         name: `leased to ${this.profile.email} for debugging`,
         pool_task_template: 3, // SKIP
         priority: 20,
-        properties: this._currentSlice.properties,
+        properties: newProperties,
         realm: this._request.realm,
         service_account: this._request.serviceAccount,
         tags: ["debug_task:1"],
