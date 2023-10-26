@@ -1156,8 +1156,10 @@ def _run_bot_inner(arg_error, quit_bit):
   _ORIGINAL_BOT_ID = os.environ.get('SWARMING_BOT_ID')
 
   config = get_config()
-  if config.get('enable_ts_monitoring'):
-    _init_ts_mon()
+
+  # Do NOT enable tsmon.
+  # TODO(gregorynisbet): Clean this up to remove all the logic that uses tsmon.
+
   try:
     # First thing is to get an arbitrary url. This also ensures the network is
     # up and running, which is necessary before trying to get the FQDN below.
