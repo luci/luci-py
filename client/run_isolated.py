@@ -105,19 +105,14 @@ RUN_ISOLATED_LOG_FILE = 'run_isolated.log'
 # - io stands for isolated_out
 # - it stands for isolated_tmp
 # - ic stands for isolated_client
-# - ns stands for nsjail
 ISOLATED_RUN_DIR = 'ir'
 ISOLATED_OUT_DIR = 'io'
 ISOLATED_TMP_DIR = 'it'
 ISOLATED_CLIENT_DIR = 'ic'
 _CAS_CLIENT_DIR = 'cc'
-_NSJAIL_DIR = 'ns'
-
 # TODO(tikuta): take these parameter from luci-config?
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
 _LUCI_GO_REVISION = 'git_revision:fd5bcf5a16a5261c39af769a1dcf54f5e2797ea6'
-_NSJAIL_PACKAGE = 'infra/3pp/tools/nsjail/${platform}'
-_NSJAIL_VERSION = 'version:2@3.0.chromium.1'
 
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
@@ -859,14 +854,8 @@ def map_and_run(data, constant_run_path):
 
   data.trim_caches_fn(result['stats']['trim_caches'])
 
-  nsjail_dir = None
-  if (sys.platform == "linux" and cipd.get_platform() == "amd64" and
-      data.containment.containment_type == subprocess42.Containment.NSJAIL):
-    nsjail_dir = make_temp_dir(_NSJAIL_DIR, data.root_dir)
-
   try:
-    with data.install_packages_fn(run_dir, cas_client_dir,
-                                  nsjail_dir) as cipd_info:
+    with data.install_packages_fn(run_dir, cas_client_dir) as cipd_info:
       if cipd_info:
         result['stats']['cipd'] = cipd_info.stats
         result['cipd_pins'] = cipd_info.pins
@@ -1088,7 +1077,7 @@ CipdInfo = collections.namedtuple('CipdInfo', [
 
 
 @contextlib.contextmanager
-def copy_local_packages(_run_dir, cas_dir, _nsjail_dir):
+def copy_local_packages(_run_dir, cas_dir):
   """Copies CIPD packages from luci/luci-go dir."""
   go_client_dir = os.environ.get('LUCI_GO_CLIENT_DIR')
   assert go_client_dir, ('Please set LUCI_GO_CLIENT_DIR env var to install CIPD'
@@ -1154,7 +1143,7 @@ def _install_packages(run_dir, cipd_cache_dir, client, packages):
 @contextlib.contextmanager
 def install_client_and_packages(run_dir, packages, service_url,
                                 client_package_name, client_version, cache_dir,
-                                cas_dir, nsjail_dir):
+                                cas_dir):
   """Bootstraps CIPD client and installs CIPD packages.
 
   Yields CipdClient, stats, client info and pins (as single CipdInfo object).
@@ -1187,8 +1176,6 @@ def install_client_and_packages(run_dir, packages, service_url,
     client_version (str): Version of CIPD client.
     cache_dir (str): where to keep cache of cipd clients, packages and tags.
     cas_dir (str): where to download cas client.
-    nsjail_dir (str): where to download nsjail. If set to None, nsjail is not
-      downloaded.
   """
   assert cache_dir
 
@@ -1217,12 +1204,6 @@ def install_client_and_packages(run_dir, packages, service_url,
     _install_packages(cas_dir, cipd_cache_dir, client,
                       [('', _CAS_PACKAGE, _LUCI_GO_REVISION)])
     logging_utils.user_logs('Installed CAS client')
-
-    # Install nsjail to |nsjail_dir|.
-    if nsjail_dir is not None:
-      _install_packages(nsjail_dir, cipd_cache_dir, client,
-                        [('', _NSJAIL_PACKAGE, _NSJAIL_VERSION)])
-      logging_utils.user_logs('Installed nsjail')
 
     file_path.make_tree_files_read_only(run_dir)
 
@@ -1353,11 +1334,10 @@ def create_option_parser():
   parser.add_option(
       '--lower-priority', action='store_true',
       help='Lowers the child process priority')
-  parser.add_option(
-      '--containment-type',
-      choices=('NONE', 'AUTO', 'JOB_OBJECT', 'NSJAIL'),
-      default='NONE',
-      help='Type of container to use')
+  parser.add_option('--containment-type',
+                    choices=('NONE', 'AUTO', 'JOB_OBJECT'),
+                    default='NONE',
+                    help='Type of container to use')
   parser.add_option(
       '--limit-processes',
       type='int',
@@ -1666,17 +1646,14 @@ def main(args):
     if not cache_dir:
       tmp_cipd_cache_dir = tempfile.mkdtemp()
       cache_dir = tmp_cipd_cache_dir
-    install_packages_fn = (
-        lambda run_dir, cas_dir, nsjail_dir: install_client_and_packages(
-            run_dir,
-            cipd.parse_package_args(options.cipd_packages),
-            options.cipd_server,
-            options.cipd_client_package,
-            options.cipd_client_version,
-            cache_dir=cache_dir,
-            cas_dir=cas_dir,
-            nsjail_dir=nsjail_dir,
-        ))
+    install_packages_fn = (lambda run_dir, cas_dir: install_client_and_packages(
+        run_dir,
+        cipd.parse_package_args(options.cipd_packages),
+        options.cipd_server,
+        options.cipd_client_package,
+        options.cipd_client_version,
+        cache_dir=cache_dir,
+        cas_dir=cas_dir))
 
   @contextlib.contextmanager
   def install_named_caches(run_dir, stats):
@@ -1735,10 +1712,6 @@ def main(args):
     containment_type = subprocess42.Containment.AUTO
   if options.containment_type == 'JOB_OBJECT':
     containment_type = subprocess42.Containment.JOB_OBJECT
-  if options.containment_type == 'NSJAIL':
-    containment_type = subprocess42.Containment.NSJAIL
-  # TODO(https://crbug.com/1227833): This object should eventually contain the
-  # path to the nsjail binary and the nsjail configuration file.
   containment = subprocess42.Containment(
       containment_type=containment_type,
       limit_processes=options.limit_processes,

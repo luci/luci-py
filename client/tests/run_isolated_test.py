@@ -132,10 +132,10 @@ class RunIsolatedTestBase(auto_stub.TestCase):
   def fake_make_temp_dir(self, prefix, _root_dir):
     """Predictably returns directory for run_tha_test (one per test case)."""
     self.assertIn(
-        prefix, (run_isolated.ISOLATED_OUT_DIR, run_isolated.ISOLATED_RUN_DIR,
-                 run_isolated.ISOLATED_TMP_DIR,
-                 run_isolated.ISOLATED_CLIENT_DIR, run_isolated._CAS_CLIENT_DIR,
-                 'cipd_site_root', run_isolated._NSJAIL_DIR))
+        prefix,
+        (run_isolated.ISOLATED_OUT_DIR, run_isolated.ISOLATED_RUN_DIR,
+         run_isolated.ISOLATED_TMP_DIR, run_isolated.ISOLATED_CLIENT_DIR,
+         run_isolated._CAS_CLIENT_DIR, 'cipd_site_root'))
     temp_dir = os.path.join(self.tempdir, prefix)
     self.assertFalse(fs.isdir(temp_dir))
     fs.makedirs(temp_dir)
@@ -1145,7 +1145,7 @@ class RunIsolatedTestCase(RunIsolatedTestRun):
     self.assertEqual('some_instance', result['missing_cas'][0]['instance'])
 
   def test_bad_cipd_package(self):
-    def emulate_bad_cipd(_run_dir, cas_dir, _nsjail_dir):
+    def emulate_bad_cipd(_run_dir, cas_dir):
       raise errors.NonRecoverableCipdException("missing_cipd", "foo_package",
                                                "not/found/foo", "deadbeef")
 
