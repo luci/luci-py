@@ -48,6 +48,7 @@
 const { glob } = require("glob");
 const path = require("path");
 const fs = require("fs");
+const childProcess = require("child_process");
 const { basename, join } = require("path");
 const CleanWebpackPlugin = require("clean-webpack-plugin");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
@@ -68,6 +69,80 @@ const minifyOptions = {
   removeScriptTypeAttributes: true,
   removeStyleLinkTypeAttributes: true,
 };
+
+/**
+ * Uses `luci-auth info` to fetch email address used in the live_demo mode.
+ *
+ * This is helpful as the email is used for some UI actions like creating
+ * a termination task.
+ *
+ * Function will **crash** entire program if it fails for whatever reason.
+ *
+ * @returns email address of logged in luci according to luci-auth
+ */
+function findLiveDemoEmail() {
+  const infoResult = childProcess.spawnSync("luci-auth", ["info"]);
+  if (infoResult.status != 0) {
+    console.error(`Error retrieving luci-auth info.
+
+You may need to run \`luci-auth login\`
+
+stdout: ${infoResult.stdout}
+stderr: ${infoResult.stderr}
+exit_code: ${infoResult.status}`);
+    process.exit(1);
+  }
+  let email = "";
+  try {
+    /* The output of `luci-auth info` call will have the following format:
+     *
+     * Logged in as jonahhooper@google.com.
+     *
+     * OAuth token details:
+     *   Client ID: xxxxx
+     *   Scopes:
+     *     https://www.googleapis.com/auth/userinfo.email
+     *     openid
+     *
+     * We extract the email address from the first line.
+     **/
+    email = infoResult.stdout
+      .toString()
+      .split("\n")[0]
+      .split(" ")[3]
+      .slice(0, -1);
+  } catch (e) {
+    console.error(`Failed to parse email from luci-auth info.
+stdout: ${infoResult.stdout}
+error: ${e}`);
+    process.exit(1);
+  }
+  return email;
+}
+
+/**
+ * Uses `luci-auth token` to fetch credentials to be used in the live_demo mode.
+ * Function will **crash** entire program if it fails for whatever reason.
+ *
+ * @returns token where token is an oauth access token derived from luci-auth.
+ */
+function findLiveDemoToken() {
+  // The default scope for both of these calls is
+  // https://www.googleapis.com/auth/userinfo.email
+  const tokenResult = childProcess.spawnSync("luci-auth", [
+    "token",
+    "-lifetime",
+    "20m",
+  ]);
+  if (tokenResult.status != 0) {
+    console.error(`Error retrieving luci-auth token ${tokenResult.error}
+stdout: ${tokenResult.stdout}
+stderr: ${tokenResult.stderr}
+exit_code: ${tokenResult.status}`);
+    process.exit(1);
+  }
+  return tokenResult.stdout.toString();
+}
 
 function demoFinder(dir, webpackConfig, demoType) {
   // Look at all sub-directories of dir and if a directory contains
@@ -268,19 +343,7 @@ module.exports = (env, argv) => {
     common = demoFinder(dirname, common, demoType);
     common.devtool = "eval-source-map";
     if (demoType === "live") {
-      const credsFilePath = path.join(
-        process.env.HOME,
-        ".config",
-        "chrome_infra",
-        "auth",
-        "creds.json"
-      );
-      if (!fs.existsSync(credsFilePath)) {
-        console.error(
-          `Credentials file not found at path ${credsFilePath}. Did you forget to run "luci-auth login"?`
-        );
-        process.exit(1);
-      }
+      const email = findLiveDemoEmail();
       common.devServer.proxy = [
         {
           changeOrigin: true,
@@ -292,10 +355,13 @@ module.exports = (env, argv) => {
           context: ["/auth/openid/state"],
           target: "https://chromium-swarm-dev.appspot.com/",
           bypass: function (_req, res, _proxyOptions) {
-            const creds = JSON.parse(fs.readFileSync(credsFilePath));
+            // The first call to `luci-auth token` will create the initial token
+            // subsequent calls don't do a network call since the token is
+            // already cached.
+            const token = findLiveDemoToken();
             res.send({
-              email: creds.cache[0].email,
-              accessToken: creds.cache[0].token.access_token,
+              email: email,
+              accessToken: token,
             });
           },
         },
