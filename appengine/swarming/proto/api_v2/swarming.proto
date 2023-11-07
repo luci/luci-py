@@ -755,6 +755,9 @@ message ResultDBInfo {
 
 // Representation of the TaskResultSummary or TaskRunResult ndb model.
 message TaskResultResponse {
+  reserved 7;
+  reserved "children_task_ids";
+
   // Summary task ID (ending with '0') when creating a new task.
   string task_id = 1;
   // Time when the task was abandoned instead of normal completion (e.g.
@@ -770,8 +773,6 @@ message TaskResultResponse {
   string bot_version = 5;
   // The cloud project id where the bot saves its logs.
   string bot_logs_cloud_project = 6;
-  // List of task IDs that this task triggered, if any.
-  repeated string children_task_ids = 7;
   // Time the task completed normally. Only one of abandoned_ts or completed_ts
   // can be set except for state == KILLED.
   //

@@ -197,7 +197,6 @@ class TaskResultApiTest(TestCase):
         None,
         'cipd_pins':
         None,
-        'children_task_ids': [],
         'completed_ts':
         None,
         'costs_usd': [],
@@ -279,7 +278,6 @@ class TaskResultApiTest(TestCase):
         'bot_version': u'abc',
         'bot_logs_cloud_project': None,
         'cas_output_root': None,
-        'children_task_ids': [],
         'cipd_pins': None,
         'completed_ts': None,
         'cost_usd': 0.,
@@ -374,16 +372,6 @@ class TaskResultApiTest(TestCase):
     actual.duration = 0.1
     actual.completed_ts = self.now
     self.assertEqual(False, actual.can_be_canceled)
-
-    actual.children_task_ids = [
-        '1d69ba3ea8008810',
-        '3d69ba3ea8008810',
-        '2d69ba3ea8008810',
-    ]
-    actual.modified_ts = utils.utcnow()
-    ndb.transaction(actual.put)
-    expected = [u'1d69ba3ea8008810', u'2d69ba3ea8008810', u'3d69ba3ea8008810']
-    self.assertEqual(expected, actual.key.get().children_task_ids)
 
   def test_new_run_result(self):
     request = _gen_request()
@@ -866,7 +854,6 @@ class TaskResultApiTest(TestCase):
     run_result.duration = 1.
     run_result.current_task_slice = 2
     run_result.exit_code = 1
-    run_result.children_task_ids = [u'12310']
     run_result.cas_output_root = task_request.CASReference(
         cas_instance=u'projects/test/instances/default',
         digest={
@@ -964,7 +951,6 @@ class TaskResultApiTest(TestCase):
             info=swarming_pb2.BotInfo(),
         ),
         server_versions=[u'v1a'],
-        children_task_ids=[u'12310'],
         task_id=u'1d69b9f858008810',
         run_id=u'1d69b9f858008811',
         cipd_pins=swarming_pb2.CIPDPins(

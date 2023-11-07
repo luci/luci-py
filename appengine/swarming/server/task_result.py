@@ -556,14 +556,6 @@ class _TaskResultCommon(ndb.Model):
   # The index is used in task listing queries to order by this property.
   abandoned_ts = ndb.DateTimeProperty()
 
-  # Children tasks that were triggered by this task. This is set when the task
-  # reentrantly creates other Swarming tasks. Note that the task_id is to a
-  # TaskResultSummary.
-  #
-  # TODO(vadimsh): Appears to be unused.
-  children_task_ids = ndb.StringProperty(
-      indexed=False, validator=_validate_task_summary_id, repeated=True)
-
   # DEPRECATED. Isolate server is being migrated to RBE-CAS. cas_output_ref will
   # be used instead.
   # File outputs of the task. Only set if TaskRequest.properties.inputs_ref is
@@ -818,7 +810,6 @@ class _TaskResultCommon(ndb.Model):
         elif key == u'pool':
           out.bot.pools.extend(values)
     out.server_versions.extend(self.server_versions)
-    out.children_task_ids.extend(self.children_task_ids)
     if self.deduped_from:
       out.deduped_from = self.deduped_from
     key = self.result_summary_key
@@ -961,9 +952,6 @@ class _TaskResultCommon(ndb.Model):
       if self.failure:
         raise datastore_errors.BadValueError(
             'failure can\'t be True on deduped task %s' % self.deduped_from)
-
-    self.children_task_ids = sorted(
-        set(self.children_task_ids), key=lambda x: int(x, 16))
 
   @classmethod
   def _properties_fixed(cls):

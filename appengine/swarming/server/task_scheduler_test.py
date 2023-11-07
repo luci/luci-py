@@ -288,7 +288,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         None,
         'cipd_pins':
         None,
-        'children_task_ids': [],
         'completed_ts':
         None,
         'costs_usd': [],
@@ -374,7 +373,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'bot_logs_cloud_project': None,
         'cas_output_root': None,
         'cipd_pins': None,
-        'children_task_ids': [],
         'completed_ts': None,
         'cost_usd': 0.,
         'current_task_slice': 0,
@@ -1655,7 +1653,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     parent_id = run_result.task_id
     result_summary = self._quick_schedule(parent_task_id=parent_id)
-    self.assertEqual([], result_summary.children_task_ids)
     self.assertEqual(parent_id, result_summary.request_key.get().parent_task_id)
 
   def test_task_timeout(self):

@@ -277,7 +277,6 @@ def task_result_response(result, include_performance_stats=True):
       started_ts=date(result.started_ts),
       created_ts=date(result.created_ts),
       bot_dimensions=_string_list_pairs_from_dict(result.bot_dimensions),
-      children_task_ids=result.children_task_ids,
       server_versions=result.server_versions,
       performance_stats=_perf_stats(result.performance_stats) if
       include_performance_stats and result.performance_stats.is_valid else None,
