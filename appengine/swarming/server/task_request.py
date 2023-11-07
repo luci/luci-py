@@ -1168,12 +1168,14 @@ class TaskRequest(ndb.Model):
   # Time this request was registered. It is set manually instead of using
   # auto_now_add=True so that expiration_ts can be set very precisely relative
   # to this property.
+  #
+  # The index is used in BQ exports and when cleaning up old tasks.
   created_ts = ndb.DateTimeProperty(required=True)
 
   # Used to make the transaction that creates TaskRequest idempotent.
   # Just a random string. Should not be used for anything else. Should not show
   # up anywhere.
-  txn_uuid = ndb.StringProperty(required=False)
+  txn_uuid = ndb.StringProperty(indexed=False, required=False)
 
   ## What
 
@@ -1196,20 +1198,21 @@ class TaskRequest(ndb.Model):
   ## Why and other contexts
 
   # The name for this task request. It's only for description.
-  name = ndb.StringProperty(required=True)
+  name = ndb.StringProperty(indexed=False, required=True)
 
   # Authenticated client that triggered this task.
-  authenticated = auth.IdentityProperty()
+  authenticated = auth.IdentityProperty(indexed=False)
 
   # Which user to blame for this task. Can be arbitrary, not asserted by any
   # credentials.
-  user = ndb.StringProperty(default='')
+  user = ndb.StringProperty(default='', indexed=False)
 
   # Indicates what OAuth2 credentials the task uses when calling other services.
   #
   # Possible values are: 'none', 'bot' or <email>. For more information see
   # swarming_rpcs.NewTaskRequest.
-  service_account = ndb.StringProperty(validator=_validate_service_account)
+  service_account = ndb.StringProperty(
+      indexed=False, validator=_validate_service_account)
 
   # Priority of the task to be run. A lower number is higher priority, thus will
   # preempt requests with lower priority (higher numbers).
@@ -1231,14 +1234,18 @@ class TaskRequest(ndb.Model):
 
   # Tags that specify the category of the task. This property contains both the
   # tags specified by the user and the tags for every TaskSlice.
-  tags = ndb.StringProperty(repeated=True, validator=_validate_tags)
+  tags = ndb.StringProperty(
+      indexed=False, repeated=True, validator=_validate_tags)
   # Tags that are provided by the user. This is used to regenerate the list of
   # tags for TaskResultSummary based on the actual TaskSlice used.
   manual_tags = ndb.StringProperty(
-      repeated=True, validator=_validate_tags, indexed=False)
+      indexed=False, repeated=True, validator=_validate_tags)
 
   # Set when a task (the parent) reentrantly create swarming tasks. Must be set
   # to a valid task_id pointing to a TaskRunResult or be None.
+  #
+  # The index is used to find children of a particular parent task to cancel
+  # them when the parent task dies.
   parent_task_id = ndb.StringProperty(validator=_validate_task_run_id)
 
   # PubSub topic to send task completion notification to.
@@ -1270,7 +1277,7 @@ class TaskRequest(ndb.Model):
 
   # Task realm.
   # See api/swarming.proto for more details.
-  realm = ndb.StringProperty(validator=_validate_realm)
+  realm = ndb.StringProperty(indexed=False, validator=_validate_realm)
 
   # Realm enforcement flag.
   # Use Realm-aware ACLs if True is set.
