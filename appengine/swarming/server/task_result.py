@@ -493,11 +493,8 @@ class _TaskResultCommon(ndb.Model):
   TODO(maruel): Overhaul this entity:
   - Get rid of TaskOutput as it is not needed anymore (?)
   """
-  # Bot that ran this task.
-  bot_id = ndb.StringProperty()
-
   # Bot version (as a hash) of the code running the task.
-  bot_version = ndb.StringProperty()
+  bot_version = ndb.StringProperty(indexed=False)
 
   # Bot dimensions at the moment the bot reaped the task. Not set for old tasks.
   bot_dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict)
@@ -512,7 +509,7 @@ class _TaskResultCommon(ndb.Model):
   # Active server version(s). Note that during execution, the active server
   # version may have changed, this list will list all versions seen as the task
   # was updated.
-  server_versions = ndb.StringProperty(repeated=True)
+  server_versions = ndb.StringProperty(indexed=False, repeated=True)
 
   # This entity is updated everytime the bot sends data so it is equivalent to
   # 'last_ping'.
@@ -520,11 +517,13 @@ class _TaskResultCommon(ndb.Model):
 
   # Records that the task failed, e.g. one process had a non-zero exit code. The
   # task may be retried if desired to weed out flakiness.
+  #
+  # The index is used in task listing queries to filter by failure.
   failure = ndb.ComputedProperty(_calculate_failure)
 
   # Internal infrastructure failure, in which case the task should be retried
   # automatically if possible.
-  internal_failure = ndb.BooleanProperty(default=False)
+  internal_failure = ndb.BooleanProperty(indexed=False, default=False)
 
   # Number of TaskOutputChunk entities for the output.
   stdout_chunks = ndb.IntegerProperty(indexed=False)
@@ -538,22 +537,32 @@ class _TaskResultCommon(ndb.Model):
   duration = ndb.FloatProperty(indexed=False, name='durations')
 
   # Time when a bot reaped this task.
+  #
+  # The index is used in task listing queries to order by this property.
   started_ts = ndb.DateTimeProperty()
 
   # Time when the task was not considered for execution anymore, or the bot
   # completed its execution.
   #
-  # For old entities prior to 2019-02-01, this value can be unset.
+  # The index is used in a bunch of places:
+  #   1. In task listing queries to order by this property.
+  #   2. In crashed bot detection to list still pending or running tasks.
+  #   3. In BQ export pagination.
   completed_ts = ndb.DateTimeProperty()
+
   # Set when a task had an internal failure, timed out or was killed by a client
   # request.
+  #
+  # The index is used in task listing queries to order by this property.
   abandoned_ts = ndb.DateTimeProperty()
 
   # Children tasks that were triggered by this task. This is set when the task
   # reentrantly creates other Swarming tasks. Note that the task_id is to a
   # TaskResultSummary.
+  #
+  # TODO(vadimsh): Appears to be unused.
   children_task_ids = ndb.StringProperty(
-      validator=_validate_task_summary_id, repeated=True)
+      indexed=False, validator=_validate_task_summary_id, repeated=True)
 
   # DEPRECATED. Isolate server is being migrated to RBE-CAS. cas_output_ref will
   # be used instead.
@@ -979,7 +988,14 @@ class TaskRunResult(_TaskResultCommon):
   Existence of this entity means a bot requested a task and started executing
   it. Everything beside created_ts and bot_id can be modified.
   """
+  # Bot that ran this task.
+  #
+  # The index is used in task listing queries to filter by a specific bot.
+  bot_id = ndb.StringProperty()
+
   # Current state of this task.
+  #
+  # The index is used in task listing queries to filter by state.
   state = StateProperty(default=State.RUNNING, validator=_validate_not_pending)
 
   # Effective cost of this task.
@@ -1002,7 +1018,7 @@ class TaskRunResult(_TaskResultCommon):
   # if a bot has not sent an update after this time while running the task,
   # it is considered dead. It is set after every ping from the bot if the
   # task is RUNNING and set to None once the task terminates.
-  dead_after_ts = ndb.DateTimeProperty()
+  dead_after_ts = ndb.DateTimeProperty(indexed=False)
 
   @property
   def created_ts(self):
@@ -1079,20 +1095,30 @@ class TaskResultSummary(_TaskResultCommon):
   It's primary purpose is for status pages listing all the active tasks or
   recently completed tasks.
   """
-  # These properties are directly copied from TaskRequest. They are only copied
-  # here to simplify searches with the Web UI, to enable DB queries based on
-  # both user and results properties (e.g. all requests from X which succeeded),
-  # and for ACL checks.
-  # They are immutable.
-  # TODO(maruel): Investigate what is worth copying over.
+  # When the task was submitted.
+  #
+  # The index is used in task listing queries to order by this property.
   created_ts = ndb.DateTimeProperty(required=True)
-  name = ndb.StringProperty()
-  user = ndb.StringProperty()
+
+  # All task tags, copied from TaskRequest.
+  #
+  # The index is used in global task listing queries to filter by.
   tags = ndb.StringProperty(repeated=True)
+
+  # Copied from TaskRequest.
+  name = ndb.StringProperty(indexed=False)
+  # Copied from TaskRequest.
+  user = ndb.StringProperty(indexed=False)
+
+  # Copied from TaskRequest.
   priority = ndb.IntegerProperty(indexed=False)
+  # Copied from TaskRequest.
   request_authenticated = auth.IdentityProperty(indexed=False, required=False)
+  # Copied from TaskRequest.
   request_realm = ndb.StringProperty(indexed=False, required=False)
+  # Extracted from dimensions in TaskRequest.
   request_pool = ndb.StringProperty(indexed=False, required=False)
+  # Extracted from dimensions in TaskRequest.
   request_bot_id = ndb.StringProperty(indexed=False, required=False)
 
   # Value of TaskRequest.properties.properties_hash only when these conditions
@@ -1101,9 +1127,16 @@ class TaskResultSummary(_TaskResultCommon):
   # - self.state == State.COMPLETED
   # - self.failure == False
   # - self.internal_failure == False
+  #
+  # The index is used to find duplicate tasks.
   properties_hash = ndb.BlobProperty(indexed=True)
 
+  # Bot that ran this task.
+  bot_id = ndb.StringProperty(indexed=False)
+
   # State of this task. The value from TaskRunResult will be copied over.
+  #
+  # The index is used in task listing queries to filter by state.
   state = StateProperty(default=State.PENDING)
 
   # Possible values:
@@ -1114,6 +1147,8 @@ class TaskResultSummary(_TaskResultCommon):
   #
   # This field is left over from when swarming had internal retries.
   # See https://crbug.com/1065101
+  #
+  # The index is used in global task listing queries to find dedupped tasks.
   try_number = ndb.IntegerProperty()
 
   # Effective cost of this task for each try. Use self.cost_usd for the sum.
@@ -1262,12 +1297,14 @@ class TaskResultSummary(_TaskResultCommon):
     assert ndb.in_transaction()
     assert isinstance(request, task_request.TaskRequest), request
     assert isinstance(run_result, TaskRunResult), run_result
+
+    # Copy all fields defined through shared _TaskResultCommon.
     for property_name in _TaskResultCommon._properties_fixed():
       setattr(self, property_name, getattr(run_result, property_name))
-    # Include explicit support for 'state' and 'try_number'. TaskRunResult.state
-    # is a ComputedProperty so it can't be copied as-is, and try_number is a
-    # generated property.
-    # pylint: disable=W0201
+
+    # Copy fields that are defined separately in TaskRunResult and
+    # TaskResultSummary. They have slightly different types.
+    self.bot_id = run_result.bot_id
     self.state = run_result.state
     self.try_number = run_result.try_number
     self.missing_cas = run_result.missing_cas
@@ -1293,29 +1330,6 @@ class TaskResultSummary(_TaskResultCommon):
       # Signal the results are valid and can be reused. If the request has a
       # SecretBytes, it is GET, which is a performance concern.
       self.properties_hash = t.properties_hash(request)
-
-  def need_update_from_run_result(self, run_result):
-    """Returns True if set_from_run_result() would modify this instance.
-
-    E.g. they are different and TaskResultSummary needs to be updated from the
-    corresponding TaskRunResult.
-    """
-    assert isinstance(run_result, TaskRunResult), run_result
-    # A previous try is still sending update. Ignore it from a result summary
-    # PoV.
-    if self.try_number and self.try_number > run_result.try_number:
-      return False
-
-    for property_name in _TaskResultCommon._properties_fixed():
-      if getattr(self, property_name) != getattr(run_result, property_name):
-        return True
-    # Include explicit support for 'state' and 'try_number'. TaskRunResult.state
-    # is a ComputedProperty so it can't be copied as-is, and try_number is a
-    # generated property.
-    # pylint: disable=W0201
-    return (
-        self.state != run_result.state or
-        self.try_number != run_result.try_number)
 
   def to_dict(self, **kwargs):
     return super(TaskResultSummary, self).to_dict(exclude=['properties_hash'])

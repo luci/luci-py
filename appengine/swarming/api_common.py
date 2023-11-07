@@ -129,10 +129,14 @@ def terminate_bot(bot_id, reason=None):
   if rbe_cfg and not rbe_cfg.hybrid_mode:
     rbe_instance = rbe_cfg.instance
 
+  if reason:
+    reason = re.sub(_WHITESPACE_RE, ' ', reason)
+    if len(reason) > 1000:
+      raise handlers_exceptions.BadRequestException(
+          'The bot termination reason is too long: %d > 1000' % len(reason))
+
   try:
     # Craft a special priority 0 task to tell the bot to shutdown.
-    if reason:
-      reason = re.sub(_WHITESPACE_RE, ' ', reason)
     request = task_request.create_termination_task(bot_id, rbe_instance, reason)
   except (datastore_errors.BadValueError, TypeError, ValueError) as e:
     raise handlers_exceptions.BadRequestException(str(e))

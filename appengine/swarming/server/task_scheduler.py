@@ -507,20 +507,6 @@ def _detect_dead_task_async(run_result_key):
   return datastore_utils.transaction_async(run)
 
 
-def _copy_summary(src, dst, skip_list):
-  """Copies the attributes of entity src into dst.
-
-  It doesn't copy the key nor any member in skip_list.
-  """
-  # pylint: disable=unidiomatic-typecheck
-  assert type(src) == type(dst), '%s!=%s' % (src.__class__, dst.__class__)
-  # Access to a protected member _XX of a client class - pylint: disable=W0212
-  kwargs = {
-    k: getattr(src, k) for k in src._properties_fixed() if k not in skip_list
-  }
-  dst.populate(**kwargs)
-
-
 def _maybe_pubsub_notify_now(result_summary, request):
   """Examines result_summary and sends task completion PubSub message.
 
@@ -791,6 +777,20 @@ def _find_dupe_task(now, h):
   return None
 
 
+def _copy_summary(src, dst, skip_list):
+  """Copies the attributes of entity src into dst.
+
+  It doesn't copy the key nor any member in skip_list.
+  """
+  # pylint: disable=unidiomatic-typecheck
+  assert type(src) == type(dst), '%s!=%s' % (src.__class__, dst.__class__)
+  # Access to a protected member _XX of a client class - pylint: disable=W0212
+  kwargs = {
+    k: getattr(src, k) for k in src._properties_fixed() if k not in skip_list
+  }
+  dst.populate(**kwargs)
+
+
 def _dedupe_result_summary(dupe_summary, result_summary, task_slice_index):
   """Copies the results from dupe_summary into result_summary."""
   # PerformanceStats is not copied over, since it's not relevant, nothing
@@ -798,6 +798,10 @@ def _dedupe_result_summary(dupe_summary, result_summary, task_slice_index):
   _copy_summary(
       dupe_summary, result_summary,
       ('created_ts', 'modified_ts', 'name', 'user', 'tags'))
+  # Copy properties not covered by _properties_fixed().
+  result_summary.bot_id = dupe_summary.bot_id
+  result_summary.missing_cas = dupe_summary.missing_cas
+  result_summary.missing_cipd = dupe_summary.missing_cipd
   # Zap irrelevant properties.
   result_summary.cost_saved_usd = dupe_summary.cost_usd
   result_summary.costs_usd = []

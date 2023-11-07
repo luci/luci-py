@@ -131,6 +131,31 @@ def _safe_cmp(a, b):
   return cmp(utils.encode_to_json(a), utils.encode_to_json(b))
 
 
+def _need_update_from_run_result(summary, run_result):
+  """Returns True if set_from_run_result() would modify this instance.
+
+  E.g. they are different and TaskResultSummary needs to be updated from the
+  corresponding TaskRunResult.
+  """
+  assert isinstance(run_result, task_result.TaskRunResult), run_result
+  # A previous try is still sending update. Ignore it from a result summary
+  # PoV.
+  if summary.try_number and summary.try_number > run_result.try_number:
+    return False
+
+  # Compare all fields defined through shared _TaskResultCommon.
+  for property_name in task_result._TaskResultCommon._properties_fixed():
+    if getattr(summary, property_name) != getattr(run_result, property_name):
+      return True
+
+  # Compare fields that are defined separately in TaskRunResult and
+  # TaskResultSummary. They have slightly different types.
+  return (
+      summary.bot_id != run_result.bot_id or
+      summary.state != run_result.state or
+      summary.try_number != run_result.try_number)
+
+
 def get_entities(entity_model):
   return sorted((i.to_dict() for i in entity_model.query().fetch()),
                 cmp=_safe_cmp)
@@ -676,19 +701,19 @@ class TaskResultApiTest(TestCase):
                                             bot_details, {},
                                             result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
-    self.assertTrue(result_summary.need_update_from_run_result(run_result))
+    self.assertTrue(_need_update_from_run_result(result_summary, run_result))
     result_summary.modified_ts = utils.utcnow()
     run_result.modified_ts = utils.utcnow()
     run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
         seconds=request.bot_ping_tolerance_secs)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
 
-    self.assertTrue(result_summary.need_update_from_run_result(run_result))
+    self.assertTrue(_need_update_from_run_result(result_summary, run_result))
     ndb.transaction(lambda: result_summary.set_from_run_result(
         run_result, request))
     ndb.transaction(lambda: ndb.put_multi([result_summary]))
 
-    self.assertFalse(result_summary.need_update_from_run_result(run_result))
+    self.assertFalse(_need_update_from_run_result(result_summary, run_result))
 
   def test_set_from_run_result_two_server_versions(self):
     request = _gen_request()
@@ -699,14 +724,14 @@ class TaskResultApiTest(TestCase):
                                             bot_details, {},
                                             result_summary.resultdb_info)
     run_result.started_ts = utils.utcnow()
-    self.assertTrue(result_summary.need_update_from_run_result(run_result))
+    self.assertTrue(_need_update_from_run_result(result_summary, run_result))
     result_summary.modified_ts = utils.utcnow()
     run_result.modified_ts = utils.utcnow()
     run_result.dead_after_ts = utils.utcnow() + datetime.timedelta(
         seconds=request.bot_ping_tolerance_secs)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
 
-    self.assertTrue(result_summary.need_update_from_run_result(run_result))
+    self.assertTrue(_need_update_from_run_result(result_summary, run_result))
     ndb.transaction(lambda: result_summary.set_from_run_result(
         run_result, request))
     ndb.transaction(lambda: ndb.put_multi([result_summary]))
