@@ -1,13 +1,14 @@
 Name: six
 Short Name: six
-URL: https://github.com/benjaminp/six/releases/tag/1.12.0
-Version: 1.12.0
-Revision: d927b9e27617abca8dbf4d66cc9265ebbde261d6
+URL: https://chrome-infra-packages.appspot.com/p/infra/python/wheels/six-py2_py3/+/xmTYzeQfRMWiTY6qjh_BQWBozfjlmsmom9WdCVi61-UC
+Version: 1.16.0
+Revision: 27cd9144e6dd3a2d3eb421fccaea6f30d3efa529
 License: Apache License, Version 2.0
 
 Description:
 Six is a Python 2 and 3 compatibility library.
 
 Local Modifications:
-- Copied six.py as __init__.py.
+- Copied six.py as __init__.py. Original was downloaded from cipd.
 - Kept LICENSE and README.rst.
+
