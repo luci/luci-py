@@ -368,7 +368,7 @@ class BotEvent(_BotCommon):
 
   # Common properties for all events (which includes everything in _BotCommon).
   ts = ndb.DateTimeProperty(auto_now_add=True)
-  event_type = ndb.StringProperty(choices=ALLOWED_EVENTS)
+  event_type = ndb.StringProperty(choices=ALLOWED_EVENTS, indexed=False)
 
   # event_type == 'bot_error', 'request_restart', 'bot_rebooting', etc.
   message = ndb.TextProperty()
