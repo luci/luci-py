@@ -509,42 +509,31 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     request = backend_pb2.ValidateConfigsRequest(
         configs=[
             backend_pb2.ValidateConfigsRequest.ConfigContext(
-                target='the-one-with-bad-values',
+                target='swarming://test-swarming',
                 config_json=struct_pb2.Struct(fields={
-                    'priority':
-                        struct_pb2.Value(
-                            number_value=task_request.MAXIMUM_PRIORITY + 1),
                     'bot_ping_tolerance':
                         struct_pb2.Value(
                             number_value=\
                             task_request._MAX_BOT_PING_TOLERANCE_SECS),
-                    'service_account':
-                        struct_pb2.Value(string_value='bot'),
-                    'agent_binary_cipd_filename':
-                        struct_pb2.Value(string_value='agent'),
-                    'agent_binary_cipd_pkg':
-                    struct_pb2.Value(
-                        string_value='agent/package/${platform}'),
-                    'agent_binary_cipd_vers':
-                        struct_pb2.Value(string_value='3'),
-                    'agent_binary_cipd_server':
-                        struct_pb2.Value(string_value='cipdserver'),
-                })),
-            backend_pb2.ValidateConfigsRequest.ConfigContext(
-                target='the-one-with-empty-bot-ping-tolerance',
-                config_json=struct_pb2.Struct(fields={
-                    'service_account':
-                      struct_pb2.Value(string_value='bot'),
-                    'agent_binary_cipd_filename':
-                      struct_pb2.Value(string_value='agent'),
-                    'agent_binary_cipd_pkg':
-                      struct_pb2.Value(
-                          string_value='agent/package/${platform}'),
-                    'agent_binary_cipd_vers':
-                      struct_pb2.Value(string_value='3'),
-                    'agent_binary_cipd_server':
-                      struct_pb2.Value(string_value='cipdserver'),
-                })),
+                }))])
+
+    raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/ValidateConfigs',
+                             _encode(request), self._headers)
+    resp = backend_pb2.ValidateConfigsResponse()
+    _decode(raw_resp.body, resp)
+
+    self.assertEqual(resp,
+                     backend_pb2.ValidateConfigsResponse(config_errors=[]))
+
+  def test_validate_configs_error_in_config(self):
+    self.set_as_project()
+    request = backend_pb2.ValidateConfigsRequest(configs=[
+        backend_pb2.ValidateConfigsRequest.ConfigContext(
+            target='swarming://test-swarming',
+            config_json=struct_pb2.Struct(
+                fields={
+                    'bot_ping_tolerance': struct_pb2.Value(number_value=8000),
+                }))
     ])
 
     raw_resp = self.app.post('/prpc/buildbucket.v2.TaskBackend/ValidateConfigs',
@@ -557,7 +546,8 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         backend_pb2.ValidateConfigsResponse(config_errors=[
             backend_pb2.ValidateConfigsResponse.ErrorDetail(
                 index=0,
-                error="priority (256) must be between 0 and 255 (inclusive)")
+                error="bot_ping_tolerance (8000) must range between 60 and 1200"
+            )
         ]))
 
 

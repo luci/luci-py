@@ -152,24 +152,48 @@ def cache_request(namespace, request_uuid, func):
   return result, False
 
 
-def validate_backend_configs(configs):
-  # type: (Sequence[swarming_pb2.SwarmingTaskBackendConfig]) ->
+def validate_backend_configs(configs, full_validation=False):
+  # type: (Sequence[swarming_pb2.SwarmingTaskBackendConfig], Bool) ->
   #     Sequence[Tuple[int, str]]
   """Checks the validity of each config.
 
-    Returns a tuple of (i, error_message) where i is the index of the
-    config that has the error.
+  This function will be called to validate the configs sent to ValidateConfig
+  and the config sent by RunTask. The two require different validation.
+
+  For the config provided in RunTask, the following fields are required:
+    - agent_binary_cipd_filename
+    - agent_binary_cipd_pkg
+    - agent_binary_cipd_vers
+    - bot_ping_tolerance
+    - priority
+    - tags
+
+  When validating configs sent to ValidateConfig, some fields (like
+  agent_binary_cipd fields) are not available since they are added to the config
+  when the buildbucket build is created. Thus we only need to validate fields
+  that are provided in the config, meaning that an empty config will return
+  without errors.
+
+    Args
+      configs: The configs that need to be validated.
+      full_validation: (optional) If set True, the above mentioned fields
+        will be required to be validated.
+    Return
+      A tuple of (i, error_message) where i is the index of the
+      config that has the error.
   """
   errors = []  # type: Sequence[Tuple[int, str]]
   for i, cfg in enumerate(configs):
     try:
-      task_request.validate_priority(cfg.priority)
+      if cfg.priority or full_validation:
+        task_request.validate_priority(cfg.priority)
     except (datastore_errors.BadValueError, TypeError) as e:
       errors.append((i, e.message))
 
     try:
-      task_request.validate_ping_tolerance(
-          'bot_ping_tolerance', cfg.bot_ping_tolerance)
+      if cfg.bot_ping_tolerance or full_validation:
+        task_request.validate_ping_tolerance('bot_ping_tolerance',
+                                             cfg.bot_ping_tolerance)
     except datastore_errors.BadValueError as e:
       errors.append((i, e.message))
 
@@ -187,18 +211,20 @@ def validate_backend_configs(configs):
         errors.append((i, e.message))
 
     try:
-      task_request.validate_package_name_template(
-          'agent_binary_cipd_pkg', cfg.agent_binary_cipd_pkg)
+      if cfg.agent_binary_cipd_pkg or full_validation:
+        task_request.validate_package_name_template('agent_binary_cipd_pkg',
+                                                    cfg.agent_binary_cipd_pkg)
     except datastore_errors.BadValueError as e:
       errors.append((i, e.message))
 
     try:
-      task_request.validate_package_version(
-          'agent_binary_cipd_vers', cfg.agent_binary_cipd_vers)
+      if cfg.agent_binary_cipd_vers or full_validation:
+        task_request.validate_package_version('agent_binary_cipd_vers',
+                                              cfg.agent_binary_cipd_vers)
     except datastore_errors.BadValueError as e:
       errors.append((i, e.message))
 
-    if not cfg.agent_binary_cipd_filename:
+    if full_validation and not cfg.agent_binary_cipd_filename:
       errors.append((i, 'missing `agent_binary_cipd_filename`'))
 
     for tag in cfg.tags:

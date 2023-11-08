@@ -64,7 +64,8 @@ class TaskBackendAPIService(object):
     api_helpers.validate_backend_configs([
         backend_conversions.ingest_backend_config_with_default(
             request.backend_config)
-    ])
+    ],
+                                         full_validation=True)
     tr, secret_bytes, build_task = backend_conversions.compute_task_request(
         request)
     caller = auth.get_current_identity().to_bytes()
