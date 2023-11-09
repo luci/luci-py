@@ -32,105 +32,46 @@ class BotManagementTest(test_case.TestCase):
     missing = expected - actual
     self.assertFalse(missing)
 
-  def test_BqState(self):
-    now = datetime.datetime(2020, 1, 2, 3, 4)
-    bq_state.BqState(id='foo').put()
-    bq_state.BqState(
-        id='foo', recent=now,
-        oldest=now - datetime.timedelta(seconds=60)).put()
-    with self.assertRaises(datastore_errors.BadValueError):
-      bq_state.BqState(id='foo', oldest=now).put()
-    with self.assertRaises(datastore_errors.BadValueError):
-      bq_state.BqState(id='foo', recent=now).put()
-    with self.assertRaises(datastore_errors.BadValueError):
-      bq_state.BqState(id='foo', recent=now, oldest=now).put()
-    with self.assertRaises(datastore_errors.BadValueError):
-      bq_state.BqState(id='foo', recent=now, oldest=now).put()
-    with self.assertRaises(datastore_errors.BadValueError):
-      bq_state.BqState(
-          id='foo',
-          recent=now - datetime.timedelta(seconds=60.1),
-          oldest=now - datetime.timedelta(seconds=60)).put()
-
   def test_cron_trigger_tasks(self):
     # Triggers tasks for a cron job, the very first time.
     # 2020-01-02T03:04:05.678900
     now = datetime.datetime(2020, 1, 2, 3, 4, 5, 678900)
     self.mock_now(now)
     urls = []
+    table_name = 'mytable'
+    now_rounded = datetime.datetime(*now.timetuple()[:5])
+    # we want 10 items, so set up the recent time 14 minutes ago
+    now_cuttof = now_rounded - datetime.timedelta(minutes=14)
+    state = bq_state.BqState(id=table_name, ts=now_rounded, recent=now_cuttof)
+    state.put()
+
     def enqueue_task(url, task_name):
       urls.append(url)
       self.assertEqual('tqname', task_name)
       return True
     self.mock(utils, 'enqueue_task', enqueue_task)
-    actual = bq_state.cron_trigger_tasks('mytable', '/internal/taskqueue/foo/',
+    actual = bq_state.cron_trigger_tasks(table_name, '/internal/taskqueue/foo/',
                                          'tqname', 100, 10)
     self.assertEqual(10, actual)
     self.assertEqual(1, bq_state.BqState.query().count())
     expected = {
         # Values are exclusive; they are the next values to process.
-        'oldest': datetime.datetime(2020, 1, 2, 2, 49),
         'recent': datetime.datetime(2020, 1, 2, 3, 0),
         'ts': now,
     }
     self.assertEqual(expected, bq_state.BqState.get_by_id('mytable').to_dict())
     expected = [
         # Only backfill.
-        '/internal/taskqueue/foo/2020-01-02T02:59',
-        '/internal/taskqueue/foo/2020-01-02T02:58',
-        '/internal/taskqueue/foo/2020-01-02T02:57',
-        '/internal/taskqueue/foo/2020-01-02T02:56',
-        '/internal/taskqueue/foo/2020-01-02T02:55',
-        '/internal/taskqueue/foo/2020-01-02T02:54',
-        '/internal/taskqueue/foo/2020-01-02T02:53',
-        '/internal/taskqueue/foo/2020-01-02T02:52',
-        '/internal/taskqueue/foo/2020-01-02T02:51',
         '/internal/taskqueue/foo/2020-01-02T02:50',
-    ]
-    self.assertEqual(expected, urls)
-
-  def test_cron_trigger_tasks_follow_up(self):
-    # Triggers tasks for a cron job, when it happened before.
-    # 2020-01-02T03:04:05.678900
-    now = datetime.datetime(2020, 1, 2, 3, 4, 5, 678900)
-    now_trimmed = datetime.datetime(2020, 1, 2, 3, 4)
-    self.mock_now(now)
-
-    oldest = (
-        now_trimmed - bq_state._OLDEST_BACKFILL +
-        datetime.timedelta(minutes=3))
-    bq_state.BqState(
-        id='mytable',
-        ts=now,
-        oldest=oldest,
-        recent=datetime.datetime(2020, 1, 2, 2, 57)).put()
-
-    urls = []
-    def enqueue_task(url, task_name):
-      urls.append(url)
-      self.assertEqual('tqname', task_name)
-      return True
-    self.mock(utils, 'enqueue_task', enqueue_task)
-
-    actual = bq_state.cron_trigger_tasks('mytable', '/internal/taskqueue/foo/',
-                                         'tqname', 100, 10)
-    self.assertEqual(6, actual)
-    self.assertEqual(1, bq_state.BqState.query().count())
-    expected = {
-        'oldest': datetime.datetime(2019, 1, 3, 3, 4),
-        'recent': datetime.datetime(2020, 1, 2, 3, 0),
-        'ts': now,
-    }
-    self.assertEqual(expected, bq_state.BqState.get_by_id('mytable').to_dict())
-    expected = [
-        # Front filling.
+        '/internal/taskqueue/foo/2020-01-02T02:51',
+        '/internal/taskqueue/foo/2020-01-02T02:52',
+        '/internal/taskqueue/foo/2020-01-02T02:53',
+        '/internal/taskqueue/foo/2020-01-02T02:54',
+        '/internal/taskqueue/foo/2020-01-02T02:55',
+        '/internal/taskqueue/foo/2020-01-02T02:56',
         '/internal/taskqueue/foo/2020-01-02T02:57',
         '/internal/taskqueue/foo/2020-01-02T02:58',
         '/internal/taskqueue/foo/2020-01-02T02:59',
-        # Backfilling.
-        '/internal/taskqueue/foo/2019-01-03T03:07',
-        '/internal/taskqueue/foo/2019-01-03T03:06',
-        '/internal/taskqueue/foo/2019-01-03T03:05',
     ]
     self.assertEqual(expected, urls)
 
@@ -144,7 +85,6 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(0, actual)
     self.assertEqual(1, bq_state.BqState.query().count())
     expected = {
-        'oldest': datetime.datetime(2020, 1, 2, 2, 59),
         'recent': datetime.datetime(2020, 1, 2, 3, 0),
         'ts': now,
     }

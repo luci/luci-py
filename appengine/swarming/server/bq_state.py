@@ -18,13 +18,6 @@ from components import utils
 import bqh
 
 
-# Oldest entity to backfill.
-#
-# https://cloud.google.com/bigquery/streaming-data-into-bigquery#streaming_into_partitioned_tables
-# states that the oldest row that can be streamed to a partitioned table by
-# TIMESTAMP is 1 year old. Use 364 days for safety.
-_OLDEST_BACKFILL = datetime.timedelta(days=364)
-
 # This is to prevent PayloadTooLargeError when inserting to BQ.
 RAW_LIMIT = 100
 
@@ -50,28 +43,9 @@ class BqState(ndb.Model):
   # Last time this entity was updated.
   ts = ndb.DateTimeProperty(indexed=False)
 
-  # When in backfill mode, the time of the next item that should be processed.
-  # If it's over _OLDEST_BACKFILL old, don't look at it.
-  # Exclusive.
-  oldest = ndb.DateTimeProperty(indexed=False)
   # When in streaming mode, the most recent item that should be processed.
   # Exclusive.
   recent = ndb.DateTimeProperty(indexed=False)
-
-  def _pre_put_hook(self):
-    super(BqState, self)._pre_put_hook()
-    if bool(self.recent) != bool(self.oldest):
-      raise datastore_errors.BadValueError(
-          'Internal error; recent and oldest must both be set')
-    if self.oldest:
-      if self.oldest >= self.recent:
-        raise datastore_errors.BadValueError('Internal error; oldest >= recent')
-      if self.oldest.second or self.oldest.microsecond:
-        raise datastore_errors.BadValueError(
-            'Internal error; oldest has seconds')
-      if self.recent.second or self.recent.microsecond:
-        raise datastore_errors.BadValueError(
-            'Internal error; recent has seconds')
 
 
 ### Private APIs.
@@ -170,16 +144,12 @@ def cron_trigger_tasks(
   start = utils.utcnow()
   start_rounded = datetime.datetime(*start.timetuple()[:5])
   recent_cutoff = start_rounded - RECENT_OFFSET
-  oldest_cutoff = start_rounded - _OLDEST_BACKFILL
 
   total = 0
   state = BqState.get_by_id(table_name)
-  if not state or not state.oldest:
-    # Flush the previous state, especially if it was the deprecated way, and
-    # start over.
+  if not state:
     state = BqState(
         id=table_name, ts=start,
-        oldest=recent_cutoff - minute,
         recent=recent_cutoff)
     state.put()
 
@@ -193,20 +163,6 @@ def cron_trigger_tasks(
       logging.warning('Enqueue for %t failed')
       break
     state.recent += minute
-    state.ts = utils.utcnow()
-    state.put()
-    total += 1
-
-  # Then trigger for backfill of old rows.
-  while total < max_taskqueues:
-    if (state.oldest <= oldest_cutoff or
-        (utils.utcnow() - start).total_seconds() >= max_seconds):
-      break
-    t = state.oldest.strftime(u'%Y-%m-%dT%H:%M')
-    if not utils.enqueue_task(baseurl + t, task_name):
-      logging.warning('Enqueue for %t failed')
-      break
-    state.oldest -= minute
     state.ts = utils.utcnow()
     state.put()
     total += 1
