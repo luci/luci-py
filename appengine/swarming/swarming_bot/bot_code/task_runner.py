@@ -695,8 +695,7 @@ class _RBEPinger:
 
   def _ping_active_lease(self):
     try:
-      if not self._rbe_session.ping_active_lease():
-        logging.warning('RBE lease is no longer active')
+      self._rbe_session.ping_active_lease()
     except remote_client.RBEServerError as e:
       logging.error('Failed to ping RBE lease: %s', e)
 

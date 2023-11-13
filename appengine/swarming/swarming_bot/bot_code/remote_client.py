@@ -1047,18 +1047,27 @@ class RBESession:
     dead yet) and polls its cancellation status. Must be called only if
     `active_lease` is set, otherwise RBESessionException is raised.
 
-    Calling this methods may update `alive` property as a side effect: a session
-    may become dead if it is gone on the backend side. The active lease is
-    considered canceled in that case. If the local session was already dead
-    when the method was called, the active lease is considered canceled as well.
+    Returns True if the lease is still alive and the bot should keep working on.
+    Once the bot completes the lease, it should call finish_active_lease(...).
 
-    Doesn't unset `active_lease` itself even if the lease was canceled. Use
-    finish_active_lease(...) to mark it as complete.
+    Returns False, but doesn't unset `active_lease`, if the lease was canceled
+    remotely. The bot should start graceful cancellation process in that case,
+    eventually calling finish_active_lease(...) to mark the lease as completed.
+
+    Returns False and unsets `active_lease` if the lease was "lost". This
+    indicates the server already gave up on this lease and the bot is free to
+    just drop it whenever it wants: no result reporting is necessary, no need
+    to call finish_active_lease(...).
+
+    Additionally calling this method may update `alive` property as a side
+    effect: a session may become dead if it is gone on the backend side. The
+    active lease is considered lost in that case as well. If the local session
+    was already dead when the method was called, this function does nothing and
+    just returns False.
 
     Returns:
-      True to keep working on the active lease, False to stop. On False, the
-      caller must eventually call finish_active_lease(...) before calling
-      the next update(...) or terminate(...).
+      True to keep working on the active lease, False if it was canceled or
+      lost (use `active_lease` value to decide).
 
     Raises:
       RBESessionException if the local session is in a wrong state.
@@ -1067,7 +1076,7 @@ class RBESession:
     if not self.active_lease:
       raise RBESessionException('ping_active_lease(...) without a lease')
     if not self.alive:
-      logging.warning('The session is already gone, canceling the lease')
+      logging.warning('The session is already gone')
       return False
 
     # Report the lease as ACTIVE. Do not use a poll token, it might have expired
@@ -1079,23 +1088,27 @@ class RBESession:
                          dimensions=self._dimensions,
                          lease=self._active_lease)
 
-    # If the session is gone, treat it as if the lease was canceled.
+    # If the session is gone, the lease is lost.
     if not self.alive:
-      logging.warning('The session is gone now, canceling the lease')
+      logging.error('The session was lost')
+      self.abandon()
       return False
 
-    # This must not be happening, but treat it as if the lease was canceled.
+    # No lease in the response means the active lease was lost.
     if not lease:
-      logging.error('The lease is unexpectedly gone, canceling it')
+      logging.error('Lost active lease %s', self._active_lease.id)
+      self._active_lease = None
       return False
 
-    # This must not be happening either, but also treat it as a cancellation.
+    # This must not be happening either, but also treat it as a lost lease.
     if lease.id != self._active_lease.id:
       logging.error('Got unexpected lease ID: want %s, got %s',
                     self._active_lease.id, lease.id)
+      self._active_lease = None
       return False
 
     # Keep working on the lease if the server tells it is still ACTIVE.
+    logging.info('The lease %s is %s', lease.id, lease.state)
     return lease.state == RBELeaseState.ACTIVE
 
   def finish_active_lease(self, result, flush=False):
@@ -1224,10 +1237,10 @@ class RBESession:
     if self.alive:
       raise RBESessionException('abandon() with a living session')
     if self._active_lease:
-      logging.error('Ignoring active lease %s', self._active_lease.id)
+      logging.error('Lost active lease %s', self._active_lease.id)
       self._active_lease = None
     if self._finished_lease:
-      logging.error('Losing results of %s', self._finished_lease.id)
+      logging.error('Lost results of %s', self._finished_lease.id)
       self._finished_lease = None
 
   def _update(self,

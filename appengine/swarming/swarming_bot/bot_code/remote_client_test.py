@@ -912,20 +912,10 @@ class TestRBESession(unittest.TestCase):
     s.update(remote_client.RBESessionStatus.OK, dims, 'poll_tok')
     self.assertEqual('lease-0', s.active_lease.id)
 
-    # Send a ping and discover the session is gone.
+    # Send a ping and discover the session is gone and the lease is lost.
     remote.mock_next_response(remote_client.RBESessionStatus.BOT_TERMINATING,
                               None)
     self.assertFalse(s.ping_active_lease())
-    self.assertFalse(s.alive)
-    self.assertIsNotNone(s.active_lease)
-
-    # Sending the ping again does nothing.
-    self.assertFalse(s.ping_active_lease())
-    self.assertFalse(s.alive)
-    self.assertIsNotNone(s.active_lease)
-
-    # "Finishing" the lease only update the local state.
-    s.finish_active_lease({})
     self.assertFalse(s.alive)
     self.assertIsNone(s.active_lease)
 
@@ -979,6 +969,40 @@ class TestRBESession(unittest.TestCase):
         'payload': {},
         'state': 'COMPLETED'
     }, remote.last_lease.to_dict())
+
+  def test_lease_lost(self):
+    remote = MockedRBERemote()
+    dims = {'dim': ['v1', 'v2']}
+
+    s = remote_client.RBESession(remote, 'some-instance', dims, 'bot_version',
+                                 'poll_tok')
+
+    # Get a task.
+    remote.mock_next_response(
+        remote_client.RBESessionStatus.OK,
+        remote_client.RBELease(
+            'lease-0',
+            remote_client.RBELeaseState.PENDING,
+            {},
+            None,
+        ),
+    )
+    s.update(remote_client.RBESessionStatus.OK, dims, 'poll_tok')
+    self.assertEqual('lease-0', s.active_lease.id)
+
+    # Send a ping and discover the lease is lost.
+    remote.mock_next_response(
+        remote_client.RBESessionStatus.OK,
+        None,
+    )
+    self.assertFalse(s.ping_active_lease())
+    self.assertTrue(s.alive)
+    self.assertIsNone(s.active_lease)
+
+    # The next update doesn't report the lost lease.
+    remote.mock_next_response(remote_client.RBESessionStatus.OK, None)
+    s.update(remote_client.RBESessionStatus.OK, dims, 'poll_tok')
+    self.assertIsNone(remote.last_lease)
 
   def test_finish_active_lease_flush(self):
     remote = MockedRBERemote()
