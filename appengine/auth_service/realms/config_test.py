@@ -5,6 +5,7 @@
 
 # pylint: disable=no-value-for-parameter
 
+import hashlib
 import logging
 import os
 import sys
@@ -19,10 +20,14 @@ import parameterized
 from test_support import test_case
 
 from components.auth import model
+from components.auth.proto import realms_pb2
 from components.config import fs
+
+from proto import config_pb2
 
 from realms import config
 from realms import permissions
+from realms import permissions_config
 
 
 def fake_db(rev, perms=None):
@@ -157,6 +162,53 @@ class CheckPermissionChangesTest(test_case.TestCase):
     self.call(fake_db('rev2', ['luci.dev.p3']))
     self.assertEqual(model.get_auth_db_revision(), 2)
     self.assertEqual(perms_from_authdb(), ['luci.dev.p3'])
+
+
+class PermissionsConfigFetchTest(test_case.TestCase):
+  @mock.patch('components.config.common.self_config_set', autospec=True)
+  @mock.patch('components.config.fs.get_provider', autospec=True)
+  def test_works(self, get_provider_mock, self_config_set_mock):
+    TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+    get_provider_mock.return_value = fs.Provider(
+        os.path.join(TESTS_DIR, 'test_data'))
+
+    # See test_data/... layout.
+    self_config_set_mock.return_value = 'services/auth-service-app-id'
+
+    rev = config.get_latest_permissions_rev_async().get_result()
+
+    expected_cfg = config_pb2.PermissionsConfig(role=[
+        config_pb2.PermissionsConfig.Role(
+            name='role/test.admin',
+            permissions=[
+                realms_pb2.Permission(name='auth.test.view'),
+                realms_pb2.Permission(name='auth.test.setTested', internal=True)
+            ]),
+        config_pb2.PermissionsConfig.Role(
+            name='role/test.viewer',
+            permissions=[realms_pb2.Permission(name='auth.test.view')])
+    ])
+    expected_digest = hashlib.sha256(
+        expected_cfg.SerializeToString()).hexdigest()
+
+    self.assertEqual(
+        rev,
+        config.PermissionsCfgRev(config_rev='unknown',
+                                 config_digest=expected_digest,
+                                 config_body=expected_cfg))
+
+  @mock.patch('components.config.common.self_config_set', autospec=True)
+  @mock.patch('components.config.fs.get_provider', autospec=True)
+  def test_fetch_error_raises(self, get_provider_mock, self_config_set_mock):
+    TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+    get_provider_mock.return_value = fs.Provider(
+        os.path.join(TESTS_DIR, 'test_data'))
+
+    # Use a non-existent path so permissions.cfg won't exist.
+    self_config_set_mock.return_value = 'services/missing-service-app-id'
+
+    with self.assertRaises(permissions_config.FetchError):
+      config.get_latest_permissions_rev_async().get_result()
 
 
 class ProjectConfigFetchTest(test_case.TestCase):

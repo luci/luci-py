@@ -30,10 +30,11 @@ from components import config
 from components import utils
 from components.auth import model
 
-from proto import realms_config_pb2
+from proto import config_pb2, realms_config_pb2
 
 from realms import common
 from realms import permissions
+from realms import permissions_config
 from realms import rules
 from realms import validation
 
@@ -42,6 +43,20 @@ import replication
 
 # Register the config validation hook.
 validation.register()
+
+
+# Information about the fetched or previously processed permissions.cfg.
+#
+# Comes from either LUCI Config (`body` is set), or from the datastore.
+PermissionsCfgRev = collections.namedtuple(
+    'PermissionsCfgRev',
+    [
+        'config_rev',  # the permsissions.cfg revision
+        'config_digest',  # digest of the raw config body
+
+        # below is only set if the config was fetched from LUCI Config
+        'config_body',  # byte blob of the config
+    ])
 
 
 # Information about fetched or previously processed realms.cfg.
@@ -75,6 +90,30 @@ def refetch_config():
   """
   jobs = []
   db = permissions.db()
+
+  try:
+    # Fetch latest permissions config and last processed revision.
+    latest_perms = get_latest_permissions_rev_async()
+    stored_perms = get_stored_permissions_rev_async()
+    latest_perms_rev = latest_perms.get_result()
+    stored_perms_rev = stored_perms.get_result()
+
+    # Update the stored permissions config if necessary.
+    jobs.extend(
+        check_permissions_config_changes(latest_perms_rev, stored_perms_rev))
+
+    # For now, compare the permissions config to permissions.db() but
+    # don't actually use it yet.
+    cfg_db = permissions_config.to_db(revision=latest_perms_rev.config_rev,
+                                      config=latest_perms_rev.config_body)
+    dissimilar_fields = compare_permissions_dbs(db, cfg_db)
+    if dissimilar_fields.issubset({'revision'}):
+      logging.info('permissions.cfg is functionally identical to '
+                   'permissions.db()')
+  except permissions_config.FetchError as e:
+    logging.error('Error fetching permissions config: %s', e)
+  except Exception as e:
+    logging.error('Failed processing permissions config: %s', e)
 
   # If db.permissions has changed, we need to propagate changes into the AuthDB.
   jobs.extend(check_permission_changes(db))
@@ -123,6 +162,100 @@ def execute_jobs(jobs, txn_sleep_time):
           exc.__class__.__name__, exc)
       success = False
   return success
+
+
+@ndb.tasklet
+def get_latest_permissions_rev_async():
+  """Returns the latest permissions config by querying LUCI Config."""
+  # Fetch the config from LUCI Config
+  latest_rev, latest_cfg = yield config.get_self_config_async(
+      permissions_config.FILENAME,
+      dest_type=config_pb2.PermissionsConfig,
+      store_last_good=False)
+
+  if latest_cfg is None:
+    raise permissions_config.FetchError('Config %s is missing' %
+                                        permissions_config.FILENAME)
+
+  if not isinstance(latest_cfg, config_pb2.PermissionsConfig):
+    raise permissions_config.FetchError(
+        'Config %s at rev %s is invalid' %
+        (permissions_config.FILENAME, latest_rev))
+
+  raise ndb.Return(
+      PermissionsCfgRev(
+          config_rev=latest_rev or 'unknown',
+          config_digest=hashlib.sha256(
+              latest_cfg.SerializeToString()).hexdigest(),
+          config_body=latest_cfg,
+      ))
+
+
+@ndb.tasklet
+def get_stored_permissions_rev_async():
+  """Returns metadata of last processed permissions config."""
+  perms_meta = yield permissions_config_meta_key().get_async()
+  if not perms_meta:
+    logging.info('No PermissionsConfigMeta entity in datastore')
+    raise ndb.Return(None)
+
+  raise ndb.Return(
+      PermissionsCfgRev(
+          config_rev=perms_meta.revision,
+          config_digest=perms_meta.config_digest,
+          config_body=None,
+      ))
+
+
+def check_permissions_config_changes(latest, stored):
+  """Returns the latest permissions config, and jobs to update the
+  stored permissions config if necessary.
+
+  Args:
+    latest (PermissionsCfgRev): the latest fetched permissions config
+                                from LUCI Config.
+    stored (PermissionsCfgRev): metadata of the last applied permissions
+                                config.
+
+  Returns:
+    a list of parameterless callbacks.
+  """
+  if (stored and stored.config_rev == latest.config_rev
+      and stored.config_digest == latest.config_digest):
+    # Stored PermissionsConfig is up to date.
+    logging.info('Processed %s at rev "%s"; already up-to-date',
+                 permissions_config.FILENAME, latest.config_rev)
+    return []
+
+  logging.info('Updating permissions config to rev "%s"', latest.config_rev)
+
+  @ndb.transactional
+  def update_stored():
+    """Updates the stored permissions config."""
+    stored_perms_cfg = permissions_config.config_key().get()
+    if (stored_perms_cfg and stored_perms_cfg.revision == latest.config_rev
+        and stored_perms_cfg.config == latest.config_body):
+      logging.info('Skipping permissions config; already up-to-date')
+      return
+
+    # Update PermissionsConfig and the metadata for it.
+    to_update = []
+    to_update.append(
+        permissions_config.PermissionsConfig(
+            key=permissions_config.config_key(),
+            config=latest.config_body,
+            revision=latest.config_rev))
+    to_update.append(
+        PermissionsConfigMeta(
+            key=permissions_config_meta_key(),
+            revision=latest.config_rev,
+            config_digest=latest.config_digest,
+            modified_ts=utils.utcnow(),
+        ))
+
+    ndb.put_multi(to_update)
+
+  return [update_stored]
 
 
 def check_permission_changes(db):
@@ -390,6 +523,35 @@ def delete_realms(project_id):
   model.replicate_auth_db()
 
 
+class PermissionsConfigMeta(ndb.Model):
+  """Metadata of the PermissionsConfig entity.
+
+  Always created/deleted/updated transactionally with the singleton
+  PermissionsConfig entity, but it is not a part of AuthDB itself (i.e.
+  components.auth doesn't know about this entity and never fetches it).
+
+  Used to hold bookkeeping state related to permissions.cfg processing.
+  Can be fetched very efficiently (compared to fetching the
+  PermissionsConfig with its large config_pb2.PermissionsConfig body).
+
+  ID is always 'meta', the parent entity is the singleton
+  PermissionsConfig.
+  """
+  # Last imported SHA1 revision of the config.
+  revision = ndb.StringProperty(indexed=False)
+  # SHA256 digest of the raw config body.
+  config_digest = ndb.StringProperty(indexed=False)
+  # When it was last updated (mostly FYI).
+  modified_ts = ndb.DateTimeProperty(indexed=False)
+
+
+def permissions_config_meta_key():
+  """Key for the PermissionsConfigMeta entity."""
+  return ndb.Key(PermissionsConfigMeta,
+                 'meta',
+                 parent=permissions_config.config_key())
+
+
 class AuthProjectRealmsMeta(ndb.Model):
   """Metadata of some AuthProjectRealms entity.
 
@@ -423,3 +585,25 @@ def project_realms_meta_key(project_id):
   return ndb.Key(
       AuthProjectRealmsMeta, 'meta',
       parent=model.project_realms_key(project_id))
+
+
+def compare_permissions_dbs(db_a, db_b):
+  """Compares the given permissions.DB's, and returns the names of the
+  fields that are different.
+  """
+  dissimilar_fields = set()
+  for field in permissions.DB._fields:
+    a_value = getattr(db_a, field)
+    b_value = getattr(db_b, field)
+
+    if field == 'implicit_root_bindings':
+      # implicit_root_bindings should be a function, so compare the
+      # outputs given the same input.
+      projID = 'dummy-project-id'
+      a_value = a_value(projID)
+      b_value = b_value(projID)
+
+    if a_value != b_value:
+      dissimilar_fields.add(field)
+
+  return dissimilar_fields
