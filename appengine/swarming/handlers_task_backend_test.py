@@ -133,7 +133,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
         start_deadline=timestamp_pb2.Timestamp(seconds=int(utils.time_time() +
                                                            120)),
         dimensions=[self._req_dim_prpc('pool', 'default')],
-        register_backend_task_token='token-token-token',
         buildbucket_host='cow-buildbucket.appspot.com',
         pubsub_topic="my_topic")
 
@@ -162,6 +161,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
 
     request = self._basic_run_task_request()
     request.build_id = "8783198670850745761"
+    request.request_id = "123"
     self.mock(random, 'getrandbits', lambda _: 0x86)
     self.mock(utils, 'time_time_ns', lambda: 1546398020)
     actual_resp = self._client_run_task(request)
@@ -191,8 +191,9 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, task_request.BuildTask.query().count())
     self.assertEqual(1, task_request.SecretBytes.query().count())
 
-    # Test tasks with different `build_id`s are not deduped.
-    request.build_id = '23895823794242'
+    # Test tasks with different `request_ids`s are not deduped.
+    request.build_id = '8783198670850745761'
+    request.request_id = "456"
     self.mock(random, 'getrandbits', lambda _: 0x87)
     actual_resp = self._client_run_task(request)
     new_expected_task_id = '4225526b80008710'
@@ -405,6 +406,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.set_as_project()
     request = self._basic_run_task_request()
     request.build_id = "8783198670850745761"
+    request.request_id = "12345"
     self.mock(random, 'getrandbits', lambda _: 0x86)
     self.mock(utils, 'time_time_ns', lambda: 1546398020)
     actual_resp = self._client_run_task(request)
@@ -416,6 +418,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
 
     # second request
     request.build_id = '23895823794242'
+    request.request_id = "67890"
     self.mock(random, 'getrandbits', lambda _: 0x87)
     self.mock(utils, 'time_time_ns', lambda: 1646398020)
     actual_resp = self._client_run_task(request)

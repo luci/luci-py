@@ -69,7 +69,7 @@ class TaskBackendAPIService(object):
     tr, secret_bytes, build_task = backend_conversions.compute_task_request(
         request)
     caller = auth.get_current_identity().to_bytes()
-    request_id = "%s:%s" % (caller, request.build_id)
+    request_id = "%s:%s" % (caller, request.request_id)
     api_helpers.process_task_request(tr, task_request.TEMPLATE_SKIP)
     try:
       result_summary = task_scheduler.schedule_request(
