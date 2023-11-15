@@ -315,6 +315,10 @@ def get_cipd_architecture():
   if cpu_type.startswith('armv') and cpu_type.endswith('l'):
     # 32-bit ARM: Standardize on ARM v6 baseline.
     return 'armv6l'
+  if cpu_type == 'evbarm':  # NetBSD's name for ARM, both 32 and 64-bit
+    return 'arm64' if get_cpu_bitness() == '64' else 'armv6l'
+  if cpu_type == 'powerpc64':  # OpenBSD's name for ppc64
+    return 'ppc64'
   # TODO(vadimsh): Detection of following architectures is likely broken:
   #   mips64, mips64le, mipsle, ppc64, ppc64le, riscv64, s390x.
   return cpu_type

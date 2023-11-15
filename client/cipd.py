@@ -303,6 +303,11 @@ def get_platform():
     arch = '386'
   elif arch == 'i86pc':  # Solaris doesn't distinguish between 64 and 32-bit.
     arch = '386' if python_bits == 32 else 'amd64'
+  elif arch == 'evbarm':  # NetBSD's name for ARM, both 32 and 64-bit
+    arch = 'armv6l' if python_bits == 32 else 'arm64'
+  elif arch == 'powerpc64':  # OpenBSD's name for ppc64
+    arch = 'ppc64'
+
   elif not arch and os_name == 'windows':
     # On some 32bit Windows7, platform.machine() returns None.
     # Fallback to 386 in that case.
