@@ -123,3 +123,11 @@ cron:
   url: /internal/cron/important/bot_groups_config
   schedule: every 1 minutes
   target: backend
+
+
+### Crons handled by the Go portion.
+
+- description: read server configs in Go
+  url: /internal/cron/update-config
+  schedule: every 1 minutes
+  target: default-go
