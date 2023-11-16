@@ -32,6 +32,11 @@ bot-page {
     }
   }
 
+  .vertical.grid {
+    display: grid;
+    gap: 1em;
+  }
+
   .horizontal.layout {
     display: flex;
     flex-direction: row;
@@ -45,6 +50,9 @@ bot-page {
     }
     &.end {
       justify-content: flex-end;
+    }
+    &.terminate {
+      gap: 1em;
     }
   }
 

@@ -785,6 +785,11 @@ describe("bot-page", function () {
         expect(dialog).toBeTruthy();
         expect(dialog).toHaveClass("opened");
 
+        const reason = "Bot misbehaving";
+        const reasonInput = $$("#reason", ele);
+        expect(reasonInput).toBeTruthy();
+        reasonInput.value = reason;
+
         const okBtn = $$("button.ok", dialog);
         expect(okBtn).toBeTruthy();
 
@@ -796,11 +801,12 @@ describe("bot-page", function () {
           expectNoUnmatchedCalls(fetchMock);
           let calls = fetchMock.calls(MATCHED, "GET");
           expect(calls).toHaveSize(0);
-          calls = fetchMock
-            .calls(MATCHED, "POST")
-            .filter(
-              checkFor("swarming.v2.Bots/TerminateBot", { bot_id: TEST_BOT_ID })
-            );
+          calls = fetchMock.calls(MATCHED, "POST").filter(
+            checkFor("swarming.v2.Bots/TerminateBot", {
+              bot_id: TEST_BOT_ID,
+              reason: reason,
+            })
+          );
           expect(calls).toHaveSize(1);
 
           done();

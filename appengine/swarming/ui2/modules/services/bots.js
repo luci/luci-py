@@ -50,13 +50,15 @@ export class BotsService extends PrpcService {
    * Terminates a bot given a botId.
    *
    * @param {String} botId - identifier of bot to terminate.
+   * @param {String} reason - user supplied reason to terminate the bot
    *
    * @returns {Object} with the shape {taskId: "some_task_id"} if the termination operation was initiated without error
    *
    **/
-  terminate(botId) {
+  terminate(botId, reason) {
     const request = {
       bot_id: botId,
+      reason: reason,
     };
     return this._call("TerminateBot", request);
   }

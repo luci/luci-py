@@ -341,6 +341,41 @@ const eventRow = (event, showAll, serverVersion) => {
   </tr>`;
 };
 
+const otherPrompts = (ele) => html` <dialog-pop-over>
+  <div class="prompt-dialog content">
+    Are you sure you want to ${ele._prompt}?
+    <div class="horizontal layout end">
+      <button @click=${ele._closePopup} class="cancel" tabindex="0">NO</button>
+      <button @click=${ele._promptCallback} class="ok" tabindex="0">YES</button>
+    </div>
+  </div>
+</dialog-pop-over>`;
+
+const terminatePrompt = (ele) => html` <dialog-pop-over>
+  <div class="prompt-dialog content">
+    <div class="vertical grid reason">
+      <div>Are you sure you want to ${ele._prompt}?</div>
+      <div class="horizontal layout terminate">
+        <label for="reason">Shutdown reason (optional)</label>
+        <input type="text" id="reason" name="reason" />
+      </div>
+      <div class="horizontal layout end">
+        <button @click=${ele._closePopup} class="cancel" tabindex="0">
+          NO
+        </button>
+        <button @click=${ele._promptCallback} class="ok" tabindex="0">
+          YES
+        </button>
+      </div>
+    </div>
+  </div>
+</dialog-pop-over>`;
+
+const prompt = (ele) => {
+  if (ele._promptType === "shutdown") return terminatePrompt(ele);
+  else return otherPrompts(ele);
+};
+
 const template = (ele) => html`
 <swarming-app id=swapp
               ?testing_offline=${ele.testing_offline}>
@@ -398,15 +433,7 @@ const template = (ele) => html`
 
   </main>
   <footer></footer>
-  <dialog-pop-over>
-    <div class='prompt-dialog content'>
-      Are you sure you want to ${ele._prompt}?
-      <div class="horizontal layout end">
-        <button @click=${ele._closePopup} class=cancel tabindex=0>NO</button>
-        <button @click=${ele._promptCallback} class=ok tabindex=0>YES</button>
-      </div>
-    </div>
-  </dialog-pop-over>
+  ${prompt(ele)}
 </swarming-app>
 `;
 
@@ -613,6 +640,7 @@ window.customElements.define(
     }
 
     _promptDelete() {
+      this._promptType = "delete";
       this._prompt = `delete dead bot '${this._botId}'`;
       this._promptCallback = this._deleteBot;
       this.render();
@@ -622,6 +650,7 @@ window.customElements.define(
     }
 
     _promptKill() {
+      this._promptType = "kill";
       this._prompt = `kill running task '${this._bot.taskId}'`;
       this._promptCallback = this._killTask;
       this.render();
@@ -631,6 +660,7 @@ window.customElements.define(
     }
 
     _promptShutdown() {
+      this._promptType = "shutdown";
       this._prompt = `gracefully shut down bot '${this._botId}'`;
       this._promptCallback = this._shutdownBot;
       this.render();
@@ -666,8 +696,9 @@ window.customElements.define(
 
     _shutdownBot() {
       this.app.addBusyTasks(1);
+      const reason = $$("#reason").value;
       this._createBotService()
-        .terminate(this._botId)
+        .terminate(this._botId, reason)
         .then((_resp) => {
           this._closePopup();
           errorMessage("Request to shutdown bot sent", 4000);
