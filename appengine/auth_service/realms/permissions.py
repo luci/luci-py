@@ -367,28 +367,33 @@ def db():
   # RPCs when one LUCI micro-service calls another in a context of some project.
   # Thus this role authorizes various internal RPCs between LUCI micro-services
   # when they are scoped to a single project.
-  role('role/luci.internal.system', [
-      # Allow Swarming to use realm accounts.
-      include('role/luci.serviceAccountTokenCreator'),
-      # Allow Buildbucket to trigger Swarming tasks and use project's pools.
-      include('role/swarming.taskTriggerer'),
-      include('role/swarming.poolUser'),
-      # Allow Scheduler and CQ to trigger Buildbucket builds.
-      include('role/buildbucket.triggerer'),
-      # Allow Buildbucket and Swarming to create new invocations.
-      include('role/resultdb.invocationCreator'),
-      # Allow trusted services to create invocations with custom IDs, e.g.
-      # `build:8878494550606210560`.
-      permission('resultdb.invocations.createWithReservedID', internal=True),
-      # Allow trusted services to populate reserved fields in new
-      # invocations.
-      permission('resultdb.invocations.setProducerResource', internal=True),
-      permission('resultdb.invocations.exportToBigQuery', internal=True),
-      # Allow LUCI Analysis to read buildbucket builds (and their
-      # ResultDB invocations) for ingestion.
-      permission('buildbucket.builds.get'),
-      include('role/resultdb.reader'),
-  ])
+  role(
+      'role/luci.internal.system',
+      [
+          # Allow Swarming to use realm accounts.
+          include('role/luci.serviceAccountTokenCreator'),
+          # Allow Buildbucket to trigger Swarming tasks, use project's pools
+          # and fetch tasks from project's pools.
+          include('role/swarming.taskTriggerer'),
+          include('role/swarming.poolUser'),
+          include('role/swarming.poolViewer'),
+          # Allow Scheduler and CQ to trigger Buildbucket builds.
+          include('role/buildbucket.triggerer'),
+          # Allow Buildbucket and Swarming to create new invocations.
+          include('role/resultdb.invocationCreator'),
+          # Allow trusted services to create invocations with custom IDs, e.g.
+          # `build:8878494550606210560`.
+          permission('resultdb.invocations.createWithReservedID',
+                     internal=True),
+          # Allow trusted services to populate reserved fields in new
+          # invocations.
+          permission('resultdb.invocations.setProducerResource', internal=True),
+          permission('resultdb.invocations.exportToBigQuery', internal=True),
+          # Allow LUCI Analysis to read buildbucket builds (and their
+          # ResultDB invocations) for ingestion.
+          permission('buildbucket.builds.get'),
+          include('role/resultdb.reader'),
+      ])
 
   # Allows to see the list of builders and read builds in a LUCI project.
   # Granted to Milo's own account in all LUCI projects to allow it to fetch
