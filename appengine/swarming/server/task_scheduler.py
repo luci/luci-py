@@ -899,15 +899,14 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
   # - if one of hard_timeout or io_timeout is set, duration is also set.
   # - hard_timeout or io_timeout can still happen in the case of killing. This
   #   still needs to result in KILLED, not TIMED_OUT.
+  logging.info('Starting transaction attempt')
 
-  result_summary_future = result_summary_key.get_async()
-  run_result = run_result_key.get()
+  run_result, result_summary = ndb.get_multi(
+      [run_result_key, result_summary_key])
   if not run_result:
-    result_summary_future.wait()
     return None, None, 'is missing'
 
   if run_result.bot_id != bot_id:
-    result_summary_future.wait()
     return None, None, (
         'expected bot (%s) but had update from bot %s' % (
         run_result.bot_id, bot_id))
@@ -921,11 +920,9 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
       # This happens as an HTTP request is retried when the DB write succeeded
       # but it still returned HTTP 500.
       if run_result.exit_code != exit_code:
-        result_summary_future.wait()
         return None, None, 'got 2 different exit_code; %s then %s' % (
             run_result.exit_code, exit_code)
       if run_result.duration != duration:
-        result_summary_future.wait()
         return None, None, 'got 2 different durations; %s then %s' % (
             run_result.duration, duration)
     else:
@@ -992,18 +989,18 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
   else:
     run_result.dead_after_ts = None
 
-  result_summary = result_summary_future.get_result()
   result_summary.set_from_run_result(run_result, request)
-
   to_put.append(result_summary)
 
   if need_cancel and run_result.state in task_result.State.STATES_RUNNING:
+    logging.info('Calling _cancel_task_tx')
     _cancel_task_tx(request, result_summary, True, bot_id, now, es_cfg,
                     run_result)
 
-  logging.info('Storing %d entities', len(to_put))
+  logging.info('Storing %d entities: %s', len(to_put), [e.key for e in to_put])
   ndb.put_multi(to_put)
 
+  logging.info('Committing transaction')
   return result_summary, run_result, None
 
 
@@ -1831,7 +1828,9 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
       need_cancel, performance_stats, now, result_summary_key, request, es_cfg,
       canceled)
   try:
+    logging.info('Starting transaction')
     smry, run_result, error = datastore_utils.transaction(run, retries=3)
+    logging.info('Transaction committed')
   except datastore_utils.CommitError as e:
     logging.info('Got commit error: %s', e)
     # It is important that the caller correctly surface this error as the bot
