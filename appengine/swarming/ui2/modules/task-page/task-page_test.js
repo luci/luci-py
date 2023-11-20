@@ -927,6 +927,10 @@ describe("task-page", function () {
 
         useSameBot.click();
 
+        const realmInput = $$("#task_realm");
+        const realm = "try/realm";
+        realmInput.value = realm;
+
         const okBtn = $$("button.ok", dialog);
         expect(okBtn).toBeTruthy();
 
@@ -947,6 +951,7 @@ describe("task-page", function () {
 
           const body = JSON.parse(options.body);
           expect(body.name).toContain("leased to");
+          expect(body.realm).toEqual(realm);
 
           const dims = body.properties.dimensions;
           expect(dims).toBeTruthy();

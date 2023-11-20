@@ -34,7 +34,10 @@ task-page {
   .ib > * {
     display: inline-block;
   }
-
+  .vertical.grid {
+    display: grid;
+    gap: 0.5em;
+  }
   .horizontal.layout {
     display: flex;
     flex-direction: row;

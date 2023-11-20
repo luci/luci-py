@@ -1150,10 +1150,14 @@ const retryOrDebugPrompt = (ele, sliceProps) => {
     Are you sure you want to ${ele._isPromptDebug ? "debug" : "retry"}
     task ${ele._taskId}?
   </h2>
-  <div>
+  <div class="vertical grid">
+    <div class=ib ?hidden=${!ele._isPromptDebug}>
+      <span>Realm (you may need to change pool dimension as well)</span>
+      <input type="text" id=task_realm value="${ele._request.realm}"></input>
+    </div>
     <div class=ib ?hidden=${!ele._isPromptDebug}>
       <span>Lease Duration</span>
-      <input id=lease_duration value=4h></input>
+      <input type="text" id=lease_duration value=4h></input>
     </div>
     <div class=ib>
       <checkbox-sk class=same-bot
@@ -1430,13 +1434,14 @@ window.customElements.define(
       // if it does not output for some time.
       // See https://crbug.com/1492327
       newProperties.io_timeout_secs = this._request.expirationSecs;
+      const realm = $$("#task_realm").value;
       const newTask = {
         expiration_secs: this._request.expirationSecs,
         name: `leased to ${this.profile.email} for debugging`,
         pool_task_template: 3, // SKIP
         priority: 20,
         properties: newProperties,
-        realm: this._request.realm,
+        realm: realm || this._request.realm,
         service_account: this._request.serviceAccount,
         tags: ["debug_task:1"],
         user: this.profile.email,
