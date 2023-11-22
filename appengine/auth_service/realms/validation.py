@@ -7,10 +7,11 @@
 from components import auth
 from components.config import validation
 
-from proto import realms_config_pb2
+from proto import config_pb2, realms_config_pb2
 
 from realms import common
 from realms import permissions
+from realms import permissions_config
 
 
 # TODO(vadimsh): Figure out how to handle deletion of roles and permissions.
@@ -27,10 +28,16 @@ def register():
   cfg_path = common.cfg_path()
   @validation.project_config_rule(cfg_path, realms_config_pb2.RealmsCfg)
   def validate_project_realms_cfg(cfg, ctx):
-    Validator(ctx, permissions.db(), allow_internal=False).validate(cfg)
+    db = permissions_config.get_stored_as_db()
+    Validator(ctx, db, allow_internal=False).validate(cfg)
+
   @validation.self_rule(cfg_path, realms_config_pb2.RealmsCfg)
   def validate_internal_realms_cfg(cfg, ctx):
-    Validator(ctx, permissions.db(), allow_internal=True).validate(cfg)
+    db = permissions_config.get_stored_as_db()
+    Validator(ctx, db, allow_internal=True).validate(cfg)
+
+  validation.self_rule(permissions_config.FILENAME,
+                       dest_type=config_pb2.PermissionsConfig)
 
 
 class Validator(object):

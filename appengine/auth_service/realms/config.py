@@ -89,7 +89,6 @@ def refetch_config():
     True on success, False on partial success or failure.
   """
   jobs = []
-  db = permissions.db()
 
   try:
     # Fetch latest permissions config and last processed revision.
@@ -102,18 +101,14 @@ def refetch_config():
     jobs.extend(
         check_permissions_config_changes(latest_perms_rev, stored_perms_rev))
 
-    # For now, compare the permissions config to permissions.db() but
-    # don't actually use it yet.
-    cfg_db = permissions_config.to_db(revision=latest_perms_rev.config_rev,
-                                      config=latest_perms_rev.config_body)
-    dissimilar_fields = compare_permissions_dbs(db, cfg_db)
-    if dissimilar_fields.issubset({'revision'}):
-      logging.info('permissions.cfg is functionally identical to '
-                   'permissions.db()')
+    db = permissions_config.to_db(revision=latest_perms_rev.config_rev,
+                                  config=latest_perms_rev.config_body)
   except permissions_config.FetchError as e:
     logging.error('Error fetching permissions config: %s', e)
-  except Exception as e:
-    logging.error('Failed processing permissions config: %s', e)
+    db = permissions_config.get_stored_as_db()
+    logging.info(
+        'Using last successfully processed permissions config at rev %s',
+        db.revision)
 
   # If db.permissions has changed, we need to propagate changes into the AuthDB.
   jobs.extend(check_permission_changes(db))
@@ -585,25 +580,3 @@ def project_realms_meta_key(project_id):
   return ndb.Key(
       AuthProjectRealmsMeta, 'meta',
       parent=model.project_realms_key(project_id))
-
-
-def compare_permissions_dbs(db_a, db_b):
-  """Compares the given permissions.DB's, and returns the names of the
-  fields that are different.
-  """
-  dissimilar_fields = set()
-  for field in permissions.DB._fields:
-    a_value = getattr(db_a, field)
-    b_value = getattr(db_b, field)
-
-    if field == 'implicit_root_bindings':
-      # implicit_root_bindings should be a function, so compare the
-      # outputs given the same input.
-      projID = 'dummy-project-id'
-      a_value = a_value(projID)
-      b_value = b_value(projID)
-
-    if a_value != b_value:
-      dissimilar_fields.add(field)
-
-  return dissimilar_fields
