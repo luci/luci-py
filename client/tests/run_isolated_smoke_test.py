@@ -529,6 +529,8 @@ class RunIsolatedTest(unittest.TestCase):
     args = [
         '--root-dir',
         self._root_dir,
+        '--cas-instance',
+        'projects/test/instances/default_instance',
         '--cas-digest',
         inputs_root_digest,
         '--cas-cache',

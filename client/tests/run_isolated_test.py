@@ -1065,6 +1065,43 @@ class RunIsolatedTestRun(RunIsolatedTestBase):
     with open(os.path.join(dest, 'foo'), 'rb') as f:
       self.assertEqual(f.read(), b'bar')
 
+  def test_write_without_empty_cas_does_not_crash(self):
+    """Test is here to prevent regression of: https://crbug.com/1504567
+    """
+    cmd = """
+import os
+outpath = os.path.join("${ISOLATED_OUTDIR}", "foo")
+with open(outpath, "w") as f:
+  f.write("dont crash")
+    """
+    os.environ.pop('RUN_ISOLATED_CAS_ADDRESS', None)
+    data = run_isolated.TaskData(
+        command=['python3', '-c', cmd],
+        relative_cwd=None,
+        cas_instance=None,
+        cas_digest=None,
+        outputs=None,
+        install_named_caches=init_named_caches_stub,
+        leak_temp_dir=False,
+        root_dir=self.tempdir,
+        hard_timeout=60,
+        grace_period=30,
+        bot_file=None,
+        switch_to_account=False,
+        install_packages_fn=run_isolated.copy_local_packages,
+        cas_cache_dir='',
+        cas_cache_policies=local_caching.CachePolicies(0, 0, 0, 0),
+        cas_kvs='',
+        env={},
+        env_prefix={},
+        lower_priority=False,
+        containment=None,
+        trim_caches_fn=trim_caches_stub)
+
+    result_json = os.path.join(self.tempdir, 'result.json')
+    ret = run_isolated.run_tha_test(data, result_json)
+    self.assertEqual(0, ret)
+
 
 class RunIsolatedTestCase(RunIsolatedTestRun):
   def test_bad_cas_json_output(self):

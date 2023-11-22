@@ -730,11 +730,13 @@ def upload_outdir(cas_client, cas_instance, outdir, tmp_dir):
         '-cas-addr',
         cas_addr,
       ])
-    else:
+    elif cas_instance:
       cmd.extend([
         '-cas-instance',
         cas_instance
       ])
+    else:
+      return None, None
 
     start = time.time()
 
