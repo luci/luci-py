@@ -95,7 +95,7 @@
     <tr>
       <td>Cost</td>
       <td>
-        {% if request.cost %}
+        {% if request.cost is defined %}
           {{'%0.5f' % (request.cost*100)}}¢
         {% else %}
           &#8209;&#8209;
