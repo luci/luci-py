@@ -16,6 +16,7 @@ from components import utils
 from components.auth import model
 from components.auth import realms
 from components.auth import replication
+from components.auth.proto import permissions_pb2
 from components.auth.proto import realms_pb2
 from components.auth.proto import replication_pb2
 from test_support import test_case
@@ -112,6 +113,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         'modified_by': None,
         'modified_ts': None,
         'permissions': [],
+        'permissionslist': None,
       },
       'project_realms': [],
     }
@@ -180,12 +182,20 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         ])
     ip_whitelist_assignments.put()
 
+    # This is only similar to (and is not exactly) the format the Go
+    # version uses, but it's the closest we can get to what it looks
+    # like after it's been unmarshalled from Go.
+    permissionslist_blob = permissions_pb2.PermissionsList(permissions=[
+        realms_pb2.Permission(name='luci.dev.p1'),
+        realms_pb2.Permission(name='luci.dev.p2'),
+    ]).SerializeToString()
     realms_globals = model.AuthRealmsGlobals(
         key=model.realms_globals_key(),
         permissions=[
             realms_pb2.Permission(name='luci.dev.p1'),
             realms_pb2.Permission(name='luci.dev.p2'),
-        ])
+        ],
+        permissionslist=permissionslist_blob)
     realms_globals.put()
 
     model.AuthProjectRealms(
@@ -302,6 +312,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
           realms_pb2.Permission(name='luci.dev.p1'),
           realms_pb2.Permission(name='luci.dev.p2'),
         ],
+        'permissionslist': permissionslist_blob,
       },
       'project_realms': [
         {

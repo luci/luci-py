@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Files copied from https://chromium.googlesource.com/infra/go/src/go.chromium.org/luci:
+# Files copied from https://chromium.googlesource.com/infra/luci/luci-go:
+#   auth_service/internal/permissions/proto/permissions.proto
 #   server/auth/service/protocol/realms.proto
 #   server/auth/service/protocol/replication.proto
 #   server/auth/service/protocol/security_config.proto
 #
-# Commit:272a175c50ec2412505f5f913476a310491722a8
+# Commit:408bb364062ce7bad80f2dc3ca87864edf017702
 # Modifications: see import_luci_go.sh
 
 compile:

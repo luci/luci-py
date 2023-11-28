@@ -1323,6 +1323,10 @@ class AuthRealmsGlobals(ndb.Model, AuthVersionedEntityMixin):
   permissions = datastore_utils.ProtobufProperty(
       realms_pb2.Permission, repeated=True)
 
+  # All globally defined permissions, in alphabetical order, populated
+  # by Auth Service v2 (Go).
+  permissionslist = ndb.BlobProperty(indexed=False)
+
 
 class AuthProjectRealms(ndb.Model, AuthVersionedEntityMixin):
   """All realms of some single LUCI project.
