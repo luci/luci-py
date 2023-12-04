@@ -47,6 +47,7 @@ import functools
 import hashlib
 import logging
 import random
+import time
 
 from google.appengine import runtime
 from google.appengine.api import app_identity
@@ -713,17 +714,24 @@ def _insert_bot_with_txn(bot_info, event):
     entities.append(BotRoot(key=root_key))
 
   attempt = 1
+  delay = 0.1
   what = 'event %s' % event.event_type if event else 'bot info'
   while True:
     try:
-      logging.info('Attempt %d to insert %s for bot_id %s', attempt, what,
-                   root_key)
+      logging.info('Attempt %d to insert %s (%d entities) for bot_id %s',
+                   attempt, what, len(entities), root_key.id)
       attempt += 1
-      datastore_utils.transaction(lambda: ndb.put_multi(entities), retries=0)
+      if len(entities) == 1:
+        entities[0].put()
+      else:
+        datastore_utils.transaction(lambda: ndb.put_multi(entities), retries=0)
       break
-    except datastore_utils.CommitError as exc:
+    except (datastore_utils.CommitError, datastore_errors.InternalError,
+            datastore_errors.Timeout) as exc:
       logging.warning('_insert_bot_with_txn: error inserting %s for %s: %s',
-                      what, root_key, exc)
+                      what, root_key.id, exc)
+      delay = min(5.0, delay * 2.0)
+      time.sleep(delay)
 
 
 def bot_event(event_type,
