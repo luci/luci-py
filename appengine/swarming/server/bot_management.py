@@ -719,7 +719,7 @@ def _insert_bot_with_txn(bot_info, event):
   while True:
     try:
       logging.info('Attempt %d to insert %s (%d entities) for bot_id %s',
-                   attempt, what, len(entities), root_key.id)
+                   attempt, what, len(entities), root_key.id())
       attempt += 1
       if len(entities) == 1:
         entities[0].put()
@@ -729,7 +729,7 @@ def _insert_bot_with_txn(bot_info, event):
     except (datastore_utils.CommitError, datastore_errors.InternalError,
             datastore_errors.Timeout) as exc:
       logging.warning('_insert_bot_with_txn: error inserting %s for %s: %s',
-                      what, root_key.id, exc)
+                      what, root_key.id(), exc)
       delay = min(5.0, delay * 2.0)
       time.sleep(delay)
 
