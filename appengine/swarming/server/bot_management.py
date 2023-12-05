@@ -727,7 +727,8 @@ def _insert_bot_with_txn(bot_info, event):
         datastore_utils.transaction(lambda: ndb.put_multi(entities), retries=0)
       break
     except (datastore_utils.CommitError, datastore_errors.InternalError,
-            datastore_errors.Timeout) as exc:
+            datastore_errors.Timeout,
+            datastore_errors.TransactionFailedError) as exc:
       logging.warning('_insert_bot_with_txn: error inserting %s for %s: %s',
                       what, root_key.id(), exc)
       delay = min(5.0, delay * 2.0)
