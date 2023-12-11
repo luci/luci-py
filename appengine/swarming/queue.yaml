@@ -130,3 +130,12 @@ queue:
 # /internal/taskqueue/monitoring/bq/bots/events/<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>
 - name: monitoring-bq-bots-events
   rate: 10/s
+
+
+## BigQuery export in golang
+
+# /internal/tasks/t/bq-export-interval
+# This is served by Swarming Go via go.chromium.org/luci/server/tq.
+- name: bq-export-interval
+  target: default-go
+  rate: 10/s

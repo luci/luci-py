@@ -131,3 +131,8 @@ cron:
   url: /internal/cron/update-config
   schedule: every 1 minutes
   target: default-go
+
+- description: Trigger task queues to send rows to to BigQuery
+  target: default-go
+  url: /internal/cron/bq-export
+  schedule: every 1 minutes
