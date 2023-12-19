@@ -231,9 +231,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.assertFalse(os.path.exists(dst))
 
   def test_get_command_env(self):
-    old_env = os.environ
+    old_env = os.environ.copy()
     try:
-      os.environ = os.environ.copy()
       os.environ.pop('B', None)
       self.assertNotIn('B', os.environ)
       os.environ['C'] = 'foo'
@@ -260,7 +259,8 @@ class RunIsolatedTest(RunIsolatedTestBase):
         self.assertEqual('/b/foo:bar', env['D'])
       self.assertEqual(os.sep + os.path.join('spam', 'eggs'), env['E'])
     finally:
-      os.environ = old_env
+      os.environ.clear()
+      os.environ.update(old_env)
 
   @mock.patch.dict(os.environ, {'SWARMING_TASK_ID': '4242'})
   def test_main(self):
