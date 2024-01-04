@@ -477,7 +477,6 @@ class SwarmingService(object):
         bot_version=details.bot_version,
         server_version=details.server_version,
         display_server_url_template=details.display_server_url_template,
-        luci_config=details.luci_config,
         cas_viewer_server=details.cas_viewer_server,
     )
 
@@ -488,24 +487,6 @@ class SwarmingService(object):
         bootstrap_token=bot_code.generate_bootstrap_token())
 
   @prpc_helpers.method
-  @auth.require(acl.can_view_config, log_identity=True)
-  def GetBootstrap(self, _request, _context):
-    obj = bot_code.get_bootstrap('', '')
-    return swarming_pb2.FileContent(content=obj.content.decode('utf-8'),
-                                    who=obj.who,
-                                    when=obj.when,
-                                    version=obj.version)
-
-  @prpc_helpers.method
-  @auth.require(acl.can_view_config, log_identity=True)
-  def GetBotConfig(self, _request, _context):
-    obj, _ = bot_code.get_bot_config()
-    return swarming_pb2.FileContent(content=obj.content.decode('utf-8'),
-                                    who=obj.who,
-                                    when=obj.when,
-                                    version=obj.version)
-
-  @prpc_helpers.method
   @auth.public
   def GetPermissions(self, request, _context):
     perms = api_common.get_permissions(request.bot_id, request.task_id,
@@ -514,8 +495,8 @@ class SwarmingService(object):
         delete_bot=perms.delete_bot,
         delete_bots=perms.delete_bots,
         terminate_bot=perms.terminate_bot,
-        get_configs=perms.get_configs,
-        put_configs=perms.put_configs,
+        get_configs=False,  # deprecated
+        put_configs=False,  # deprecated
         cancel_task=perms.cancel_task,
         cancel_tasks=perms.cancel_tasks,
         get_bootstrap_token=perms.get_bootstrap_token,
