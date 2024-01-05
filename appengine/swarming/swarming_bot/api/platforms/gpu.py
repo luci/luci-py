@@ -11,7 +11,7 @@ ASPEED = '1a03'
 INTEL = '8086'
 MAXTROX = '102b'
 NVIDIA = '10de'
-
+QUALCOMM = 'qcom'
 
 _VENDOR_MAPPING = {
     AMD: (
@@ -97,6 +97,9 @@ _VENDOR_MAPPING = {
             '1cb3': 'Quadro P400',
             '2184': 'GeForce GTX 1660',
         }),
+    QUALCOMM: ('Qualcomm', {
+        '043a': 'Adreno 690',
+    }),
 }
 
 

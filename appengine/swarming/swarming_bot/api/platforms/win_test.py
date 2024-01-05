@@ -163,6 +163,24 @@ class TestWin(auto_stub.TestCase):
         ['1ae0', '1ae0:a002', '1ae0:a002-1.1.1.18'], ['Unknown GGA 1.1.1.18'])
       self.assertEqual(expected, actual)
 
+  def test_get_gpu_qualcomm(self):
+    SWbemObjectSet = mock.Mock(
+        PNPDeviceID='ACPI\\VEN_QCOM&DEV_043A&SUBSYS_CLS08180&REV_0913\\0',
+        # "680" instead of "690" is intentional since the incorrect naming shows
+        # up on at least one real world device.
+        VideoProcessor='Adreno 680',
+        DriverVersion='27.20.1870.0')
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = [SWbemObjectSet]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      actual = win.get_gpu()
+      SWbemServices.query.assert_called_once_with(
+          'SELECT * FROM Win32_VideoController')
+      expected = (['qcom', 'qcom:043a', 'qcom:043a-27.20.1870.0'],
+                  ['Qualcomm Adreno 690 27.20.1870.0'])
+      self.assertEqual(expected, actual)
+
   def test_list_top_windows(self):
     win.list_top_windows()
 

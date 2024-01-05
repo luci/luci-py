@@ -448,7 +448,9 @@ def get_gpu():
       pnp_string = device.PNPDeviceID
       ven_id = 'UNKNOWN'
       dev_id = 'UNKNOWN'
-      match = re.search(r'VEN_([0-9A-F]{4})', pnp_string)
+      # Qualcomm shows up as QCOM instead of a regular hex string, likely due
+      # to the hardware being an integrated SoC instead of using PCI-e.
+      match = re.search(r'VEN_([0-9A-F]{4}|QCOM)', pnp_string)
       if match:
         ven_id = match.group(1).lower()
       match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
