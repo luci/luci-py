@@ -75,29 +75,32 @@ import { moreOrLess } from "../templates";
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 import { COUNT_FILTERS } from "../task";
 
-const colHead = (col, ele) => html` <th>
-  ${getColHeader(col)}
-  <sort-toggle .key=${col} .currentKey=${ele._sort} .direction=${ele._dir}>
-  </sort-toggle>
-</th>`;
+const colHead = (col, ele) =>
+  html` <th>
+    ${getColHeader(col)}
+    <sort-toggle .key=${col} .currentKey=${ele._sort} .direction=${ele._dir}>
+    </sort-toggle>
+  </th>`;
 
 const taskCol = (col, task, ele) => html` <td>${column(col, task, ele)}</td>`;
 
-const taskRow = (task, ele) => html` <tr class="task-row ${taskClass(task)}">
-  ${ele._cols.map((col) => taskCol(col, task, ele))}
-</tr>`;
+const taskRow = (task, ele) =>
+  html` <tr class="task-row ${taskClass(task)}">
+    ${ele._cols.map((col) => taskCol(col, task, ele))}
+  </tr>`;
 
-const columnOption = (key, ele) => html` <div class="item">
-  <span class="key">${getColHeader(key)}</span>
-  <span class="flex"></span>
-  <checkbox-sk
-    ?checked=${ele._cols.indexOf(key) >= 0}
-    @click=${(e) => ele._toggleCol(e, key)}
-    @keypress=${(e) => ele._toggleCol(e, key)}
-    data-key=${key}
-  >
-  </checkbox-sk>
-</div>`;
+const columnOption = (key, ele) =>
+  html` <div class="item">
+    <span class="key">${getColHeader(key)}</span>
+    <span class="flex"></span>
+    <checkbox-sk
+      ?checked=${ele._cols.indexOf(key) >= 0}
+      @click=${(e) => ele._toggleCol(e, key)}
+      @keypress=${(e) => ele._toggleCol(e, key)}
+      data-key=${key}
+    >
+    </checkbox-sk>
+  </div>`;
 
 const colSelector = (ele) => {
   if (!ele._showColSelector) {
@@ -118,34 +121,30 @@ const colSelector = (ele) => {
 </div>`;
 };
 
-const colOptions = (
-  ele,
-  firstCol
-) => html` <!-- Put the click action here to make it bigger, especially for mobile.-->
-  <th class="col_options" @click=${ele._toggleColSelector}>
-    <span class="show_widget">
-      <more-vert-icon-sk
-        tabindex="0"
-        @keypress=${ele._toggleColSelector}
-      ></more-vert-icon-sk>
-    </span>
-    <span>${getColHeader(firstCol)}</span>
-    <sort-toggle
-      @click=${(e) => e.stopPropagation() && e.preventDefault()}
-      key="name"
-      .currentKey=${ele._sort}
-      .direction=${ele._dir}
-    >
-    </sort-toggle>
-    ${colSelector(ele)}
-  </th>`;
+const colOptions = (ele, firstCol) =>
+  html` <!-- Put the click action here to make it bigger, especially for mobile.-->
+    <th class="col_options" @click=${ele._toggleColSelector}>
+      <span class="show_widget">
+        <more-vert-icon-sk
+          tabindex="0"
+          @keypress=${ele._toggleColSelector}
+        ></more-vert-icon-sk>
+      </span>
+      <span>${getColHeader(firstCol)}</span>
+      <sort-toggle
+        @click=${(e) => e.stopPropagation() && e.preventDefault()}
+        key="name"
+        .currentKey=${ele._sort}
+        .direction=${ele._dir}
+      >
+      </sort-toggle>
+      ${colSelector(ele)}
+    </th>`;
 
-const primaryOption = (key, ele) => html` <div
-  class="item"
-  ?selected=${ele._primaryKey === key}
->
-  <span class="key">${humanizePrimaryKey(key)}</span>
-</div>`;
+const primaryOption = (key, ele) =>
+  html` <div class="item" ?selected=${ele._primaryKey === key}>
+    <span class="key">${humanizePrimaryKey(key)}</span>
+  </div>`;
 
 const secondaryOptions = (ele) => {
   if (!ele._primaryKey) {
@@ -181,25 +180,27 @@ const secondaryOptions = (ele) => {
   );
 };
 
-const filterChip = (filter, ele) => html` <span class="chip">
-  <span>${maybeApplyAlias(filter)}</span>
-  <cancel-icon-sk @click=${() => ele._removeFilter(filter)}></cancel-icon-sk>
-</span>`;
+const filterChip = (filter, ele) =>
+  html` <span class="chip">
+    <span>${maybeApplyAlias(filter)}</span>
+    <cancel-icon-sk @click=${() => ele._removeFilter(filter)}></cancel-icon-sk>
+  </span>`;
 
 // can't use <select> and <option> because <option> strips out non-text
 // (e.g. checkboxes)
-const filters = (ele) => html` <!-- primary key selector-->
-  <select-sk
-    class="selector keys"
-    @scroll=${ele._scrollCheck}
-    @selection-changed=${ele._primaryKeyChanged}
-  >
-    ${ele._filteredPrimaryArr.map((key) => primaryOption(key, ele))}
-  </select-sk>
-  <!-- secondary value selector-->
-  <select-sk class="selector values" disabled>
-    ${secondaryOptions(ele)}
-  </select-sk>`;
+const filters = (ele) =>
+  html` <!-- primary key selector-->
+    <select-sk
+      class="selector keys"
+      @scroll=${ele._scrollCheck}
+      @selection-changed=${ele._primaryKeyChanged}
+    >
+      ${ele._filteredPrimaryArr.map((key) => primaryOption(key, ele))}
+    </select-sk>
+    <!-- secondary value selector-->
+    <select-sk class="selector values" disabled>
+      ${secondaryOptions(ele)}
+    </select-sk>`;
 
 const options = (ele) => html`
 <div class=options>
@@ -232,26 +233,32 @@ const options = (ele) => html`
   </button>
 </div>`;
 
-const summaryQueryRow = (ele, count) => html` <tr>
-  <td>
-    <a href=${ifDefined(ele._makeSummaryURL(count.filter))}>${count.label}</a>:
-  </td>
-  <td>${count.value}</td>
-</tr>`;
+const summaryQueryRow = (ele, count) =>
+  html` <tr>
+    <td>
+      <a href=${ifDefined(ele._makeSummaryURL(count.filter))}>${count.label}</a
+      >:
+    </td>
+    <td>${count.value}</td>
+  </tr>`;
 
-const summary = (ele) => html` <div class="summary">
-  <div class="title" @click=${ele._toggleAllStates}>
-    Selected Tasks ${moreOrLess(ele._allStates)}
-  </div>
-  <table id="query_counts">
-    ${summaryQueryRow(ele, { label: "Displayed", value: ele._tasks.length })}
-    ${ele._queryCounts
-      .filter(ele._filterCounts.bind(ele))
-      .map((count) => summaryQueryRow(ele, count))}
-  </table>
-  <more-horiz-icon-sk @click=${ele._toggleAllStates} ?hidden=${ele._allStates}>
-  </more-horiz-icon-sk>
-</div>`;
+const summary = (ele) =>
+  html` <div class="summary">
+    <div class="title" @click=${ele._toggleAllStates}>
+      Selected Tasks ${moreOrLess(ele._allStates)}
+    </div>
+    <table id="query_counts">
+      ${summaryQueryRow(ele, { label: "Displayed", value: ele._tasks.length })}
+      ${ele._queryCounts
+        .filter(ele._filterCounts.bind(ele))
+        .map((count) => summaryQueryRow(ele, count))}
+    </table>
+    <more-horiz-icon-sk
+      @click=${ele._toggleAllStates}
+      ?hidden=${ele._allStates}
+    >
+    </more-horiz-icon-sk>
+  </div>`;
 
 const header = (ele) => html`
 <div class=header ?hidden=${!ele.loggedInAndAuthorized}>

@@ -265,34 +265,33 @@ const taskInfoTable = (ele, request, result, currentSlice) => {
   `;
 };
 
-const stateLoadBlock = (ele, request, result) =>
-  html`
-    <tr>
-      <td>State</td>
-      <td class=${stateClass(result)}>
-        ${humanState(result, ele._currentSliceIdx)}
-      </td>
-    </tr>
-    ${countBlocks(
-      result,
-      ele._capacityCounts[ele._currentSliceIdx],
-      ele._pendingCounts[ele._currentSliceIdx],
-      ele._runningCounts[ele._currentSliceIdx],
-      ele._currentSlice.properties || {}
-    )}
-    <tr ?hidden=${!result.dedupedFrom} class="highlighted">
-      <td><b>Deduped From</b></td>
-      <td>
-        <a href=${taskPageLink(result.dedupedFrom)} target="_blank">
-          ${result.dedupedFrom}
-        </a>
-      </td>
-    </tr>
-    <tr ?hidden=${!result.dedupedFrom}>
-      <td>Deduped On</td>
-      <td title=${request.createdTs}>${request.humanized.time.createdTs}</td>
-    </tr>
-  `;
+const stateLoadBlock = (ele, request, result) => html`
+  <tr>
+    <td>State</td>
+    <td class=${stateClass(result)}>
+      ${humanState(result, ele._currentSliceIdx)}
+    </td>
+  </tr>
+  ${countBlocks(
+    result,
+    ele._capacityCounts[ele._currentSliceIdx],
+    ele._pendingCounts[ele._currentSliceIdx],
+    ele._runningCounts[ele._currentSliceIdx],
+    ele._currentSlice.properties || {}
+  )}
+  <tr ?hidden=${!result.dedupedFrom} class="highlighted">
+    <td><b>Deduped From</b></td>
+    <td>
+      <a href=${taskPageLink(result.dedupedFrom)} target="_blank">
+        ${result.dedupedFrom}
+      </a>
+    </td>
+  </tr>
+  <tr ?hidden=${!result.dedupedFrom}>
+    <td>Deduped On</td>
+    <td title=${request.createdTs}>${request.humanized.time.createdTs}</td>
+  </tr>
+`;
 const countBlocks = (
   result,
   capacityCount,

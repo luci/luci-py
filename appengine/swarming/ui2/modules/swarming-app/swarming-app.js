@@ -93,11 +93,12 @@ function gitLink(details) {
   return html`<a href=https://chromium.googlesource.com/infra/luci/luci-py/+/${version}>${version}</a>`;
 }
 
-const dynamicContentTemplate = (ele) => html` <div class="server-version">
-    AppEngine version: ${serverLink(ele._projectId, ele._serverDetails)} Git
-    version:${gitLink(ele._serverDetails)}
-  </div>
-  <oauth-login ?testing_offline=${ele.testing_offline}> </oauth-login>`;
+const dynamicContentTemplate = (ele) =>
+  html` <div class="server-version">
+      AppEngine version: ${serverLink(ele._projectId, ele._serverDetails)} Git
+      version:${gitLink(ele._serverDetails)}
+    </div>
+    <oauth-login ?testing_offline=${ele.testing_offline}> </oauth-login>`;
 
 const fabTemplate = document.createElement("template");
 fabTemplate.innerHTML = `

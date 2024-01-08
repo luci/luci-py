@@ -133,6 +133,8 @@ const GPU_ALIASES = {
   "8086:591e": "Intel Kaby Lake HD Graphics 615",
   "8086:5926": "Intel Kaby Lake Iris Plus Graphics 640",
   "8086:9bc5": "Intel Comet Lake S UHD Graphics 630",
+  qcom: "Qualcomm",
+  "qcom:043a": "Qualcomm Adreno 690",
 };
 
 const DEVICE_ALIASES = {

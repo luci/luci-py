@@ -683,12 +683,10 @@ const colMap = {
   firstSeen: (bot, _ele) => {
     return bot.humanized.time.firstSeenTs;
   },
-  id: (bot, _ele) => html`<a
-    target="_blank"
-    rel="noopener"
-    href=${botLink(bot.botId)}
-    >${bot.botId}</a
-  >`,
+  id: (bot, _ele) =>
+    html`<a target="_blank" rel="noopener" href=${botLink(bot.botId)}
+      >${bot.botId}</a
+    >`,
   lastSeen: (bot, ele) => {
     if (ele._verbose) {
       return human.localeTime(bot.lastSeenTs);

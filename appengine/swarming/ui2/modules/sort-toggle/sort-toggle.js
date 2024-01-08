@@ -24,14 +24,15 @@ import "elements-sk/icon/arrow-drop-up-icon-sk";
  * @fires sort-change
  */
 
-const template = (ele) => html` <arrow-drop-down-icon-sk
-    ?hidden=${ele.key === ele.currentKey && ele.direction === "asc"}
-  >
-  </arrow-drop-down-icon-sk>
-  <arrow-drop-up-icon-sk
-    ?hidden=${ele.key === ele.currentKey && ele.direction === "desc"}
-  >
-  </arrow-drop-up-icon-sk>`;
+const template = (ele) =>
+  html` <arrow-drop-down-icon-sk
+      ?hidden=${ele.key === ele.currentKey && ele.direction === "asc"}
+    >
+    </arrow-drop-down-icon-sk>
+    <arrow-drop-up-icon-sk
+      ?hidden=${ele.key === ele.currentKey && ele.direction === "desc"}
+    >
+    </arrow-drop-up-icon-sk>`;
 
 window.customElements.define(
   "sort-toggle",

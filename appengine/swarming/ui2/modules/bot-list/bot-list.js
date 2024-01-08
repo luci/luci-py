@@ -67,24 +67,24 @@ import { taskListLink } from "../util";
 import SwarmingAppBoilerplate from "../SwarmingAppBoilerplate";
 import { BotsService } from "../services/bots";
 
-const colHead = (col, ele) => html` <th>
-  ${getColHeader(col)}
-  <sort-toggle .key=${col} .currentKey=${ele._sort} .direction=${ele._dir}>
-  </sort-toggle>
-</th>`;
+const colHead = (col, ele) =>
+  html` <th>
+    ${getColHeader(col)}
+    <sort-toggle .key=${col} .currentKey=${ele._sort} .direction=${ele._dir}>
+    </sort-toggle>
+  </th>`;
 
 const botCol = (col, bot, ele) => html` <td>${column(col, bot, ele)}</td>`;
 
-const botRow = (bot, ele) => html` <tr class="bot-row ${ele._botClass(bot)}">
-  ${ele._cols.map((col) => botCol(col, bot, ele))}
-</tr>`;
+const botRow = (bot, ele) =>
+  html` <tr class="bot-row ${ele._botClass(bot)}">
+    ${ele._cols.map((col) => botCol(col, bot, ele))}
+  </tr>`;
 
-const primaryOption = (key, ele) => html` <div
-  class="item"
-  ?selected=${ele._primaryKey === key}
->
-  <span class="key">${key}</span>
-</div>`;
+const primaryOption = (key, ele) =>
+  html` <div class="item" ?selected=${ele._primaryKey === key}>
+    <span class="key">${key}</span>
+  </div>`;
 
 const secondaryOptions = (ele) => {
   if (!ele._primaryKey) {
@@ -118,85 +118,89 @@ const secondaryOptions = (ele) => {
   );
 };
 
-const filterChip = (filter, ele) => html` <span class="chip">
-  <span>${maybeApplyAlias(filter)}</span>
-  <cancel-icon-sk @click=${() => ele._removeFilter(filter)}></cancel-icon-sk>
-</span>`;
+const filterChip = (filter, ele) =>
+  html` <span class="chip">
+    <span>${maybeApplyAlias(filter)}</span>
+    <cancel-icon-sk @click=${() => ele._removeFilter(filter)}></cancel-icon-sk>
+  </span>`;
 
 // can't use <select> and <option> because <option> strips out non-text
 // (e.g. checkboxes)
-const filters = (ele) => html` <!-- primary key selector-->
-  <select-sk
-    class="selector keys"
-    @scroll=${ele._scrollCheck}
-    @selection-changed=${ele._primaryKeyChanged}
-  >
-    ${ele._filteredPrimaryArr.map((key) => primaryOption(key, ele))}
-  </select-sk>
-  <!-- secondary value selector-->
-  <select-sk class="selector values" disabled>
-    ${secondaryOptions(ele)}
-  </select-sk>`;
-
-const options = (ele) => html` <div class="options">
-  <div class="verbose">
-    <checkbox-sk ?checked=${ele._verbose} @click=${ele._toggleVerbose}>
-    </checkbox-sk>
-    <span>Verbose Entries</span>
-  </div>
-  <a href=${ele._matchingTasksLink()}>View Matching Tasks</a>
-  <button
-    id="delete_all"
-    ?disabled=${!ele.permissions.deleteBots}
-    @click=${ele._promptMassDelete}
-  >
-    DELETE ALL DEAD BOTS
-  </button>
-</div>`;
-
-const summaryFleetRow = (ele, count) => html` <tr>
-  <td>
-    <a href=${ifDefined(ele._makeSummaryURL(count, false))}>${count.label}</a>:
-  </td>
-  <td>${count.value}</td>
-</tr>`;
-
-const summaryQueryRow = (ele, count) => html` <tr>
-  <td>
-    <a href=${ifDefined(ele._makeSummaryURL(count, true))}>${count.label}</a>:
-  </td>
-  <td>${count.value}</td>
-</tr>`;
-
-const summary = (ele) => html` <div
-    class="summary"
-    ?hidden=${!ele._showFleetCounts}
-  >
-    <div class="fleet_header hider title" @click=${ele._toggleFleetsCount}>
-      <span>Fleet</span>
-      ${moreOrLess(ele._showFleetCounts)}
-    </div>
-    <table id="fleet_counts">
-      ${ele._fleetCounts.map((count) => summaryFleetRow(ele, count))}
-    </table>
-  </div>
-
-  <div class="summary">
-    <div
-      class="fleet_header shower title"
-      ?hidden=${ele._showFleetCounts}
-      @click=${ele._toggleFleetsCount}
+const filters = (ele) =>
+  html` <!-- primary key selector-->
+    <select-sk
+      class="selector keys"
+      @scroll=${ele._scrollCheck}
+      @selection-changed=${ele._primaryKeyChanged}
     >
-      <span>Fleet</span>
-      ${moreOrLess(ele._showFleetCounts)}
+      ${ele._filteredPrimaryArr.map((key) => primaryOption(key, ele))}
+    </select-sk>
+    <!-- secondary value selector-->
+    <select-sk class="selector values" disabled>
+      ${secondaryOptions(ele)}
+    </select-sk>`;
+
+const options = (ele) =>
+  html` <div class="options">
+    <div class="verbose">
+      <checkbox-sk ?checked=${ele._verbose} @click=${ele._toggleVerbose}>
+      </checkbox-sk>
+      <span>Verbose Entries</span>
+    </div>
+    <a href=${ele._matchingTasksLink()}>View Matching Tasks</a>
+    <button
+      id="delete_all"
+      ?disabled=${!ele.permissions.deleteBots}
+      @click=${ele._promptMassDelete}
+    >
+      DELETE ALL DEAD BOTS
+    </button>
+  </div>`;
+
+const summaryFleetRow = (ele, count) =>
+  html` <tr>
+    <td>
+      <a href=${ifDefined(ele._makeSummaryURL(count, false))}>${count.label}</a
+      >:
+    </td>
+    <td>${count.value}</td>
+  </tr>`;
+
+const summaryQueryRow = (ele, count) =>
+  html` <tr>
+    <td>
+      <a href=${ifDefined(ele._makeSummaryURL(count, true))}>${count.label}</a>:
+    </td>
+    <td>${count.value}</td>
+  </tr>`;
+
+const summary = (ele) =>
+  html` <div class="summary" ?hidden=${!ele._showFleetCounts}>
+      <div class="fleet_header hider title" @click=${ele._toggleFleetsCount}>
+        <span>Fleet</span>
+        ${moreOrLess(ele._showFleetCounts)}
+      </div>
+      <table id="fleet_counts">
+        ${ele._fleetCounts.map((count) => summaryFleetRow(ele, count))}
+      </table>
     </div>
 
-    <div class="title">Selected</div>
-    <table id="query_counts">
-      ${summaryQueryRow(ele, { label: "Displayed", value: ele._bots.length })}
-      ${ele._queryCounts.map((count) => summaryQueryRow(ele, count))}
-    </table>
-  </div>`;
+    <div class="summary">
+      <div
+        class="fleet_header shower title"
+        ?hidden=${ele._showFleetCounts}
+        @click=${ele._toggleFleetsCount}
+      >
+        <span>Fleet</span>
+        ${moreOrLess(ele._showFleetCounts)}
+      </div>
+
+      <div class="title">Selected</div>
+      <table id="query_counts">
+        ${summaryQueryRow(ele, { label: "Displayed", value: ele._bots.length })}
+        ${ele._queryCounts.map((count) => summaryQueryRow(ele, count))}
+      </table>
+    </div>`;
 
 const header = (ele) => html`
 <div class=header>
@@ -223,17 +227,18 @@ const header = (ele) => html`
   ${ele._filters.map((filter) => filterChip(filter, ele))}
 </div>`;
 
-const columnOption = (key, ele) => html` <div class="item">
-  <span class="key">${key}</span>
-  <span class="flex"></span>
-  <checkbox-sk
-    ?checked=${ele._cols.indexOf(key) >= 0}
-    ?disabled=${forcedColumns.indexOf(key) >= 0}
-    @click=${(e) => ele._toggleCol(e, key)}
-    @keypress=${(e) => ele._toggleCol(e, key)}
-  >
-  </checkbox-sk>
-</div>`;
+const columnOption = (key, ele) =>
+  html` <div class="item">
+    <span class="key">${key}</span>
+    <span class="flex"></span>
+    <checkbox-sk
+      ?checked=${ele._cols.indexOf(key) >= 0}
+      ?disabled=${forcedColumns.indexOf(key) >= 0}
+      @click=${(e) => ele._toggleCol(e, key)}
+      @keypress=${(e) => ele._toggleCol(e, key)}
+    >
+    </checkbox-sk>
+  </div>`;
 
 const colSelector = (ele) => {
   if (!ele._showColSelector) {
@@ -254,26 +259,25 @@ const colSelector = (ele) => {
 </div>`;
 };
 
-const colOptions = (
-  ele
-) => html` <!-- Put the click action here to make it bigger, especially for mobile.-->
-  <th class="col_options" @click=${ele._toggleColSelector}>
-    <span class="show_widget">
-      <more-vert-icon-sk
-        tabindex="0"
-        @keypress=${ele._toggleColSelector}
-      ></more-vert-icon-sk>
-    </span>
-    <span>Bot Id</span>
-    <sort-toggle
-      @click=${(e) => e.stopPropagation() && e.preventDefault()}
-      key="id"
-      .currentKey=${ele._sort}
-      .direction=${ele._dir}
-    >
-    </sort-toggle>
-    ${colSelector(ele)}
-  </th>`;
+const colOptions = (ele) =>
+  html` <!-- Put the click action here to make it bigger, especially for mobile.-->
+    <th class="col_options" @click=${ele._toggleColSelector}>
+      <span class="show_widget">
+        <more-vert-icon-sk
+          tabindex="0"
+          @keypress=${ele._toggleColSelector}
+        ></more-vert-icon-sk>
+      </span>
+      <span>Bot Id</span>
+      <sort-toggle
+        @click=${(e) => e.stopPropagation() && e.preventDefault()}
+        key="id"
+        .currentKey=${ele._sort}
+        .direction=${ele._dir}
+      >
+      </sort-toggle>
+      ${colSelector(ele)}
+    </th>`;
 
 const template = (ele) => html`
 <swarming-app id=swapp

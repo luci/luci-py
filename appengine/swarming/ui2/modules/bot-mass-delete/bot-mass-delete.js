@@ -141,7 +141,9 @@ window.customElements.define(
                   this._finished = true;
                   this.render();
                   this.dispatchEvent(
-                    new CustomEvent("bots-deleting-finished", { bubbles: true })
+                    new CustomEvent("bots-deleting-finished", {
+                      bubbles: true,
+                    })
                   );
                   return;
                 }

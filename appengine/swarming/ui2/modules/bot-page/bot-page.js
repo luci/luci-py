@@ -341,24 +341,10 @@ const eventRow = (event, showAll, serverVersion) => {
   </tr>`;
 };
 
-const otherPrompts = (ele) => html` <dialog-pop-over>
-  <div class="prompt-dialog content">
-    Are you sure you want to ${ele._prompt}?
-    <div class="horizontal layout end">
-      <button @click=${ele._closePopup} class="cancel" tabindex="0">NO</button>
-      <button @click=${ele._promptCallback} class="ok" tabindex="0">YES</button>
-    </div>
-  </div>
-</dialog-pop-over>`;
-
-const terminatePrompt = (ele) => html` <dialog-pop-over>
-  <div class="prompt-dialog content">
-    <div class="vertical grid reason">
-      <div>Are you sure you want to ${ele._prompt}?</div>
-      <div class="horizontal layout terminate">
-        <label for="reason">Shutdown reason (optional)</label>
-        <input type="text" id="reason" name="reason" />
-      </div>
+const otherPrompts = (ele) =>
+  html` <dialog-pop-over>
+    <div class="prompt-dialog content">
+      Are you sure you want to ${ele._prompt}?
       <div class="horizontal layout end">
         <button @click=${ele._closePopup} class="cancel" tabindex="0">
           NO
@@ -368,8 +354,28 @@ const terminatePrompt = (ele) => html` <dialog-pop-over>
         </button>
       </div>
     </div>
-  </div>
-</dialog-pop-over>`;
+  </dialog-pop-over>`;
+
+const terminatePrompt = (ele) =>
+  html` <dialog-pop-over>
+    <div class="prompt-dialog content">
+      <div class="vertical grid reason">
+        <div>Are you sure you want to ${ele._prompt}?</div>
+        <div class="horizontal layout terminate">
+          <label for="reason">Shutdown reason (optional)</label>
+          <input type="text" id="reason" name="reason" />
+        </div>
+        <div class="horizontal layout end">
+          <button @click=${ele._closePopup} class="cancel" tabindex="0">
+            NO
+          </button>
+          <button @click=${ele._promptCallback} class="ok" tabindex="0">
+            YES
+          </button>
+        </div>
+      </div>
+    </div>
+  </dialog-pop-over>`;
 
 const prompt = (ele) => {
   if (ele._promptType === "shutdown") return terminatePrompt(ele);
