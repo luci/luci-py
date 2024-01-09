@@ -406,8 +406,8 @@ def known():
 ### Private stuff.
 
 
-# Used only on dev server as an ultimate fallback to enable local_smoke_test to
-# work.
+# Used only on dev server as an ultimate fallback to enable local_smoke_testing
+# to work.
 _LOCAL_FAKE_CONFIG = None
 
 # Parsed representation of pools.cfg ready for queries.

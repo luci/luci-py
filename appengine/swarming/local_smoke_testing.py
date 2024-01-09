@@ -1634,7 +1634,7 @@ def process_arguments():
 def main():
   fix_encoding.fix_encoding()
   args = process_arguments()
-  Test.tmpdir = unicode(tempfile.mkdtemp(prefix='local_smoke_test'))
+  Test.tmpdir = unicode(tempfile.mkdtemp(prefix='local_smoke_testing'))
 
   # Force language to be English, otherwise the error messages differ from
   # expectations.
@@ -1664,8 +1664,8 @@ def main():
     bot.start()
     client = SwarmingClient(servers.swarming_server.url,
                             servers.cas_server.address, Test.tmpdir)
-    # All requests in local_smoke_test.py are expected to be authenticated with
-    # IP address.
+    # All requests in local_smoke_testing.py are expected to be authenticated
+    # with IP address.
     # If it's logged in, luci-go clients send auth header unexpectedly.
     client.ensure_logged_out()
     # Test cases only interact with the client; except for test_update_continue

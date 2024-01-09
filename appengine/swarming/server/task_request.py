@@ -124,7 +124,7 @@ MAX_EXPIRATION_SECS = 7 * 24 * 60 * 60
 # Minimum value for timeouts.
 #
 # The rationale for 1s on local dev server is to enable quicker testing in
-# local_smoke_test.py.
+# local_smoke_testing.py.
 _MIN_TIMEOUT_SECS = 1 if utils.is_local_dev_server() else 30
 
 # The world started on 2010-01-01 at 00:00:00 UTC. The rationale is that using
