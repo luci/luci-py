@@ -104,11 +104,9 @@ RUN_ISOLATED_LOG_FILE = 'run_isolated.log'
 # - ir stands for isolated_run
 # - io stands for isolated_out
 # - it stands for isolated_tmp
-# - ic stands for isolated_client
 ISOLATED_RUN_DIR = 'ir'
 ISOLATED_OUT_DIR = 'io'
 ISOLATED_TMP_DIR = 'it'
-ISOLATED_CLIENT_DIR = 'ic'
 _CAS_CLIENT_DIR = 'cc'
 # TODO(tikuta): take these parameter from luci-config?
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
