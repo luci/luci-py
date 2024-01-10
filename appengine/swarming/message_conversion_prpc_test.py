@@ -62,6 +62,7 @@ class TestMessageConversion(test_case.TestCase):
     ])
     props.cipd_input.server = 'https://pool.config.cipd.example.com'
     props.command[:] = ['python', '-c', 'print(1)']
+    props.relative_cwd = 'something'
     props.containment.containment_type = swarming_pb2.ContainmentType.AUTO
     props.dimensions.extend([
         swarming_pb2.StringPair(key='os', value='Amiga'),
@@ -125,7 +126,7 @@ class TestMessageConversion(test_case.TestCase):
             inputs_ref=None,
             io_timeout_secs=1200,
             outputs=[u'foo', u'path/to/foobar'],
-            relative_cwd=u''),
+            relative_cwd=u'something'),
         wait_for_capacity=True)
 
   def _create_default_new_task_request(self):

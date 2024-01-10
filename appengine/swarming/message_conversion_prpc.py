@@ -365,6 +365,7 @@ def _task_properties(props):
       ] if props.env else None,
       dimensions=_duplicate_string_pairs_from_dict(props.dimensions),
       command=props.command,
+      relative_cwd=props.relative_cwd,
       outputs=props.outputs,
       idempotent=props.idempotent,
       io_timeout_secs=props.io_timeout_secs,
