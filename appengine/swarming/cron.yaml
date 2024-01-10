@@ -111,6 +111,12 @@ cron:
   schedule: every 1 minutes
 
 
+- description: Report Task running/pending metrics from go service
+  target: monitor
+  url: /internal/cron/report-tasks
+  schedule: every 1 minutes
+
+
 ### Configs
 
 - description: read luci-config configs
