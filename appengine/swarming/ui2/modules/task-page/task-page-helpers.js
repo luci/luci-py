@@ -329,3 +329,24 @@ const TASK_TIMES = [
   "modifiedTs",
   "startedTs",
 ];
+
+/** isFromBuildBucket returns true if a task comes from BuildBucket.
+ */
+export function isFromBuildBucket(request) {
+  if (!request || !request.tags || !request.tags.length) {
+    return false;
+  }
+  // BuildBucket adds specific tags to the Swarming task.
+  // infra_superproject/+/0d182f6ece270468fafbd1d7b1a48b3d1b0e023e:infra/go/src/go.chromium.org/luci/buildbucket/appengine/tasks/swarming.go;l=659.
+  const buildBucketTags = [
+    "buildbucket_bucket",
+    "buildbucket_build_id",
+    "buildbucket_hostname",
+  ];
+  // Exits on the first BuildBucket tag found.
+  return request.tags.some((tag) => {
+    return buildBucketTags.some((bbTag) => {
+      return tag.startsWith(bbTag);
+    });
+  });
+}

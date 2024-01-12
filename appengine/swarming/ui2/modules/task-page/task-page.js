@@ -27,6 +27,7 @@ import {
   hasRichOutput,
   humanState,
   firstDimension,
+  isFromBuildBucket,
   parseRequest,
   parseResult,
   richLogsLink,
@@ -1060,7 +1061,9 @@ const performanceStatsSection = (ele, performanceStats) => {
 };
 
 const reproduceSection = (ele, currentSlice) => {
-  if (!ele._taskId || ele._notFound) {
+  // Do not show reproduction info for BuildBucket tasks.
+  // BuildBucket tasks cannot be reproduced locally.
+  if (!ele._taskId || ele._notFound || isFromBuildBucket(ele._request)) {
     return "";
   }
   const casRef =

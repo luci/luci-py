@@ -300,7 +300,7 @@ describe("task-page", function () {
         mockUnauthorizedPrpc(fetchMock, "swarming.v2.Bots", "CountBots");
       }
       beforeEach(() => {
-        serveTask(1, "Completed task with 2 slices");
+        serveTask(1, "Completed task - 2 slices - BuildBucket");
         notAuthorized();
       });
 
@@ -325,7 +325,7 @@ describe("task-page", function () {
     }); // end describe('authorized user, but not authorized for counts APIs')
 
     describe("Completed task with 2 slices", function () {
-      beforeEach(() => serveTask(1, "Completed task with 2 slices"));
+      beforeEach(() => serveTask(1, "Completed task - 2 slices - BuildBucket"));
 
       it("shows relevant task request data", function (done) {
         loggedInTaskPage((ele) => {
@@ -338,7 +338,9 @@ describe("task-page", function () {
           const cell = (r, c) => rows[r].children[c];
           // Spot check some of the content
           expect(cell(0, 0)).toMatchTextContent("Name");
-          expect(cell(0, 1)).toMatchTextContent("Completed task with 2 slices");
+          expect(cell(0, 1)).toMatchTextContent(
+            "Completed task - 2 slices - BuildBucket"
+          );
           expect(cell(1, 0)).toMatchTextContent("State");
           expect(cell(1, 1)).toMatchTextContent("COMPLETED (SUCCESS)");
           expect(cell(2, 1)).toMatchTextContent(
@@ -700,11 +702,39 @@ describe("task-page", function () {
         });
       });
     }); // end describe('Expired Task')
+
+    describe("BuildBucket task", function () {
+      beforeEach(() => serveTask(1, "Completed task - 2 slices - BuildBucket"));
+
+      it("does not show reproduction info", function (done) {
+        loggedInTaskPage((ele) => {
+          const retrySection = $$("div.reproduce", ele);
+          expect(retrySection).toBeFalsy();
+
+          done();
+        });
+      });
+    }); // end describe('BuildBucket task')
+
+    describe("non-BuildBucket task", function () {
+      beforeEach(() => {
+        serveTask(6, "Completed task - 2 slices - non-BuildBucket");
+      });
+
+      it("does not show reproduction info", function (done) {
+        loggedInTaskPage((ele) => {
+          const retrySection = $$("div.reproduce", ele);
+          expect(retrySection).toBeTruthy();
+
+          done();
+        });
+      });
+    }); // end describe('non-BuildBucket task')
   }); // end describe('html structure')
 
   describe("dynamic behavior", function () {
     describe("Completed task with 2 slices", function () {
-      beforeEach(() => serveTask(1, "Completed task with 2 slices"));
+      beforeEach(() => serveTask(1, "Completed task - 2 slices - BuildBucket"));
 
       it("shows and hides the extra details", function (done) {
         loggedInTaskPage((ele) => {
@@ -799,7 +829,7 @@ describe("task-page", function () {
     }
 
     it("makes auth'd API calls when a logged in user views landing page", function (done) {
-      serveTask(1, "Completed task with 2 slices");
+      serveTask(1, "Completed task - 2 slices - BuildBucket");
       loggedInTaskPage((ele) => {
         const calls = fetchMock.calls(MATCHED, "POST");
         expect(calls).toHaveSize(
@@ -905,7 +935,7 @@ describe("task-page", function () {
     });
 
     it("makes a POST to debug a job", function (done) {
-      serveTask(1, "Completed task with 2 slices");
+      serveTask(1, "Completed task - 2 slices - BuildBucket");
       loggedInTaskPage((ele) => {
         fetchMock.resetHistory();
         mockPrpc(fetchMock, "swarming.v2.Tasks", "NewTask", {
