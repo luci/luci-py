@@ -666,11 +666,17 @@ message TaskCancelRequest {
 
 // Request to cancel some subset of pending/running tasks.
 message TasksCancelRequest {
+  // Number of items to cancel per request. limit must be in [1..1000].
   int32 limit = 1;
+  // Previous call would have returned a cursor if there were more tasks to kill.
   string cursor = 2;
+  // Any task which contains one or more of tags will be cancelled.
   repeated string tags = 3;
+  // Kill running tasks if set. Otherwise running tasks will be ignored.
   bool kill_running = 4;
+  // Only tasks later or equal to start will be cancelled. No effect if unset.
   google.protobuf.Timestamp start = 5;
+  // Only tasks earlier or equal to end will be cancelled. No effect if unset.
   google.protobuf.Timestamp end = 6;
 }
 
