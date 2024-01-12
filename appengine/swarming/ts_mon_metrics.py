@@ -157,25 +157,6 @@ _tasks_slice_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
     bucketer=gae_ts_mon.FixedWidthBucketer(width=30),
 )
 
-
-# Global metric. Metric fields:
-# - spec_name: name of a job specification.
-# - project_id: e.g. 'chromium'.
-# - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - pool: e.g. 'Chrome'.
-# - rbe: RBE instance of the task or literal 'none'.
-# - status: 'pending' or 'running'.
-_jobs_active = gae_ts_mon.GaugeMetric(
-    'jobs/active', 'Number of running, pending or otherwise active jobs.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('rbe'),
-        gae_ts_mon.StringField('status'),
-    ])
-
-
 # Instance metric. Metric fields:
 # - auth_method = one of 'luci_token', 'service_account', 'ip_whitelist'.
 # - condition = depends on the auth method (e.g. email for 'service_account').
@@ -418,41 +399,6 @@ def on_bot_auth_success(auth_method, condition):
   })
 
 
-def set_jobs_metrics():
-  state_map = {
-      task_result.State.RUNNING: 'running',
-      task_result.State.PENDING: 'pending'
-  }
-  jobs_counts = defaultdict(lambda: 0)
-  jobs_total = 0
-
-  q = task_result.get_result_summaries_query(start=None,
-                                             end=None,
-                                             sort='created_ts',
-                                             state='pending_running',
-                                             tags=None)
-  cursor = None
-  more = True
-  while more:
-    summaries, cursor, more = q.fetch_page(5000, start_cursor=cursor)
-    for summary in summaries:
-      jobs_total += 1
-      status = state_map.get(summary.state, '')
-      tags_dict = _tags_to_dict(summary.tags)
-      fields = _extract_job_fields(tags_dict)
-      fields['status'] = status
-
-      key = tuple(sorted(fields.items()))
-      jobs_counts[key] += 1
-
-    logging.debug('_set_jobs_metrics: processed %d jobs', jobs_total)
-
-  target_fields = dict(_TARGET_FIELDS)
-
-  for key, count in jobs_counts.items():
-    _jobs_active.set(count, target_fields=target_fields, fields=dict(key))
-
-
 def on_task_status_change_pubsub_latency(tags, state, http_status_code,
                                          latency):
   fields = _extract_given_job_fields(tags, [
@@ -511,10 +457,3 @@ def on_handler_timeout(endpoint, stage, exception):
       'stage': stage,
       'exception': exception,
   })
-
-
-def initialize():
-  # These metrics are the ones that are reset everything they are flushed.
-  gae_ts_mon.register_global_metrics([
-      _jobs_active,
-  ])

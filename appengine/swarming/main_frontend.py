@@ -78,7 +78,6 @@ def create_application():
   prpc_api = webapp2.WSGIApplication(handlers_prpc.get_routes())
   gae_ts_mon.instrument_wsgi_application(prpc_api)
 
-  ts_mon_metrics.initialize()
   utils.report_memory(frontend_app, timeout=60)
   utils.report_memory(endpoints_api, timeout=60)
   utils.report_memory(prpc_api, timeout=60)

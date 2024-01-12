@@ -52,7 +52,6 @@ def create_application():
   backend_app = handlers_backend.create_application(False)
   gae_ts_mon.initialize_prod(backend_app, is_enabled_fn=is_enabled_callback)
 
-  ts_mon_metrics.initialize()
   utils.report_memory(backend_app)
   return backend_app
 

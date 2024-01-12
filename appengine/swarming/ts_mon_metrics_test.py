@@ -185,62 +185,6 @@ class TestMetrics(test_case.TestCase):
     ts_mon_metrics.on_task_requested(summary, deduped=False)
     self.assertEqual(1, ts_mon_metrics._jobs_requested.get(fields=fields))
 
-  def test_initialize(self):
-    # Smoke test for syntax errors.
-    ts_mon_metrics.initialize()
-
-  def test_set_jobs_metrics(self):
-    tags = [
-        'project:test_project',
-        'subproject:test_subproject',
-        'pool:test_pool',
-        'buildername:test_builder',
-        'name:some_tests',
-        'device_type:some_device',
-    ]
-    summary_running = _gen_task_result_summary(self.now, 1, tags=tags)
-    summary_running.state = task_result.State.RUNNING
-    summary_running.modified_ts = self.now
-    summary_running.started_ts = self.now
-    summary_running.bot_id = 'test_bot1'
-    summary_running.put()
-
-    summary_pending = _gen_task_result_summary(
-        self.now - datetime.timedelta(minutes=5), 2, tags=tags)
-    summary_pending.state = task_result.State.PENDING
-    summary_pending.modified_ts = self.now
-    summary_pending.bot_id = 'test_bot2'
-    summary_pending.put()
-
-    summary_pending = _gen_task_result_summary(
-        self.now - datetime.timedelta(minutes=10), 3, tags=tags)
-    summary_pending.state = task_result.State.PENDING
-    summary_pending.modified_ts = self.now
-    summary_pending.bot_id = ''
-    summary_pending.put()
-
-    ts_mon_metrics.set_jobs_metrics()
-
-    jobs_fields = {
-        'project_id': 'test_project',
-        'subproject_id': 'test_subproject',
-        'pool': 'test_pool',
-        'spec_name': 'test_builder',
-        'rbe': 'none',
-    }
-    jobs_target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
-    jobs_target_fields['hostname'] = 'autogen:test_bot1'
-
-    jobs_fields['status'] = 'running'
-    self.assertEqual(
-        1,
-        ts_mon_metrics._jobs_active.get(
-            fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
-    jobs_fields['status'] = 'pending'
-    self.assertEqual(
-        2,
-        ts_mon_metrics._jobs_active.get(
-            fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
 
   def test_on_task_expired(self):
     tags = [

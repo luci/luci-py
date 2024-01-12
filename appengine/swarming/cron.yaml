@@ -95,11 +95,6 @@ cron:
   schedule: every 1 minutes
   target: backend
 
-- description: Send task metrics
-  url: /internal/cron/monitoring/tsmon/jobs
-  schedule: every 1 minutes
-  target: backend
-
 - description: Trigger task queues to send rows to to BigQuery
   target: backend
   url: /internal/cron/monitoring/bq
