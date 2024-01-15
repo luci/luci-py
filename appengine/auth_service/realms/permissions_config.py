@@ -1,10 +1,8 @@
 # Copyright 2023 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
-"""Contains model and adapter functions to transition Auth Service v1
-to use permissions.cfg from LUCI Config service, instead of calling
-permissions.db(). This is necessary to deprecate
-auth_service/realms/permissions.py.
+"""Contains model and adapter functions so Auth Service v1 uses
+permissions.cfg from LUCI Config service.
 """
 
 from google.appengine.ext import ndb

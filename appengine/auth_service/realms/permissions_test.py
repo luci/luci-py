@@ -97,15 +97,6 @@ class BuilderTest(test_case.TestCase):
       self.permission('luci.dev.p1', internal=True)
 
 
-class HardcodedDBTest(test_case.TestCase):
-
-  def test_can_be_built(self):
-    db = permissions.db()
-    val = validation.Validator(cfgvalidation.Context.raise_on_error(), db, True)
-    for b in db.implicit_root_bindings('proj'):
-      val.validate_binding(b, {})
-
-
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
