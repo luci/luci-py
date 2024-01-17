@@ -263,7 +263,10 @@ def get_networks():
   metadata = get_metadata()
   names = []
   for network in metadata['instance'].get('networkInterfaces', []):
-    names.append(network['network'])
+    # Can be a nonsense string ("0") when running inside a GKE container that
+    # emulates GCE metadata server in a buggy way. Skip it. We want a dict.
+    if isinstance(network, dict):
+      names.append(network['network'])
   return names
 
 
