@@ -6,4 +6,9 @@ queue:
 - name: process-auth-db-change
   max_concurrent_requests: 1
   rate: 100/s
-  target: backend
+
+### Auth Service v2 queues
+
+- name: tq-sweep
+  rate: 500/s
+  target: backendv2
