@@ -59,6 +59,7 @@ class TaskBackendAPIService(object):
   def RunTask(self, request, _context):
     # type: (backend_pb2.RunTaskRequest, context.ServicerContext)
     #     -> backend_pb2.RunTaskResponse
+    logging.info("RunTask RequestID: %s" % request.request_id)
     validate_run_task_request(request)
 
     api_helpers.validate_backend_configs([
