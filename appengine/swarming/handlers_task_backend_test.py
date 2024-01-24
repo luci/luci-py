@@ -482,10 +482,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.assertIn(('X-Prpc-Grpc-Code', '7'), raw_resp._headerlist)
     self.assertEqual(
         raw_resp.body,
-        cgi.escape(
-            'project "luci-project" does not have '
-            'permission "swarming.pools.listTasks"',
-            quote=True))
+        cgi.escape('Task "%s" is not accessible' % first_id, quote=True))
 
   @mock.patch('handlers_task_backend._FETCH_TASKS_LIMIT', 2)
   def test_fetch_tasks_too_many(self):

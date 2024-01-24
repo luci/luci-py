@@ -146,11 +146,10 @@ class TaskBackendAPIService(object):
         for task_id in requested_task_ids
     ]
 
-    pools = []
     for tr in ndb.get_multi(request_keys):
       if tr:
-        pools += bot_management.get_pools_from_dimensions_flat(tr.tags)
-    realms.check_tasks_list_acl(pools)
+        access_info = realms.task_access_info_from_request(tr)
+        realms.check_task_get_acl(access_info)
 
     task_results = task_result.fetch_task_results(requested_task_ids)
 
