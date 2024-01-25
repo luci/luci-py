@@ -319,8 +319,10 @@ def get_cipd_architecture():
     return 'arm64' if get_cpu_bitness() == '64' else 'armv6l'
   if cpu_type == 'powerpc64':  # OpenBSD's name for ppc64
     return 'ppc64'
+  if cpu_type == 'riscv':
+    return 'riscv64' if get_cpu_bitness() == '64' else 'riscv'
   # TODO(vadimsh): Detection of following architectures is likely broken:
-  #   mips64, mips64le, mipsle, ppc64, ppc64le, riscv64, s390x.
+  #   mips64, mips64le, mipsle, ppc64, ppc64le, s390x.
   return cpu_type
 
 
