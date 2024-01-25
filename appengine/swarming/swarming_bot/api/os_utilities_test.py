@@ -128,6 +128,22 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertEqual(os_utilities.get_cpu_dimensions(),
                      ['mips', 'mips-32', 'mips-32-Cavium_Octeon_II_V0.1'])
 
+  def test_get_cpu_dimensions_ppc64(self):
+    self.mock(sys, 'platform', 'linux')
+    self.mock(platform, 'machine', lambda: 'ppc64')
+    self.mock(os_utilities, 'get_cpuinfo', lambda: {'name': 'POWER8'})
+    self.mock(sys, 'maxsize', 2**63 - 1)
+    self.assertEqual(os_utilities.get_cpu_dimensions(),
+                     ['ppc64', 'ppc64-64', 'ppc64-64-POWER8'])
+
+  def test_get_cpu_dimensions_ppc64le(self):
+    self.mock(sys, 'platform', 'linux')
+    self.mock(platform, 'machine', lambda: 'ppc64le')
+    self.mock(os_utilities, 'get_cpuinfo', lambda: {'name': 'POWER10'})
+    self.mock(sys, 'maxsize', 2**63 - 1)
+    self.assertEqual(os_utilities.get_cpu_dimensions(),
+                     ['ppc64le', 'ppc64le-64', 'ppc64le-64-POWER10'])
+
   def test_parse_intel_model(self):
     examples = [
         ('Intel(R) Core(TM) i5-5200U CPU @ 2.20GHz', 'i5-5200U'),

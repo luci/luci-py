@@ -369,7 +369,7 @@ def get_cpu_dimensions():
     if cpu_type != 'arm':
       out.append('arm')
       out.append('arm-' + bitness)
-  elif cpu_type.startswith('mips'):
+  elif cpu_type.startswith('mips') or cpu_type.startswith('ppc64'):
     if name:
       out.append('%s-%s-%s' % (cpu_type, bitness, name.replace(' ', '_')))
   # else AMD like "AMD PRO A6-8500B R5, 6 Compute Cores 2C+4G     "

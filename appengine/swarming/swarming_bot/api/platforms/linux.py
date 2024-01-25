@@ -206,6 +206,9 @@ def get_cpuinfo():
     # MIPS.
     cpu_info['flags'] = values['isa']
     cpu_info['name'] = values['cpu model']
+  elif "POWER" in values.get('cpu', ''):
+    # ppc64/ppc64le
+    cpu_info['name'] = values.get('cpu', '').split(' ')[0]
   elif values:
     # CPU implementer == 0x41 means ARM.
     if 'Features' in values:

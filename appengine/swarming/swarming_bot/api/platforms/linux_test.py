@@ -104,6 +104,39 @@ VCED exceptions         : not available
 VCEI exceptions         : not available
 """
 
+PPC64_CPU_INFO = r"""
+processor  : 0
+cpu        : POWER10 (architected), altivec supported
+clock      : 2750.000000MHz
+revision   : 2.0 (pvr 0080 0200)
+
+processor  : 1
+cpu        : POWER10 (architected), altivec supported
+clock      : 2750.000000MHz
+revision   : 2.0 (pvr 0080 0200)
+
+processor  : 2
+cpu        : POWER10 (architected), altivec supported
+clock      : 2750.000000MHz
+revision   : 2.0 (pvr 0080 0200)
+
+processor  : 3
+cpu        : POWER10 (architected), altivec supported
+clock      : 2750.000000MHz
+revision   : 2.0 (pvr 0080 0200)
+
+processor  : 4
+cpu        : POWER10 (architected), altivec supported
+clock      : 2750.000000MHz
+revision   : 2.0 (pvr 0080 0200)
+
+timebase   : 512000000
+platform   : pSeries
+model      : IBM,9105-42A
+machine    : CHRP IBM,9105-42A
+MMU        : Radix
+"""
+
 
 @unittest.skipUnless(sys.platform == 'linux', 'linux only test')
 class TestCPUInfo(auto_stub.TestCase):
@@ -180,6 +213,11 @@ class TestCPUInfo(auto_stub.TestCase):
             'flags': ['mips2', 'mips3', 'mips4', 'mips5', 'mips64r2'],
             'name': 'Cavium Octeon II V0.1',
         }, self.get_cpuinfo(MIPS64_CPU_INFO))
+
+  def test_get_cpuinfo_ppc64(self):
+    self.assertEqual({
+        'name': 'POWER10',
+    }, self.get_cpuinfo(PPC64_CPU_INFO))
 
   def test_get_num_processors(self):
     self.assertTrue(linux.get_num_processors() != 0)
