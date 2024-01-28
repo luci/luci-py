@@ -15,10 +15,11 @@ LUCI_GO=../../../../../../go/src/go.chromium.org/luci
 LUCI_GO_PROTOS_DIR=${LUCI_GO}/server/auth/service/protocol/components/auth/proto
 
 # Kill all existing files.
-rm -f permissions* realms* replication* security_config*
+rm -f permissions* realms* replication* security_config* tasks*
 
 # Copy fresh files.
 cp \
+  ${LUCI_GO}/auth_service/api/taskspb/tasks.proto \
   ${LUCI_GO}/auth_service/internal/permissions/proto/permissions.proto \
   ${LUCI_GO_PROTOS_DIR}/realms.proto \
   ${LUCI_GO_PROTOS_DIR}/replication.proto \
@@ -28,6 +29,7 @@ cp \
 
 # Make proto package path for permissions relative to the new root.
 sed -i 's|package auth.service|package components.auth|g' ./permissions.proto
+sed -i 's|package auth.tasks|package components.auth|g' ./tasks.proto
 
 # Make proto import paths relative to the new root.
 sed -i 's|import "go.chromium.org/luci/auth_service/internal/permissions/proto/|import "components/auth/proto/|g' ./permissions.proto

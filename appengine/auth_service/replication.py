@@ -23,7 +23,7 @@ from components.auth import model
 from components.auth import replication
 from components.auth import signature
 from components.auth import version
-from components.auth.proto import replication_pb2
+from components.auth.proto import replication_pb2, tasks_pb2
 
 import config
 import gcs
@@ -261,6 +261,29 @@ def trigger_replication(auth_db_rev=None, transactional=False):
       queue_name='replication',
       transactional=transactional):
     raise ReplicationTriggerError()
+
+  # This is to enable comparison of Auth Service v2 AuthDB to
+  # Auth Service v1's AuthDB.
+  payload = {
+    'class': 'replication-task',
+    'body': json_format.MessageToDict(tasks_pb2.ReplicationTask(
+      auth_db_rev=auth_db_rev,
+    )),
+  }
+  ok = utils.enqueue_task(
+    # The last path component is informational for nicer logs. All data
+    # is transferred through `payload`.
+    url='/internal/tasks/t/replication/%d' % auth_db_rev,
+    queue_name='replication',
+    # Let dispatch.yaml decide.
+    use_dedicated_module=False,
+    transactional=transactional,
+    payload=utils.encode_to_json(payload))
+  if not ok:
+    # Not fatal - log an error message.
+    logging.error(
+      'failed to enqueue task for v2 replication for rev %d',
+      auth_db_rev)
 
 
 def update_replicas_task(auth_db_rev):

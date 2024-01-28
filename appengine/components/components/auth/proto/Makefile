@@ -18,7 +18,7 @@
 #   server/auth/service/protocol/replication.proto
 #   server/auth/service/protocol/security_config.proto
 #
-# Commit:408bb364062ce7bad80f2dc3ca87864edf017702
+# Commit:79a0735fcd7576e7c9bcf1845bc865786dde6936
 # Modifications: see import_luci_go.sh
 
 compile:
