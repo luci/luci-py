@@ -285,6 +285,33 @@ def trigger_replication(auth_db_rev=None, transactional=False):
       'failed to enqueue task for v2 replication for rev %d',
       auth_db_rev)
 
+  # This is to enable comparison of changelogs generated between Auth
+  # Service v1 and v2. While this is not logically where a
+  # process-change task would be enqueued, this is the simplest way to
+  # ensure only Auth Service v1 is enqueuing tasks to Auth Service v2,
+  # as that task enqueuing is defined in components/components/auth.
+  payload = {
+      'class':
+      'process-change-task',
+      'body':
+      json_format.MessageToDict(
+          tasks_pb2.ProcessChangeTask(auth_db_rev=auth_db_rev, )),
+  }
+  ok = utils.enqueue_task(
+      # The last path component is informational for nicer logs. All data
+      # is transferred through `payload`.
+      url='/internal/tasks/t/process-auth-db-change/%d' % auth_db_rev,
+      queue_name='process-auth-db-change',
+      # Let dispatch.yaml decide.
+      use_dedicated_module=False,
+      transactional=transactional,
+      payload=utils.encode_to_json(payload))
+  if not ok:
+    # Not fatal - log an error message.
+    logging.error(
+        'failed to enqueue task for v2 changelog generation for rev %d',
+        auth_db_rev)
+
 
 def update_replicas_task(auth_db_rev):
   """Packs AuthDB and pushes it to all out-of-date Replicas.
