@@ -1087,7 +1087,7 @@ def copy_local_packages(_run_dir, cas_dir):
   yield None
 
 
-def _install_packages(run_dir, cipd_cache_dir, client, packages):
+def _install_packages(run_dir, cipd_cache_dir, client, packages, timeout=None):
   """Calls 'cipd ensure' for packages.
 
   Args:
@@ -1095,6 +1095,7 @@ def _install_packages(run_dir, cipd_cache_dir, client, packages):
     cipd_cache_dir (str): the directory to use for the cipd package cache.
     client (CipdClient): the cipd client to use
     packages: packages to install, list [(path, package_name, version), ...].
+    timeout (int): if not None, timeout in seconds for cipd ensure to run.
 
   Returns: list of pinned packages.  Looks like [
     {
@@ -1124,10 +1125,11 @@ def _install_packages(run_dir, cipd_cache_dir, client, packages):
   pins = client.ensure(
       run_dir,
       {
-          subdir: [(name, vers) for name, vers, _ in pkgs
-                  ] for subdir, pkgs in by_path.items()
+          subdir: [(name, vers) for name, vers, _ in pkgs]
+          for subdir, pkgs in by_path.items()
       },
       cache_dir=cipd_cache_dir,
+      timeout=timeout,
   )
 
   for subdir, pin_list in sorted(pins.items()):
@@ -1201,8 +1203,10 @@ def install_client_and_packages(run_dir, packages, service_url,
       logging_utils.user_logs('Installed task packages')
 
     # Install cas client to |cas_dir|.
-    _install_packages(cas_dir, cipd_cache_dir, client,
-                      [('', _CAS_PACKAGE, _LUCI_GO_REVISION)])
+    _install_packages(cas_dir,
+                      cipd_cache_dir,
+                      client, [('', _CAS_PACKAGE, _LUCI_GO_REVISION)],
+                      timeout=10 * 60)
     logging_utils.user_logs('Installed CAS client')
 
     file_path.make_tree_files_read_only(run_dir)
