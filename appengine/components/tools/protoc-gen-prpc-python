@@ -93,7 +93,8 @@ def generate_code(file_descriptor, all_files):
   fragments = [HEADER_FORMAT % {
       'file_name': file_descriptor.name,
       'file_set_descriptor_b64': string_to_code_lines(
-          base64.b64encode(zlib.compress(file_set.SerializeToString())),
+          base64.b64encode(
+              zlib.compress(file_set.SerializeToString())).decode('utf-8'),
           indent=4),
   }]
 
