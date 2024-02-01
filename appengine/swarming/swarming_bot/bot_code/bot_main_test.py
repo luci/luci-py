@@ -112,6 +112,7 @@ class TestBotBase(net_utils.TestCase):
     self.bot = None  # see make_bot
     self.clock = None  # see make_bot
     self.loop_state = None  # see make_bot
+    self.expected_rbe_worker_props = None
     self.make_bot()
 
   def tearDown(self):
@@ -131,6 +132,13 @@ class TestBotBase(net_utils.TestCase):
     self.clock._now_impl = lambda: self.quit_bit.now
     self.loop_state = bot_main._BotLoopState(self.bot, None, None,
                                              self.quit_bit, self.clock)
+
+  def mock_rbe_worker_properties(self):
+    with self.bot.mutate_internals() as mut:
+      props = remote_client.WorkerProperties('rbe-pool-id', 'rbe-pool-version')
+      mut.update_rbe_worker_properties(props)
+      self.attributes['state']['rbe_worker_props'] = props.to_dict()
+    self.expected_rbe_worker_props = props.to_dict()
 
   def poll_once(self):
     self.quit_bit.reset()
@@ -193,6 +201,8 @@ class TestBotBase(net_utils.TestCase):
         'dimensions': self.attributes['dimensions'],
         'poll_token': poll_token,
     }
+    if self.expected_rbe_worker_props:
+      data['worker_properties'] = self.expected_rbe_worker_props
 
     def on_request(kwargs):
       self.assertEqual(kwargs['data'], data)
@@ -219,6 +229,8 @@ class TestBotBase(net_utils.TestCase):
         'dimensions': self.attributes['dimensions'],
         'session_token': session_token,
     }
+    if self.expected_rbe_worker_props:
+      data['worker_properties'] = self.expected_rbe_worker_props
     if lease_in:
       data['lease'] = lease_in
     if not blocking:
@@ -990,6 +1002,8 @@ class TestBotMain(TestBotBase):
     self.assertEqual(None, self.bot.bot_restart_msg())
 
   def test_rbe_mode_idle(self):
+    self.mock_rbe_worker_properties()
+
     # Switches into the RBE mode, creates and polls the session. Gets nothing.
     self.expected_requests([
         self.expected_poll_request({
@@ -2014,7 +2028,7 @@ class TestBotMain(TestBotBase):
 
     rbe_session = remote_client.RBESession(self.bot.remote, 'rbe-instance',
                                            self.bot.dimensions, 'bot_version',
-                                           'poll-token', 'session-token',
+                                           None, 'poll-token', 'session-token',
                                            'session-id')
     rbe_session._active_lease = remote_client.RBELease(
         'id', remote_client.RBELeaseState.ACTIVE)
@@ -2304,6 +2318,25 @@ class TestBotNotMocked(TestBotBase):
     self.assertEqual(23, e.exception.code)
 
     self.assertEqual([[bot_main.THIS_FILE, 'start_slave', '--survive']], calls)
+
+
+class TestRBEWorkerProperties(TestBotBase):
+
+  def test_works(self):
+    self.mock(
+        gce, 'get_metadata', lambda: {
+            'instance': {
+                'attributes': {
+                    'pool_id': 'rbe-pool-id',
+                    'pool_version': 'rbe-pool-version',
+                },
+            },
+        })
+    props = bot_main._get_rbe_worker_properties()
+    self.assertEqual(props.to_dict(), {
+        'pool_id': 'rbe-pool-id',
+        'pool_version': 'rbe-pool-version'
+    })
 
 
 if __name__ == '__main__':

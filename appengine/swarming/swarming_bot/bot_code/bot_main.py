@@ -409,6 +409,16 @@ def _get_settings(botobj):
   return DEFAULT_SETTINGS
 
 
+def _get_rbe_worker_properties():
+  """Extracts remote_client.WorkerProperties from the environment."""
+  md = platforms.gce.get_metadata()
+  if not md:
+    return None
+  attrs = md.get('instance', {}).get('attributes', {})
+  return remote_client.WorkerProperties(attrs.get('pool_id', ''),
+                                        attrs.get('pool_version', ''))
+
+
 def _get_state(botobj, sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
 
@@ -1198,6 +1208,18 @@ def _run_bot_inner(arg_error, quit_bit):
   if arg_error:
     botobj.post_error('Bootstrapping error: %s' % arg_error)
 
+  # Pick up RBE-related worker properties from the environment. Do it as soon as
+  # possible to report them to Swarming during the handshake as part of the
+  # state. This may be useful in debugging.
+  if platforms.is_gce():
+    with botobj.mutate_internals() as mut:
+      props = _get_rbe_worker_properties()
+      if props:
+        logging.info('RBE worker properties: %s', props.to_dict())
+      else:
+        logging.info('No RBE worker properties discovered')
+      mut.update_rbe_worker_properties(props)
+
   if quit_bit.is_set():
     logging.info('Early quit 2')
     return 0
@@ -1769,7 +1791,8 @@ class _BotLoopState:
         logging.info('RBE: opening session at %s', self._rbe_intended_instance)
         self._rbe_session = remote_client.RBESession(
             self._bot.remote, self._rbe_intended_instance, self._bot.dimensions,
-            self._rbe_bot_version, self._rbe_poll_token)
+            self._rbe_bot_version, self._bot.rbe_worker_properties,
+            self._rbe_poll_token)
         logging.info('RBE: session is %s', self._rbe_session.session_id)
         self._rbe_consecutive_errors = 0
       except remote_client_errors.RBEServerError as e:

@@ -545,6 +545,7 @@ class RemoteClientNative(object):
   def rbe_create_session(self,
                          dimensions,
                          bot_version,
+                         worker_properties,
                          poll_token,
                          session_token=None,
                          retry_transient=False):
@@ -558,6 +559,7 @@ class RemoteClientNative(object):
     Arguments:
       dimensions: a dict with bot dimensions as {str => [str]}.
       bot_version: a string with bot version for monitoring and logs.
+      worker_properties: a WorkerProperties instance or None.
       poll_token: a token reported by `rbe` poll(...) command.
       session_token: a session token of a previous session if reopening it.
       retry_transient: True to retry many times on transient errors. This is
@@ -573,6 +575,9 @@ class RemoteClientNative(object):
     data = {'dimensions': dimensions, 'poll_token': poll_token}
     if bot_version:
       data['bot_version'] = bot_version
+    if worker_properties:
+      assert isinstance(worker_properties, WorkerProperties), worker_properties
+      data['worker_properties'] = worker_properties.to_dict()
     if session_token:
       data['session_token'] = session_token
     resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/create',
@@ -597,6 +602,7 @@ class RemoteClientNative(object):
                          status,
                          dimensions,
                          bot_version,
+                         worker_properties,
                          lease=None,
                          poll_token=None,
                          blocking=True,
@@ -612,6 +618,7 @@ class RemoteClientNative(object):
       status: the desired bot session status as RBESessionStatus enum.
       dimensions: a dict with bot dimensions as {str => [str]}.
       bot_version: a string with bot version for monitoring and logs.
+      worker_properties: a WorkerProperties instance or None.
       lease: an optional RBELease the bot is or was working on.
       poll_token: a token reported by latest `rbe` poll(...) command, optional.
       blocking: if True, allow waiting for a bit for new leases to appear.
@@ -633,6 +640,9 @@ class RemoteClientNative(object):
     }
     if bot_version:
       data['bot_version'] = bot_version
+    if worker_properties:
+      assert isinstance(worker_properties, WorkerProperties), worker_properties
+      data['worker_properties'] = worker_properties.to_dict()
     if lease:
       assert isinstance(lease, RBELease), lease
       data['lease'] = lease.to_dict(omit_payload=True)
@@ -817,6 +827,45 @@ class RBELease:
     return d
 
 
+class WorkerProperties:
+  """Properties describing the RBE Worker, passed to RBE as is."""
+
+  def __init__(self, pool_id, pool_version):
+    self.pool_id = pool_id
+    self.pool_version = pool_version
+
+  def __eq__(self, other):
+    return (self.pool_id == other.pool_id
+            and self.pool_version == other.pool_version)
+
+  @staticmethod
+  def from_dict(d):
+    """Constructs WorkerProperties given its dict representation.
+
+    Raises:
+      TypeError if types are wrong.
+    """
+    if not isinstance(d, dict):
+      raise TypeError('Not a dict')
+
+    def get_str(key):
+      val = d.get(key, '')
+      if not isinstance(val, str):
+        raise TypeError('Invalid %s' % key)
+      return val
+
+    return WorkerProperties(get_str('pool_id'), get_str('pool_version'))
+
+  def to_dict(self):
+    """Converts WorkerProperties to a dict representation."""
+    d = {}
+    if self.pool_id:
+      d['pool_id'] = self.pool_id
+    if self.pool_version:
+      d['pool_version'] = self.pool_version
+    return d
+
+
 class RBESession:
   """An RBE bot session.
 
@@ -829,6 +878,7 @@ class RBESession:
                instance,
                dimensions,
                bot_version,
+               worker_properties,
                poll_token,
                session_token=None,
                session_id=None):
@@ -839,6 +889,7 @@ class RBESession:
       instance: an RBE instance this session will be running on.
       dimensions: a dict with bot dimensions as {str => [str]}.
       bot_version: a string with bot version for monitoring and logs.
+      worker_properties: a WorkerProperties instance or None.
       poll_token: a token reported by `rbe` poll(...) command.
       session_token: if set, do not call rbe_create_session, use this token.
       session_id: if set, do not call rbe_create_session, use this ID.
@@ -847,13 +898,15 @@ class RBESession:
       RBEServerError if the RPC fails for whatever reason.
     """
     if not session_token or not session_id:
-      resp = remote.rbe_create_session(dimensions, bot_version, poll_token)
+      resp = remote.rbe_create_session(dimensions, bot_version,
+                                       worker_properties, poll_token)
       session_token = resp.session_token
       session_id = resp.session_id
     self._remote = remote
     self._instance = instance
     self._dimensions = copy.deepcopy(dimensions)
     self._bot_version = bot_version
+    self._worker_properties = worker_properties
     self._poll_token = poll_token
     self._session_token = session_token
     self._session_id = session_id
@@ -870,6 +923,8 @@ class RBESession:
         self._dimensions,
         'bot_version':
         self._bot_version,
+        'worker_properties':
+        self._worker_properties.to_dict() if self._worker_properties else None,
         'poll_token':
         self._poll_token,
         'session_token':
@@ -906,19 +961,31 @@ class RBESession:
         dump = json.load(f)
       except ValueError as e:
         raise ValueError('Not a valid JSON: %s' % e)
+
+    worker_properties = None
+    try:
+      wp = dump.get('worker_properties')
+      if wp:
+        worker_properties = WorkerProperties.from_dict(wp)
+    except TypeError as e:
+      raise ValueError('Invalid worker_properties dict: %s' % e)
+
     try:
       session = RBESession(remote, dump['instance'], dump['dimensions'],
-                           dump['bot_version'], dump['poll_token'],
-                           dump['session_token'], dump['session_id'])
+                           dump['bot_version'], worker_properties,
+                           dump['poll_token'], dump['session_token'],
+                           dump['session_id'])
       last_acked_status = dump['last_acked_status']
       active_lease = dump['active_lease']
       finished_lease = dump['finished_lease']
     except KeyError as e:
       raise ValueError('Missing key %s' % e)
+
     try:
       session._last_acked_status = RBESessionStatus[last_acked_status]
     except KeyError as e:
       raise ValueError('Invalid RBESessionStatus: %s' % e)
+
     try:
       if active_lease:
         session._active_lease = RBELease.from_dict(active_lease)
@@ -926,6 +993,7 @@ class RBESession:
         session._finished_lease = RBELease.from_dict(finished_lease)
     except TypeError:
       raise ValueError('Invalid lease dict')
+
     return session
 
   def restore(self, path):
@@ -940,6 +1008,7 @@ class RBESession:
     self._session_id = loaded._session_id
     self._dimensions = loaded._dimensions
     self._bot_version = loaded._bot_version
+    self._worker_properties = loaded._worker_properties
     self._poll_token = loaded._poll_token
     self._session_token = loaded._session_token
     self._last_acked_status = loaded._last_acked_status
@@ -1217,6 +1286,7 @@ class RBESession:
     # pass the previous session token to grab server-signed parameters from it
     # in case the poll token is already stale.
     resp = self._remote.rbe_create_session(self._dimensions, self._bot_version,
+                                           self._worker_properties,
                                            self._poll_token,
                                            self._session_token)
     self._session_id = resp.session_id
@@ -1278,6 +1348,7 @@ class RBESession:
         status,
         dimensions,
         self._bot_version,
+        self._worker_properties,
         lease,
         poll_token,
         blocking,

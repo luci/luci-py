@@ -46,6 +46,7 @@ class Bot(object):
     self._bot_restart_msg = None
     self._bot_config = {}
     self._rbe_instance = None
+    self._rbe_worker_properties = None
     self._rbe_hybrid_mode = False
     self._rbe_session = None
 
@@ -139,6 +140,11 @@ class Bot(object):
   def bot_version(self):
     """Version of the running swarming_bot.zip file."""
     return self._bot_version
+
+  @property
+  def rbe_worker_properties(self):
+    """Worker properties to report to RBE, if any."""
+    return self._rbe_worker_properties
 
   @property
   def state(self):
@@ -332,6 +338,10 @@ class BotMutator(object):
     self._bot._rbe_session = session
     self._refresh_attributes()
 
+  def update_rbe_worker_properties(self, worker_properties):
+    self._bot._rbe_worker_properties = worker_properties
+    self._refresh_attributes()
+
   def update_dimensions(self, new_dimensions):
     """Updates `bot.dimensions` by merging-in automatically set dimensions."""
     dimensions = new_dimensions.copy()
@@ -355,6 +365,10 @@ class BotMutator(object):
       state.pop('rbe_session', None)
       state.pop('rbe_hybrid_mode', None)
       state.pop('rbe_idle', None)
+    if self._bot._rbe_worker_properties:
+      state['rbe_worker_props'] = self._bot._rbe_worker_properties.to_dict()
+    else:
+      state.pop('rbe_worker_props', None)
     state['bot_group_cfg_version'] = self._bot._bot_group_cfg_ver
     if self._bot._bot_config:
       state['bot_config'] = self._bot._bot_config
