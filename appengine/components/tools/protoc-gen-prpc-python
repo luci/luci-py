@@ -1,9 +1,10 @@
-#!/usr/bin/env vpython
+#!/usr/bin/env vpython3
 # Copyright 2017 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
 # [VPYTHON:BEGIN]
+# python_version: "3.8"
 # wheel: <
 #   name: "infra/python/wheels/protobuf-py2_py3"
 #   version: "version:3.6.1"
@@ -117,7 +118,7 @@ def safe_filename(filename):
 
 
 def main():
-  data = sys.stdin.read()
+  data = sys.stdin.buffer.read()
   req = plugin.CodeGeneratorRequest()
   req.ParseFromString(data)
   res = plugin.CodeGeneratorResponse()
@@ -129,7 +130,7 @@ def main():
           name=safe_filename(file.name).replace('.proto', '_prpc_pb2.py'),
           content=generate_code(file, files),
       )
-  sys.stdout.write(res.SerializeToString())
+  sys.stdout.buffer.write(res.SerializeToString())
 
 
 if __name__ == '__main__':
