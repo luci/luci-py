@@ -50,8 +50,8 @@ _INDEX = {
 SERVICE_FORMAT = '''
 %(service_name)sServiceDescription = {
   'file_descriptor_set': FILE_DESCRIPTOR_SET,
-  'file_descriptor': _INDEX[%(file_name)r]['descriptor'],
-  'service_descriptor': _INDEX[%(file_name)r]['services'][%(service_name)r],
+  'file_descriptor': _INDEX[u%(file_name)r]['descriptor'],
+  'service_descriptor': _INDEX[u%(file_name)r]['services'][u%(service_name)r],
 }
 '''
 
