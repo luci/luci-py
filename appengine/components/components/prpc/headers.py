@@ -3,6 +3,7 @@
 # that can be found in the LICENSE file.
 
 import base64
+import binascii
 import collections
 import re
 
@@ -104,7 +105,7 @@ def parse_headers(headers):
     if header.endswith('-bin'):
       try:
         value = base64.b64decode(value)
-      except TypeError:
+      except (TypeError, binascii.Error):
         raise ValueError('Received invalid base64 string in header %s' % header)
       header = header[:-len('-bin')]
     invocation_metadata.append((header, value))
