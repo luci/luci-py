@@ -1667,6 +1667,8 @@ def get_result_summaries_query(start, end, sort, state, tags):
       if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
         raise ValueError('Invalid tags')
       values = parts[1].split(OR_DIM_SEP)
+      if len(values) > 1:
+        logging.info('OR_TAG_QUERY: %s', tag)
       separated_tags = ['%s:%s' % (parts[0], v) for v in values]
       q = q.filter(TaskResultSummary.tags.IN(separated_tags))
 
