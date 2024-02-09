@@ -1108,6 +1108,9 @@ def get_dimensions():
     display_attached = platforms.win.is_display_attached()
     if display_attached:
       dimensions['display_attached'] = ['1']
+      screen_scaling_percent = platforms.win.get_screen_scaling_percent()
+      if screen_scaling_percent:
+        dimensions['screen_scaling_percent'] = [screen_scaling_percent]
     else:
       dimensions['display_attached'] = ['0']
 

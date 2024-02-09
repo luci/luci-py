@@ -672,6 +672,42 @@ def is_display_attached():
   return False
 
 
+def get_screen_scaling_percent():
+  """Gets the screen scaling percent as a string.
+
+  This corresponds to the scaling setting in the Windows display options for
+  the primary monitor.
+
+  Returns:
+    None if the screen scaling cannot be determined, otherwise a string
+    containing the screen scaling percent without the percent sign.
+  """
+  if not is_display_attached():
+    return None
+
+  try:
+    import win32con
+    import win32gui
+    import win32ui
+  except ImportError:
+    return None
+
+  try:
+    desktop_handle = win32gui.GetDC(0)
+    logical_screen_height = win32ui.GetDeviceCaps(desktop_handle,
+                                                  win32con.VERTRES)
+    physical_screen_height = win32ui.GetDeviceCaps(desktop_handle,
+                                                   win32con.DESKTOPVERTRES)
+  finally:
+    win32gui.ReleaseDC(0, desktop_handle)
+  # Should never happen in practice, but avoid division by 0 to be safe.
+  if logical_screen_height == 0:
+    return None
+
+  scaling_ratio = float(physical_screen_height) / float(logical_screen_height)
+  return str(int(scaling_ratio * 100))
+
+
 @tools.cached
 def get_ssd():
   """Returns a list of SSD disks."""

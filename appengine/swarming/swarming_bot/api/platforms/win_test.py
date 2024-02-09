@@ -192,6 +192,31 @@ class TestWin(auto_stub.TestCase):
         win._CMD_RE, 'Microsoft Windows [version 10.0.16299.19]', re.IGNORECASE)
     self.assertEqual(('10.0', '16299.19'), m.groups())
 
+  def test_get_screen_scaling_percent_success(self):
+    cases = [
+        (100, 100, '100'),
+        (100, 50, '200'),
+        (100, 80, '125'),
+        (100, 0, None),
+    ]
+    for physical, logical, result in cases:
+      with mock.patch('api.platforms.win.is_display_attached',
+                      return_value=True):
+
+        def mock_impl(*_, **__):
+          mock_impl.call_count += 1
+          if mock_impl.call_count == 1:
+            return logical
+          if mock_impl.call_count == 2:
+            return physical
+          raise RuntimeError('Called more than 2 times')
+
+        mock_impl.call_count = 0
+
+        with mock.patch('win32ui.GetDeviceCaps', side_effect=mock_impl):
+          with mock.patch('win32gui.GetDC'), mock.patch('win32gui.ReleaseDC'):
+            self.assertEqual(win.get_screen_scaling_percent(), result)
+
 
 class TestWinPlatformIndendent(auto_stub.TestCase):
   """Like TestWin, but not limited to running on Windows."""
@@ -250,6 +275,18 @@ class TestWinPlatformIndendent(auto_stub.TestCase):
     with mock.patch('api.platforms.win._get_wmi_wbem',
                     return_value=SWbemServices):
       self.assertIsNone(win.is_display_attached())
+
+  def test_get_screen_scaling_percent_no_display(self):
+    with mock.patch('api.platforms.win.is_display_attached',
+                    return_value=False):
+      self.assertIsNone(win.get_screen_scaling_percent())
+
+  # Use non-Windows platforms as a proxy for Windows deployments where the
+  # required pywin32 modules aren't present.
+  @unittest.skipIf(sys.platform == 'win32', 'pywin32 might exist')
+  def test_get_screen_scaling_percent_import_error(self):
+    with mock.patch('api.platforms.win.is_display_attached', return_value=True):
+      self.assertIsNone(win.get_screen_scaling_percent())
 
 
 if __name__ == '__main__':
