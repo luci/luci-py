@@ -16,6 +16,7 @@ import re
 import sys
 import threading
 
+import six
 from six.moves import urllib
 
 from email import utils as email_utils
@@ -725,13 +726,16 @@ def enqueue_task(*args, **kwargs):
 
 ## JSON
 
-try:
-  # protorpc is an ancient and deprecated library, but to_json_encodable is used
-  # in many places. Make to_json_encodable gracefully degrade when protorpc is
-  # missing.
-  from protorpc import messages
-  from protorpc.remote import protojson
-except ImportError:
+if six.PY2:  # protorpc does not work with py3 at all
+  try:
+    # protorpc is an ancient and deprecated library, but to_json_encodable is
+    # used in many places. Make to_json_encodable gracefully degrade when
+    # protorpc is missing.
+    from protorpc import messages
+    from protorpc.remote import protojson
+  except ImportError:
+    messages = None
+else:
   messages = None
 
 

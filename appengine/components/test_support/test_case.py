@@ -9,13 +9,16 @@ import json
 import logging
 import time
 
-import webtest
+import six
+if six.PY2:
+  import webtest  # only for endpoints
 
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 
-from components import endpoints_webapp2
+if six.PY2:  # endpoints is py2-only
+  from components import endpoints_webapp2
 from components import utils
 from depot_tools import auto_stub
 
@@ -220,113 +223,118 @@ class TestCase(auto_stub.TestCase):
       return t
     return None
 
-class Endpoints(object):
-  """Handles endpoints API calls."""
-  def __init__(self, api_service_cls, regex=None, source_ip='127.0.0.1'):
-    super(Endpoints, self).__init__()
-    self._api_service_cls = api_service_cls
-    kwargs = {'debug': True}
-    if regex:
-      kwargs['regex'] = regex
-    self._api_app = webtest.TestApp(
-        endpoints_webapp2.api_server([self._api_service_cls], **kwargs),
-        extra_environ={'REMOTE_ADDR': source_ip})
 
-  def call_api(self, method, body=None, status=(200, 204)):
-    """Calls endpoints API method identified by its name."""
-    # Because body is a dict and not a ResourceContainer, there's no way to tell
-    # which parameters belong in the URL and which belong in the body when the
-    # HTTP method supports both. However there's no harm in supplying parameters
-    # in both the URL and the body since ResourceContainers don't allow the same
-    # parameter name to be used in both places. Supplying parameters in both
-    # places produces no ambiguity and extraneous parameters are safely ignored.
-    assert hasattr(self._api_service_cls, method), method
-    info = getattr(self._api_service_cls, method).method_info
-    path = info.get_path(self._api_service_cls.api_info)
+if six.PY2:
 
-    # Identify which arguments are path parameters and which are query strings.
-    body = body or {}
-    query_strings = []
-    for key, value in sorted(body.items()):
-      if '{%s}' % key in path:
-        path = path.replace('{%s}' % key, value)
-      else:
-        # We cannot tell if the parameter is a repeated field from a dict.
-        # Allow all query strings to be multi-valued.
-        if not isinstance(value, list):
-          value = [value]
-        for val in value:
-          query_strings.append('%s=%s' % (key, val))
-    if query_strings:
-      path = '%s?%s' % (path, '&'.join(query_strings))
+  class Endpoints(object):
+    """Handles endpoints API calls."""
 
-    path = '/_ah/api/%s/%s/%s' % (self._api_service_cls.api_info.name,
-                                  self._api_service_cls.api_info.version,
-                                  path)
-    try:
-      if info.http_method in ('GET', 'DELETE'):
-        return self._api_app.get(path, status=status)
-      return self._api_app.post_json(path, body, status=status)
-    except Exception as e:
-      # Useful for diagnosing issues in test cases.
-      logging.info('%s failed: %s', path, e)
-      raise
+    def __init__(self, api_service_cls, regex=None, source_ip='127.0.0.1'):
+      super(Endpoints, self).__init__()
+      self._api_service_cls = api_service_cls
+      kwargs = {'debug': True}
+      if regex:
+        kwargs['regex'] = regex
+      self._api_app = webtest.TestApp(endpoints_webapp2.api_server(
+          [self._api_service_cls], **kwargs),
+                                      extra_environ={'REMOTE_ADDR': source_ip})
 
+    def call_api(self, method, body=None, status=(200, 204)):
+      """Calls endpoints API method identified by its name."""
+      # Because body is a dict and not a ResourceContainer, there's no way to
+      # tell which parameters belong in the URL and which belong in the body
+      # when the HTTP method supports both. However there's no harm in
+      # supplying parameters in both the URL and the body since
+      # ResourceContainers don't allow the same parameter name to be used in
+      # both places. Supplying parameters in both places produces no ambiguity
+      # and extraneous parameters are safely ignored.
+      assert hasattr(self._api_service_cls, method), method
+      info = getattr(self._api_service_cls, method).method_info
+      path = info.get_path(self._api_service_cls.api_info)
 
-class EndpointsTestCase(TestCase):
-  """Base class for a test case that tests Cloud Endpoint Service.
+      # Identify which arguments are path parameters and which are query
+      # strings.
+      body = body or {}
+      query_strings = []
+      for key, value in sorted(body.items()):
+        if '{%s}' % key in path:
+          path = path.replace('{%s}' % key, value)
+        else:
+          # We cannot tell if the parameter is a repeated field from a dict.
+          # Allow all query strings to be multi-valued.
+          if not isinstance(value, list):
+            value = [value]
+          for val in value:
+            query_strings.append('%s=%s' % (key, val))
+      if query_strings:
+        path = '%s?%s' % (path, '&'.join(query_strings))
 
-  Usage:
-    class MyTestCase(test_case.EndpointsTestCase):
-      api_service_cls = MyEndpointsService
+      path = '/_ah/api/%s/%s/%s' % (self._api_service_cls.api_info.name,
+                                    self._api_service_cls.api_info.version,
+                                    path)
+      try:
+        if info.http_method in ('GET', 'DELETE'):
+          return self._api_app.get(path, status=status)
+        return self._api_app.post_json(path, body, status=status)
+      except Exception as e:
+        # Useful for diagnosing issues in test cases.
+        logging.info('%s failed: %s', path, e)
+        raise
 
-      def test_stuff(self):
-        response = self.call_api('my_method')
-        self.assertEqual(...)
+  class EndpointsTestCase(TestCase):
+    """Base class for a test case that tests Cloud Endpoint Service.
 
-      def test_expected_fail(self):
-        with self.call_should_fail(403):
-          self.call_api('protected_method')
-  """
-  # Should be set in subclasses to a subclass of remote.Service.
-  api_service_cls = None
-  # Should be set in subclasses to a regular expression to match against path
-  # parameters. See components.endpoints_webapp2.adapter.api_server.
-  api_service_regex = None
+    Usage:
+      class MyTestCase(test_case.EndpointsTestCase):
+        api_service_cls = MyEndpointsService
 
-  # See call_should_fail.
-  expected_fail_status = None
+        def test_stuff(self):
+          response = self.call_api('my_method')
+          self.assertEqual(...)
 
-  _endpoints = None
+        def test_expected_fail(self):
+          with self.call_should_fail(403):
+            self.call_api('protected_method')
+    """
+    # Should be set in subclasses to a subclass of remote.Service.
+    api_service_cls = None
+    # Should be set in subclasses to a regular expression to match against path
+    # parameters. See components.endpoints_webapp2.adapter.api_server.
+    api_service_regex = None
 
-  def setUp(self):
-    super(EndpointsTestCase, self).setUp()
-    self._endpoints = Endpoints(
-        self.api_service_cls, regex=self.api_service_regex)
+    # See call_should_fail.
+    expected_fail_status = None
 
-  def call_api(self, method, body=None, status=(200, 204)):
-    if self.expected_fail_status:
-      status = self.expected_fail_status
-    return self._endpoints.call_api(method, body, status)
+    _endpoints = None
 
-  @contextlib.contextmanager
-  def call_should_fail(self, status):
-    """Asserts that Endpoints call inside the guarded region of code fails."""
-    # TODO(vadimsh): Get rid of this function and just use
-    # call_api(..., status=...). It existed as a workaround for bug that has
-    # been fixed:
-    # https://code.google.com/p/googleappengine/issues/detail?id=10544
-    assert self.expected_fail_status is None, 'nested call_should_fail'
-    assert status is not None
-    self.expected_fail_status = int(status)
-    try:
-      yield
-    except AssertionError:
-      # Assertion can happen if tests are running on GAE < 1.9.31, where
-      # endpoints bug still exists (and causes webapp guts to raise assertion).
-      # It should be rare (since we are switching to GAE >= 1.9.31), so don't
-      # bother to check that assertion was indeed raised. Just skip it if it
-      # did.
-      pass
-    finally:
-      self.expected_fail_status = None
+    def setUp(self):
+      super(EndpointsTestCase, self).setUp()
+      self._endpoints = Endpoints(self.api_service_cls,
+                                  regex=self.api_service_regex)
+
+    def call_api(self, method, body=None, status=(200, 204)):
+      if self.expected_fail_status:
+        status = self.expected_fail_status
+      return self._endpoints.call_api(method, body, status)
+
+    @contextlib.contextmanager
+    def call_should_fail(self, status):
+      """Asserts that Endpoints call inside the guarded region of code fails."""
+      # TODO(vadimsh): Get rid of this function and just use
+      # call_api(..., status=...). It existed as a workaround for bug that has
+      # been fixed:
+      # https://code.google.com/p/googleappengine/issues/detail?id=10544
+      assert self.expected_fail_status is None, 'nested call_should_fail'
+      assert status is not None
+      self.expected_fail_status = int(status)
+      try:
+        yield
+      except AssertionError:
+        # Assertion can happen if tests are running on GAE < 1.9.31, where
+        # endpoints bug still exists (and causes webapp guts to raise
+        # assertion). It should be rare (since we are switching to GAE >=
+        # 1.9.31), so don't bother to check that assertion was indeed raised.
+        # Just skip it if it did.
+        pass
+      finally:
+        self.expected_fail_status = None
