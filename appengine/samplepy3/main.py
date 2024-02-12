@@ -34,7 +34,6 @@ from components import protoutil
 #from components import net
 #from components import prpc
 #from components import pubsub
-#from components import stats_framework
 #from components import template
 #from components import utils
 
