@@ -1001,7 +1001,7 @@ def _check_go(min_version='1.16.0'):
         'Could not find `go` in PATH. Is it needed to deploy Go code.')
 
 
-def _check_cloudbuildhelper(min_version='1.1.13'):
+def _check_cloudbuildhelper(min_version='1.5.3'):
   """Checks `cloudbuildhelper` is in PATH and it is fresh enough."""
   explainer = (
       'It is needed to deploy Go GAE apps now (https://crbug.com/1057067).\n'
@@ -1062,8 +1062,12 @@ def _prep_go_deployment(services, app_dir):
     # to `inputsdir` which is the parent of app_dir) into the corresponding
     # output directory in the staging destination.
     manifest_body['build'].append({
-        'go_gae_bundle': os.path.join('${inputsdir}', app_name, rel_path),
-        'dest': os.path.join('${contextdir}', app_name, rel_dir),
+        'go_gae_bundle':
+        os.path.join('${inputsdir}', app_name, rel_path),
+        'go_gae_bundle_as_module':
+        True,
+        'dest':
+        os.path.join('${contextdir}', app_name, rel_dir),
     })
 
   garbage = []
@@ -1085,24 +1089,24 @@ def _prep_go_deployment(services, app_dir):
 
     # Prepare ModuleFiles which point to staged YAMLs now. It is important to
     # follow symlinks in the staged output to get to the package directories
-    # in _gopath: that way "gcloud app deploy" will know what Go packages these
-    # YAML correspond too. This information eventually may surface in error
-    # stack traces.
+    # in _gopath/_gomod: that way "gcloud app deploy" will know what Go packages
+    # these YAML correspond too.
     staged_services = []
     for m in services:
       # E.g. "services/module-services.yaml".
       rel_path = os.path.relpath(m.path, app_dir)
       # E.g. "/tmp/_gae_py_xxx/app_name/services", matches `dest` in the YAML.
       abs_dir = os.path.join(stage_dir, app_name, os.path.dirname(rel_path))
-      # If it is a symlink, follow it to its destination in _gopath. This is how
-      # cloudbuildhelper packages directories specified via `go_gae_bundle`.
+      # If it is a symlink, follow it to its destination in _gopath/_gomod. This
+      # is how cloudbuildhelper packages directories specified via
+      # `go_gae_bundle`.
       abs_dir = os.path.realpath(abs_dir)
       # The YAML *must* be there.
       yaml_path = os.path.join(abs_dir, os.path.basename(m.path))
       assert os.path.isfile(yaml_path), yaml_path
       staged_services.append(ModuleFile(path=yaml_path, data=m.data))
 
-    # Scrub Go environ to set it up to use staged _gopath only.
+    # Scrub Go environ to set it up to use staged code only.
     for k in list(os.environ):
       if k.startswith('GO') or k.startswith('CGO'):
         os.environ.pop(k)
@@ -1110,11 +1114,15 @@ def _prep_go_deployment(services, app_dir):
     # We must not fetch any extra code at this point.
     os.environ['GOPROXY'] = 'off'
 
-    # GOPATH with the staged files, if present, is at _gopath.
+    # These indicate which bundling mode was used by cloudbuildhelper.
     go_path = os.path.join(stage_dir, '_gopath')
+    go_mod = os.path.join(stage_dir, '_gomod')
     if os.path.exists(go_path):
       os.environ['GOPATH'] = os.path.realpath(go_path)
       os.environ['GO111MODULE'] = 'off'
+    elif os.path.exists(go_mod):
+      os.environ.pop('GOPATH', None)
+      os.environ['GO111MODULE'] = 'on'
 
     # Proceed using the staged service YAMLs.
     yield staged_services
