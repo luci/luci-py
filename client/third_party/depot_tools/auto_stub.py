@@ -70,7 +70,14 @@ class TestCase(unittest.TestCase, AutoStubMixIn):
 
   def has_failed(self):
     """Returns True if the test has failed."""
-    if not self._resultForDoCleanups:
-      # Maybe skipped.
-      return False
-    return not self._resultForDoCleanups.wasSuccessful()
+    if hasattr(self, '_resultForDoCleanups'):  # py2
+      if not self._resultForDoCleanups:
+        # Maybe skipped.
+        return False
+      return not self._resultForDoCleanups.wasSuccessful()
+    if hasattr(self._outcome, 'errors'):  # py3.4 - 3.10
+      result = self.defaultTestResult()
+      self._feedErrorsToResult(result, self._outcome.errors)
+    else:  # py3.11
+      result = self._outcome.result
+    return any(test == self for test, _ in result.errors + result.failures)

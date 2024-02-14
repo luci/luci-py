@@ -113,7 +113,8 @@ class TestCase(auto_stub.TestCase):
         root_path=self.APP_DIR,
         consistency_policy=datastore_stub_util.PseudoRandomHRConsistencyPolicy(
             probability=1))
-    self.testbed.init_logservice_stub()
+    if six.PY2:
+      self.testbed.init_logservice_stub()  # Not in the py3 SDK
     self.testbed.init_memcache_stub()
     self.testbed.init_modules_stub()
 
@@ -167,7 +168,7 @@ class TestCase(auto_stub.TestCase):
     Sadly, taskqueue_stub implementation does not provide a nice way to run
     them so run the pending tasks manually.
     """
-    self.assertEqual([None], self._taskqueue_stub._queues.keys())
+    self.assertEqual([None], list(self._taskqueue_stub._queues.keys()))
     ran_total = 0
     while True:
       # Do multiple loops until no task was run.

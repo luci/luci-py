@@ -5,6 +5,8 @@
 import os
 import sys
 
+import six
+
 # /appengine/components
 ROOT_DIR = os.path.dirname(
     os.path.dirname(os.path.realpath(os.path.abspath(__file__))))
@@ -33,7 +35,8 @@ def setup_test_env(app_dir=None, app_id='sample-app'):
 
   # Import the rest of GAE packages bundled with dev appserver.
   from tool_support import gae_sdk_utils
-  gae_sdk_utils.setup_gae_env()
+  if six.PY2:
+    gae_sdk_utils.setup_gae_env()
   gae_sdk_utils.setup_env(None, app_id, 'v1a', None)
 
   from components import utils
