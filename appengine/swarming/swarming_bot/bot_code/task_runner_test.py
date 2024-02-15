@@ -372,6 +372,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         self.pings = 0
         self.active_lease = True
         self.alive = True
+        self.terminating = False
 
       def ping_active_lease(self):
         self.pings += 1
@@ -399,6 +400,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       def __init__(self):
         self.active_lease = False
         self.alive = False
+        self.terminating = False
         self.session_id = 'session_id'
         self.dimensions = {}
         self.updates = 0

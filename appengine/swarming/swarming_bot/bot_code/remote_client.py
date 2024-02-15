@@ -913,6 +913,7 @@ class RBESession:
     self._last_acked_status = RBESessionStatus.OK
     self._active_lease = None
     self._finished_lease = None
+    self._terminated = False
 
   def to_dict(self):
     """Returns the state of the session as a dict."""
@@ -937,6 +938,8 @@ class RBESession:
         self._active_lease.to_dict() if self._active_lease else None,
         'finished_lease':
         self._finished_lease.to_dict() if self._finished_lease else None,
+        'terminated':
+        self._terminated,
     }
 
   def dump(self, path):
@@ -978,6 +981,7 @@ class RBESession:
       last_acked_status = dump['last_acked_status']
       active_lease = dump['active_lease']
       finished_lease = dump['finished_lease']
+      session._terminated = dump['terminated']
     except KeyError as e:
       raise ValueError('Missing key %s' % e)
 
@@ -1014,6 +1018,7 @@ class RBESession:
     self._last_acked_status = loaded._last_acked_status
     self._active_lease = loaded._active_lease
     self._finished_lease = loaded._finished_lease
+    self._terminated = loaded._terminated
 
   @property
   def instance(self):
@@ -1032,10 +1037,20 @@ class RBESession:
 
   @property
   def alive(self):
-    """True if this session exists and can process leases."""
-    return self._last_acked_status in (
+    """True if this session is open, but possibly terminating."""
+    return not self._terminated and self._last_acked_status in (
         RBESessionStatus.OK,
         RBESessionStatus.MAINTENANCE,
+        RBESessionStatus.HOST_REBOOTING,
+        RBESessionStatus.BOT_TERMINATING,
+    )
+
+  @property
+  def terminating(self):
+    """True if this session is being closed (in particular by the server)."""
+    return self._last_acked_status in (
+        RBESessionStatus.HOST_REBOOTING,
+        RBESessionStatus.BOT_TERMINATING,
     )
 
   @property
@@ -1233,18 +1248,24 @@ class RBESession:
     if lease:
       logging.error('Ignoring unexpected lease in MAINTENANCE: %s', lease.id)
 
-  def terminate(self):
+  def terminate(self, status=RBESessionStatus.BOT_TERMINATING):
     """Terminates this RBE session.
 
     Does nothing if the session is dead (in particular was already terminated).
     Ignores `active_lease`.
 
-    Retries the call a bunch of times on transient RPC errors to increase
-    chances of successfully reporting results of the last finished lease. If
-    errors are still happening, eventually just gives up. Session termination
-    usually happens when the process is exiting, there's no time left to retry
-    forever.
+    This is the same as passing BOT_TERMINATING or HOST_REBOOTING status to
+    update(...), except it retries the call a bunch of times on transient RPC
+    errors to increase chances of successfully reporting results of the last
+    finished lease. If errors are still happening, eventually just gives up.
+    Session termination usually happens when the process is exiting, there's no
+    time left to retry forever.
     """
+    assert status in (
+        RBESessionStatus.BOT_TERMINATING,
+        RBESessionStatus.HOST_REBOOTING,
+    ), status
+
     if self._active_lease:
       logging.error('Ignoring active lease %s', self._active_lease.id)
 
@@ -1254,7 +1275,7 @@ class RBESession:
       return
 
     try:
-      lease = self._update(status=RBESessionStatus.BOT_TERMINATING,
+      lease = self._update(status=status,
                            dimensions=self._dimensions,
                            lease=self._finished_lease,
                            retry_transient=True)
@@ -1292,11 +1313,12 @@ class RBESession:
     self._session_id = resp.session_id
     self._session_token = resp.session_token
     self._last_acked_status = RBESessionStatus.OK
+    self._terminated = False
 
   def abandon(self):
-    """Abandons this dead session, logging any pending state that is lost now.
+    """Abandons this session, logging any pending state that is lost now.
 
-    Should be called only for dead sessions (`alive` is False). Raises
+    Should be called only for dead or terminating sessions. Raises
     RBESessionException otherwise.
 
     Doesn't do any RPCs.
@@ -1304,7 +1326,7 @@ class RBESession:
     Raises:
       RBESessionException if the local session is in a wrong state.
     """
-    if self.alive:
+    if self.alive and not self.terminating:
       raise RBESessionException('abandon() with a living session')
     if self._active_lease:
       logging.error('Lost active lease %s', self._active_lease.id)
@@ -1322,8 +1344,8 @@ class RBESession:
               retry_transient=False):
     """Used internally by other methods.
 
-    Updates `alive` property based on the server response. Doesn't touch the
-    state related to leases.
+    Updates `alive` and `terminating` properties based on the server response.
+    Doesn't touch the state related to leases.
 
     Arguments:
       status: the desired bot session status as RBESessionStatus enum.
@@ -1359,11 +1381,22 @@ class RBESession:
     if resp.session_token:
       self._session_token = resp.session_token
 
+    logging.debug('RBE %s: %s => %s', self._session_id, status, resp.status)
     if resp.status != RBESessionStatus.OK:
-      # The server told us the session is gone.
+      # The server told us the session is pending termination or already gone.
       self._last_acked_status = resp.status
     else:
       # Use whatever we told the server. The server accepted this status.
       self._last_acked_status = status
+
+    # If we asked the server to terminate the session and the server ACKed this,
+    # the session is considered gracefully terminated.
+    self._terminated = (status in (
+        RBESessionStatus.HOST_REBOOTING,
+        RBESessionStatus.BOT_TERMINATING,
+    ) and self._last_acked_status in (
+        RBESessionStatus.HOST_REBOOTING,
+        RBESessionStatus.BOT_TERMINATING,
+    ))
 
     return resp.lease

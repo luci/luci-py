@@ -689,6 +689,9 @@ class _RBEPinger:
     else:
       self._schedule_next_ping(60.0)
       self._ping_session()
+    if self._rbe_session.alive and self._rbe_session.terminating:
+      logging.warning('RBE session %s is pending termination',
+                      self._rbe_session.session_id)
 
   def _schedule_next_ping(self, delta):
     self._next_ping_time = monotonic_time() + random.uniform(delta, delta * 1.5)

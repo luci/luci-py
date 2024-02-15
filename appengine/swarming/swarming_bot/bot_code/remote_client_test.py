@@ -898,15 +898,19 @@ class TestRBESession(unittest.TestCase):
     s = remote_client.RBESession(remote, 'some-instance', dims, 'bot_version',
                                  None, 'poll_tok')
 
-    # The session is immediately gone.
+    # The session is marked as being terminated.
     remote.mock_next_response(remote_client.RBESessionStatus.BOT_TERMINATING,
                               None)
     s.update(remote_client.RBESessionStatus.OK, dims, 'poll_tok')
     self.assertIsNone(s.active_lease)
-    self.assertFalse(s.alive)
+    self.assertTrue(s.alive)
+    self.assertTrue(s.terminating)
 
-    # Terminating doesn't really do anything, since the session is gone.
+    # Terminate closes the session for good.
+    remote.mock_next_response(remote_client.RBESessionStatus.BOT_TERMINATING,
+                              None)
     s.terminate()
+    self.assertFalse(s.alive)
 
   def test_server_side_session_expiry_with_active_lease(self):
     remote = MockedRBERemote()
@@ -932,11 +936,15 @@ class TestRBESession(unittest.TestCase):
     remote.mock_next_response(remote_client.RBESessionStatus.BOT_TERMINATING,
                               None)
     self.assertFalse(s.ping_active_lease())
-    self.assertFalse(s.alive)
+    self.assertTrue(s.alive)
+    self.assertTrue(s.terminating)
     self.assertIsNone(s.active_lease)
 
-    # Terminating the session doesn't really do anything.
+    # Terminate closes the session for good.
+    remote.mock_next_response(remote_client.RBESessionStatus.BOT_TERMINATING,
+                              None)
     s.terminate()
+    self.assertFalse(s.alive)
 
   def test_lease_server_cancellation(self):
     remote = MockedRBERemote()

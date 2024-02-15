@@ -1269,11 +1269,8 @@ def _run_bot_inner(arg_error, quit_bit):
   # Spin until getting a termination signal. Shutdown RBE on exit.
   state = _BotLoopState(botobj, rbe_params, rbe_bot_version, quit_bit)
   with botobj.mutate_internals() as mut:
-    mut.set_exit_hook(lambda _: state.rbe_disable())
+    mut.set_exit_hook(lambda _: state.on_bot_exit())
   state.run()
-
-  # Tell the server we are going away.
-  botobj.post_event('bot_shutdown', 'Signal was received')
 
   # Do the final cleanup, if any.
   _bot_exit_hook(botobj)
@@ -1372,6 +1369,8 @@ class _BotLoopState:
     self._rbe_idle = None
     # When we should poll RBE next time (if at all).
     self._rbe_poll_timer = None
+    # True if the RBE server asked the bot to terminate. Sticky.
+    self._rbe_termination_pending = False
 
     # Number of consecutive poll cycles when bot did no tasks.
     self._consecutive_idle_cycles = 0
@@ -1452,15 +1451,15 @@ class _BotLoopState:
           self.rbe_enable(rbe_params)
         else:
           # No RBE params => it is a native Swarming bot, turn off RBE.
-          self.rbe_disable()
+          self.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
       elif cmd == 'sleep':
         # This can only happen for native Swarming bot, turn off RBE.
-        self.rbe_disable()
-      elif cmd in ('terminate', 'update', 'bot_restart'):
-        # We are about to terminate the process. Tell RBE about that.
+        self.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
+      elif cmd == 'terminate':
+        # We are about to terminate the process for good. Tell RBE about that.
         self.rbe_status(remote_client.RBESessionStatus.BOT_TERMINATING)
-      elif cmd in ('host_reboot', 'restart'):
-        # We are about to restart the host. Tell RBE about that.
+      elif cmd in ('update', 'bot_restart', 'host_reboot', 'restart'):
+        # We are about to restart the bot or the host. Tell RBE about that.
         self.rbe_status(remote_client.RBESessionStatus.HOST_REBOOTING)
 
       # RBE polls from bots in hybrid mode are synchronized to Swarming timer.
@@ -1528,6 +1527,12 @@ class _BotLoopState:
         self.swarming_handle_cmd(cmd, param)
       elif rbe_lease:
         self.rbe_handle_lease(rbe_lease)
+      elif self._rbe_termination_pending:
+        self.rbe_handle_termination()
+
+      # If the bot is already exiting, skip calling on_bot_idle hook.
+      if self._quit_bit.is_set():
+        break
 
       # If we ran a command, need to poll from the scheduler ASAP without
       # sleeping. In pure RBE mode this is already taken care of via
@@ -1630,6 +1635,29 @@ class _BotLoopState:
     self._consecutive_idle_cycles += 1
     _maybe_update_lkgbc(self._bot)
 
+  def on_bot_exit(self):
+    """Called when the bot is about to terminate.
+
+    In particular, this is called after the bot:
+      * Received SIGTERM.
+      * Asked to terminate by the RBE server.
+      * Asked to restart by the Swarming server.
+      * Asked to update by the Swarming server.
+      * Asked to restart by some hook.
+      * Asked to reboot the machine by the Swarming server.
+      * Asked to reboot the machine by some hook.
+
+    These calls happen through a convoluted chain of hooks and callbacks. See
+    Bot.set_exit_hook, Bot.host_reboot (can be called from bot hooks, calls the
+    exit hook itself), _bot_exit_hook (and its callers in this file).
+    """
+    if not self._bot.shutdown_event_posted:
+      self._bot.post_event('bot_shutdown', 'Signal was received')
+    if self._quit_bit.is_set():
+      self.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
+    else:
+      self.rbe_disable(remote_client.RBESessionStatus.HOST_REBOOTING)
+
   def report_exception(self, msg):
     """Called to report an unexpected exception to Swarming server."""
     logging.exception('%s', msg)
@@ -1725,17 +1753,22 @@ class _BotLoopState:
       self._swarming_poll_timer.reset(random.uniform(100.0, 140.0))
 
   @_trap_all_exceptions
-  def rbe_disable(self):
+  def rbe_disable(self, status):
     """Terminates and forgets the RBE session and RBE state."""
+    assert status in (
+        remote_client.RBESessionStatus.HOST_REBOOTING,
+        remote_client.RBESessionStatus.BOT_TERMINATING,
+    ), status
     self._rbe_poll_token = None
     self._rbe_intended_instance = None
-    self._rbe_intended_status = remote_client.RBESessionStatus.BOT_TERMINATING
+    self._rbe_intended_status = status
     self._rbe_hybrid_mode = False
     self._rbe_idle = None
     self._rbe_consecutive_errors = 0
     if self._rbe_session:
-      logging.info('RBE: terminating session %s', self._rbe_session.session_id)
-      self._rbe_session.terminate()
+      logging.info('RBE: terminating session %s with status %s',
+                   self._rbe_session.session_id, self._rbe_intended_status)
+      self._rbe_session.terminate(self._rbe_intended_status)
       self._rbe_session = None
     if self._rbe_poll_timer:
       self._rbe_poll_timer.cancel()
@@ -1744,6 +1777,13 @@ class _BotLoopState:
   @_trap_all_exceptions
   def rbe_status(self, status):
     """Updates the intended RBE BotSession status (reported on next poll)."""
+    # Note that MAINTENANCE status is used by rbe_poll(...) internally while
+    # doing a "maintenance" pool. It can't be set via rbe_status(...).
+    assert status in (
+        remote_client.RBESessionStatus.OK,
+        remote_client.RBESessionStatus.HOST_REBOOTING,
+        remote_client.RBESessionStatus.BOT_TERMINATING,
+    ), status
     if self._rbe_intended_status != status:
       self._rbe_intended_status = status
       # If we are actually polling RBE now, try to report the new status ASAP.
@@ -1769,11 +1809,9 @@ class _BotLoopState:
     # Note that we also check session state right after polling as well (this is
     # where session status changes) to avoid holding on to sessions known to be
     # dead.
-    if self._rbe_session and not self._rbe_session.alive:
-      logging.info('RBE: session %s is dead', self._rbe_session.session_id)
-      self._rbe_consecutive_errors += 1
-      self._rbe_session.abandon()
-      self._rbe_session = None
+    self.rbe_maybe_abandon_closed_session()
+    # RBE can ask the session to terminate gracefully while the task is running.
+    self.rbe_recognize_pending_termination()
 
     if not self._rbe_session:
       # Don't know if there are pending tasks, need a session for it.
@@ -1782,7 +1820,8 @@ class _BotLoopState:
       # can happen if the bot is already shutting down. To avoid potential weird
       # issues if the shutdown fails due to errors, reschedule the poll some
       # time later by treating this state as a transient error.
-      if self._rbe_intended_status != remote_client.RBESessionStatus.OK:
+      if (self._rbe_intended_status != remote_client.RBESessionStatus.OK
+          or self._rbe_termination_pending):
         logging.warning('The bot is terminating, refusing to open RBE session')
         self._rbe_consecutive_errors += 1
         return None
@@ -1814,37 +1853,83 @@ class _BotLoopState:
 
     # There's a healthy session, we can update it.
     try:
+      # Note this may be one of the termination statuses as well. The session
+      # will react by changing its `alive` and `terminating` properties.
       report_status = self._rbe_intended_status
-      if report_status == remote_client.RBESessionStatus.OK and maintenance:
+      if self._rbe_termination_pending:
+        report_status = remote_client.RBESessionStatus.BOT_TERMINATING
+      elif report_status == remote_client.RBESessionStatus.OK and maintenance:
         report_status = remote_client.RBESessionStatus.MAINTENANCE
       logging.info('RBE: updating %s as %s (blocking=%s)',
                    self._rbe_session.session_id, report_status, blocking)
       lease = self._rbe_session.update(report_status, self._bot.dimensions,
                                        self._rbe_poll_token, blocking)
-      # A session can die either because we reported a terminal status (happens
-      # when exiting) or if the server closed it itself. Either way, we should
-      # abandon this session and create a new one later, if still necessary.
-      # This should not be happening on every loop cycle. As a precaution
-      # against busy-looping, treat session closure as a transient error to slow
-      # down spinning.
-      if not self._rbe_session.alive:
-        logging.info('RBE: session %s is closed', self._rbe_session.session_id)
-        self._rbe_consecutive_errors += 1
-        self._rbe_session.abandon()
-        self._rbe_session = None
-        self._rbe_idle = None
+
+      # This session could have been closed (either by us or by the server).
+      # We should abandon this session and create a new one on the next loop
+      # iteration (if the loop is still running at all). If the bot is stopping,
+      # this is the last iteration and we won't open a new session.
+      self.rbe_maybe_abandon_closed_session()
+      if not self._rbe_session:
         return None
+
+      # The server can ask us to terminate gracefully (but see a caveat in
+      # rbe_maybe_abandon_closed_session).
+      self.rbe_recognize_pending_termination()
+
       # The session is healthy! Return whatever was polled, if anything.
       if report_status == remote_client.RBESessionStatus.OK:
         self._rbe_idle = not lease
       self._rbe_consecutive_errors = 0
       return lease
+
     except remote_client_errors.RBEServerError as e:
       if self._rbe_consecutive_errors > 3:
         self.report_exception('Failed to update RBE Session: %s' % e)
       self._rbe_consecutive_errors += 1
       self._rbe_idle = None
       return None
+
+  def rbe_maybe_abandon_closed_session(self):
+    """Abandons the RBE session if it looks dead or terminated."""
+    if not self._rbe_session:
+      return  # nothing to abandon
+
+    if self._rbe_session.alive:
+      if not self._rbe_session.terminating:
+        return  # the session is very much alive
+
+      # The session exists, but is terminating. This can happen in two cases:
+      #   1. This is an RBE Worker VM and the RBE wants it gone.
+      #   2. This is a bare metal bot and its session has expired.
+      #
+      # For RBE Worker VMs we should obey and terminate the bot: the RBE will
+      # recreate the VM if it is still needed. Termination will be handled by
+      # rbe_poll(...) when it notices `terminating == true`. So keep the
+      # session.
+      if self._bot.rbe_worker_properties:
+        return
+
+      # But for the bare metal bots, we can't just shut down. There's nothing
+      # that can revive them. Instead we'll treat such session as dead and get
+      # a new one. Proceed to abandoning the session.
+      logging.warning('RBE: session %s is unexpectedly terminated by RBE',
+                      self._rbe_session.session_id)
+
+    # Abandoning a session is a rare event. As a precaution against busy-looping
+    # if something goes wrong treat a session closure as a transient error to
+    # slow down spinning.
+    self._rbe_consecutive_errors += 1
+    self._rbe_session.abandon()
+    self._rbe_session = None
+    self._rbe_idle = None
+
+  def rbe_recognize_pending_termination(self):
+    """Sets "termination is pending" flag and logs this."""
+    if (self._rbe_session and self._rbe_session.terminating
+        and not self._rbe_termination_pending):
+      logging.warning('RBE: the bot is terminated by the RBE server')
+      self._rbe_termination_pending = True
 
   @_trap_all_exceptions
   def rbe_handle_lease(self, rbe_lease):
@@ -1881,6 +1966,20 @@ class _BotLoopState:
       self.cmd_run(param, self._rbe_session)
     else:
       raise ValueError('Unexpected claim outcome: %s' % cmd)
+
+  @_trap_all_exceptions
+  def rbe_handle_termination(self):
+    """Called when RBE asks the bot to gracefully terminate."""
+    with self._bot.mutate_internals() as mut:
+      # A terminating bot is not running any tasks => it is idle.
+      mut.update_idleness(True)
+      # If it is an RBE worker VM, ask Swarming to cleanup after it.
+      if self._bot.rbe_worker_properties:
+        mut.update_auto_cleanup(True)
+    # Set the quit bit only after the server acknowledged the termination.
+    if not self._bot.shutdown_event_posted:
+      self._bot.post_event('bot_shutdown', 'Terminated by RBE')
+    self._quit_bit.set()
 
   ##############################################################################
   ## Python Swarming.

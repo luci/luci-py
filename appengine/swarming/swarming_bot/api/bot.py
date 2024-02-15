@@ -50,6 +50,9 @@ class Bot(object):
     self._rbe_hybrid_mode = False
     self._rbe_session = None
 
+    # Mutable in response to other Bot calls.
+    self._shutdown_event_posted = False
+
     # Populate parts of self._dimensions and self._state that depend on other
     # fields with default values.
     with self.mutate_internals() as mut:
@@ -181,6 +184,11 @@ class Bot(object):
     """
     return os.path.join(self.base_dir, 'swarming_bot.zip')
 
+  @property
+  def shutdown_event_posted(self):
+    """True if already submitted `bot_shutdown` or `bot_rebooting` events."""
+    return self._shutdown_event_posted
+
   def get_pseudo_rand(self, width):
     """Returns a constant pseudo-random factor for the bot within +/-width.
 
@@ -198,6 +206,8 @@ class Bot(object):
   def post_event(self, event_type, message):
     """Posts an event to the server."""
     self._remote.post_bot_event(event_type, message, self.attributes)
+    if event_type in ('bot_shutdown', 'bot_rebooting'):
+      self._shutdown_event_posted = True
 
   def post_error(self, message):
     """Posts given string as a failure.
@@ -331,6 +341,11 @@ class BotMutator(object):
     prev, self._bot._idle = self._bot._idle, idle
     self._refresh_attributes()
     return prev
+
+  def update_auto_cleanup(self, auto_cleanup):
+    """Asks Swarming to cleanup after this bot once it's gone."""
+    # TODO: Implement.
+    _ = auto_cleanup
 
   def update_rbe_state(self, instance, hybrid_mode, session):
     self._bot._rbe_instance = instance

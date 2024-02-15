@@ -196,6 +196,20 @@ class TestBotBase(net_utils.TestCase):
         {},
     )
 
+  def expect_bot_event_request(self, event, message):
+
+    def on_request(kwargs):
+      self.assertEqual(kwargs['data']['event'], event)
+      self.assertEqual(kwargs['data']['message'], message)
+
+    return (
+        'https://localhost:1/swarming/api/v1/bot/event',
+        on_request,
+        {
+            'ok': True
+        },
+    )
+
   def expected_rbe_create_request(self, poll_token, session_token, fail=False):
     data = {
         'dimensions': self.attributes['dimensions'],
@@ -1052,7 +1066,7 @@ class TestBotMain(TestBotBase):
       self.poll_once()
     self.assertEqual(polls, 9)
 
-    # Reports the idle state again, but gets the command to terminate.
+    # Reports the idle state again, but gets the Swarming command to terminate.
     self.expected_requests([
         self.expected_poll_request(
             {
@@ -1071,7 +1085,62 @@ class TestBotMain(TestBotBase):
 
     # When the bot shuts down, rbe_disable doesn't do anything, since the
     # session is already closed.
-    self.loop_state.rbe_disable()
+    self.loop_state.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
+
+  def test_rbe_mode_rbe_termination(self):
+    self.mock_rbe_worker_properties()
+
+    # Switches into the RBE mode, creates and polls the session. Gets nothing.
+    self.expected_requests([
+        self.expected_poll_request({
+            'cmd': 'rbe',
+            'rbe': {
+                'poll_token': 'pt0',
+                'instance': 'instance_0',
+                'hybrid_mode': False,
+                'sleep': 0.0,
+            },
+        }),
+        self.expected_rbe_create_request('pt0', 'st0'),
+        self.expected_rbe_update_request('pt0', 'st0'),
+    ])
+    self.poll_once()
+
+    # Polls RBE and gets an RBE termination request. Posts the termination
+    # notification to Swarming.
+    self.expected_requests([
+        self.expected_poll_request(
+            {
+                'cmd': 'rbe',
+                'rbe': {
+                    'poll_token': 'pt0',
+                    'instance': 'instance_0',
+                    'hybrid_mode': False,
+                    'sleep': 0.0,
+                },
+            },
+            rbe_idle=True,
+            sleep_streak=1),
+        self.expected_rbe_update_request('pt0',
+                                         'st0',
+                                         status_out='BOT_TERMINATING',
+                                         blocking=True),
+        self.expect_bot_event_request('bot_shutdown', 'Terminated by RBE'),
+    ])
+    self.poll_once()
+
+    # Wanting to terminate now.
+    self.assertTrue(self.loop_state._rbe_termination_pending)
+
+    # When the bot shuts down it acknowledges the session is terminating. It
+    # doesn't post another bot_shutdown event.
+    self.expected_requests([
+        self.expected_rbe_update_request(None,
+                                         'st0',
+                                         'BOT_TERMINATING',
+                                         blocking=True),
+    ])
+    self.loop_state.on_bot_exit()
 
   def test_rbe_mode_idle_dimensions_change(self):
     # Switches into the RBE mode, creates and polls the session. Gets nothing.
@@ -1249,7 +1318,7 @@ class TestBotMain(TestBotBase):
     self.assertEqual(self.loop_state._rbe_consecutive_errors, 1)
 
     # Termination doesn't do anything, there's no session.
-    self.loop_state.rbe_disable()
+    self.loop_state.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
 
   def test_rbe_mode_switching_instance(self):
     # Switches into the RBE mode, creates and polls the session. Gets nothing.
@@ -1516,7 +1585,7 @@ class TestBotMain(TestBotBase):
             blocking=True,
         ),
     ])
-    self.loop_state.rbe_disable()
+    self.loop_state.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
 
   def test_rbe_mode_claim_run(self):
     ran = []
