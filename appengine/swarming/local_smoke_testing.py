@@ -459,7 +459,7 @@ class Test(unittest.TestCase):
     summary = self.gen_expected(
         name=u'non_utf8',
         # The string is mostly converted to 'Replacement Character'.
-        output=re.compile(u'(\\s|\\S)*A﻿���sfs�\\(B'),
+        output=re.compile(u'(\\s|\\S)*A﻿�sfs�\\(B'),
         tags=sorted([
             u'authenticated:bot:whitelisted-ip',
             u'os:' + self.dimensions['os'][0],
