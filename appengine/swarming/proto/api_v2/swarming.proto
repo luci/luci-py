@@ -518,6 +518,9 @@ message SwarmingTaskBackendConfig {
   // Tags are 'key:value' strings that describes what the task is about.
   // This can later be leveraged to search for kinds of tasks per tag.
   repeated string tags = 10;
+
+  // Customized name of the task.
+  string task_name = 11;
 }
 
 // Swarming:ResultDB integration configuration for a task.

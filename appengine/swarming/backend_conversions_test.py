@@ -87,6 +87,7 @@ class TestBackendConversions(test_case.TestCase):
                           struct_pb2.Value(string_value ='k2:v2'),
                       ],
                   )),
+                'task_name': struct_pb2.Value(string_value='task_name'),
             }),
         grace_period=duration_pb2.Duration(seconds=grace_secs),
         execution_timeout=duration_pb2.Duration(seconds=exec_secs),
@@ -119,7 +120,7 @@ class TestBackendConversions(test_case.TestCase):
         expiration_ts=utils.timestamp_to_datetime(start_deadline_secs *
                                                   1000000),
         realm='some:realm',
-        name='bb-4242',
+        name='task_name',
         priority=5,
         bot_ping_tolerance_secs=70,
         service_account='who@serviceaccount.com',

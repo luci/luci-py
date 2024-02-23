@@ -64,13 +64,16 @@ def compute_task_request(run_task_req):
   # The expiration_ts may be different from run_task_req.start_deadline
   # if the last slice's expiration_secs had to be extended to 60s
   now = utils.utcnow()
+  name = backend_config.task_name
+  if not name:
+    name = 'bb-%s' % run_task_req.build_id
   tr = task_request.TaskRequest(
       created_ts=now,
       task_slices=slices,
       expiration_ts=utils.timestamp_to_datetime(
           utils.datetime_to_timestamp(now) + expiration_ms),
       realm=run_task_req.realm,
-      name='bb-%s' % run_task_req.build_id,
+      name=name,
       priority=backend_config.priority,
       bot_ping_tolerance_secs=backend_config.bot_ping_tolerance,
       service_account=backend_config.service_account,
