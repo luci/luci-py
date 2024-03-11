@@ -618,8 +618,11 @@ class BuildTask(ndb.Model):
 
   Also stores latest task state.
   """
-
+  # Disable in-process per-request cache and memcache, since Go service will
+  # perform some writes and cannot update the same caches.
+  _use_cache = False
   _use_memcache = False
+
   build_id = ndb.StringProperty(required=True, indexed=False)
   buildbucket_host = ndb.StringProperty(required=True, indexed=False)
   # A monotonically increasing integer that is used to compare when updates
