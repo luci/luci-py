@@ -129,6 +129,7 @@ const GPU_ALIASES = {
   "8086:3e92": "Intel Coffee Lake S UHD Graphics 630",
   "8086:3e9b": "Intel Coffee Lake H UHD Graphics 630",
   "8086:3ea5": "Intel Coffee Lake Iris Plus Graphics 655",
+  "8086:4680": "Intel Alder Lake S UHD Graphics 770",
   "8086:5912": "Intel Kaby Lake HD Graphics 630",
   "8086:591e": "Intel Kaby Lake HD Graphics 615",
   "8086:5926": "Intel Kaby Lake Iris Plus Graphics 640",
