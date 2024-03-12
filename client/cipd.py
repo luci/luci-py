@@ -307,6 +307,8 @@ def get_platform():
     arch = 'armv6l' if python_bits == 32 else 'arm64'
   elif arch == 'powerpc64':  # OpenBSD's name for ppc64
     arch = 'ppc64'
+  elif arch == 'loongarch64':
+    arch = 'loong64'
 
   elif not arch and os_name == 'windows':
     # On some 32bit Windows7, platform.machine() returns None.

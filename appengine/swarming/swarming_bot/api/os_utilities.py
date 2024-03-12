@@ -321,6 +321,9 @@ def get_cipd_architecture():
     return 'ppc64'
   if cpu_type == 'riscv':
     return 'riscv64' if get_cpu_bitness() == '64' else 'riscv'
+  if cpu_type == 'loongarch64':
+    return 'loong64'
+
   # TODO(vadimsh): Detection of following architectures is likely broken:
   #   mips64, mips64le, mipsle, ppc64, ppc64le, s390x.
   return cpu_type
