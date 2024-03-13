@@ -32,6 +32,12 @@ queue:
   bucket_size: 100
   rate: 500/s
 
+# /internal/tasks/t/buildbucket-notify-go/<task_id:[0-9a-f]+> is served on Go.
+- name: buildbucket-notify-go
+  bucket_size: 100
+  rate: 500/s
+  target: default-go
+
 # /internal/taskqueue/important/task_queues/update-bot-matches
 - name: update-bot-matches
   bucket_size: 100
