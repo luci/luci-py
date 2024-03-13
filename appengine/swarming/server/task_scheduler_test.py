@@ -208,6 +208,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
     self._enqueue_async_orig = self.mock(utils, 'enqueue_task_async',
                                          self._enqueue_async)
+    self.mock(task_scheduler, '_route_to_go', lambda **_kwargs: False)
+
     # See mock_pub_sub()
     self._pub_sub_mocked = False
     self.publish_successful = True
@@ -2862,6 +2864,41 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertItemsEqual([res.task_id for res in results],
                           [res.task_id for res in pending_results])
     self.execute_tasks()
+
+  def test_route_bb_notification_to_Go(self):
+    # Cancel a pending task.
+    self._register_bot(self.bot_dimensions)
+    result_summary = self._quick_schedule(
+        pubsub_topic='projects/abc/topics/def',
+        has_build_task=True,
+        build_task=task_request.BuildTask(
+            build_id="1234",
+            buildbucket_host="buildbucket_host",
+            latest_task_status=task_result.State.PENDING,
+            pubsub_topic="backend_pubsub_topic",
+            update_id=0))
+    self.mock(task_scheduler, '_route_to_go', lambda **_kwargs: True)
+    self.mock(utils, 'enqueue_task', mock.Mock())
+    utils.enqueue_task.return_value = True
+
+    ok, was_running = task_scheduler.cancel_task(
+        result_summary.request_key.get(), result_summary.key, False, None)
+    self.assertEqual(True, ok)
+    self.assertEqual(False, was_running)
+
+    # assert pubsub noitification was sent to Py while BB notification was sent
+    # to the Go version.
+    utils.enqueue_task.assert_has_calls([
+        mock.call(('/internal/taskqueue/important/pubsub/'
+                   'notify-task/1d69b9f088008910'),
+                  'pubsub',
+                  transactional=True,
+                  payload=mock.ANY),
+        mock.call('/internal/tasks/t/buildbucket-notify-go/1d69b9f088008910',
+                  'buildbucket-notify-go',
+                  transactional=True,
+                  payload=mock.ANY),
+    ])
 
   def test_expire_slice(self):
     enqueued = self.mock_enqueue_rbe_task()

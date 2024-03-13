@@ -29,6 +29,7 @@ import backend_conversions
 import handlers_exceptions
 import ts_mon_metrics
 
+from proto.api_v2.swarming_pb2 import TaskState
 from server import bot_management
 from server import config
 from server import external_scheduler
@@ -574,6 +575,20 @@ def _maybe_pubsub_send_build_task_update(bb_task, build_id, pubsub_topic):
   return True
 
 
+def _route_to_go(prod_pct=0, dev_pct=0):
+  """Returns True if it should route to Go.
+
+  Arguments:
+    prod_pct: percentage of traffic in Prod that should route to Go.
+    dev_pct est: percentage of traffic on Prod that should route to Go.
+  """
+
+  pct = prod_pct
+  if utils.is_dev():
+    pct = dev_pct
+  return random.randint(0, 99) < pct
+
+
 def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
                                     transactional):
   """Enqueues tasks to send PubSub, es, and bb notifications for given request.
@@ -617,16 +632,37 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
         es_cfg, [(request, result_summary)], True, False)
 
   if request.has_build_task:
-    payload = {
-        'task_id': task_id,
-        'state': result_summary.state,
-        'update_id': utils.time_time_ns()
-    }
-    ok = utils.enqueue_task(
-        '/internal/taskqueue/important/buildbucket/notify-task/%s' % task_id,
-        'buildbucket-notify',
-        transactional=transactional,
-        payload=utils.encode_to_json(payload))
+    if _route_to_go(prod_pct=0, dev_pct=25):
+      go_payload = {
+          'class':
+          'buildbucket-notify-go',
+          'body':
+          '''{
+            "taskId": "%s",
+            "state": "%s",
+            "updateId": "%s"
+            }
+          ''' %
+          (task_id,
+           TaskState.DESCRIPTOR.values_by_number[result_summary.state].name,
+           utils.time_time_ns()),
+      }
+      ok = utils.enqueue_task('/internal/tasks/t/buildbucket-notify-go/%s' %
+                              task_id,
+                              'buildbucket-notify-go',
+                              transactional=transactional,
+                              payload=utils.encode_to_json(go_payload))
+    else:
+      payload = {
+          'task_id': task_id,
+          'state': result_summary.state,
+          'update_id': utils.time_time_ns(),
+      }
+      ok = utils.enqueue_task(
+          '/internal/taskqueue/important/buildbucket/notify-task/%s' % task_id,
+          'buildbucket-notify',
+          transactional=transactional,
+          payload=utils.encode_to_json(payload))
     if not ok:
       raise datastore_utils.CommitError(
           'Failed to enqueue buildbucket notify task')
