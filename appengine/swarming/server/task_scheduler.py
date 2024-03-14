@@ -634,18 +634,13 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
   if request.has_build_task:
     if _route_to_go(prod_pct=0, dev_pct=25):
       go_payload = {
-          'class':
-          'buildbucket-notify-go',
-          'body':
-          '''{
-            "taskId": "%s",
-            "state": "%s",
-            "updateId": "%s"
-            }
-          ''' %
-          (task_id,
-           TaskState.DESCRIPTOR.values_by_number[result_summary.state].name,
-           utils.time_time_ns()),
+          'class': 'buildbucket-notify-go',
+          'body': {
+              "taskId": task_id,
+              "state":
+              TaskState.DESCRIPTOR.values_by_number[result_summary.state].name,
+              "updateId": utils.time_time_ns(),
+          }
       }
       ok = utils.enqueue_task('/internal/tasks/t/buildbucket-notify-go/%s' %
                               task_id,
