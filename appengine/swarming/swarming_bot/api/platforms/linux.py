@@ -98,9 +98,9 @@ def _get_nvidia_version():
 
 
 @tools.cached
-def _get_intel_version():
-  """Retrieves the Mesa DRI driver version, which is usable as the Intel GPU
-  driver version.
+def _get_mesa_version():
+  """Retrieves the Mesa DRI driver version, which is usable as the Intel and AMD
+  GPU driver versions.
   """
   try:
     out = subprocess.check_output(['dpkg', '-s', 'libgl1-mesa-dri']).decode()
@@ -280,12 +280,11 @@ def get_gpu():
     dev_name = device.group(1)
     dev_id = device.group(2)
 
-    # TODO(maruel): Implement for AMD once needed.
     version = ''
     if ven_id == gpu.NVIDIA:
       version = _get_nvidia_version()
-    elif ven_id == gpu.INTEL:
-      version = _get_intel_version()
+    elif ven_id in (gpu.INTEL, gpu.AMD):
+      version = _get_mesa_version()
     ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
 
     dimensions.add(ven_id)

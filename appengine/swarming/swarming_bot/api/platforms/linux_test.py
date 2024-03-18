@@ -302,7 +302,7 @@ class TestLinux(auto_stub.TestCase):
     """)
     self.assertEqual(linux.get_ssd(), ('nvme0n1',))
 
-  def test_get_gpu(self):
+  def test_get_gpu_nvidia(self):
     # pylint: disable=line-too-long
     self.mock_check_output.return_value = textwrap.dedent("""\
       18:00.0 "VGA compatible controller [0300]" "NVIDIA Corporation [10de]" "GP107GL [Quadro P1000] [1cb1]" -ra1 "NVIDIA Corporation [10de]" "GP107GL [Quadro P1000] [11bc]"
@@ -312,11 +312,37 @@ class TestLinux(auto_stub.TestCase):
                        (['10de', '10de:1cb1', '10de:1cb1-440.82'
                         ], ['Nvidia GP107GL [Quadro P1000] 440.82']))
 
-  def test_get_intel_version(self):
+  def test_get_gpu_intel(self):
+    # pylint: disable=line-too-long
+    self.mock_check_output.side_effect = (
+        # lscpi -mm -nn
+        '00:02.0 "VGA compatible controller [0300]" "Intel Corporation [8086]" "Device [9bc5]" -r05 "Dell [1028]" "Device [09a4]"'
+        .encode('utf-8'),
+        # dpkg -s libgl1-mesa-dri
+        'Version: 23.2.1-1ubuntu3.1~22.04.2'.encode('utf-8'),
+    )
+    self.assertEqual(linux.get_gpu(),
+                     (['8086', '8086:9bc5', '8086:9bc5-23.2.1'
+                       ], ['Intel Comet Lake S UHD Graphics 630 23.2.1']))
+
+  def test_get_gpu_amd(self):
+    # pylint: disable=line-too-long
+    self.mock_check_output.side_effect = (
+        # lscpi -mm -nn
+        '03:00.0 "VGA compatible controller [0300]" "Advanced Micro Devices, Inc. [AMD/ATI] [1002]" "Navi 14 [Radeon RX 5500/5500M / Pro 5500M] [7340]" -rc5 "Gigabyte Technology Co., Ltd [1458]" "Navi 14 [Radeon RX 5500/5500M / Pro 5500M] [2319]"'
+        .encode('utf-8'),
+        # dpkg -s libgl1-mesa-dri
+        'Version: 23.2.1-1ubuntu3.1~22.04.2'.encode('utf-8'),
+    )
+    self.assertEqual(linux.get_gpu(),
+                     (['1002', '1002:7340', '1002:7340-23.2.1'
+                       ], ['AMD Radeon RX 5500 XT 23.2.1']))
+
+  def test_get_mesa_version(self):
     self.mock_check_output.return_value = textwrap.dedent("""\
       Version: 1.2.3
     """).encode()
-    self.assertEqual(linux._get_intel_version(), '1.2.3')
+    self.assertEqual(linux._get_mesa_version(), '1.2.3')
 
   def test_get_device_tree_compatible(self):
     with mock.patch('builtins.open') as mock_open:
