@@ -318,6 +318,31 @@ def get_reboot_required():
   return os.path.exists('/var/run/reboot-required')
 
 
+def is_display_attached():
+  """Returns whether a display is attached to the machine or not.
+
+  Returns:
+    None, True, or False. It is None when the presence of a display cannot be
+    determined, and a bool otherwise returning whether a display is attached.
+  """
+  try:
+    out = subprocess.check_output(['lshw', '-c', 'display'],
+                                  universal_newlines=True)
+  except (OSError, subprocess.CalledProcessError) as e:
+    # Could happen when the host is shutting down or lshw is not available
+    # for some reason.
+    logging.error('is_display_attached(): %s', e)
+    return None
+
+  # When a display is properly attached, there should be a resolution listed in
+  # the configuration.
+  for line in out.splitlines():
+    line = line.strip()
+    if line.startswith('configuration') and 'resolution' in line:
+      return True
+  return False
+
+
 @tools.cached
 def get_ssd():
   """Returns a list of SSD disks."""

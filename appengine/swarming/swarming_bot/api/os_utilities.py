@@ -1071,6 +1071,12 @@ def get_dimensions():
     if gov:
       dimensions['cpu_governor'] = gov
 
+    display_attached = platforms.linux.is_display_attached()
+    if display_attached:
+      dimensions['display_attached'] = ['1']
+    else:
+      dimensions['display_attached'] = ['0']
+
   if sys.platform == 'darwin':
     model = platforms.osx.get_hardware_model_string()
     if model:

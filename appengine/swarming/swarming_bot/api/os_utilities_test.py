@@ -245,6 +245,7 @@ class TestOsUtilities(auto_stub.TestCase):
     if sys.platform == 'linux':
       expected.add('kernel')
       expected.add('kvm')
+      expected.add('display_attached')
     if sys.platform == 'win32':
       expected.add('integrity')
       expected.add('display_attached')

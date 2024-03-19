@@ -350,6 +350,49 @@ class TestLinux(auto_stub.TestCase):
       self.assertEqual(linux.get_device_tree_compatible(),
                        sorted(['foo', 'bar']))
 
+  def test_is_display_attached_true(self):
+    # Real output from a Linux machine with a display attached.
+    self.mock_check_output.return_value = """\
+  *-display
+       description: VGA compatible controller
+       product: AlderLake-S GT1
+       vendor: Intel Corporation
+       physical id: 2
+       bus info: pci@0000:00:02.0
+       logical name: /dev/fb0
+       version: 0c
+       width: 64 bits
+       clock: 33MHz
+       capabilities: vga_controller bus_master cap_list rom fb
+       configuration: depth=32 driver=i915 latency=0 resolution=1920,1080
+"""
+    self.assertTrue(linux.is_display_attached())
+
+  def test_is_display_attached_false(self):
+    # Real output from a Linux machine with a display attached, but not
+    # functioning properly.
+    self.mock_check_output.return_value = """\
+  *-display
+       description: VGA compatible controller
+       product: AlderLake-S GT1
+       vendor: Intel Corporation
+       physical id: 2
+       bus info: pci@0000:00:02.0
+       version: 0c
+       width: 64 bits
+       clock: 33MHz
+       capabilities: vga_controller bus_master cap_list rom
+       configuration: driver=i915 latency=0
+"""
+    self.assertFalse(linux.is_display_attached())
+
+  def test_is_display_attached_unknown(self):
+    self.mock_check_output.side_effect = OSError('Executable not found')
+    with self.assertLogs(level='ERROR') as logging_manager:
+      self.assertIsNone(linux.is_display_attached())
+    self.assertIn('ERROR:root:is_display_attached(): Executable not found',
+                  logging_manager.output)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
