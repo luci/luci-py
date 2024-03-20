@@ -632,7 +632,7 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
         es_cfg, [(request, result_summary)], True, False)
 
   if request.has_build_task:
-    if _route_to_go(prod_pct=50, dev_pct=100):
+    if _route_to_go(prod_pct=0, dev_pct=100):
       go_payload = {
           'class': 'buildbucket-notify-go',
           'body': {
