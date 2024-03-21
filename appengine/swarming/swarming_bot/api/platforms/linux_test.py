@@ -353,18 +353,19 @@ class TestLinux(auto_stub.TestCase):
   def test_is_display_attached_true(self):
     # Real output from a Linux machine with a display attached.
     self.mock_check_output.return_value = """\
-  *-display
-       description: VGA compatible controller
-       product: AlderLake-S GT1
-       vendor: Intel Corporation
-       physical id: 2
-       bus info: pci@0000:00:02.0
-       logical name: /dev/fb0
-       version: 0c
-       width: 64 bits
-       clock: 33MHz
-       capabilities: vga_controller bus_master cap_list rom fb
-       configuration: depth=32 driver=i915 latency=0 resolution=1920,1080
+Screen 0: minimum 320 x 200, current 1280 x 1024, maximum 16384 x 16384
+DisplayPort-0 disconnected (normal left inverted right x axis y axis)
+DisplayPort-1 disconnected (normal left inverted right x axis y axis)
+DisplayPort-2 disconnected (normal left inverted right x axis y axis)
+HDMI-A-0 connected primary 1280x1024+0+0 (normal left inverted right x axis y axis) 450mm x 360mm
+   1280x1024     60.02*+  75.02
+   1280x800      60.02
+   1152x864      75.00    59.97
+   1280x720      60.02
+   1024x768      85.00    75.03    70.07    60.00
+   800x600       85.06    72.19    75.00    60.32    56.25
+   640x480       85.01    75.00    72.81    60.00    59.94
+   720x400       70.08
 """
     self.assertTrue(linux.is_display_attached())
 
@@ -372,17 +373,11 @@ class TestLinux(auto_stub.TestCase):
     # Real output from a Linux machine with a display attached, but not
     # functioning properly.
     self.mock_check_output.return_value = """\
-  *-display
-       description: VGA compatible controller
-       product: AlderLake-S GT1
-       vendor: Intel Corporation
-       physical id: 2
-       bus info: pci@0000:00:02.0
-       version: 0c
-       width: 64 bits
-       clock: 33MHz
-       capabilities: vga_controller bus_master cap_list rom
-       configuration: driver=i915 latency=0
+Screen 0: minimum 320 x 200, current 1024 x 768, maximum 16384 x 16384
+DisplayPort-0 disconnected primary (normal left inverted right x axis y axis)
+DisplayPort-1 disconnected (normal left inverted right x axis y axis)
+DisplayPort-2 disconnected (normal left inverted right x axis y axis)
+HDMI-A-0 disconnected (normal left inverted right x axis y axis)
 """
     self.assertFalse(linux.is_display_attached())
 

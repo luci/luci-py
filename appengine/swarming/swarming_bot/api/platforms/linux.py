@@ -326,7 +326,9 @@ def is_display_attached():
     determined, and a bool otherwise returning whether a display is attached.
   """
   try:
-    out = subprocess.check_output(['lshw', '-c', 'display'],
+    # Since this uses xrandr, an alternative method will need to be added
+    # whenever Wayland is planned to be used for testing.
+    out = subprocess.check_output(['xrandr', '--display', ':0.0', '--query'],
                                   universal_newlines=True)
   except (OSError, subprocess.CalledProcessError) as e:
     # Could happen when the host is shutting down or lshw is not available
@@ -334,11 +336,10 @@ def is_display_attached():
     logging.error('is_display_attached(): %s', e)
     return None
 
-  # When a display is properly attached, there should be a resolution listed in
-  # the configuration.
+  # When a display is properly attached, there should be a monitor listed as
+  # connected and set as primary.
   for line in out.splitlines():
-    line = line.strip()
-    if line.startswith('configuration') and 'resolution' in line:
+    if ' connected primary ' in line:
       return True
   return False
 
