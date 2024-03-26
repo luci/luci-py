@@ -19,6 +19,7 @@ import uuid
 
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
+from google.protobuf import timestamp_pb2
 
 from components import auth
 from components import datastore_utils
@@ -608,22 +609,45 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
   assert isinstance(request, task_request.TaskRequest), request
   task_id = task_pack.pack_result_summary_key(result_summary.key)
   if request.pubsub_topic:
-    payload = {
-        'task_id': task_id,
-        'topic': request.pubsub_topic,
-        'auth_token': request.pubsub_auth_token,
-        'userdata': request.pubsub_userdata,
-        'tags': result_summary.tags,
-        'state': result_summary.state,
-    }
-    payload['start_time'] = utils.milliseconds_since_epoch()
-
-    logging.debug("Enqueuing PubSub msg with payload: %s", str(payload))
-    ok = utils.enqueue_task(
-        '/internal/taskqueue/important/pubsub/notify-task/%s' % task_id,
-        'pubsub',
-        transactional=transactional,
-        payload=utils.encode_to_json(payload))
+    # Experiment on Buildbucket first.
+    if ('projects/cr-buildbucket' in request.pubsub_topic
+        and _route_to_go(prod_pct=0, dev_pct=100)):
+      now = timestamp_pb2.Timestamp()
+      now.FromDatetime(utils.utcnow())
+      payload = {
+          'class': 'pubsub-go',
+          'body': {
+              'taskId': task_id,
+              'topic': request.pubsub_topic,
+              'authToken': request.pubsub_auth_token,
+              'userdata': request.pubsub_userdata,
+              'tags': result_summary.tags,
+              'state':
+              TaskState.DESCRIPTOR.values_by_number[result_summary.state].name,
+              'startTime': now.ToJsonString(),
+          }
+      }
+      ok = utils.enqueue_task('/internal/tasks/t/pubsub-go/%s' % task_id,
+                              'pubsub-v2',
+                              transactional=transactional,
+                              payload=utils.encode_to_json(payload))
+    else:
+      payload = {
+          'task_id': task_id,
+          'topic': request.pubsub_topic,
+          'auth_token': request.pubsub_auth_token,
+          'userdata': request.pubsub_userdata,
+          'tags': result_summary.tags,
+          'state': result_summary.state,
+          'start_time': utils.milliseconds_since_epoch()
+      }
+      ok = utils.enqueue_task(
+          '/internal/taskqueue/important/pubsub/notify-task/%s' % task_id,
+          'pubsub',
+          transactional=transactional,
+          payload=utils.encode_to_json(payload))
+    logging.debug("Payload of PubSub msg that was tried to enqueued: %s",
+                  str(payload))
     if not ok:
       raise datastore_utils.CommitError('Failed to enqueue pubsub notify task')
 
