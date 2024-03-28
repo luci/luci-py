@@ -609,9 +609,8 @@ def _maybe_taskupdate_notify_via_tq(result_summary, request, es_cfg,
   assert isinstance(request, task_request.TaskRequest), request
   task_id = task_pack.pack_result_summary_key(result_summary.key)
   if request.pubsub_topic:
-    # Experiment on Buildbucket first.
     if ('projects/cr-buildbucket' in request.pubsub_topic
-        and _route_to_go(prod_pct=25, dev_pct=100)):
+        or _route_to_go(prod_pct=0, dev_pct=100)):
       now = timestamp_pb2.Timestamp()
       now.FromDatetime(utils.utcnow())
       payload = {

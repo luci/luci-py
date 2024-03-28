@@ -2865,7 +2865,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                           [res.task_id for res in pending_results])
     self.execute_tasks()
 
-  def test_route_bb_notification_to_Go(self):
+  def test_route_notification_to_Go(self):
     # Cancel a pending task.
     self._register_bot(self.bot_dimensions)
     result_summary = self._quick_schedule(
@@ -2886,12 +2886,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(True, ok)
     self.assertEqual(False, was_running)
 
-    # assert pubsub noitification was sent to Py while BB notification was sent
+    # assert both pubsub noitification and BB notification was sent
     # to the Go version.
     utils.enqueue_task.assert_has_calls([
-        mock.call(('/internal/taskqueue/important/pubsub/'
-                   'notify-task/1d69b9f088008910'),
-                  'pubsub',
+        mock.call(('/internal/tasks/t/pubsub-go/1d69b9f088008910'),
+                  'pubsub-v2',
                   transactional=True,
                   payload=mock.ANY),
         mock.call('/internal/tasks/t/buildbucket-notify-go/1d69b9f088008910',
