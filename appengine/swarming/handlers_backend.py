@@ -15,7 +15,7 @@ from google.appengine import runtime
 
 from google.protobuf import json_format
 
-from proto.api import plugin_pb2
+from proto.plugin import plugin_pb2
 
 from components import decorators
 from components import datastore_utils

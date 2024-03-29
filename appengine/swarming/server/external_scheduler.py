@@ -17,9 +17,9 @@ from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 from google.protobuf import json_format
 
-from proto.api import plugin_pb2
-from proto.api import plugin_prpc_pb2
 from proto.api import swarming_pb2
+from proto.plugin import plugin_pb2
+from proto.plugin import plugin_prpc_pb2
 
 from server import config
 from server import pools_config

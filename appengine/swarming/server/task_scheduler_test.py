@@ -50,8 +50,8 @@ from server import task_scheduler
 from server import task_to_run
 from server.task_result import State
 
-from proto.api import plugin_pb2
 from proto.config import pools_pb2
+from proto.plugin import plugin_pb2
 
 from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
 from bb.go.chromium.org.luci.buildbucket.proto import task_pb2

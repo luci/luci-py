@@ -473,7 +473,7 @@ def _task_properties_from_rpc(props):
             for pack in (props.cipd_input.packages or [])
         ])
 
-  # Default value for swarming_pb2.ContainmentType is NOT_SPECIFIED which is 0.
+  # Default value for ContainmentType is NOT_SPECIFIED which is 0.
   containment = task_request.Containment(
       containment_type=int(props.containment.containment_type))
 

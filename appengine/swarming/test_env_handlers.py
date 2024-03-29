@@ -32,10 +32,10 @@ from components.auth.proto import replication_pb2
 import gae_ts_mon
 from test_support import test_case
 
-from proto.api import plugin_pb2
 from proto.config import config_pb2
 from proto.config import pools_pb2
 from proto.config import realms_pb2
+from proto.plugin import plugin_pb2
 from server import config
 from server import external_scheduler
 from server import large

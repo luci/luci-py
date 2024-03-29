@@ -107,7 +107,7 @@ def apply_default_for_task_props(props):
   ])
   props.cipd_input.server = 'https://pool.config.cipd.example.com'
   props.command[:] = ['python', '-c', 'print(1)']
-  props.containment.containment_type = swarming_pb2.ContainmentType.AUTO
+  props.containment.containment_type = swarming_pb2.Containment.AUTO
   props.dimensions.extend([
       swarming_pb2.StringPair(key='os', value='Amiga'),
       swarming_pb2.StringPair(key='pool', value='default')
@@ -278,7 +278,7 @@ class PrpcTest(test_env_handlers.AppTestBase):
       ])
       props.cipd_input.server = 'https://pool.config.cipd.example.com'
       props.command[:] = ['python', '-c', 'print(1)']
-      props.containment.containment_type = swarming_pb2.ContainmentType.AUTO
+      props.containment.containment_type = swarming_pb2.Containment.AUTO
       props.dimensions.extend([
           swarming_pb2.StringPair(key='os', value='Amiga'),
           swarming_pb2.StringPair(key='pool', value='default')

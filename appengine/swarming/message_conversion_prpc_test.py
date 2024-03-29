@@ -63,7 +63,7 @@ class TestMessageConversion(test_case.TestCase):
     props.cipd_input.server = 'https://pool.config.cipd.example.com'
     props.command[:] = ['python', '-c', 'print(1)']
     props.relative_cwd = 'something'
-    props.containment.containment_type = swarming_pb2.ContainmentType.AUTO
+    props.containment.containment_type = swarming_pb2.Containment.AUTO
     props.dimensions.extend([
         swarming_pb2.StringPair(key='os', value='Amiga'),
         swarming_pb2.StringPair(key='pool', value='default')

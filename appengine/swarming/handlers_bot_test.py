@@ -31,9 +31,9 @@ from components import auth
 from components import ereporter2
 from components import utils
 from components.test_support import test_case
-from proto.api import plugin_pb2
 from proto.config import bots_pb2
 from proto.config import pools_pb2
+from proto.plugin import plugin_pb2
 from server import bot_archive
 from server import bot_auth
 from server import bot_code
