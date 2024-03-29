@@ -1080,39 +1080,51 @@ class TaskSlice(ndb.Model):
   # set to False to avoid unnecessary waiting.
   wait_for_capacity = ndb.BooleanProperty(default=False)
 
-  def properties_hash(self, request):
-    """Calculates the properties_hash for this request, if applicable.
+  # Precalculated properties hash for deduplication and BQ exports.
+  #
+  # Populated in task_scheduler.schedule_request(...) before storing the entity.
+  properties_hash = ndb.BlobProperty(indexed=False)
 
-    Note: if the property has secret bytes, this function call causes a DB GET.
+  def precalculate_properties_hash(self, secret_bytes):
+    """Calculates the hash of properties for this slice.
+
+    Populates self.properties_hash.
+
+    Args:
+      secret_bytes: SecretBytes entity for the request, if any.
     """
-    if not self.properties.idempotent:
-      return None
-    return self._properties_hash_raw(request).digest()
-
-  def _properties_hash_raw(self, request):
-    """Calculates the properties_hash for this request."""
     props = self.properties.to_dict()
-    if self.properties.has_secret_bytes:
-      # When called from task_scheduler.schedule_task(), this function is called
-      # in the same context that stored the SecretBytes entity, so the entity is
-      # still in the in process cache.
-      #
-      # When called in the context of an idempotent TaskRunResult that is
-      # COMPLETED with success, this is much more costly since this happens
-      # inside a transaction.
-      s = task_pack.request_key_to_secret_bytes_key(request.key).get()
-      if s:
-        props['secret_bytes'] = s.secret_bytes.encode('hex')
-      else:
-        # A TaskRequest is broken if the corresponding SecretBytes is not
-        # present. Tolerate it here but log a warning.
-        logging.warning('%s is broken; SecretBytes is missing', request.task_id)
-    return self.HASHING_ALGO(utils.encode_to_json(props))
+    if secret_bytes:
+      props['secret_bytes'] = secret_bytes.secret_bytes.encode('hex')
+    self.properties_hash = self.HASHING_ALGO(
+        utils.encode_to_json(props)).digest()
+
+  def get_properties_hash(self, request):
+    """Returns the hash of properties for this slice.
+
+    For newer entities, this just returns the precalculated `properties_hash`
+    value. For older entities it calculates the hash on the fly, potentially
+    fetching the SecretBytes entity if necessary.
+
+    Args:
+      request: the parent TaskRequest.
+
+    Returns:
+      Raw digest as a byte string.
+    """
+    if not self.properties_hash:
+      secret_bytes = None
+      if self.properties.has_secret_bytes:
+        secret_bytes = task_pack.request_key_to_secret_bytes_key(
+            request.key).get()
+      self.precalculate_properties_hash(secret_bytes)
+    return self.properties_hash
 
   def to_dict(self):
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty! It
     # will call the default method and not the overridden one. :(
-    out = super(TaskSlice, self).to_dict(exclude=['properties'])
+    out = super(TaskSlice,
+                self).to_dict(exclude=['properties', 'properties_hash'])
     out['properties'] = self.properties.to_dict()
     return out
 
@@ -1120,7 +1132,7 @@ class TaskSlice(ndb.Model):
     """Converts self to a swarming_pb2.TaskSlice."""
     if self.properties:
       self.properties.to_proto(out.properties)
-      out.properties_hash = self._properties_hash_raw(request).hexdigest()
+      out.properties_hash = self.get_properties_hash(request).encode('hex')
     out.wait_for_capacity = self.wait_for_capacity
     if self.expiration_secs:
       out.expiration.seconds = self.expiration_secs

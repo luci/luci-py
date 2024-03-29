@@ -175,7 +175,10 @@ def _taskproperties_to_rpc(props):
 def _taskslice_from_rpc(msg):
   """Converts a swarming_rpcs.TaskSlice to a task_request.TaskSlice."""
   props, secret_bytes = _taskproperties_from_rpc(msg.properties)
-  out = _rpc_to_ndb(task_request.TaskSlice, msg, properties=props)
+  out = _rpc_to_ndb(task_request.TaskSlice,
+                    msg,
+                    properties=props,
+                    properties_hash=None)
   return out, secret_bytes
 
 

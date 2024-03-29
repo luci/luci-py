@@ -802,7 +802,7 @@ def _find_dupe_task(now, h):
   is equivalent to decreasing TaskRequest.created_ts, ordering by key works as
   well and doesn't require a composite index.
   """
-  logging.info("_find_dupe_task for properties_hash: %r", h)
+  logging.info("_find_dupe_task for properties_hash: %s", h.encode('hex'))
   # TODO(maruel): Make a reverse map on successful task completion so this
   # becomes a simple ndb.get().
   cls = task_result.TaskResultSummary
@@ -1366,7 +1366,8 @@ def schedule_request(request,
 
   Arguments:
   - request: TaskRequest entity to be saved in the DB. It's key must not be set
-             and the entity must not be saved in the DB yet.
+             and the entity must not be saved in the DB yet. It will be mutated
+             to have the correct key and have `properties_hash` populated.
   - request_id: Optional string. Used to pull TaskRequestID from datastore.
              If request_id is not provided, there is no
              guarantee of idempotency.
@@ -1418,12 +1419,18 @@ def schedule_request(request,
   result_summary = task_result.new_result_summary(request)
   result_summary.modified_ts = now
 
+  # Precalculate all property hashes in advance. That way even if we end up
+  # using e.g. first task slice, all hashes will still be populated (for BQ
+  # export).
+  for i in range(request.num_task_slices):
+    request.task_slice(i).precalculate_properties_hash(secret_bytes)
+
   # If have results for any idempotent slice, reuse it. No need to run anything.
   dupe_summary = None
   for i in range(request.num_task_slices):
     t = request.task_slice(i)
     if t.properties.idempotent:
-      dupe_summary = _find_dupe_task(now, t.properties_hash(request))
+      dupe_summary = _find_dupe_task(now, t.properties_hash)
       if dupe_summary:
         _dedupe_result_summary(dupe_summary, result_summary, i)
         # In this code path, there's not much to do as the task will not be run,

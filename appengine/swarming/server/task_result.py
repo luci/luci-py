@@ -1317,7 +1317,7 @@ class TaskResultSummary(_TaskResultCommon):
         not self.deduped_from):
       # Signal the results are valid and can be reused. If the request has a
       # SecretBytes, it is GET, which is a performance concern.
-      self.properties_hash = t.properties_hash(request)
+      self.properties_hash = t.get_properties_hash(request)
 
   def to_dict(self, **kwargs):
     return super(TaskResultSummary, self).to_dict(exclude=['properties_hash'])

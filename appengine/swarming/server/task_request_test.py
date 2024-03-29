@@ -509,7 +509,7 @@ class TaskRequestApiTest(TestCase):
     # Needed for the get() call below.
     req.put()
     sb = _gen_secret(req, 'I am a banana')
-    # Needed for properties_hash() call.
+    # Needed for get_properties_hash() call.
     sb.put()
     expected_properties = {
         'caches': [],
@@ -613,7 +613,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     self.assertEqual(
         '01c7cb24beefad19fe79f8adab4e72447175a6d8b290fb22930f102fc71cf596',
-        req.task_slice(0).properties_hash(req).encode('hex'))
+        req.task_slice(0).get_properties_hash(req).encode('hex'))
 
   def test_init_new_request_cas_input(self):
     parent = _gen_request()
@@ -641,7 +641,7 @@ class TaskRequestApiTest(TestCase):
     # Needed for the get() call below.
     req.put()
     sb = _gen_secret(req, 'I am not a banana')
-    # Needed for properties_hash() call.
+    # Needed for get_properties_hash() call.
     sb.put()
     expected_properties = {
         'caches': [],
@@ -746,7 +746,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     self.assertEqual(
         'be94b558a518f4d2864960ce0b1a3dbdce050e2713df668d52fd4f43fc0ce2c2',
-        req.task_slice(0).properties_hash(req).encode('hex'))
+        req.task_slice(0).get_properties_hash(req).encode('hex'))
 
   def test_init_new_request_parent(self):
     parent = _gen_request()
@@ -778,7 +778,7 @@ class TaskRequestApiTest(TestCase):
     # Ensure the algorithm is deterministic.
     self.assertEqual(
         '7f75debbd69ed0838c40cacc5ff6942e0199644103b84cf49a84c5deb44f6b78',
-        request.task_slice(0).properties_hash(request).encode('hex'))
+        request.task_slice(0).get_properties_hash(request).encode('hex'))
 
   def test_init_new_request_bot_service_account(self):
     request = _gen_request(service_account='bot')
@@ -912,9 +912,9 @@ class TaskRequestApiTest(TestCase):
                 properties=_gen_properties(idempotent=True)),
         ])
     self.assertEqual(
-        request_1.task_slice(0).properties_hash(request_1),
-        request_2.task_slice(0).properties_hash(request_2))
-    self.assertTrue(request_1.task_slice(0).properties_hash(request_1))
+        request_1.task_slice(0).get_properties_hash(request_1),
+        request_2.task_slice(0).get_properties_hash(request_2))
+    self.assertTrue(request_1.task_slice(0).get_properties_hash(request_1))
 
   def test_different(self):
     # Two TestRequest with different properties.
@@ -923,8 +923,8 @@ class TaskRequestApiTest(TestCase):
     request_2 = _gen_request(
         properties=_gen_properties(execution_timeout_secs=129, idempotent=True))
     self.assertNotEqual(
-        request_1.task_slice(0).properties_hash(request_1),
-        request_2.task_slice(0).properties_hash(request_2))
+        request_1.task_slice(0).get_properties_hash(request_1),
+        request_2.task_slice(0).get_properties_hash(request_2))
 
   def test_TaskRequest_to_proto(self):
     # Try to set as much things as possible to exercise most code paths.
