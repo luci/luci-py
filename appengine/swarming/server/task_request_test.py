@@ -563,6 +563,8 @@ class TaskRequestApiTest(TestCase):
         u'Request name',
         'parent_task_id':
         unicode(parent_id),
+        'root_task_id':
+        unicode(parent_id),
         'priority':
         50,
         'pubsub_topic':
@@ -694,6 +696,8 @@ class TaskRequestApiTest(TestCase):
         'name':
         u'Request name',
         'parent_task_id':
+        parent_id,
+        'root_task_id':
         parent_id,
         'priority':
         50,
@@ -1083,18 +1087,14 @@ class TaskRequestApiTest(TestCase):
     actual = swarming_pb2.TaskRequest()
     request.to_proto(actual)
     self.assertEqual(unicode(expected), unicode(actual))
-    actual = swarming_pb2.TaskRequest()
-    expected.root_task_id = grand_parent.task_id
-    expected.root_run_id = grand_parent.task_id[:-1] + u'1'
-    request.to_proto(actual, append_root_ids=True)
-    self.assertEqual(unicode(expected), unicode(actual))
 
-    # With append_root_ids=True.
     actual = swarming_pb2.TaskRequest()
-    request.to_proto(actual, append_root_ids=True)
     expected.root_task_id = grand_parent.task_id
     expected.root_run_id = grand_parent.task_id[:-1] + u'1'
-    self.assertEqual(unicode(expected), unicode(actual))
+    request.to_proto(actual, append_root_ids=True)
+
+    # Propagated via `root_task_id` property as well.
+    self.assertEqual(request.root_task_id, expected.root_run_id)
 
   def test_TaskRequest_to_proto_empty(self):
     # Assert that it doesn't throw on empty entity.

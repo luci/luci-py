@@ -312,6 +312,7 @@ def new_task_request_from_rpc(msg, now):
       tags=None,
       manual_tags=msg.tags,
       # This is internal field not settable via RPC.
+      root_task_id=None,
       realms_enabled=None,
       resultdb_update_token=None,
       resultdb=resultdb,

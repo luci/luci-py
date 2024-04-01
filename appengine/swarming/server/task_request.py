@@ -1263,6 +1263,20 @@ class TaskRequest(ndb.Model):
   # them when the parent task dies.
   parent_task_id = ndb.StringProperty(validator=_validate_task_run_id)
 
+  # Identifies the task run that started the tree of Swarming tasks.
+  #
+  # If a new task doesn't have a parent, this is set to None. Otherwise if
+  # the parent task has `root_task_id`, this value is used in the new task.
+  # Otherwise `parent_task_id` itself is used.
+  #
+  # That way all tasks from the same task tree (except the root one itself) will
+  # have `root_task_id` populated.
+  #
+  # This is used in BQ exported. Not clear if anyone actually consumes this
+  # information.
+  root_task_id = ndb.StringProperty(indexed=False,
+                                    validator=_validate_task_run_id)
+
   # PubSub topic to send task completion notification to.
   pubsub_topic = ndb.StringProperty(
       indexed=False, validator=_validate_pubsub_topic)
@@ -1883,6 +1897,8 @@ def init_new_request(request, allow_high_priority, template_apply):
       raise ValueError('parent_task_id is not a valid task')
     # Drop the previous user.
     request.user = parent.user
+    # Propagate `root_task_id`.
+    request.root_task_id = parent.root_task_id or request.parent_task_id
 
   # If the priority is below 20, make sure the user has right to do so.
   if request.priority < 20 and not allow_high_priority:
