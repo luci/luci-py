@@ -117,12 +117,12 @@ class AppTestBase(test_case.TestCase):
       proto = plugin_pb2.NotifyTasksRequest()
       json_format.Parse(kwargs['params']['request_json'], proto)
       return external_scheduler.notify_request_now(es_host, proto)
-    self.assertIn(queue_name,
-                  ('buildbucket-notify', 'cancel-children-tasks', 'pubsub',
-                   'monitoring-bq-tasks-results-run',
-                   'monitoring-bq-tasks-results-summary',
-                   'monitoring-bq-bots-events', 'monitoring-bq-tasks-requests',
-                   'rbe-enqueue'))
+    self.assertIn(
+        queue_name,
+        ('buildbucket-notify', 'cancel-children-tasks', 'pubsub',
+         'monitoring-bq-tasks-results-run',
+         'monitoring-bq-tasks-results-summary', 'monitoring-bq-bots-events',
+         'monitoring-bq-tasks-requests', 'rbe-enqueue', 'pubsub-v2'))
     return True
 
   @ndb.tasklet
