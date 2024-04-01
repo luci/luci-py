@@ -1600,6 +1600,7 @@ def get_process_auth_db():
 
   # Do the actual fetch outside the lock. Be careful to handle any unexpected
   # exception by 'fixing' the global state before leaving this function.
+  fetched = None
   try:
     # Note: if process doesn't use 'get_latest_auth_db' this lock is noop, since
     # the dance we do with _auth_db_fetching_thread already guarantees there's
@@ -1607,20 +1608,17 @@ def get_process_auth_db():
     # conjunction with concurrent 'get_latest_auth_db' calls.
     with _auth_db_fetch_lock:
       fetched = fetch_auth_db(known_auth_db=known_auth_db)
-  except Exception:
-    # Be sure to allow other threads to try the fetch. Meanwhile log the
-    # exception and return a stale copy of AuthDB. Better than nothing.
-    logging.exception('Failed to refetch AuthDB, returning stale cached copy')
+  finally:
     with _auth_db_lock:
       assert _auth_db_fetching_thread == threading.current_thread()
       _auth_db_fetching_thread = None
-      return _auth_db
-
-  # Fetch has completed successfully. Update the process cache now.
-  with _auth_db_lock:
-    assert _auth_db_fetching_thread == threading.current_thread()
-    _auth_db_fetching_thread = None
-    return _roll_auth_db_cache(fetched)
+      if fetched:
+        # Fetch has completed successfully. Update the process cache now.
+        # pylint: disable=lost-exception
+        return _roll_auth_db_cache(fetched)
+      # The fetch has failed. An exception is already being raised and will be
+      # propagated up the stack.
+  raise AssertionError('This line should be unreachable')
 
 
 def get_latest_auth_db():

@@ -14,6 +14,7 @@ import mock
 from test_support import test_env
 test_env.setup_test_env()
 
+from google.appengine import runtime
 from google.appengine.ext import ndb
 
 from components.auth import api
@@ -702,17 +703,17 @@ class TestAuthDBCache(test_case.TestCase):
     self.set_time(api.get_process_cache_expiration_sec() + 1)
 
     # Emulate an exception in fetch_auth_db.
-    def mock_fetch_auth_db(*_kwargs):
-      raise Exception('Boom!')
+    def mock_fetch_auth_db(**_kwargs):
+      raise runtime.DeadlineExceededError()
     self.mock(api, 'fetch_auth_db', mock_fetch_auth_db)
 
     # Capture calls to logging.exception.
     logger_calls = []
     self.mock(api.logging, 'exception', lambda *_args: logger_calls.append(1))
 
-    # Should return older copy of auth_db_v0 and log the exception.
-    self.assertEqual(auth_db_v0, api.get_process_auth_db())
-    self.assertEqual(1, len(logger_calls))
+    # Propagates the exception, releases the fetch lock.
+    with self.assertRaises(runtime.DeadlineExceededError):
+      api.get_process_auth_db()
 
     # Make fetch_auth_db to work again. Verify get_process_auth_db() works too.
     self.set_fetched_auth_db(auth_db_v1)
