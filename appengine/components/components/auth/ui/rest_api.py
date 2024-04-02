@@ -832,7 +832,7 @@ class GroupHandler(EntityHandlerBase):
 class ReplicationHandler(handler.AuthenticatingHandler):
   """Accepts AuthDB push from Primary."""
 
-  # Handler uses X-Appengine-Inbound-Appid header protected by GAE.
+  # Handler checks headers already protected by CORS mechanism.
   xsrf_token_enforce_on = ()
 
   def send_response(self, response):
@@ -849,18 +849,27 @@ class ReplicationHandler(handler.AuthenticatingHandler):
     response.auth_code_version = version.__version__
     self.send_response(response)
 
-  # Check that request came from some GAE app. More thorough check is inside.
-  @api.require(lambda: api.get_current_identity().is_service)
+  # The ACL check is inside.
+  @api.public
   def post(self):
+    logging.info('Push from %s', api.get_current_identity().to_bytes())
+
     # Check that current service is a Replica.
     if not model.is_replica():
       self.send_error(replication_pb2.ReplicationPushResponse.NOT_A_REPLICA)
       return
 
+    # This is e.g. "chrome-infra-auth".
+    primary_id = model.get_replication_state().primary_id
+
     # Check that request came from expected Primary service.
-    expected_ident = model.Identity(
-        model.IDENTITY_SERVICE, model.get_replication_state().primary_id)
-    if api.get_current_identity() != expected_ident:
+    expected_ident = (
+        # For GAE => GAE requests using URL Fetch API.
+        model.Identity(model.IDENTITY_SERVICE, primary_id),
+        # For requests authenticated with OAuth access tokens.
+        model.Identity(model.IDENTITY_USER,
+                       primary_id + '@appspot.gserviceaccount.com'))
+    if api.get_current_identity() not in expected_ident:
       self.send_error(replication_pb2.ReplicationPushResponse.FORBIDDEN)
       return
 
