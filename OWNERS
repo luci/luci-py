@@ -1,9 +1,6 @@
-dheriot@google.com
 iannucci@chromium.org
 jonahhooper@google.com
-justinluong@google.com
 maruel@chromium.org
-mkiedys@google.com
 vadimsh@chromium.org
 
 per-file DEPS=chromium-autoroll@skia-public.iam.gserviceaccount.com
