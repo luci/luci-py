@@ -32,18 +32,24 @@ _config_called = False
 _config = lib_config.register(
     'components_auth',
     {
-      # Title of the service to show in UI.
-      'UI_APP_NAME': 'Auth',
-      # True if application is calling 'configure_ui' manually.
-      'UI_CUSTOM_CONFIG': False,
-      # Module name to use for task queue tasks.
-      'BACKEND_MODULE': 'default',
-      # Name of the task queue that processes AuthDB diffs (see change_log.py).
-      'PROCESS_CHANGE_TASK_QUEUE': 'default',
-      # A callback that returns a list of OAuth client IDs to accept.
-      'OAUTH_CLIENT_IDS_PROVIDER': None,
-      # True to enable authentication based on 'X-Luci-Project' headers.
-      'USE_PROJECT_IDENTITIES': False,
+        # Title of the service to show in UI.
+        'UI_APP_NAME': 'Auth',
+        # True if application is calling 'configure_ui' manually.
+        'UI_CUSTOM_CONFIG': False,
+        # Module name to use for task queue tasks.
+        'BACKEND_MODULE': 'default',
+        # An optional callback to enqueue a task to trigger changelog
+        # generation. If none, a standard process-change task will be
+        # enqueued to the configured PROCESS_CHANGE_TASK_QUEUE (see
+        # change_log.py).
+        'CUSTOM_PROCESS_CHANGE_TASK_ENQUEUER': None,
+        # Name of the task queue that processes AuthDB diffs (see
+        # change_log.py).
+        'PROCESS_CHANGE_TASK_QUEUE': 'default',
+        # A callback that returns a list of OAuth client IDs to accept.
+        'OAUTH_CLIENT_IDS_PROVIDER': None,
+        # True to enable authentication based on 'X-Luci-Project' headers.
+        'USE_PROJECT_IDENTITIES': False,
     })
 
 

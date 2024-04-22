@@ -765,12 +765,15 @@ def enqueue_process_change_task(auth_db_rev):
   assert ndb.in_transaction()
   conf = config.ensure_configured()
   try:
-    # Pin the task to the module and version.
-    taskqueue.add(
-        url='/internal/auth/taskqueue/process-change/%d' % auth_db_rev,
-        queue_name=conf.PROCESS_CHANGE_TASK_QUEUE,
-        headers={'Host': modules.get_hostname(module=conf.BACKEND_MODULE)},
-        transactional=True)
+    if conf.CUSTOM_PROCESS_CHANGE_TASK_ENQUEUER:
+      conf.CUSTOM_PROCESS_CHANGE_TASK_ENQUEUER(auth_db_rev)
+    else:
+      # Pin the task to the module and version.
+      taskqueue.add(
+          url='/internal/auth/taskqueue/process-change/%d' % auth_db_rev,
+          queue_name=conf.PROCESS_CHANGE_TASK_QUEUE,
+          headers={'Host': modules.get_hostname(module=conf.BACKEND_MODULE)},
+          transactional=True)
   except Exception as e:
     logging.error(
         'Problem adding "process-change" task to the task queue (%s): %s',
