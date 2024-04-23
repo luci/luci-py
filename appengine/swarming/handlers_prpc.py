@@ -512,4 +512,4 @@ def get_routes(debug=False):
   s.add_service(InternalsService())
   s.add_service(SwarmingService())
   s.add_interceptor(auth.prpc_interceptor)
-  return s.get_routes()
+  return s.get_routes() + s.get_routes(prefix='/python')
