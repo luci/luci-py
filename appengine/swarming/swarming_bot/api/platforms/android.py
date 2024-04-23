@@ -11,6 +11,7 @@ the server to allow additional server-specific functionality.
 import collections
 import logging
 import os
+import re
 import time
 
 try:
@@ -144,12 +145,13 @@ def get_dimensions(devices):
   # TODO(bpastene) Make sure all the devices use the same board and OS.
   # product.device should be read (and listed) first, that is, before
   # build.product because the latter is deprecated.
-  # https://android.googlesource.com/platform/build/+/master/tools/buildinfo.sh
+  # https://android.googlesource.com/platform/build/+/b0dfb70381b729cd652a8e07b087bbb2e332e8cc/tools/buildinfo.sh
   dimension_properties = {
       'device_abi': ['product.cpu.abi'],
       'device_os': ['build.id'],
       'device_os_flavor': ['product.brand', 'product.system.brand'],
       'device_os_type': ['build.type'],
+      'device_os_version': ['build.version.release'],
       'device_type': ['product.device', 'build.product', 'product.board'],
   }
   for dim in dimension_properties:
@@ -191,6 +193,15 @@ def get_dimensions(devices):
       for os in dimensions.get('device_os', []) if os and os[0].isupper()
   }
   dimensions['device_os'] = dimensions['device_os'].union(android_vers)
+
+  # Add all prefixes of complex OS versions like 8.1.0
+  device_os_version = dimensions.get('device_os_version', set())
+  if device_os_version:
+    vers = next(iter(device_os_version))
+    vers_prefixes = [vers[0:i.start()] for i in re.finditer('\.', vers)]
+    dimensions['device_os_version'] = dimensions['device_os_version'].union(
+        vers_prefixes)
+
   dimensions['android'].sort()
   for dim in dimension_properties:
     if not dimensions[dim]:
@@ -248,8 +259,8 @@ def get_state(devices):
   """Returns state information about all the devices connected to the host.
   """
   keys = ('board.platform', 'build.product', 'build.fingerprint', 'build.id',
-          'build.type', 'build.version.sdk', 'product.board', 'product.cpu.abi',
-          'product.device')
+          'build.type', 'build.version.release', 'build.version.sdk',
+          'product.board', 'product.cpu.abi', 'product.device')
 
   def fn(device):
     if not device.is_valid or device.failure:
