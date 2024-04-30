@@ -288,6 +288,54 @@ class TestWinPlatformIndendent(auto_stub.TestCase):
     with mock.patch('api.platforms.win.is_display_attached', return_value=True):
       self.assertIsNone(win.get_screen_scaling_percent())
 
+  def test_get_display_resolution_success(self):
+    SWbemObject = mock.Mock(CurrentHorizontalResolution=1280,
+                            CurrentVerticalResolution=720)
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = [SWbemObject]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertEqual(win.get_display_resolution(), (1280, 720))
+
+  def test_get_display_resolution_missing_display(self):
+    # Both fields missing.
+    SWbemObject = mock.Mock(CurrentHorizontalResolution=None,
+                            CurrentVerticalResolution=None)
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = [SWbemObject]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertIsNone(win.get_display_resolution())
+
+    # First field missing.
+    SWbemObject = mock.Mock(CurrentHorizontalResolution=None,
+                            CurrentVerticalResolution=720)
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = [SWbemObject]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertIsNone(win.get_display_resolution())
+
+    # Second field missing.
+    SWbemObject = mock.Mock(CurrentHorizontalResolution=1280,
+                            CurrentVerticalResolution=None)
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = [SWbemObject]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertIsNone(win.get_display_resolution())
+
+  def test_get_display_resolution_no_wbem(self):
+    with mock.patch('api.platforms.win._get_wmi_wbem', return_value=None):
+      self.assertIsNone(win.get_display_resolution())
+
+  def test_get_display_resolution_scripting_error_handled(self):
+    SWbemServices = mock.Mock()
+    SWbemServices.query.side_effect = win._WbemScriptingError()
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertIsNone(win.get_display_resolution())
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

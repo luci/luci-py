@@ -388,6 +388,44 @@ HDMI-A-0 disconnected (normal left inverted right x axis y axis)
     self.assertIn('ERROR:root:is_display_attached(): Executable not found',
                   logging_manager.output)
 
+  def test_get_display_resolution_success(self):
+    # Real output from a Linux machine with a 2560x144 display attached.
+    self.mock_check_output.return_value = """\
+Screen 0: minimum 320 x 200, current 4000 x 2560, maximum 16384 x 16384
+DisplayPort-0 disconnected (normal left inverted right x axis y axis)
+DisplayPort-1 disconnected (normal left inverted right x axis y axis)
+DisplayPort-2 connected primary 2560x1440+0+518 (normal left inverted right x axis y axis) 597mm x 336mm
+   2560x1440     59.95*+
+   1920x1200     59.88
+   1920x1080     60.00    50.00    59.94    49.95
+   1600x1200     60.00
+   1680x1050     59.95
+   1600x900      60.00
+   1280x1024     60.02
+   1440x900      59.89
+   1280x800      59.95
+   1280x720      60.00    50.00    59.94
+   1024x768      60.00
+   800x600       60.32
+   720x576       50.00
+   720x480       60.00    59.94
+   640x480       60.00    59.94
+"""
+    horizontal, vertical = linux.get_display_resolution()
+    self.assertEqual(horizontal, 2560)
+    self.assertEqual(vertical, 1440)
+
+  def test_get_display_resolution_unknown(self):
+    self.mock_check_output.return_value = ''
+    self.assertIsNone(linux.get_display_resolution())
+
+  def test_get_display_resolution_command_error(self):
+    self.mock_check_output.side_effect = OSError('Executable not found')
+    with self.assertLogs(level='ERROR') as logging_manager:
+      self.assertIsNone(linux.get_display_resolution())
+    self.assertIn('ERROR:root:get_display_resolution(): Executable not found',
+                  logging_manager.output)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

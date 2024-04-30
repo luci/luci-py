@@ -793,6 +793,24 @@ def is_display_attached():
   return False
 
 
+def get_display_resolution():
+  """Gets the resolution of the attached display.
+
+  Returns:
+    None or a tuple (horizontal, vertical). It is None when the resolution
+    cannot be determined, e.g. if a display is not attched. Otherwise,
+    |horizontal| and |vertical| are ints specifying the horizontal and vertical
+    resolution of the display.
+  """
+  if Quartz is None:
+    return None
+
+  display_id = Quartz.CGMainDisplayID()
+  horizontal = Quartz.CGDisplayPixelsWide(display_id)
+  vertical = Quartz.CGDisplayPixelsHigh(display_id)
+  return horizontal, vertical
+
+
 @tools.cached
 def get_ssd():
   """Returns a list of SSD disks."""

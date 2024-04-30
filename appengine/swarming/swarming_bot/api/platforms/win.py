@@ -646,6 +646,26 @@ def get_reboot_required():
       k.Close()
 
 
+def _query_video_controller_resolution():
+  """Returns the result of querying video controllers for resolutions.
+
+  Returns:
+    None or an iterable of SWbemObjects. It is None if the query cannot be
+    completed for some reason, otherwise it contains the results of the query.
+  """
+  wbem = _get_wmi_wbem()
+  if not wbem:
+    return None
+  query = ('SELECT CurrentHorizontalResolution, CurrentVerticalResolution '
+           'FROM Win32_VideoController')
+  try:
+    return wbem.query(query)
+  except _WbemScriptingError as e:
+    # This generally happens when this is called as the host is shutting down.
+    logging.error('_query_video_controller_resolution: %s', e)
+    return None
+
+
 def is_display_attached():
   """Returns whether a display is attached to the machine or not.
 
@@ -656,19 +676,12 @@ def is_display_attached():
   # When a display is attached and functioning properly, a number of fields
   # should have their values properly set (i.e. not be empty), including the
   # ones for display resolution.
-  wbem = _get_wmi_wbem()
-  if not wbem:
+  query_results = _query_video_controller_resolution()
+  if query_results is None:
     return None
-  query = ('SELECT CurrentHorizontalResolution, CurrentVerticalResolution '
-           'FROM Win32_VideoController')
-  try:
-    for ctl in wbem.query(query):
-      if ctl.CurrentHorizontalResolution and ctl.CurrentVerticalResolution:
-        return True
-  except _WbemScriptingError as e:
-    # This generally happens when this is called as the host is shutting down.
-    logging.error('is_display_attached(): %s', e)
-    return None
+  for ctl in query_results:
+    if ctl.CurrentHorizontalResolution and ctl.CurrentVerticalResolution:
+      return True
   return False
 
 
@@ -706,6 +719,25 @@ def get_screen_scaling_percent():
 
   scaling_ratio = float(physical_screen_height) / float(logical_screen_height)
   return str(int(scaling_ratio * 100))
+
+
+def get_display_resolution():
+  """Gets the resolution of the attached display.
+
+  Returns:
+    None or a tuple (horizontal, vertical). It is None when the resolution
+    cannot be determined, e.g. if a display is not attched. Otherwise,
+    |horizontal| and |vertical| are ints specifying the horizontal and vertical
+    resolution of the display.
+  """
+  query_results = _query_video_controller_resolution()
+  if query_results is None:
+    return None
+  for ctl in query_results:
+    if ctl.CurrentHorizontalResolution and ctl.CurrentVerticalResolution:
+      return (int(ctl.CurrentHorizontalResolution),
+              int(ctl.CurrentVerticalResolution))
+  return None
 
 
 @tools.cached

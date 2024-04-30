@@ -26,6 +26,9 @@ from api.platforms import gpu
 
 ## Private stuff.
 
+_RESOLUTION_REGEX = re.compile(
+    r' connected primary (?P<horizontal>\d+)x(?P<vertical>\d+)\+')
+
 
 libc = ctypes.cdll.LoadLibrary(ctypes.util.find_library('c'))
 
@@ -342,6 +345,38 @@ def is_display_attached():
     if ' connected primary ' in line:
       return True
   return False
+
+
+def get_display_resolution():
+  """Gets the resolution of the attached display.
+
+  Returns:
+    None or a tuple (horizontal, vertical). It is None when the resolution
+    cannot be determined, e.g. if a display is not attched. Otherwise,
+    |horizontal| and |vertical| are ints specifying the horizontal and vertical
+    resolution of the display.
+  """
+  try:
+    # Since this uses xrandr, an alternative method will need to be added
+    # whenever Wayland is planned to be used for testing.
+    out = subprocess.check_output(['xrandr', '--display', ':0.0', '--query'],
+                                  universal_newlines=True)
+  except (OSError, subprocess.CalledProcessError) as e:
+    # Could happen when the host is shutting down or xrandr is not available
+    # for some reason.
+    logging.error('get_display_resolution(): %s', e)
+    return None
+
+  # When a display is properly attached, there should be a monitor listed as
+  # connected and set as primary with the current resolution, e.g.
+  #   DisplayPort-2 connected primary 2560x1440+0+518 (normal...
+  for line in out.splitlines():
+    match = _RESOLUTION_REGEX.search(line)
+    if not match:
+      continue
+    return int(match.group('horizontal')), int(match.group('vertical'))
+
+  return None
 
 
 @tools.cached

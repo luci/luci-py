@@ -272,6 +272,7 @@ class TestOsUtilities(auto_stub.TestCase):
         'cpu_name',
         'cwd',
         'disks',
+        'display_resolution',
         'env',
         'gpu',
         'ip',

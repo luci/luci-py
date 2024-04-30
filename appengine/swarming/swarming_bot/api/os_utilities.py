@@ -1175,11 +1175,13 @@ def get_state():
     state['named_caches'] = cache
   if sys.platform in ('cygwin', 'win32'):
     state['cygwin'] = [sys.platform == 'cygwin']
+    _set_display_resolution_state(state, platforms.win.get_display_resolution())
   if sys.platform == 'darwin':
     state['xcode'] = platforms.osx.get_xcode_state()
     temp = platforms.osx.get_temperatures()
     if temp is not None:
       state['temp'] = temp
+    _set_display_resolution_state(state, platforms.osx.get_display_resolution())
   if sys.platform == 'linux':
     temp = platforms.linux.get_temperatures()
     if temp:
@@ -1188,6 +1190,8 @@ def get_state():
     docker_host_hostname = os.environ.get('DOCKER_HOST_HOSTNAME')
     if docker_host_hostname:
       state['docker_host_hostname'] = docker_host_hostname
+    _set_display_resolution_state(state,
+                                  platforms.linux.get_display_resolution())
   if platforms.is_gce():
     networks = platforms.gce.get_networks()
     if networks:
@@ -1199,6 +1203,16 @@ def get_state():
   elif nb_files_in_temp > 1024:
     state['quarantined'] = '> 1024 files in TEMP (%s)' % tmpdir
   return state
+
+
+def _set_display_resolution_state(state, resolution):
+  state['display_resolution'] = {}
+  if resolution:
+    state['display_resolution']['horizontal'] = resolution[0]
+    state['display_resolution']['vertical'] = resolution[1]
+  else:
+    state['display_resolution']['horizontal'] = 'unavailable'
+    state['display_resolution']['vertical'] = 'unavailable'
 
 
 ## State mutating.

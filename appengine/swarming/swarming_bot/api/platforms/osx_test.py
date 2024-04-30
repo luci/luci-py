@@ -535,6 +535,16 @@ class TestOsx(unittest.TestCase):
     display_attached = osx.is_display_attached()
     self.assertIsNotNone(display_attached)
 
+  def test_get_display_resolution(self):
+    # The display resolution is going to be dependent on hardware, but we can
+    # at least ensure that we don't hit any errors.
+    resolution = osx.get_display_resolution()
+    self.assertIsNotNone(resolution)
+    self.assertIsInstance(resolution, tuple)
+    self.assertEqual(len(resolution), 2)
+    self.assertIsInstance(resolution[0], int)
+    self.assertIsInstance(resolution[1], int)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
