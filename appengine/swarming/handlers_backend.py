@@ -350,7 +350,8 @@ class TaskMonitoringBotsEventsBQ(webapp2.RequestHandler):
     ndb.get_context().set_cache_policy(lambda _: False)
     start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
     end = start + datetime.timedelta(seconds=60)
-    bot_management.task_bq_events(start, end)
+    if bq_state.should_export('bot_events', start):
+      bot_management.task_bq_events(start, end)
 
 
 class TaskMonitoringTasksRequestsBQ(webapp2.RequestHandler):
@@ -361,7 +362,8 @@ class TaskMonitoringTasksRequestsBQ(webapp2.RequestHandler):
     ndb.get_context().set_cache_policy(lambda _: False)
     start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
     end = start + datetime.timedelta(seconds=60)
-    task_request.task_bq(start, end)
+    if bq_state.should_export('task_requests', start):
+      task_request.task_bq(start, end)
 
 
 class TaskMonitoringTasksResultsRunBQ(webapp2.RequestHandler):
@@ -371,7 +373,8 @@ class TaskMonitoringTasksResultsRunBQ(webapp2.RequestHandler):
   def post(self, timestamp):
     start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
     end = start + datetime.timedelta(seconds=60)
-    task_result.task_bq_run(start, end)
+    if bq_state.should_export('task_results_run', start):
+      task_result.task_bq_run(start, end)
 
 
 class TaskMonitoringTasksResultsSummaryBQ(webapp2.RequestHandler):
@@ -381,7 +384,8 @@ class TaskMonitoringTasksResultsSummaryBQ(webapp2.RequestHandler):
   def post(self, timestamp):
     start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
     end = start + datetime.timedelta(seconds=60)
-    task_result.task_bq_summary(start, end)
+    if bq_state.should_export('task_results_summary', start):
+      task_result.task_bq_summary(start, end)
 
 
 ###

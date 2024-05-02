@@ -48,6 +48,18 @@ class BqState(ndb.Model):
   recent = ndb.DateTimeProperty(indexed=False)
 
 
+class BqMigrationState(ndb.Model):
+  """Used during Python => Go BQ export migration.
+
+  ID is the table name being exported.
+  """
+  # Disable caching to allow writing from Go.
+  _use_memcache = False
+
+  # When to switch BQ exports from Python to Go.
+  python_to_go = ndb.DateTimeProperty(indexed=False)
+
+
 ### Private APIs.
 
 
@@ -180,3 +192,20 @@ def send_to_bq(table_name, rows):
   if rows:
     logging.info('Sending %d rows', len(rows))
     _send_to_bq_raw('swarming', table_name, rows)
+
+
+def should_export(table_name, ts):
+  """True if Python code should perform this export task.
+
+  Arguments:
+    table_name: a table name being exported e.g. "task_requests".
+    ts: datetime.datetime of the start of the exported interval.
+
+  Returns:
+    True to do exports from Python, False to silently skip them.
+  """
+  state = BqMigrationState.get_by_id(table_name)
+  if state and ts >= state.python_to_go:
+    logging.info('Skipping, exports are done from Go')
+    return False
+  return True

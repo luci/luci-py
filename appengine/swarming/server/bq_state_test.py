@@ -157,6 +157,21 @@ class BotManagementTest(test_case.TestCase):
     with self.assertRaises(bq_state.BQError):
       bq_state.send_to_bq('foo', rows)
 
+  def test_should_export(self):
+    now = datetime.datetime(2020, 1, 2, 3, 4, 0, 0)
+    minute = datetime.timedelta(seconds=60)
+
+    self.assertTrue(bq_state.should_export('task_requests', now))
+
+    bq_state.BqMigrationState(
+        id='task_requests',
+        python_to_go=now + 2 * minute,
+    ).put()
+
+    self.assertTrue(bq_state.should_export('task_requests', now))
+    self.assertTrue(bq_state.should_export('task_requests', now + minute))
+    self.assertFalse(bq_state.should_export('task_requests', now + 2 * minute))
+
 
 if __name__ == '__main__':
   logging.basicConfig(
