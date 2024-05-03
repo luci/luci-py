@@ -251,19 +251,7 @@ def trigger_replication(auth_db_rev=None, transactional=False):
   if auth_db_rev is None:
     auth_db_rev = model.get_replication_state().auth_db_rev
 
-  # Use explicit task queue call instead of 'deferred' module to route tasks
-  # through WSGI app set up in backend/handlers.py. It has global state
-  # correctly configured (ereporter config, etc). 'deferred' module uses its
-  # own WSGI app. Task '/internal/taskqueue/replication/<rev>' translates
-  # to a call to 'update_replicas_task(<rev>)'.
-  if not utils.enqueue_task(
-      url='/internal/taskqueue/replication/%d' % auth_db_rev,
-      queue_name='replication',
-      transactional=transactional):
-    raise ReplicationTriggerError()
-
-  # This is to enable comparison of Auth Service v2 AuthDB to
-  # Auth Service v1's AuthDB.
+  # This enqueues to Auth Service v2's replication queue.
   payload = {
       'class':
       'replication-task',
@@ -279,9 +267,9 @@ def trigger_replication(auth_db_rev=None, transactional=False):
       transactional=transactional,
       payload=utils.encode_to_json(payload))
   if not ok:
-    # Not fatal - log an error message.
     logging.error('failed to enqueue task for v2 replication for rev %d',
                   auth_db_rev)
+    raise ReplicationTriggerError()
 
 
 def update_replicas_task(auth_db_rev):
