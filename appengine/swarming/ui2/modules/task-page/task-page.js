@@ -1423,36 +1423,40 @@ window.customElements.define(
       return newDimensions;
     }
 
-    _debugTask() {
+    _currentSliceProperties() {
       // this._currentSlice.properties is rendered with the UI2
       // Unfortunately, that means if we modify it directly then an incorrect
-      // value will be rerendered. So make a copy only when the debug task
-      // is created so that this does not happen.
-      const newProperties = JSON.parse(
-        JSON.stringify(this._currentSlice.properties)
-      );
+      // value will be rerendered. So return a copy to allow callers to safely
+      // modify it.
+      return JSON.parse(JSON.stringify(this._currentSlice.properties));
+    }
 
-      // Set io_timeout_secs to expirationSecs so that sleep task is not killed
-      // if it does not output for some time.
-      // See https://crbug.com/1492327
-      newProperties.io_timeout_secs = this._request.expirationSecs;
-      const realm = $$("#task_realm").value;
-      const newTask = {
-        expiration_secs: this._request.expirationSecs,
-        name: `leased to ${this.profile.email} for debugging`,
-        pool_task_template: 3, // SKIP
-        priority: 20,
-        properties: newProperties,
-        realm: realm || this._request.realm,
-        service_account: this._request.serviceAccount,
-        tags: ["debug_task:1"],
-        user: this.profile.email,
-      };
+    _debugTask() {
+      // The requested debug task duration, as integer number of seconds.
+      const leaseDuration = parseDuration($$("#lease_duration").value);
 
-      const leaseDurationEle = $$("#lease_duration").value;
-      const leaseDuration = parseDuration(leaseDurationEle);
+      // A mutable copy of the current slice properties.
+      const properties = this._currentSliceProperties();
 
-      newTask.properties.command = [
+      // Override dimensions to hit the requested bot.
+      const dims = this._collectDimensions();
+      if (!dims) {
+        return;
+      }
+      properties.dimensions = dims;
+
+      // These are set to "<REDACTED>" when in the UI. Clear to avoid confusion.
+      properties.secretBytes = "";
+      // Always run this task.
+      properties.idempotent = false;
+
+      // Set both execution and IO timeout to the lease duration to make sure
+      // the debug task just stays there, idle, for the entire duration.
+      properties.executionTimeoutSecs = leaseDuration;
+      properties.ioTimeoutSecs = leaseDuration;
+
+      // Make the task just sleep.
+      properties.command = [
         "python3",
         "-c",
         `import os, sys, time
@@ -1470,14 +1474,22 @@ print('LUCI_CONTEXT=' + os.environ['LUCI_CONTEXT'])
 sys.stdout.flush()
 time.sleep(${leaseDuration})`,
       ];
-      newTask.properties.execution_timeout_secs = leaseDuration;
-      newTask.properties.io_timeout_secs = leaseDuration;
-      const dims = this._collectDimensions();
-      if (!dims) {
-        return;
-      }
-      newTask.properties.dimensions = dims;
-      this._newTask(newTask);
+
+      this._newTask({
+        name: `leased to ${this.profile.email} for debugging`,
+        poolTaskTemplate: "SKIP",
+        priority: 20,
+        realm: $$("#task_realm").value || this._request.realm,
+        serviceAccount: this._request.serviceAccount,
+        tags: ["debug_task:1"],
+        taskSlices: [
+          {
+            expirationSecs: this._request.expirationSecs,
+            properties: properties,
+          },
+        ],
+        user: this.profile.email,
+      });
       this._closePopups();
     }
 
@@ -1501,7 +1513,7 @@ time.sleep(${leaseDuration})`,
         signal: this._fetchController.signal,
       };
       // re-fetch permissions with the task ID.
-      this.app._fetchPermissions(extra, { task_id: this._taskId });
+      this.app._fetchPermissions(extra, { taskId: this._taskId });
       this._fetchTaskInfo(extra);
       this._fetchStdOut(extra);
     }
@@ -1682,7 +1694,6 @@ time.sleep(${leaseDuration})`,
 
     // _newTask makes a request to the server to start a new task, given a request.
     _newTask(newTask) {
-      newTask.properties.idempotent = false;
       this.app.addBusyTasks(1);
       this._createTasksService()
         .new(newTask)
@@ -1742,27 +1753,43 @@ time.sleep(${leaseDuration})`,
     }
 
     _retryTask() {
-      const newTask = {
-        expiration_secs: this._request.expirationSecs,
-        name: this._request.name + " (retry)",
-        pool_task_template: 3, // SKIP
-        priority: this._request.priority,
-        properties: this._currentSlice.properties,
-        service_account: this._request.serviceAccount,
-        tags: this._request.tags,
-        user: this.profile.email,
-        resultdb: { enable: Boolean(this._result.resultdbInfo) },
-        realm: this._request.realm,
-      };
-      newTask.tags.push("retry:1");
+      // Make a copy of properties to avoid mutating the one used by the UI.
+      const properties = this._currentSliceProperties();
 
+      // Also copy tags to add one more.
+      const tags = [...this._request.tags];
+      if (!tags.includes("retry:1")) {
+        tags.push("retry:1");
+      }
+
+      // Override dimensions to hit the requested bot.
       const dims = this._collectDimensions();
       if (!dims) {
         return;
       }
-      newTask.properties.dimensions = dims;
+      properties.dimensions = dims;
 
-      this._newTask(newTask);
+      // These are set to "<REDACTED>" when in the UI. Clear to avoid confusion.
+      properties.secretBytes = "";
+      // Always run this task.
+      properties.idempotent = false;
+
+      this._newTask({
+        name: this._request.name + " (retry)",
+        poolTaskTemplate: "SKIP", // the template is already expanded
+        priority: this._request.priority,
+        taskSlices: [
+          {
+            expirationSecs: this._request.expirationSecs,
+            properties: properties,
+          },
+        ],
+        serviceAccount: this._request.serviceAccount,
+        tags: tags,
+        user: this.profile.email,
+        resultdb: { enable: Boolean(this._result.resultdbInfo) },
+        realm: this._request.realm,
+      });
       this._closePopups();
     }
 

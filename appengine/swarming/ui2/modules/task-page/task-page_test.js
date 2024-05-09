@@ -983,7 +983,7 @@ describe("task-page", function () {
           expect(body.name).toContain("leased to");
           expect(body.realm).toEqual(realm);
 
-          const dims = body.properties.dimensions;
+          const dims = body.taskSlices[0].properties.dimensions;
           expect(dims).toBeTruthy();
           dims.sort((a, b) => {
             return a.key.localeCompare(b.key);
