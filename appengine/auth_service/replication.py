@@ -60,6 +60,11 @@ class AuthReplicaState(ndb.Model, datastore_utils.SerializableModelMixin):
 
   Parent key is replicas_root_key(). Key id is GAE application ID of a replica.
   """
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
+  _use_cache = False
+  _use_memcache = False
+
   # How to convert this entity to serializable dict.
   serializable_properties = {
     'replica_url': datastore_utils.READABLE,
