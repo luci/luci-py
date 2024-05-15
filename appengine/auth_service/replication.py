@@ -96,6 +96,11 @@ class AuthDBSnapshot(ndb.Model):
 
   Root entity. ID is corresponding revision number (as integer). Immutable.
   """
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
+  _use_cache = False
+  _use_memcache = False
+
   # Deflated serialized ReplicationPushRequest proto message.
   auth_db_deflated = ndb.BlobProperty()
   # A list of shard IDs if sharded or empty if auth_db_deflated should be used.
@@ -119,6 +124,11 @@ class AuthDBSnapshotLatest(ndb.Model):
 
   Exists in single instance with key ('AuthDBSnapshotLatest', 'latest').
   """
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
+  _use_cache = False
+  _use_memcache = False
+
   # Revision number of latest stored AuthDBSnaphost. Monotonically increases.
   auth_db_rev = ndb.IntegerProperty(indexed=False)
   # When latest stored AuthDBSnaphost was created (and this entity updated).
