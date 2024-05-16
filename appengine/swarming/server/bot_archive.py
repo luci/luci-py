@@ -69,6 +69,7 @@ FILES = (
     'bb/go/chromium/org/luci/resultdb/proto/__init__.py',
     'bb/go/chromium/org/luci/resultdb/proto/v1/common_pb2.py',
     'bb/go/chromium/org/luci/resultdb/proto/v1/__init__.py',
+    'bb/go/chromium/org/luci/resultdb/proto/v1/instruction_pb2.py',
     'bb/go/chromium/org/luci/resultdb/proto/v1/invocation_pb2.py',
     'bb/go/chromium/org/luci/resultdb/proto/v1/predicate_pb2.py',
     'bb/go/__init__.py',

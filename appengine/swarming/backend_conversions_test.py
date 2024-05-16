@@ -336,7 +336,7 @@ class TestBackendConversions(test_case.TestCase):
       if task_id is not None:
         task.id.id = str(task_id)
       if summary is not None:
-        task.summary_html = summary
+        task.summary_markdown = summary
       if set_timeout:
         task.status_details.timeout.SetInParent()
       if set_exhaustion:
@@ -391,22 +391,17 @@ class TestBackendConversions(test_case.TestCase):
     results = [None, res_sum_1, run_res_2, run_res_3, run_res_4, run_res_5]
 
     expected_tasks = [
-        test_task(
-            common_pb2.INFRA_FAILURE,
-            task_id='1',
-            summary='Swarming task 1 not found'),
+        test_task(common_pb2.INFRA_FAILURE,
+                  task_id='1',
+                  summary='Swarming task 1 not found'),
         test_task(common_pb2.SCHEDULED, task_id=res_sum_1.task_id),
-        test_task(
-            common_pb2.INFRA_FAILURE,
-            task_id=run_res_2.task_id,
-            summary='Task expired.',
-            set_timeout=True,
-            set_exhaustion=True),
+        test_task(common_pb2.INFRA_FAILURE,
+                  task_id=run_res_2.task_id,
+                  summary='Task expired.',
+                  set_timeout=True,
+                  set_exhaustion=True),
         test_task(common_pb2.CANCELED, task_id=run_res_3.task_id),
-        test_task(
-            common_pb2.FAILURE,
-            task_id=run_res_4.task_id,
-            summary='Task completed with failure.'),
+        test_task(common_pb2.FAILURE, task_id=run_res_4.task_id),
         test_task(common_pb2.SUCCESS, task_id=run_res_5.task_id),
     ]
 

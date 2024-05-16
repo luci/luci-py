@@ -232,7 +232,7 @@ def convert_results_to_tasks(task_results, task_ids):
 
     if result is None:
       task.status = common_pb2.INFRA_FAILURE
-      task.summary_html = 'Swarming task %s not found' % task_ids[i]
+      task.summary_markdown = 'Swarming task %s not found' % task_ids[i]
       tasks.append(task)
       continue
 
@@ -339,7 +339,7 @@ def convert_task_state_to_status(state, failure, task):
   StatusDetails and SummaryHTML accordingly. Modifies task in place.
   """
   task.status = common_pb2.STATUS_UNSPECIFIED
-  task.summary_html = ""
+  task.summary_markdown = ""
 
   if state == task_result.State.PENDING:
     task.status = common_pb2.SCHEDULED
@@ -349,34 +349,33 @@ def convert_task_state_to_status(state, failure, task):
 
   elif state == task_result.State.EXPIRED:
     task.status = common_pb2.INFRA_FAILURE
-    task.summary_html = 'Task expired.'
+    task.summary_markdown = 'Task expired.'
     task.status_details.resource_exhaustion.SetInParent()
     task.status_details.timeout.SetInParent()
 
   elif state == task_result.State.TIMED_OUT:
     task.status = common_pb2.INFRA_FAILURE
-    task.summary_html = 'Task timed out.'
+    task.summary_markdown = 'Task timed out.'
     task.status_details.timeout.SetInParent()
 
   elif state == task_result.State.CLIENT_ERROR:
     task.status = common_pb2.FAILURE
-    task.summary_html = 'Task client error.'
+    task.summary_markdown = 'Task client error.'
 
   elif state == task_result.State.BOT_DIED:
     task.status = common_pb2.INFRA_FAILURE
-    task.summary_html = 'Task bot died.'
+    task.summary_markdown = 'Task bot died.'
 
   elif state in [task_result.State.CANCELED, task_result.State.KILLED]:
     task.status = common_pb2.CANCELED
 
   elif state == task_result.State.NO_RESOURCE:
     task.status = common_pb2.INFRA_FAILURE
-    task.summary_html = 'Task did not start, no resource.'
+    task.summary_markdown = 'Task did not start, no resource.'
     task.status_details.resource_exhaustion.SetInParent()
 
   elif state == task_result.State.COMPLETED:
     if failure:
       task.status = common_pb2.FAILURE
-      task.summary_html = ('Task completed with failure.')
     else:
       task.status = common_pb2.SUCCESS

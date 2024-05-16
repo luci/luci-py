@@ -50,6 +50,7 @@ NEEDED_PROTOS = {
     'buildbucket/proto/builds_service_prpc_pb2.py',
     'buildbucket/proto/build_field_visibility_pb2.py',
     'buildbucket/proto/notification_pb2.py',
+    'resultdb/proto/v1/instruction_pb2.py',
     'resultdb/proto/v1/invocation_pb2.py', 'resultdb/proto/v1/common_pb2.py',
     'resultdb/proto/v1/predicate_pb2.py', 'common/proto/options_pb2.py',
     'common/proto/structmask/structmask_pb2.py'
