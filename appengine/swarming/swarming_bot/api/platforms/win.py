@@ -740,6 +740,34 @@ def get_display_resolution():
   return None
 
 
+def get_active_displays():
+  """Gets the list of currently active displays.
+
+  Returns:
+    None or a list of strings. Is is None when the active displays cannot be
+    determined, e.g. if an underlying query fails. Otherwise, the list of
+    strings contains the IDs of any active displays. This list can be empty if
+    no displays are active.
+  """
+  wbem = _get_wmi_wbem()
+  if not wbem:
+    return None
+
+  query = ('SELECT * FROM Win32_PnPEntity '
+           'WHERE PNPClass = "Monitor" AND Status = "OK"')
+  try:
+    query_results = wbem.query(query)
+  except _WbemScriptingError as e:
+    logging.error('get_active_displays: %s', e)
+    return None
+
+  active_displays = []
+  for display in query_results:
+    active_displays.append(display.PNPDeviceID)
+  active_displays.sort()
+  return active_displays
+
+
 @tools.cached
 def get_ssd():
   """Returns a list of SSD disks."""

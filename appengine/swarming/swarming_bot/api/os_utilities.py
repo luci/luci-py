@@ -1176,6 +1176,8 @@ def get_state():
   if sys.platform in ('cygwin', 'win32'):
     state['cygwin'] = [sys.platform == 'cygwin']
     _set_display_resolution_state(state, platforms.win.get_display_resolution())
+    active_displays = platforms.win.get_active_displays() or []
+    state['active_displays'] = active_displays
   if sys.platform == 'darwin':
     state['xcode'] = platforms.osx.get_xcode_state()
     temp = platforms.osx.get_temperatures()

@@ -336,6 +336,35 @@ class TestWinPlatformIndendent(auto_stub.TestCase):
                     return_value=SWbemServices):
       self.assertIsNone(win.get_display_resolution())
 
+  def test_get_active_displays_success(self):
+    display_a = mock.Mock(PNPDeviceID='DISPLAY\\AAAA\\1234')
+    display_b = mock.Mock(PNPDeviceID='DISPLAY\\BBBB\\1234')
+    SWbemServices = mock.Mock()
+    # Deliberately swap the order to test that the return value is sorted.
+    SWbemServices.query.return_value = [display_b, display_a]
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertEqual(win.get_active_displays(),
+                       ['DISPLAY\\AAAA\\1234', 'DISPLAY\\BBBB\\1234'])
+
+  def test_get_active_displays_success_no_results(self):
+    SWbemServices = mock.Mock()
+    SWbemServices.query.return_value = []
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertEqual(win.get_active_displays(), [])
+
+  def test_get_active_displays_no_wbem(self):
+    with mock.patch('api.platforms.win._get_wmi_wbem', return_value=None):
+      self.assertIsNone(win.get_active_displays())
+
+  def test_get_active_displays_scripting_error_handled(self):
+    SWbemServices = mock.Mock()
+    SWbemServices.query.side_effect = win._WbemScriptingError()
+    with mock.patch('api.platforms.win._get_wmi_wbem',
+                    return_value=SWbemServices):
+      self.assertIsNone(win.get_active_displays())
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
