@@ -103,7 +103,7 @@ const dynamicContentTemplate = (ele) =>
 const fabTemplate = document.createElement("template");
 fabTemplate.innerHTML = `
 <a target=_blank rel=noopener
-   href="https://bugs.chromium.org/p/chromium/issues/entry?components=Infra%3ELUCI%3ETaskDistribution%3EUI&owner=kjlubick@chromium.org&status=Assigned">
+   href="https://bugs.chromium.org/p/chromium/issues/entry?components=Infra%3ELUCI%3ETaskDistribution%3EUI&owner=vadimsh@chromium.org&status=Assigned">
   <bug-report-icon-sk class=fab></bug-report-icon-sk>
 </a>`;
 
