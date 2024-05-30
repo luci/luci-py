@@ -798,9 +798,9 @@ def _find_dupe_task(now, h):
   property for more details.
 
   Do not use "task_result.TaskResultSummary.created_ts > oldest" here because
-  this would require a composite index. It's unnecessary because TaskRequest.key
-  is equivalent to decreasing TaskRequest.created_ts, ordering by key works as
-  well and doesn't require a composite index.
+  this would require an index. It's unnecessary because TaskRequest.key is
+  equivalent to decreasing TaskRequest.created_ts, ordering by key works as
+  well and doesn't require an index.
   """
   logging.info("_find_dupe_task for properties_hash: %s", h.encode('hex'))
   # TODO(maruel): Make a reverse map on successful task completion so this

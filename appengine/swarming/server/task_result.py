@@ -1084,9 +1084,7 @@ class TaskResultSummary(_TaskResultCommon):
   recently completed tasks.
   """
   # When the task was submitted.
-  #
-  # The index is used in task listing queries to order by this property.
-  created_ts = ndb.DateTimeProperty(required=True)
+  created_ts = ndb.DateTimeProperty(indexed=False, required=True)
 
   # All task tags, copied from TaskRequest.
   #
