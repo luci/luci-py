@@ -994,6 +994,15 @@ class TaskRunResult(_TaskResultCommon):
   # this task to be set to state == KILLED.
   killing = ndb.BooleanProperty(indexed=False)
 
+  # Copied from TaskRequest.
+  request_created = ndb.DateTimeProperty(indexed=False)
+  # Copied from TaskRequest.
+  request_tags = ndb.StringProperty(indexed=False, repeated=True)
+  # Copied from TaskRequest.
+  request_name = ndb.StringProperty(indexed=False)
+  # Copied from TaskRequest.
+  request_user = ndb.StringProperty(indexed=False)
+
   # A task run execution can't by definition save any cost.
   cost_saved_usd = None
 
@@ -1010,7 +1019,13 @@ class TaskRunResult(_TaskResultCommon):
 
   @property
   def created_ts(self):
-    return self.request.created_ts
+    # Use the copied property if available (it is missing for older entities),
+    # then fallback to fetching it from the TaskRequest (self.request is
+    # secretly making a datastore get).
+    #
+    # TODO: To remove the fallback, either wait until ~2026 for all old entities
+    # to naturally expire, or run a backfill job to populate old entities.
+    return self.request_created or self.request.created_ts
 
   @property
   def performance_stats_key(self):
@@ -1018,7 +1033,8 @@ class TaskRunResult(_TaskResultCommon):
 
   @property
   def name(self):
-    return self.request.name
+    # See the comment in created_ts.
+    return self.request_name or self.request.name
 
   @property
   def request_key(self):
@@ -1057,7 +1073,12 @@ class TaskRunResult(_TaskResultCommon):
     return entities
 
   def to_dict(self, **kwargs):
-    out = super(TaskRunResult, self).to_dict()
+    out = super(TaskRunResult, self).to_dict(exclude=[
+        'request_created',
+        'request_tags',
+        'request_name',
+        'request_user',
+    ])
     out['try_number'] = self.try_number
     return out
 
@@ -1590,6 +1611,10 @@ def new_run_result(request, to_run, bot_id, bot_details, bot_dimensions,
       bot_version=bot_details.bot_version,
       bot_logs_cloud_project=bot_details.logs_cloud_project,
       resultdb_info=resultdb_info,
+      request_created=request.created_ts,
+      request_tags=request.tags,
+      request_name=request.name,
+      request_user=request.user,
       current_task_slice=to_run.task_slice_index,
       server_versions=[utils.get_app_version()])
 
