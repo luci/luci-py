@@ -1,4 +1,9 @@
 cron:
+- description: fetch service config from luci-config
+  target: backend
+  url: /internal/cron/update_config
+  schedule: every 1 minutes
+
 - description: fetch realm configs from luci-config
   target: backend
   url: /internal/cron/update_realms
@@ -33,7 +38,7 @@ cron:
   url: /internal/tasks/c/sweep
   schedule: every 1 minutes
 
-- description: Fetch and apply latest service configs from luci-config.
+- description: Update configs in Auth Service v2.
   target: backendv2
   url: /internal/cron/update-config
   schedule: every 1 minutes
