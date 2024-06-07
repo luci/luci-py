@@ -1034,7 +1034,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         0, len(self._yield_next_available_task_to_dispatch(bot_dimensions)))
 
-    actual = list(task_to_run.yield_expired_task_to_run())
+    actual = list(task_to_run.yield_expired_task_to_run(0.0))
 
     # Only to_run_2 and to_run_3 should be yielded. to_run_4 is too old and is
     # ignored.

@@ -2208,9 +2208,14 @@ def cron_abort_expired_task_to_run():
     else:
       enqueued.append(len(to_runs))
 
+  delay_sec = 0.0
+  if pools_config.all_pools_migrated_to_rbe():
+    logging.info('Delaying the expiration check to expire through RBE instead')
+    delay_sec = 60.0
+
   task_to_runs = []
   try:
-    for to_run in task_to_run.yield_expired_task_to_run():
+    for to_run in task_to_run.yield_expired_task_to_run(delay_sec):
       task_to_runs.append(to_run)
       # Enqueue every 50 TaskToRunShards.
       if len(task_to_runs) == 50:

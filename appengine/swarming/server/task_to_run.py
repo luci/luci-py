@@ -969,13 +969,13 @@ def yield_next_available_task_to_dispatch(bot_id, pool, queues,
                                        visited=stats.visited)
 
 
-def yield_expired_task_to_run():
+def yield_expired_task_to_run(delay_sec):
   """Yields the expired TaskToRunShard still marked as available."""
   # The query fetches tasks that reached expiration time recently
   # to avoid fetching all past tasks. It uses a large batch size
   # since the entities are very small and to reduce RPC overhead.
   def _query(kind):
-    now = utils.utcnow()
+    now = utils.utcnow() - datetime.timedelta(seconds=delay_sec)
     # The backsearch here is just to ensure that we find entities that we forgot
     # about before because the cron job couldn't keep up. In practice
     # expiration_ts should not be more than 1 minute old (as the cron job runs

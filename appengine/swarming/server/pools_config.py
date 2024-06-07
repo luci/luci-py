@@ -403,6 +403,18 @@ def known():
   return sorted(_fetch_pools_config().pools)
 
 
+def all_pools_migrated_to_rbe():
+  """Returns True if all pools have been migrated to RBE."""
+  pools = _fetch_pools_config().pools
+  if not pools:
+    return False  # just to simplify tests that don't setup any pool configs
+  for pool in pools.values():
+    cfg = pool.rbe_migration
+    if not cfg or cfg.rbe_mode_percent != 100:
+      return False
+  return True
+
+
 ### Private stuff.
 
 

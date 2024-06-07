@@ -156,6 +156,9 @@ class PoolsConfigTest(test_case.TestCase):
     self.assertEqual(expected2, pools_config.get_pool_config('another_name'))
     self.assertEqual(['another_name', 'pool_name'], pools_config.known())
 
+  def test_all_pools_migrated_to_rbe(self):
+    self.mock_config(TEST_CONFIG)
+    self.assertFalse(pools_config.all_pools_migrated_to_rbe())
 
   def test_validate_external_services_cipd(self):
 
