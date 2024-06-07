@@ -187,7 +187,7 @@ def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
 
 
 def _expire_slice(request, to_run_key, terminal_state, claim, txn_retries,
-                  txn_catch_errors):
+                  txn_catch_errors, reason):
   """Expires a single TaskToRunShard if it is still pending.
 
   If the task has more slices, enqueues the next slice. Otherwise marks the
@@ -200,6 +200,7 @@ def _expire_slice(request, to_run_key, terminal_state, claim, txn_retries,
     claim: if True, obtain task_to_run.Claim before touching the task.
     txn_retries: how many times to retry the transaction on collisions.
     txn_catch_errors: if True, ignore datastore_utils.CommitError.
+    reason: a string tsmon label used to identify how expiration happened.
 
   Returns:
     (TaskResultSummary if updated it, new TaskToRunShard if enqueued a slice).
@@ -255,7 +256,7 @@ def _expire_slice(request, to_run_key, terminal_state, claim, txn_retries,
 
   if summary:
     logging.info('Expired %s/%s', request.task_id, slice_index)
-    ts_mon_metrics.on_task_expired(summary, old_ttr)
+    ts_mon_metrics.on_task_expired(summary, old_ttr, reason)
   if state_changed:
     ts_mon_metrics.on_task_status_change_scheduler_latency(summary)
 
@@ -1699,7 +1700,8 @@ def bot_reap_task(bot_dimensions, queues, bot_details, deadline):
                                             task_result.State.EXPIRED,
                                             claim=False,
                                             txn_retries=1,
-                                            txn_catch_errors=True)
+                                            txn_catch_errors=True,
+                                            reason='bot_reap_task')
         if not new_to_run:
           if summary:
             expired += 1
@@ -2138,7 +2140,7 @@ def cancel_tasks(limit, query, cursor=None):
   return cursor, results
 
 
-def expire_slice(to_run_key, terminal_state):
+def expire_slice(to_run_key, terminal_state, reason):
   """Expires a slice represented by the given TaskToRunShard entity.
 
   Schedules the next slice, if possible, or terminates the task with the given
@@ -2151,6 +2153,7 @@ def expire_slice(to_run_key, terminal_state):
   Arguments:
     to_run_key: an entity key of TaskToRunShard entity to expire.
     terminal_state: the task state to set if this slice is the last one.
+    reason: a string tsmon label used to identify how expiration happened.
 
   Raises:
     datastore_utils.CommitError on transaction errors.
@@ -2165,7 +2168,8 @@ def expire_slice(to_run_key, terminal_state):
                 terminal_state,
                 claim=False,
                 txn_retries=4,
-                txn_catch_errors=False)
+                txn_catch_errors=False,
+                reason=reason)
 
 
 ### Cron job.
@@ -2408,6 +2412,7 @@ def task_expire_tasks(task_to_runs):
           claim=True,
           txn_retries=4,
           txn_catch_errors=True,
+          reason='task_expire_tasks',
       )
       if new_to_run:
         # The next slice was enqueued.

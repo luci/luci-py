@@ -448,13 +448,13 @@ class InternalsService(object):
       terminal_state = task_result.State.EXPIRED
       report_to_log = True
 
-    task_scheduler.expire_slice(to_run_key, terminal_state)
+    reason_name = rbe_pb2.ExpireSliceRequest.Reason.Name(request.reason)
+    task_scheduler.expire_slice(to_run_key, terminal_state, reason_name)
 
     # Submit the report only after expiring the slice, in case this is slow.
     if report_to_log:
       ereporter2.log(source='rbe',
-                     category=rbe_pb2.ExpireSliceRequest.Reason.Name(
-                         request.reason),
+                     category=reason_name,
                      message=request.details,
                      params={
                          'task_id':

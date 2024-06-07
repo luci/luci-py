@@ -1008,7 +1008,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       to_run_key = task_to_run.request_to_task_to_run_key(request, 0)
       self.mock_now(self.now, 60)
       task_scheduler._expire_slice(request, to_run_key, State.EXPIRED, False, 1,
-                                   True)
+                                   True, 'some-reason')
       mock_call.assert_called_once_with('1d69b9f088008911',
                                         u'resultdb-update-token')
 
@@ -2934,7 +2934,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     del enqueued[:]
 
     # Expire this pending slice.
-    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE)
+    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE,
+                                'some-reason')
 
     # The second slice is pending now.
     result_summary = result_summary.key.get()
@@ -2949,7 +2950,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     del enqueued[:]
 
     # Expire this pending slice as well.
-    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE)
+    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE,
+                                'some-reason')
 
     # The task is fully expired now.
     result_summary = result_summary.key.get()
@@ -3004,7 +3006,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     del enqueued[:]
 
     # Expire this pending slice.
-    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE)
+    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE,
+                                'some-reason')
     # The second slice is pending now.
     result_summary = result_summary.key.get()
     self.assertEqual(result_summary.state, State.PENDING)
@@ -3018,7 +3021,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     del enqueued[:]
 
     # Expire this pending slice as well.
-    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE)
+    task_scheduler.expire_slice(ttr.key, task_result.State.NO_RESOURCE,
+                                'some-reason')
 
     # The task is fully expired now.
     result_summary = result_summary.key.get()

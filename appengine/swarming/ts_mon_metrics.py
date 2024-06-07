@@ -153,6 +153,7 @@ _tasks_slice_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('rbe'),
         gae_ts_mon.IntegerField('slice_index'),
+        gae_ts_mon.StringField('reason'),
     ],
     bucketer=gae_ts_mon.FixedWidthBucketer(width=30),
 )
@@ -366,7 +367,7 @@ def on_task_completed(summary):
     _jobs_durations.add(summary.duration, fields=fields)
 
 
-def on_task_expired(summary, task_to_run):
+def on_task_expired(summary, task_to_run, reason):
   """When a task slice is expired."""
   tags_dict = _tags_to_dict(summary.tags)
   fields = {
@@ -378,7 +379,9 @@ def on_task_expired(summary, task_to_run):
   if task_to_run.expiration_delay is not None:
     _tasks_slice_expiration_delay.add(
         task_to_run.expiration_delay,
-        fields=dict(fields, slice_index=task_to_run.task_slice_index))
+        fields=dict(fields,
+                    slice_index=task_to_run.task_slice_index,
+                    reason=reason))
 
   # task expiration delay
   if summary.expiration_delay is not None:

@@ -2557,6 +2557,7 @@ class InternalsServicePrpcTest(PrpcTest):
     expire_slice_mock.assert_called_once_with(
         task_to_run.task_to_run_key_from_parts(req_key, 15, 32),
         task_result.State.NO_RESOURCE,
+        'NO_RESOURCE',
     )
 
   @mock.patch('server.task_scheduler.expire_slice')
@@ -2579,6 +2580,7 @@ class InternalsServicePrpcTest(PrpcTest):
     expire_slice_mock.assert_called_once_with(
         task_to_run.task_to_run_key_from_parts(req_key, 15, 32),
         task_result.State.EXPIRED,
+        'PERMISSION_DENIED',
     )
 
     errs = list(ereporter2.Error.query())
@@ -2613,6 +2615,7 @@ class InternalsServicePrpcTest(PrpcTest):
     expire_slice_mock.assert_called_once_with(
         task_to_run.task_to_run_key_from_parts(req_key, 15, 32),
         task_result.State.BOT_DIED,
+        'BOT_INTERNAL_ERROR',
     )
 
     errs = list(ereporter2.Error.query())

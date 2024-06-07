@@ -201,14 +201,14 @@ class TestMetrics(test_case.TestCase):
         state=task_result.State.EXPIRED)
     to_run = _get_task_to_run(self.now, 1, 0, expiration_delay=1)
 
-    ts_mon_metrics.on_task_expired(summary, to_run)
+    ts_mon_metrics.on_task_expired(summary, to_run, 'reason')
     self.assertEqual(
         1,
         ts_mon_metrics._tasks_expiration_delay.get(fields=fields).sum)
     self.assertEqual(
         1,
         ts_mon_metrics._tasks_slice_expiration_delay.get(
-            fields=dict(fields, slice_index=0)).sum)
+            fields=dict(fields, slice_index=0, reason='reason')).sum)
 
   def test_on_task_to_run_consumed(self):
     tags = [
