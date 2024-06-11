@@ -257,6 +257,11 @@ class _ImportedConfigRevisions(ndb.Model):
   Parent entity is AuthDB root (auth.model.root_key()). Updated in a transaction
   when importing configs.
   """
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
+  _use_cache = False
+  _use_memcache = False
+
   revisions = ndb.JsonProperty()
 
 

@@ -108,6 +108,11 @@ def config_key():
 
 class GroupImporterConfig(ndb.Model):
   """Singleton entity with group importer configuration JSON."""
+  # Disable memcache and always fetch from Datastore. This means we can see
+  # changes from the Go version of the app.
+  _use_cache = False
+  _use_memcache = False
+
   config_proto = ndb.TextProperty()
   config_revision = ndb.JsonProperty() # see config.py, _update_imports_config
   modified_by = auth.IdentityProperty(indexed=False)
