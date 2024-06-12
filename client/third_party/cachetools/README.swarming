@@ -5,5 +5,6 @@ Revision: e27332bc82f4e327aedaec17c9b656ae719322ed (presumed; this is 2.0.0).
 Home-page: https://github.com/tkem/cachetools
 License: MIT
 
-Local modifications: none; installed via 'pip install cachetools' and copied
-to this directory.
+Local modifications:
+- installed via 'pip install cachetools' and copied to this directory.
+- Added import for collections.MutableMapping above python 3.3.

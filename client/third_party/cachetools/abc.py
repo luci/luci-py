@@ -1,11 +1,16 @@
 from __future__ import absolute_import
 
 import collections
+import sys
 
 from abc import abstractmethod
 
+if sys.version_info[:2] >= (3, 3):
+    from collections.abc import MutableMapping
+else:
+    from collections import MutableMapping
 
-class DefaultMapping(collections.MutableMapping):
+class DefaultMapping(MutableMapping):
 
     __slots__ = ()
 
