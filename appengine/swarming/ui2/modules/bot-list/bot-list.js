@@ -609,7 +609,7 @@ window.customElements.define(
       this.app.addBusyTasks(1);
       // We can re-use the query params from listQueryParams because
       // the backend will ignore those it doesn't understand (e.g limit
-      // and is_dead, etc).
+      // and isDead, etc).
       service
         .count(listRequest.dimensions)
         .then((resp) => {

@@ -112,7 +112,7 @@ window.customElements.define(
       const request = {
         dimensions: this.dimensions,
         limit: 200, // see https://crbug.com/908423
-        is_dead: "TRUE",
+        isDead: "TRUE",
       };
 
       const service = new BotsService(this.authHeader);
@@ -129,7 +129,7 @@ window.customElements.define(
                 cursor: resp.cursor,
                 dimensions: this.dimensions,
                 limit: 200, // see https://crbug.com/908423
-                is_dead: "TRUE",
+                isDead: "TRUE",
               };
               service
                 .list(request)

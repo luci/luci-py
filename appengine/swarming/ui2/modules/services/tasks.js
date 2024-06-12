@@ -19,8 +19,8 @@ export class TasksService extends PrpcService {
    **/
   cancel(taskId, killRunning) {
     return this._call("CancelTask", {
-      task_id: taskId,
-      kill_running: killRunning,
+      taskId: taskId,
+      killRunning: killRunning,
     });
   }
 
@@ -35,7 +35,7 @@ export class TasksService extends PrpcService {
    **/
   stdout(taskId, offset, length) {
     return this._call("GetStdout", {
-      task_id: taskId,
+      taskId: taskId,
       offset: offset,
       length: length,
     });
@@ -50,7 +50,7 @@ export class TasksService extends PrpcService {
    **/
   request(taskId) {
     return this._call("GetRequest", {
-      task_id: taskId,
+      taskId: taskId,
     });
   }
 
@@ -64,8 +64,8 @@ export class TasksService extends PrpcService {
    **/
   result(taskId, includePerformanceStats) {
     return this._call("GetResult", {
-      task_id: taskId,
-      include_performance_stats: includePerformanceStats,
+      taskId: taskId,
+      includePerformanceStats: includePerformanceStats,
     });
   }
 

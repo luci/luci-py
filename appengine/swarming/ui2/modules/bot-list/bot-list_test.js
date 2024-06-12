@@ -1394,7 +1394,7 @@ describe("bot-list", function () {
               { key: "pool", value: "Skia" },
               { key: "os", value: "Android" },
             ],
-            is_dead: "FALSE",
+            isDead: "FALSE",
             limit: 256,
           },
         },
@@ -1413,7 +1413,7 @@ describe("bot-list", function () {
           filters: ["status:dead", "device_type:bullhead"],
           output: {
             dimensions: [{ key: "device_type", value: "bullhead" }],
-            is_dead: "TRUE",
+            isDead: "TRUE",
             limit: 456,
           },
         },
@@ -1430,16 +1430,16 @@ describe("bot-list", function () {
               { key: "device_type", value: "bullhead" },
               { key: "device_type", value: "marlin" },
             ],
-            in_maintenance: "TRUE",
+            inMaintenance: "TRUE",
             limit: 789,
           },
         },
         {
-          // is_busy
+          // isBusy
           limit: 7,
           filters: ["task:busy"],
           output: {
-            is_busy: "TRUE",
+            isBusy: "TRUE",
             limit: 7,
             dimensions: [],
           },

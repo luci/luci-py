@@ -18,18 +18,18 @@ export class BotsService extends PrpcService {
   /**
    * Calls the GetBot route.
    *
-   *  @param {String} bot_id - identifier of the bot to retrieve.
+   *  @param {String} botId - identifier of the bot to retrieve.
    *
    *  @returns {Object} object with information about the bot in question.
    */
   bot(botId) {
-    return this._call("GetBot", { bot_id: botId });
+    return this._call("GetBot", { botId: botId });
   }
 
   /**
    * Calls the ListBotTasks route
    *
-   *  @param {String} bot_id - identifier of the bot to retrieve.
+   *  @param {String} botId - identifier of the bot to retrieve.
    *  @param {String} cursor - cursor retrieved from previous request to ListBotTasks.
    *
    *  @returns {Object} object containing both items and cursor fields. `items` contains a list of tasks associated with the Bot and `cursor` is a db cursor from the previous request.
@@ -38,10 +38,10 @@ export class BotsService extends PrpcService {
     const request = {
       sort: QUERY_START_TS,
       state: QUERY_ALL,
-      bot_id: botId,
+      botId: botId,
       cursor: cursor,
       limit: 30,
-      include_performance_stats: true,
+      includePerformanceStats: true,
     };
     return this._call("ListBotTasks", request);
   }
@@ -57,7 +57,7 @@ export class BotsService extends PrpcService {
    **/
   terminate(botId, reason) {
     const request = {
-      bot_id: botId,
+      botId: botId,
       reason: reason,
     };
     return this._call("TerminateBot", request);
@@ -74,7 +74,7 @@ export class BotsService extends PrpcService {
   events(botId, cursor) {
     const request = {
       limit: 50,
-      bot_id: botId,
+      botId: botId,
       cursor: cursor,
     };
     return this._call("ListBotEvents", request);
@@ -88,7 +88,7 @@ export class BotsService extends PrpcService {
    * @returns {Object} with shape { deleted: bool } where deleted is true if the bot was actually deleted.
    **/
   delete(botId) {
-    return this._call("DeleteBot", { bot_id: botId });
+    return this._call("DeleteBot", { botId: botId });
   }
 
   /**

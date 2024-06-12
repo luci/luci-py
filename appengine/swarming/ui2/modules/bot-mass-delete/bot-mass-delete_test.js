@@ -114,20 +114,14 @@ describe("bot-mass-delete", function () {
               { key: "pool", value: "Chrome" },
             ]) &&
             req.limit === 200 &&
-            req.is_dead === "TRUE"
+            req.isDead === "TRUE"
           );
         }
       );
 
-      mockPrpc(
-        fetchMock,
-        "swarming.v2.Bots",
-        "DeleteBot",
-        { deleted: true },
-        (req) => {
-          return ["bot-1", "bot-2", "bot-3"].includes(req.bot_id);
-        }
-      );
+      mockPrpc(fetchMock, "swarming.v2.Bots", "DeleteBot", {}, (req) => {
+        return ["bot-1", "bot-2", "bot-3"].includes(req.botId);
+      });
 
       let sawStartEvent = false;
       ele.addEventListener("bots-deleting-started", () => {
@@ -177,20 +171,14 @@ describe("bot-mass-delete", function () {
               { key: "pool", value: "Chrome" },
             ]) &&
             req.limit === 200 &&
-            req.is_dead === "TRUE"
+            req.isDead === "TRUE"
           );
         }
       );
 
-      mockPrpc(
-        fetchMock,
-        "swarming.v2.Bots",
-        "DeleteBot",
-        { deleted: true },
-        (req) => {
-          return ["bot-1", "bot-2", "bot-3"].includes(req.bot_id);
-        }
-      );
+      mockPrpc(fetchMock, "swarming.v2.Bots", "DeleteBot", {}, (req) => {
+        return ["bot-1", "bot-2", "bot-3"].includes(req.botId);
+      });
 
       let sawStartEvent = false;
       ele.addEventListener("bots-deleting-started", () => {

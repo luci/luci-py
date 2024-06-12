@@ -53,7 +53,7 @@ describe("bot-page", function () {
     mockUnauthorizedSwarmingService(
       fetchMock,
       {
-        cancel_task: false,
+        cancelTask: false,
       },
       {
         serverVersion:
@@ -589,7 +589,7 @@ describe("bot-page", function () {
 
       it("does not display kill task on dead bot", function (done) {
         loggedInBotPage((ele) => {
-          ele._bot.task_id = "t1233";
+          ele._bot.taskId = "t1233";
           const dataTable = $$("table.data_table", ele);
           expect(dataTable).toBeTruthy();
 
@@ -672,7 +672,7 @@ describe("bot-page", function () {
           "2 from swarming-app, 1 for permissions, 3 for events, tasks and botInfo"
         );
 
-        const getBotsReq = { bot_id: TEST_BOT_ID };
+        const getBotsReq = { botId: TEST_BOT_ID };
         const getBotsCall = prpcCalls.filter(
           checkFor("prpc/swarming.v2.Bots/GetBot", getBotsReq)
         );
@@ -684,9 +684,9 @@ describe("bot-page", function () {
         );
 
         const listBotTasksReq = {
-          bot_id: TEST_BOT_ID,
+          botId: TEST_BOT_ID,
           cursor: "",
-          include_performance_stats: true,
+          includePerformanceStats: true,
           limit: 30,
           sort: 4,
           state: 10,
@@ -702,7 +702,7 @@ describe("bot-page", function () {
         );
 
         const listBotEventsReq = {
-          bot_id: TEST_BOT_ID,
+          botId: TEST_BOT_ID,
           cursor: "",
           limit: 50,
         };
@@ -728,7 +728,7 @@ describe("bot-page", function () {
         ele.permissions.cancelTask = true;
         ele.render();
         fetchMock.resetHistory();
-        // This is the task_id on the 'running' bot.
+        // This is the taskId on the 'running' bot.
         mockPrpc(fetchMock, "swarming.v2.Tasks", "CancelTask", {
           canceled: true,
           wasRunning: true,
@@ -758,7 +758,7 @@ describe("bot-page", function () {
           expect(calls).toHaveSize(1);
           const call = calls[0];
           const options = call[1];
-          expect(options.body).toContain('"kill_running":true');
+          expect(options.body).toContain('"killRunning":true');
 
           done();
         });
@@ -771,7 +771,7 @@ describe("bot-page", function () {
         ele.permissions.terminateBot = true;
         ele.render();
         fetchMock.resetHistory();
-        // This is the task_id on the 'running' bot.
+        // This is the taskId on the 'running' bot.
         mockPrpc(fetchMock, "swarming.v2.Bots", "TerminateBot", {
           taskId: "some_task_id",
         });
@@ -803,7 +803,7 @@ describe("bot-page", function () {
           expect(calls).toHaveSize(0);
           calls = fetchMock.calls(MATCHED, "POST").filter(
             checkFor("swarming.v2.Bots/TerminateBot", {
-              bot_id: TEST_BOT_ID,
+              botId: TEST_BOT_ID,
               reason: reason,
             })
           );
@@ -820,8 +820,8 @@ describe("bot-page", function () {
         ele.permissions.deleteBot = true;
         ele.render();
         fetchMock.resetHistory();
-        // This is the task_id on the 'running' bot.
-        mockPrpc(fetchMock, "swarming.v2.Bots", "DeleteBot", { success: true });
+        // This is the taskId on the 'running' bot.
+        mockPrpc(fetchMock, "swarming.v2.Bots", "DeleteBot", {});
 
         const deleteBtn = $$("main button.delete", ele);
         expect(deleteBtn).toBeTruthy();
@@ -880,7 +880,7 @@ describe("bot-page", function () {
           const req = JSON.parse(calls[0][1].body);
           // spot check a few fields
           expect(req.state).toEqual(10);
-          expect(req.bot_id).toEqual(TEST_BOT_ID);
+          expect(req.botId).toEqual(TEST_BOT_ID);
           expect(req.limit).toEqual(30);
           // validate cursor
           // Hack bc prpc causes the fetch to terminate early.
@@ -931,7 +931,7 @@ describe("bot-page", function () {
 
           const request = JSON.parse(calls[0][1].body);
           // spot check a few fields
-          expect(request.bot_id).toEqual(TEST_BOT_ID);
+          expect(request.botId).toEqual(TEST_BOT_ID);
           expect(request.limit).toEqual(50);
           // validate cursor
           expect(request.cursor).toEqual("myCursor");

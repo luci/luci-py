@@ -257,19 +257,19 @@ export function listQueryParams(filters, limit, cursor) {
     const rest = f.substring(col.length + 1);
     if (col === "status") {
       if (rest === "alive") {
-        params.is_dead = "FALSE";
+        params.isDead = "FALSE";
       } else if (rest === "quarantined") {
         params.quarantined = "TRUE";
       } else if (rest === "maintenance") {
-        params.in_maintenance = "TRUE";
+        params.inMaintenance = "TRUE";
       } else if (rest === "dead") {
-        params.is_dead = "TRUE";
+        params.isDead = "TRUE";
       }
     } else if (col === "task") {
       if (rest === "busy") {
-        params.is_busy = "TRUE";
+        params.isBusy = "TRUE";
       } else if (rest === "idle") {
-        params.is_busy = "FALSE";
+        params.isBusy = "FALSE";
       }
     } else {
       // We can assume dimension here. The only other possibility

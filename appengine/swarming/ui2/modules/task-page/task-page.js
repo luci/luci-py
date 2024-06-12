@@ -75,7 +75,7 @@ const extractPrimaryHostname = (botId) => {
     return parts[0];
   }
   if (parts.length > 2) {
-    throw Error("Unable to parse composed bot_id: " + botId);
+    throw Error("Unable to parse composite bot ID: " + botId);
   }
   return botId;
 };

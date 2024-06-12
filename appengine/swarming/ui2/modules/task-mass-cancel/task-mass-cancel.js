@@ -126,7 +126,7 @@ window.customElements.define(
       };
 
       if (this._both) {
-        payload.kill_running = true;
+        payload.killRunning = true;
       }
 
       const service = new TasksService(this.authHeader);
@@ -143,7 +143,7 @@ window.customElements.define(
             cursor: resp.cursor,
           };
           if (this._both) {
-            payload.kill_running = true;
+            payload.killRunning = true;
           }
           service
             .massCancel(payload)
