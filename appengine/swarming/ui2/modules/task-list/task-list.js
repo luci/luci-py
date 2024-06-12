@@ -642,11 +642,16 @@ window.customElements.define(
     _fetchCounts(queryParams) {
       const states = COUNT_FILTERS.slice(1).map((c) => c.filter);
       this.app.addBusyTasks(1 + states.length);
+
+      // CountTasks RPC doesn't accept a limit.
+      const limitlessQueryParams = { ...queryParams };
+      delete limitlessQueryParams["limit"];
+
       // Do not abort taskCount requests since they do not depend on filters
       // which may change.
       const service = this._createTasksService();
       const totalPromise = service
-        .count(queryParams)
+        .count(limitlessQueryParams)
         .then((resp) => {
           this.app.finishedTask();
           return resp.count || 0;
@@ -654,9 +659,8 @@ window.customElements.define(
         .catch((e) => this.prpcError(e, "count/total", true));
       this._queryCounts[0].value = html`${until(totalPromise, "...")}`;
 
-      const statelessQueryParams = { ...queryParams };
+      const statelessQueryParams = { ...limitlessQueryParams };
       delete statelessQueryParams["state"];
-      delete statelessQueryParams["limit"];
       for (let i = 0; i < states.length; i++) {
         const query = { ...statelessQueryParams, state: states[i] };
         const promise = service
