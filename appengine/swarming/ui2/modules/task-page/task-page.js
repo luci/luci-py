@@ -968,6 +968,11 @@ const performanceStatsSection = (ele, performanceStats) => {
   if (!ele._taskId || ele._notFound || !performanceStats) {
     return "";
   }
+  const sectionDuration = (section) => {
+    return humanDuration((performanceStats[section] || {}).duration || 0);
+  };
+  const isolatedDownload = performanceStats.isolatedDownload || {};
+  const isolatedUpload = performanceStats.isolatedUpload || {};
   return html` <div class="title">Performance Stats</div>
     <table class="performance-stats">
       <tr>
@@ -980,81 +985,65 @@ const performanceStatsSection = (ele, performanceStats) => {
       </tr>
       <tr>
         <td>Cache trimming before the task</td>
-        <td>${humanDuration(performanceStats.cacheTrim.duration || 0)}</td>
+        <td>${sectionDuration("cacheTrim")}</td>
       </tr>
       <tr>
         <td>Installing CIPD packages</td>
-        <td>
-          ${humanDuration(performanceStats.packageInstallation.duration || 0)}
-        </td>
+        <td>${sectionDuration("packageInstallation")}</td>
       </tr>
       <tr>
         <td>Installing Named Caches</td>
-        <td>
-          ${humanDuration(performanceStats.namedCachesInstall.duration || 0)}
-        </td>
+        <td>${sectionDuration("namedCachesInstall")}</td>
       </tr>
       <tr>
         <td>Uninstalling Named Caches</td>
-        <td>
-          ${humanDuration(performanceStats.namedCachesUninstall.duration || 0)}
-        </td>
+        <td>${sectionDuration("namedCachesUninstall")}</td>
       </tr>
       <tr>
         <td>Downloading Inputs</td>
-        <td>
-          ${humanDuration(performanceStats.isolatedDownload.duration || 0)}
-        </td>
+        <td>${sectionDuration("isolatedDownload")}</td>
       </tr>
       <tr>
         <td>Uploading Outputs</td>
-        <td>${humanDuration(performanceStats.isolatedUpload.duration || 0)}</td>
+        <td>${sectionDuration("isolatedUpload")}</td>
       </tr>
       <tr>
         <td>Cleanup directories</td>
-        <td>${humanDuration(performanceStats.cleanup.duration || 0)}</td>
+        <td>${sectionDuration("cleanup")}</td>
       </tr>
       <tr>
         <td>Initial bot cache</td>
         <td>
-          ${performanceStats.isolatedDownload.initialNumberItems || 0} items;
-          ${human.bytes(performanceStats.isolatedDownload.initialSize || 0)}
+          ${isolatedDownload.initialNumberItems || 0} items;
+          ${human.bytes(isolatedDownload.initialSize || 0)}
         </td>
       </tr>
       <tr>
         <td>Inputs (downloaded)</td>
         <td>
-          ${performanceStats.isolatedDownload.numItemsCold || 0} items;
-          ${human.bytes(
-            performanceStats.isolatedDownload.totalBytesItemsCold || 0
-          )}
+          ${isolatedDownload.numItemsCold || 0} items;
+          ${human.bytes(isolatedDownload.totalBytesItemsCold || 0)}
         </td>
       </tr>
       <tr>
         <td>Inputs (cached)</td>
         <td>
-          ${performanceStats.isolatedDownload.numItemsHot || 0} items;
-          ${human.bytes(
-            performanceStats.isolatedDownload.totalBytesItemsHot || 0
-          )}
+          ${isolatedDownload.numItemsHot || 0} items;
+          ${human.bytes(isolatedDownload.totalBytesItemsHot || 0)}
         </td>
       </tr>
       <tr>
         <td>Outputs (uploaded)</td>
         <td>
-          ${performanceStats.isolatedUpload.numItemsCold || 0} items;
-          ${human.bytes(
-            performanceStats.isolatedUpload.totalBytesItemsCold || 0
-          )}
+          ${isolatedUpload.numItemsCold || 0} items;
+          ${human.bytes(isolatedUpload.totalBytesItemsCold || 0)}
         </td>
       </tr>
       <tr>
         <td>Outputs (cached)</td>
         <td>
-          ${performanceStats.isolatedUpload.numItemsHot || 0} items;
-          ${human.bytes(
-            performanceStats.isolatedUpload.totalBytesItemsHot || 0
-          )}
+          ${isolatedUpload.numItemsHot || 0} items;
+          ${human.bytes(isolatedUpload.totalBytesItemsHot || 0)}
         </td>
       </tr>
     </table>`;
