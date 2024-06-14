@@ -74,6 +74,7 @@ const DEVICE_TYPE_ALIASES = {
   sprout: "Android One",
   starlte: "Galaxy S9",
   taimen: "Pixel 2 XL",
+  tangorpro: "Pixel Tablet",
   "TECNO-KB8": "TECNO Spark 3 Pro",
   walleye: "Pixel 2",
   zerofltetmo: "Galaxy S6",
