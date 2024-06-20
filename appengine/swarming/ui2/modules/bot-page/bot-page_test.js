@@ -688,8 +688,8 @@ describe("bot-page", function () {
           cursor: "",
           includePerformanceStats: true,
           limit: 30,
-          sort: 4,
-          state: 10,
+          sort: "QUERY_STARTED_TS",
+          state: "QUERY_ALL",
         };
         const listBotsCall = prpcCalls.filter(
           checkFor("prpc/swarming.v2.Bots/ListBotTasks", listBotTasksReq)
@@ -879,7 +879,7 @@ describe("bot-page", function () {
 
           const req = JSON.parse(calls[0][1].body);
           // spot check a few fields
-          expect(req.state).toEqual(10);
+          expect(req.state).toEqual("QUERY_ALL");
           expect(req.botId).toEqual(TEST_BOT_ID);
           expect(req.limit).toEqual(30);
           // validate cursor

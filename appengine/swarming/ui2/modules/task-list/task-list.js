@@ -640,6 +640,9 @@ window.customElements.define(
     }
 
     _fetchCounts(queryParams) {
+      // COUNT_FILTERS[0] is "Total" and by default it counts all tasks in any
+      // state. We skip it because we want "Total" to show the number of tasks
+      // matching `queryParams` instead (which may have a state filter applied).
       const states = COUNT_FILTERS.slice(1).map((c) => c.filter);
       this.app.addBusyTasks(1 + states.length);
 
@@ -760,7 +763,11 @@ window.customElements.define(
       if (!state) {
         return undefined;
       }
-      // strip out any conflicting state filters.
+      // Display e.g. "state:PENDING" filter instead of "state:QUERY_PENDING".
+      if (state.startsWith("QUERY_")) {
+        state = state.slice("QUERY_".length);
+      }
+      // Strip out any conflicting state filters.
       const withNewState = this._filters.filter((f) => {
         return !f.startsWith("state");
       });

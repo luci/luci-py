@@ -4,9 +4,6 @@
 
 import { PrpcService } from "./common";
 
-const QUERY_START_TS = 4;
-const QUERY_ALL = 10;
-
 /**
  * Service to communicate with swarming.v2.Bots prpc service.
  */
@@ -36,8 +33,8 @@ export class BotsService extends PrpcService {
    */
   tasks(botId, cursor) {
     const request = {
-      sort: QUERY_START_TS,
-      state: QUERY_ALL,
+      sort: "QUERY_STARTED_TS",
+      state: "QUERY_ALL",
       botId: botId,
       cursor: cursor,
       limit: 30,

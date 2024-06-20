@@ -366,7 +366,7 @@ describe("task-list", function () {
                 "&c=duration&c=bot&c=pool-tag" +
                 "&c=state&d=desc" +
                 "&et=1545237983234" +
-                "&f=state%3AQUERY_COMPLETED_FAILURE" +
+                "&f=state%3ACOMPLETED_FAILURE" +
                 "&k=&n=true&s=createdTs" +
                 "&st=1545151583234&v=false"
             );
@@ -1089,7 +1089,7 @@ describe("task-list", function () {
         ele._startTime = Timestamp.fromMilliseconds(1545151583000);
         ele._endTime = Timestamp.fromMilliseconds(1545237981000);
         ele._sort = "completedTs";
-        ele._filters = ["pool-tag:Chrome", "state:QUERY_DEDUPED"];
+        ele._filters = ["pool-tag:Chrome", "state:DEDUPED"];
         ele.render();
 
         const countRows = $("#query_counts tr", ele);
@@ -1102,7 +1102,7 @@ describe("task-list", function () {
             "&c=pendingTime&c=duration&c=bot&c=pool-tag" +
             "&c=state&d=desc&et=1545237981000" +
             "&f=pool-tag%3AChrome" +
-            "&f=state%3AQUERY_COMPLETED_FAILURE" +
+            "&f=state%3ACOMPLETED_FAILURE" +
             "&k=&n=true&s=completedTs&st=1545151583000&v=false"
         );
         done();
@@ -1187,7 +1187,7 @@ describe("task-list", function () {
       loggedInTasklist((ele) => {
         ele._filters = ["os-tag:Android"];
         fetchMock.resetHistory();
-        ele._addFilter("state:QUERY_PENDING_RUNNING");
+        ele._addFilter("state:PENDING_RUNNING");
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, "POST");
           expect(calls).toHaveSize(
@@ -1211,7 +1211,7 @@ describe("task-list", function () {
       loggedInTasklist((ele) => {
         ele._filters = [];
         fetchMock.resetHistory();
-        ele._addFilter("state:QUERY_PENDING_RUNNING");
+        ele._addFilter("state:PENDING_RUNNING");
         fetchMock.flush(true).then(() => {
           const calls = fetchMock.calls(MATCHED, "POST");
           expect(calls).toHaveSize(
@@ -1378,7 +1378,7 @@ describe("task-list", function () {
       expect(tasks).toBeTruthy();
       expect(tasks).toHaveSize(22);
 
-      const filtered = filterTasks(["state:QUERY_COMPLETED_FAILURE"], tasks);
+      const filtered = filterTasks(["state:COMPLETED_FAILURE"], tasks);
       expect(filtered).toHaveSize(2);
       const expectedIds = ["41e0310fe0b7c410", "41e031b2c8b46710"];
       const actualIds = filtered.map((task) => task.taskId);
@@ -1418,7 +1418,7 @@ describe("task-list", function () {
       expect(actualIds).toContain("41dfa79d3bf29010");
       expect(actualIds).toContain("41df677202f20310");
 
-      filtered = filterTasks(["state:QUERY_DEDUPED"], tasks);
+      filtered = filterTasks(["state:DEDUPED"], tasks);
       expect(filtered).toHaveSize(2);
       actualIds = filtered.map((task) => task.taskId);
       expect(actualIds).toContain("41e0284bc3ef4f10");

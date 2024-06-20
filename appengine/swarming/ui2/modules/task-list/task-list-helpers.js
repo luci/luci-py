@@ -145,21 +145,24 @@ export function column(col, task, ele) {
  */
 export const specialFilters = {
   state: function (task, s) {
+    if (s.startsWith("QUERY_")) {
+      s = s.slice("QUERY_".length);
+    }
     const state = task.state;
-    if (s === state || s === "QUERY_ALL") {
+    if (s === state || s === "ALL") {
       return true;
     }
-    if (s === "QUERY_PENDING_RUNNING") {
+    if (s === "PENDING_RUNNING") {
       return ONGOING_STATES.has(state);
     }
     const failure = task.failure;
-    if (s === "QUERY_COMPLETED_SUCCESS") {
+    if (s === "COMPLETED_SUCCESS") {
       return state === "COMPLETED" && !failure;
     }
-    if (s === "QUERY_COMPLETED_FAILURE") {
+    if (s === "COMPLETED_FAILURE") {
       return state === "COMPLETED" && failure;
     }
-    if (s === "QUERY_DEDUPED") {
+    if (s === "DEDUPED") {
       return state === "COMPLETED" && task.dedupedFrom;
     }
   },
