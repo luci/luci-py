@@ -1,9 +1,4 @@
 cron:
-- description: fetch realm configs from luci-config
-  target: backend
-  url: /internal/cron/update_realms
-  schedule: every 1 minutes
-
 - description: group import from external sources
   target: backend
   url: /internal/cron/import_groups
@@ -38,7 +33,7 @@ cron:
   url: /internal/cron/update-config
   schedule: every 1 minutes
 
-- description: Update permissions and realms configs from luci-config in Auth Service v2.
+- description: Fetch and apply latest permissions and realms configs from luci-config.
   target: backendv2
   url: /internal/cron/update-realms
   schedule: every 1 minutes
