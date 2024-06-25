@@ -672,6 +672,18 @@ def _snapshot_bot_info(bot_info):
 _FREQUENT_EVENTS = frozenset(
     ['request_sleep', 'task_update', 'bot_idle', 'bot_polling'])
 
+# Events that may result in creation of new BotInfo entities (i.e. a new bot
+# appearing). Most often this is just bot_connected.
+_HEALTHY_BOT_EVENTS = frozenset([
+    'bot_connected',
+    'bot_idle',
+    'bot_polling',
+    'request_restart',
+    'request_sleep',
+    'request_task',
+    'request_update',
+])
+
 
 def _should_store_event(event_type, before, after):
   """Decides if we should store a new BotEvent entity.
@@ -693,14 +705,18 @@ def _should_store_event(event_type, before, after):
       or before[1] != after[1])
 
 
-def _insert_bot_with_txn(bot_info, event):
-  """Stores BotInfo and (if given) BotEvent."""
-  root_key = bot_info.key.root()
+def _insert_bot_with_txn(root_key, bot_info, event):
+  """Stores BotInfo and/or BotEvent (skipping None)."""
+  entities = []
 
-  entities = [bot_info]
+  if bot_info:
+    assert bot_info.key.root() == root_key
+    entities.append(bot_info)
   if event:
     assert event.key.root() == root_key
     entities.append(event)
+  if not entities:
+    return
 
   # This is intentionally kept outside of the txn.
   # Worst case for a race condition on creating BotRoot will be that we end up
@@ -795,12 +811,14 @@ def bot_event(event_type,
   # BotInfo and BotEvent operate with flattened dimensions.
   dimensions_flat = task_queues.bot_dimensions_to_flat(dimensions or {})
 
-  # Retrieve the previous BotInfo to update it. Note that events are ultimately
-  # produced by a single serial bot process and there should not be concurrent
-  # events from the same bot, therefore there are no transactions here. In the
-  # worst case some intermediary state changes won't be properly recorded.
+  # Retrieve the previous BotInfo to update it. Note that most events are
+  # ultimately produced by a single serial bot process and there should not be
+  # concurrent events from the same bot, therefore there are no transactions
+  # here. In the worst case some intermediary state changes won't be properly
+  # recorded.
   info_key = get_info_key(bot_id)
   bot_info = info_key.get()
+  store_bot_info = True
   if not bot_info:
     # Register only id and pool dimensions at the first handshake.
     bot_info = BotInfo(
@@ -810,6 +828,18 @@ def bot_event(event_type,
             if d.startswith('id:') or d.startswith('pool:')
         ],
     )
+    # Create BotInfo only if this event indicates the bot is actually alive.
+    # This check exists to workaround race conditions when deleting bots. In
+    # particular, cron_update_bot_info marks the bot as deleted before it
+    # emits `bot_missing` event. If between these two calls, something
+    # (like GCE Provider) notices the bot is marked as dead and calls DeleteBot,
+    # the late `bot_missing` event ends up recreating the deleted bot. A similar
+    # thing can happen when a dead bot suddenly comes back to life just to
+    # report that it has failed a task and is terminating now (`bot_shutdown`
+    # event).
+    store_bot_info = event_type in _HEALTHY_BOT_EVENTS
+    if not store_bot_info:
+      logging.warning('No BotInfo(%s) when storing %s', bot_id, event_type)
 
   # Snapshot the state before any changes, used in _should_store_event.
   state_before = _snapshot_bot_info(bot_info)
@@ -853,11 +883,13 @@ def bot_event(event_type,
                      last_seen_ts=bot_info.last_seen_ts,
                      idle_since_ts=bot_info.idle_since_ts,
                      message=event_msg)
-    _insert_bot_with_txn(bot_info, event)
+    _insert_bot_with_txn(info_key.root(), bot_info if store_bot_info else None,
+                         event)
     return event.key
 
   # No need to emit an event. Just update BotInfo (and BotRoot) on its own.
-  _insert_bot_with_txn(bot_info, None)
+  if store_bot_info:
+    _insert_bot_with_txn(info_key.root(), bot_info, None)
   return None
 
 
