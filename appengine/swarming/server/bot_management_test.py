@@ -82,8 +82,10 @@ def _ensure_bot_info(bot_id=u'id1', **kwargs):
 
 
 def _gen_bot_info(**kwargs):
+  now = kwargs.get('last_seen_ts') or utils.utcnow()
   out = {
-      'authenticated_as': u'bot:id1.domain',
+      'authenticated_as':
+      u'bot:id1.domain',
       'composite': [
           bot_management.BotInfo.NOT_IN_MAINTENANCE,
           bot_management.BotInfo.ALIVE,
@@ -95,31 +97,50 @@ def _gen_bot_info(**kwargs):
           u'os': [u'Ubuntu', u'Ubuntu-16.04'],
           u'pool': [u'default'],
       },
-      'external_ip': u'8.8.4.4',
-      'first_seen_ts': utils.utcnow(),
-      'id': 'id1',
-      'idle_since_ts': None,
-      'is_dead': False,
-      'last_seen_ts': utils.utcnow(),
-      'lease_id': None,
-      'lease_expiration_ts': None,
-      'leased_indefinitely': None,
-      'machine_lease': None,
-      'machine_type': None,
-      'quarantined': False,
-      'maintenance_msg': None,
+      'expire_at':
+      now + bot_management._OLD_BOT_INFO_CUT_OFF,
+      'external_ip':
+      u'8.8.4.4',
+      'first_seen_ts':
+      now,
+      'id':
+      'id1',
+      'idle_since_ts':
+      None,
+      'is_dead':
+      False,
+      'last_seen_ts':
+      now,
+      'lease_id':
+      None,
+      'lease_expiration_ts':
+      None,
+      'leased_indefinitely':
+      None,
+      'machine_lease':
+      None,
+      'machine_type':
+      None,
+      'quarantined':
+      False,
+      'maintenance_msg':
+      None,
       'state': {
           u'ram': 65
       },
-      'task_id': None,
-      'task_name': None,
-      'version': _VERSION,
+      'task_id':
+      None,
+      'task_name':
+      None,
+      'version':
+      _VERSION,
   }
   out.update(kwargs)
   return out
 
 
 def _gen_bot_event(**kwargs):
+  ts = kwargs.get('ts') or utils.utcnow()
   out = {
       'authenticated_as': u'bot:id1.domain',
       'dimensions': {
@@ -127,6 +148,7 @@ def _gen_bot_event(**kwargs):
           u'os': [u'Ubuntu', u'Ubuntu-16.04'],
           u'pool': [u'default'],
       },
+      'expire_at': ts + bot_management._OLD_BOT_EVENTS_CUT_OFF,
       'external_ip': u'8.8.4.4',
       'idle_since_ts': None,
       'last_seen_ts': kwargs.get('ts') or utils.utcnow(),
@@ -142,7 +164,7 @@ def _gen_bot_event(**kwargs):
           u'ram': 65
       },
       'task_id': None,
-      'ts': utils.utcnow(),
+      'ts': ts,
       'version': _VERSION,
   }
   out.update(kwargs)
@@ -684,12 +706,14 @@ class BotManagementTest(test_case.TestCase):
     check_alive([bot1_alive, bot2_alive])
 
     # Just stale enough to trigger the dead logic.
-    then = self.mock_now(self.now, timeout)
+    now = self.mock_now(self.now, timeout)
     # The cron job didn't run yet, so it still has ALIVE bit.
     check_dead([])
     check_alive([bot1_alive, bot2_alive])
     self.assertEqual(1, bot_management.cron_update_bot_info())
-    # The cron job ran, so it's now correct.
+    # The cron job ran, so it's now correct. This also bumped expiry time of
+    # the dead bot's BotInfo (when emitting the `bot_missing` event).
+    bot1_dead['expire_at'] = now + bot_management._OLD_BOT_INFO_CUT_OFF
     check_dead([bot1_dead])
     check_alive([bot2_alive])
 

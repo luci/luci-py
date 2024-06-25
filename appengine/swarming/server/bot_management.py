@@ -69,6 +69,8 @@ from server.constants import OR_DIM_SEP
 
 # BotEvent entities are deleted when they are older than the cutoff.
 _OLD_BOT_EVENTS_CUT_OFF = datetime.timedelta(days=4 * 7)
+# BotInfo entities are deleted when they are older than the cutoff.
+_OLD_BOT_INFO_CUT_OFF = _OLD_BOT_EVENTS_CUT_OFF + datetime.timedelta(hours=4)
 
 
 ### Models.
@@ -130,6 +132,9 @@ class _BotCommon(ndb.Model):
   # Time the bot started polling for next task.
   # None is set during running task or hooks.
   idle_since_ts = ndb.DateTimeProperty(indexed=False)
+
+  # When this entity can be cleaned up via Cloud Datastore TTL policy.
+  expire_at = ndb.DateTimeProperty(indexed=False)
 
   @property
   def dimensions(self):
@@ -597,11 +602,15 @@ def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
   return q
 
 
-def _apply_event_updates(bot_info, event_type, task_id, task_name, external_ip,
-                         authenticated_as, dimensions_flat, state, version,
-                         quarantined, maintenance_msg, register_dimensions):
+def _apply_event_updates(bot_info, event_type, now, task_id, task_name,
+                         external_ip, authenticated_as, dimensions_flat, state,
+                         version, quarantined, maintenance_msg,
+                         register_dimensions):
   """Mutates BotInfo based on event details passed to bot_event(...)."""
-  now = utils.utcnow()
+  # Bump the expiration time every time the entity is touched. Note that this
+  # field is unindexed (Cloud Datastore TTL policy doesn't need an index),
+  # the cost of updating it is negligible.
+  bot_info.expire_at = now + _OLD_BOT_INFO_CUT_OFF
 
   # `bot_missing` event is created by the server (see cron_update_bot_info), not
   # a bot. So it shouldn't update fields that are reported by the bot itself.
@@ -841,12 +850,16 @@ def bot_event(event_type,
     if not store_bot_info:
       logging.warning('No BotInfo(%s) when storing %s', bot_id, event_type)
 
+  # Use the exact same timestamp in both BotInfo and BotEvent for consistency.
+  now = utils.utcnow()
+
   # Snapshot the state before any changes, used in _should_store_event.
   state_before = _snapshot_bot_info(bot_info)
 
   # Mutate BotInfo in place based on the event details.
   _apply_event_updates(bot_info=bot_info,
                        event_type=event_type,
+                       now=now,
                        task_id=task_id,
                        task_name=task_name,
                        external_ip=external_ip,
@@ -871,6 +884,8 @@ def bot_event(event_type,
   if _should_store_event(event_type, state_before, state_after):
     event = BotEvent(parent=bot_info.key.parent(),
                      event_type=event_type,
+                     ts=now,
+                     expire_at=now + _OLD_BOT_EVENTS_CUT_OFF,
                      external_ip=bot_info.external_ip,
                      authenticated_as=bot_info.authenticated_as,
                      dimensions_flat=(dimensions_flat
