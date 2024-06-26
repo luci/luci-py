@@ -1,5 +1,8 @@
 queue:
 
+# WARNING: This queue.yaml is used only in local unit tests. The real
+# queue.yaml file (deployed to GAE) lives in the luci-go repository now.
+
 ## Tasks
 
 # /internal/taskqueue/important/tasks/cancel
