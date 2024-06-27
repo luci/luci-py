@@ -57,10 +57,8 @@ from google.appengine.ext import ndb
 from google.protobuf import json_format
 
 from components import datastore_utils
-from components import pubsub
 from components import utils
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
-from server import bq_state
 from server import config
 from server import task_pack
 from server import task_queues
@@ -1214,33 +1212,6 @@ def cron_aggregate_dimensions():
     if group == 'all':
       DimensionAggregation(
           key=DimensionAggregation.KEY, dimensions=dims_prop, ts=now).put()
-    DimensionAggregation(
-        key=get_aggregation_key(group), dimensions=dims_prop, ts=now).put()
-
-
-def task_bq_events(start, end):
-  """Sends BotEvents to BigQuery swarming.bot_events table."""
-  def _convert(e):
-    """Returns a tuple(bq_key, row)."""
-    out = swarming_pb2.BotEvent()
-    e.to_proto(out)
-    bq_key = e.id + ':' + e.ts.strftime(u'%Y-%m-%dT%H:%M:%S.%fZ')
-    return (bq_key, out)
-
-  total = 0
-
-  q = BotEvent.query(BotEvent.ts >= start, BotEvent.ts <= end)
-  cursor = None
-  more = True
-  while more:
-    entities, cursor, more = q.fetch_page(500, start_cursor=cursor)
-    total += len(entities)
-    rows = [_convert(e) for e in entities]
-    bq_state.send_to_bq('bot_events', rows)
-    if rows:
-      pubsub.publish_multi(
-          'projects/%s/topics/bot_events' % (app_identity.get_application_id()),
-          ((json_format.MessageToJson(event,
-                                      preserving_proto_field_name=True), None)
-           for _bq_key, event in rows))
-  return total
+    DimensionAggregation(key=get_aggregation_key(group),
+                         dimensions=dims_prop,
+                         ts=now).put()

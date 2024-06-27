@@ -79,10 +79,8 @@ from google.protobuf import json_format
 
 from components import auth
 from components import datastore_utils
-from components import pubsub
 from components import utils
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
-from server import bq_state
 from server import large
 from server import resultdb
 from server import task_pack
@@ -1696,88 +1694,6 @@ def get_result_summaries_query(start, end, sort, state, tags):
       q = q.filter(TaskResultSummary.tags.IN(separated_tags))
 
   return filter_query(TaskResultSummary, q, start, end, sort, state)
-
-
-def task_bq_run(start, end):
-  """Sends TaskRunResult to BigQuery swarming.task_results_run table.
-
-  Multiple queries are run one after the other. This is because ndb.OR() cannot
-  be used when the subqueries are inequalities on different fields.
-  """
-  def _convert(e):
-    """Returns a tuple(bq_key, row)."""
-    out = swarming_pb2.TaskResult()
-    e.to_proto(out, append_root_ids=True)
-    return (e.task_id, out)
-
-  total = 0
-  seen = set()
-
-  # Completed
-  q = TaskRunResult.query(
-      TaskRunResult.completed_ts >= start,
-      TaskRunResult.completed_ts <= end,
-      # Disable cache for consistency.
-      default_options=ndb.QueryOptions(use_cache=False, use_memcache=False))
-  cursor = None
-  more = True
-  while more:
-    entities, cursor, more = q.fetch_page(
-        bq_state.RAW_LIMIT, start_cursor=cursor)
-    rows = [_convert(e) for e in entities]
-    seen.update(e.task_id for e in entities)
-    total += len(rows)
-    bq_state.send_to_bq('task_results_run', rows)
-    if rows:
-      pubsub.publish_multi(
-          'projects/%s/topics/task_results_run' %
-          (app_identity.get_application_id()), ((json_format.MessageToJson(
-              result, preserving_proto_field_name=True), None)
-                                                for _task_id, result in rows))
-  return total
-
-
-def task_bq_summary(start, end):
-  """Sends TaskResultSummary to BigQuery swarming.task_results_summary table.
-
-  Multiple queries are run one after the other. This is because ndb.OR() cannot
-  be used when the subqueries are inequalities on different fields.
-  """
-  def _convert(e):
-    """Returns a tuple(bq_key, row)."""
-    out = swarming_pb2.TaskResult()
-    e.to_proto(out, append_root_ids=True)
-    if not out.HasField('end_time'):
-      logging.warning('crbug.com/1064833: task %s does not have end_time %s',
-                      e.task_id, out)
-    return (e.task_id, out)
-
-  total = 0
-  seen = set()
-
-  # Completed
-  q = TaskResultSummary.query(
-      TaskResultSummary.completed_ts >= start,
-      TaskResultSummary.completed_ts <= end,
-      # Disable cache for consistency.
-      default_options=ndb.QueryOptions(use_cache=False, use_memcache=False))
-  cursor = None
-  more = True
-  while more:
-    entities, cursor, more = q.fetch_page(
-        bq_state.RAW_LIMIT, start_cursor=cursor)
-    rows = [_convert(e) for e in entities]
-    seen.update(e.task_id for e in entities)
-    total += len(rows)
-    bq_state.send_to_bq('task_results_summary', rows)
-    if rows:
-      pubsub.publish_multi(
-          'projects/%s/topics/task_results_summary' %
-          (app_identity.get_application_id()), ((json_format.MessageToJson(
-              summary, preserving_proto_field_name=True), None)
-                                                for _task_id, summary in rows))
-
-  return total
 
 
 def fetch_task_results(task_ids):

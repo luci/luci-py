@@ -25,7 +25,6 @@ from components import utils
 from test_support import test_case
 
 from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
-from server import bq_state
 from server import bot_management
 from server import config
 from server import task_queues
@@ -805,80 +804,6 @@ class BotManagementTest(test_case.TestCase):
 
   def test_filter_availability(self):
     pass # Tested in handlers_endpoints_test
-
-  def test_task_bq_empty(self):
-    # Empty, nothing is done.
-    start = utils.utcnow()
-    end = start+datetime.timedelta(seconds=60)
-    self.assertEqual(0, bot_management.task_bq_events(start, end))
-
-  def test_task_bq_events(self):
-    payloads = []
-    def send_to_bq(table_name, rows):
-      self.assertEqual('bot_events', table_name)
-      payloads.append(rows)
-
-    self.mock(bq_state, 'send_to_bq', send_to_bq)
-
-    # Generate a few events.
-    start = self.mock_now(self.now, 10)
-    _bot_event(bot_id=u'id1', event_type='bot_connected')
-    self.mock_now(self.now, 11)
-    _bot_event(event_type='request_sleep')  # stored
-    self.mock_now(self.now, 12)
-    _bot_event(event_type='request_sleep')  # not stored
-    self.mock_now(self.now, 13)
-    _bot_event(event_type='request_sleep', quarantined=True)  # stored
-    self.mock_now(self.now, 14)
-    _bot_event(event_type='request_sleep', quarantined=True)  # not stored
-    self.mock_now(self.now, 15)
-    _bot_event(event_type='request_sleep')  # stored
-    self.mock_now(self.now, 16)
-    _bot_event(event_type='request_sleep')  # not stored
-    self.mock_now(self.now, 17)
-    _bot_event(event_type='request_sleep', maintenance_msg='foo')  # stored
-    self.mock_now(self.now, 18)
-    _bot_event(event_type='request_sleep', maintenance_msg='bar')  # not stored
-    self.mock_now(self.now, 19)
-    _bot_event(event_type='request_sleep')  # stored
-    self.mock_now(self.now, 20)
-    _bot_event(event_type='request_sleep')  # not stored
-    self.mock_now(self.now, 21)
-    _bot_event(event_type='request_task', task_id='12311', task_name='yo')
-    self.mock_now(self.now, 22)
-    _bot_event(event_type='task_update', task_id='12311') # not stored
-    self.mock_now(self.now, 23)
-    _bot_event(event_type='task_completed', task_id='12311')
-    self.mock_now(self.now, 24)
-    _bot_event(event_type='request_sleep')  # stored
-    end = self.mock_now(self.now, 25)
-
-    with mock.patch(
-        'components.pubsub.publish_multi',
-        side_effect=lambda _topic, messages: list(messages)) as mocked:
-      # normal request_sleep is not streamed.
-      bot_management.task_bq_events(start, end)
-      mocked.assert_called()
-    self.assertEqual(1, len(payloads))
-    actual_rows = payloads[0]
-    expected = [
-        (r[0], bot_management.BotEvent._MAPPING[r[1]]) for r in [
-            # (bq_key, event)
-            ('id1:2010-01-02T03:04:15.000006Z', 'bot_connected'),
-            ('id1:2010-01-02T03:04:16.000006Z',
-             'request_sleep'),  # dimensions update
-            ('id1:2010-01-02T03:04:18.000006Z',
-             'request_sleep'),  # quarantine start
-            ('id1:2010-01-02T03:04:20.000006Z', 'request_sleep'),  # recovered
-            ('id1:2010-01-02T03:04:22.000006Z',
-             'request_sleep'),  # maintenance start
-            ('id1:2010-01-02T03:04:24.000006Z', 'request_sleep'),  # recovered
-            ('id1:2010-01-02T03:04:26.000006Z', 'request_task'),
-            ('id1:2010-01-02T03:04:28.000006Z', 'task_completed'),
-            ('id1:2010-01-02T03:04:29.000006Z', 'request_sleep'),  # first idle
-        ]
-    ]
-    self.assertEqual(expected, [(r[0], r[1].event) for r in actual_rows])
 
 
 if __name__ == '__main__':

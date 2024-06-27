@@ -72,7 +72,6 @@ from components.config import validation
 
 from proto.api import swarming_pb2
 from proto.config import pools_pb2
-from server import bq_state
 from server import config
 from server import directory_occlusion
 from server import pools_config
@@ -2157,27 +2156,3 @@ def task_delete_tasks(task_ids):
   finally:
     logging.info('Deleted %d TaskRequest groups; %d entities in total', count,
                  total)
-
-
-def task_bq(start, end):
-  """Sends TaskRequest to BigQuery swarming.task_requests table."""
-
-  # TODO(maruel): What about shutdown requests.
-  def _convert(e):
-    """Returns a tuple(bq_key, row)."""
-    out = swarming_pb2.TaskRequest()
-    e.to_proto(out, append_root_ids=True)
-    return (e.task_id, out)
-
-  total = 0
-
-  q = TaskRequest.query(TaskRequest.created_ts >= start,
-                        TaskRequest.created_ts <= end)
-  cursor = None
-  more = True
-  while more:
-    entities, cursor, more = q.fetch_page(
-        bq_state.RAW_LIMIT, start_cursor=cursor)
-    total += len(entities)
-    bq_state.send_to_bq('task_requests', [_convert(e) for e in entities])
-  return total

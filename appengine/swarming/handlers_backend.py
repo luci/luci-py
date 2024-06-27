@@ -20,7 +20,6 @@ from proto.plugin import plugin_pb2
 from components import decorators
 from components import datastore_utils
 from components import utils
-from server import bq_state
 from server import bot_groups_config
 from server import bot_management
 from server import config
@@ -162,39 +161,6 @@ class CronTasksStats(_CronHandlerBase):
 
   def run_cron(self):
     stats_tasks.cron_generate_stats()
-
-class CronSendToBQ(_CronHandlerBase):
-  """Triggers many tasks queues to send data to BigQuery."""
-
-  def run_cron(self):
-    # It can trigger up to the sum of all the max_taskqueues below.
-    # It should complete within close to 50 seconds as each function will try to
-    # limit itself to its allocated chunk.
-    max_seconds = 50. / 2
-    bq_state.cron_trigger_tasks(
-        'task_results_run',
-        '/internal/taskqueue/monitoring/bq/tasks/results/run/',
-        'monitoring-bq-tasks-results-run',
-        max_seconds,
-        max_taskqueues=30)
-    bq_state.cron_trigger_tasks(
-        'task_results_summary',
-        '/internal/taskqueue/monitoring/bq/tasks/results/summary/',
-        'monitoring-bq-tasks-results-summary',
-        max_seconds,
-        max_taskqueues=30)
-    bq_state.cron_trigger_tasks(
-        'bot_events',
-        '/internal/taskqueue/monitoring/bq/bots/events/',
-        'monitoring-bq-bots-events',
-        max_seconds,
-        max_taskqueues=30)
-    bq_state.cron_trigger_tasks(
-        'task_requests',
-        '/internal/taskqueue/monitoring/bq/tasks/requests/',
-        'monitoring-bq-tasks-requests',
-        max_seconds,
-        max_taskqueues=30)
 
 
 ## Task queues.
@@ -342,52 +308,6 @@ class TaskNamedCachesPool(webapp2.RequestHandler):
     named_caches.task_update_pool(params['pool'])
 
 
-class TaskMonitoringBotsEventsBQ(webapp2.RequestHandler):
-  """Sends rows to BigQuery swarming.bot_events table."""
-
-  @decorators.require_taskqueue('monitoring-bq-bots-events')
-  def post(self, timestamp):
-    ndb.get_context().set_cache_policy(lambda _: False)
-    start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
-    end = start + datetime.timedelta(seconds=60)
-    if bq_state.should_export('bot_events', start):
-      bot_management.task_bq_events(start, end)
-
-
-class TaskMonitoringTasksRequestsBQ(webapp2.RequestHandler):
-  """Sends rows to BigQuery swarming.task_requests table."""
-
-  @decorators.require_taskqueue('monitoring-bq-tasks-requests')
-  def post(self, timestamp):
-    ndb.get_context().set_cache_policy(lambda _: False)
-    start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
-    end = start + datetime.timedelta(seconds=60)
-    if bq_state.should_export('task_requests', start):
-      task_request.task_bq(start, end)
-
-
-class TaskMonitoringTasksResultsRunBQ(webapp2.RequestHandler):
-  """Sends rows to BigQuery swarming.task_results_run table."""
-
-  @decorators.require_taskqueue('monitoring-bq-tasks-results-run')
-  def post(self, timestamp):
-    start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
-    end = start + datetime.timedelta(seconds=60)
-    if bq_state.should_export('task_results_run', start):
-      task_result.task_bq_run(start, end)
-
-
-class TaskMonitoringTasksResultsSummaryBQ(webapp2.RequestHandler):
-  """Sends rows to BigQuery swarming.task_results_summary table."""
-
-  @decorators.require_taskqueue('monitoring-bq-tasks-results-summary')
-  def post(self, timestamp):
-    start = datetime.datetime.strptime(timestamp, u'%Y-%m-%dT%H:%M')
-    end = start + datetime.timedelta(seconds=60)
-    if bq_state.should_export('task_results_summary', start):
-      task_result.task_bq_summary(start, end)
-
-
 ###
 
 
@@ -414,7 +334,6 @@ def get_routes():
 
       # Not yet used.
       ('/internal/cron/monitoring/tasks/stats', CronTasksStats),
-      ('/internal/cron/monitoring/bq', CronSendToBQ),
       ('/internal/cron/monitoring/bots/aggregate_dimensions',
        CronBotsDimensionAggregationHandler),
       ('/internal/cron/important/bot_groups_config',
@@ -447,16 +366,6 @@ def get_routes():
        TaskESNotifyKickHandler),
       (r'/internal/taskqueue/important/named_cache/update-pool',
        TaskNamedCachesPool),
-      (r'/internal/taskqueue/monitoring/bq/bots/events/'
-       r'<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>', TaskMonitoringBotsEventsBQ),
-      (r'/internal/taskqueue/monitoring/bq/tasks/requests/'
-       r'<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>', TaskMonitoringTasksRequestsBQ),
-      (r'/internal/taskqueue/monitoring/bq/tasks/results/run/'
-       r'<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>',
-       TaskMonitoringTasksResultsRunBQ),
-      (r'/internal/taskqueue/monitoring/bq/tasks/results/summary/'
-       r'<timestamp:\d{4}-\d\d-\d\dT\d\d:\d\d>',
-       TaskMonitoringTasksResultsSummaryBQ),
   ]
   return [webapp2.Route(*a) for a in routes]
 

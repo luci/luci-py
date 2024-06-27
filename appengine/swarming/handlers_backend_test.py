@@ -144,16 +144,6 @@ class BackendTest(test_env_handlers.AppTestBase):
          '/internal/taskqueue/important/task_queues/rescan-matching-task-sets'),
         ('named-cache-task',
          '/internal/taskqueue/important/named_cache/update-pool'),
-        ('monitoring-bq-bots-events',
-         '/internal/taskqueue/monitoring/bq/bots/events/2020-01-01T01:01'),
-        ('monitoring-bq-tasks-requests',
-         '/internal/taskqueue/monitoring/bq/tasks/requests/2020-01-01T01:01'),
-        ('monitoring-bq-tasks-results-run',
-         '/internal/taskqueue/monitoring/bq/tasks/results/run/'
-         '2020-01-01T01:01'),
-        ('monitoring-bq-tasks-results-summary',
-         '/internal/taskqueue/monitoring/bq/tasks/results/summary/'
-         '2020-01-01T01:01'),
     ],
                                   key=lambda x: x[1])
     self.assertEqual(len(expected_task_queues), len(task_queue_routes))
@@ -171,57 +161,6 @@ class BackendTest(test_env_handlers.AppTestBase):
             url, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
       except Exception as e:
         self.fail('%s: %s' % (url, e))
-
-  def test_taskqueue_monitoring_bq_bots_events(self):
-    self.set_as_admin()
-    now = datetime.datetime(2020, 1, 2, 3, 4, 0)
-    def task_bq_events(start, end):
-      self.assertEqual(start, now)
-      self.assertEqual(end, now + datetime.timedelta(seconds=60))
-      return 0, 0
-    self.mock(bot_management, 'task_bq_events', task_bq_events)
-    self.app.post(
-        '/internal/taskqueue/monitoring/bq/bots/events/2020-01-02T03:04',
-        headers={'X-AppEngine-QueueName': 'monitoring-bq-bots-events'})
-
-  def test_taskqueue_monitoring_bq_tasks_requests(self):
-    self.set_as_admin()
-    now = datetime.datetime(2020, 1, 2, 3, 4, 0)
-    def task_bq(start, end):
-      self.assertEqual(start, now)
-      self.assertEqual(end, now + datetime.timedelta(seconds=60))
-      return 0, 0
-    self.mock(task_request, 'task_bq', task_bq)
-    self.app.post(
-        '/internal/taskqueue/monitoring/bq/tasks/requests/2020-01-02T03:04',
-        headers={'X-AppEngine-QueueName': 'monitoring-bq-tasks-requests'})
-
-  def test_taskqueue_monitoring_bq_tasks_results_run(self):
-    self.set_as_admin()
-    now = datetime.datetime(2020, 1, 2, 3, 4, 0)
-    def task_bq_run(start, end):
-      self.assertEqual(start, now)
-      self.assertEqual(end, now + datetime.timedelta(seconds=60))
-      return 0, 0
-    self.mock(task_result, 'task_bq_run', task_bq_run)
-    self.app.post(
-        '/internal/taskqueue/monitoring/bq/tasks/results/run/2020-01-02T03:04',
-        headers={'X-AppEngine-QueueName': 'monitoring-bq-tasks-results-run'})
-
-  def test_taskqueue_monitoring_bq_tasks_results_summary(self):
-    self.set_as_admin()
-    now = datetime.datetime(2020, 1, 2, 3, 4, 0)
-    def task_bq_summary(start, end):
-      self.assertEqual(start, now)
-      self.assertEqual(end, now + datetime.timedelta(seconds=60))
-      return 0, 0
-    self.mock(task_result, 'task_bq_summary', task_bq_summary)
-    self.app.post(
-        '/internal/taskqueue/monitoring/bq/tasks/results/summary/'
-          '2020-01-02T03:04',
-        headers={
-          'X-AppEngine-QueueName': 'monitoring-bq-tasks-results-summary',
-        })
 
 
 if __name__ == '__main__':

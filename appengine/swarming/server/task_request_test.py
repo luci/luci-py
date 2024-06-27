@@ -24,7 +24,6 @@ from components import utils
 from test_support import test_case
 
 from proto.api import swarming_pb2
-from server import bq_state
 from server import config
 from server import pools_config
 from server import task_pack
@@ -1839,54 +1838,6 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(5, task_request.task_delete_tasks(task_ids))
     self.assertEqual(0, task_request.TaskRequest.query().count())
     self.assertEqual(0, Foo.query().count())
-
-  def test_task_bq_empty(self):
-    # Empty, nothing is done.
-    start = utils.utcnow()
-    end = start + datetime.timedelta(seconds=60)
-    self.assertEqual(0, task_request.task_bq(start, end))
-
-  def test_task_bq(self):
-
-    def getrandbits(i):
-      self.assertEqual(i, 16)
-      return 0x7766
-
-    self.mock(random, 'getrandbits', getrandbits)
-    payloads = []
-
-    def send_to_bq(table_name, rows):
-      self.assertEqual('task_requests', table_name)
-      payloads.append(rows)
-
-    self.mock(bq_state, 'send_to_bq', send_to_bq)
-
-    # Generate two tasks requests.
-    now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
-    start = self.mock_now(now, 10)
-    request_1 = _gen_request()
-    request_1.key = task_request.new_request_key()
-    run_1_id = request_1.task_id[:-1] + '1'
-    request_1.put()
-    self.mock_now(now, 20)
-    request_2 = _gen_request(parent_task_id=run_1_id)
-    request_2.key = task_request.new_request_key()
-    request_2.put()
-    end = self.mock_now(now, 30)
-
-    self.assertEqual(2, task_request.task_bq(start, end))
-    self.assertEqual(1, len(payloads), payloads)
-    actual_rows = payloads[0]
-    self.assertEqual(2, len(actual_rows))
-    expected_ids = [
-        # No root IDs on task 1.
-        (request_1.task_id, '', ''),
-        # Task 1 is the root of Task 2.
-        (request_2.task_id, request_1.task_id, run_1_id),
-    ]
-    self.assertEqual(
-        expected_ids,
-        [(t.task_id, t.root_task_id, t.root_run_id) for _, t in actual_rows])
 
   def test_yield_request_keys_by_parent_task_id(self):
     parent_request = _gen_request()
