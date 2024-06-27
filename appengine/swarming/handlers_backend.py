@@ -25,8 +25,6 @@ from server import bot_management
 from server import config
 from server import external_scheduler
 from server import named_caches
-from server import stats_bots
-from server import stats_tasks
 from server import task_queues
 from server import task_request
 from server import task_result
@@ -147,20 +145,6 @@ class CronExternalSchedulerGetCallbacksHandler(_CronHandlerBase):
 
   def run_cron(self):
     task_scheduler.cron_handle_get_callbacks()
-
-
-class CronBotsStats(_CronHandlerBase):
-  """Update bots monitoring statistics."""
-
-  def run_cron(self):
-    stats_bots.cron_generate_stats()
-
-
-class CronTasksStats(_CronHandlerBase):
-  """Update tasks monitoring statistics."""
-
-  def run_cron(self):
-    stats_tasks.cron_generate_stats()
 
 
 ## Task queues.
@@ -328,12 +312,6 @@ def get_routes():
       ('/internal/cron/cleanup/bots/delete_old_bot_events',
        CronDeleteOldBotEvents),
       ('/internal/cron/cleanup/tasks/delete_old', CronDeleteOldTasks),
-
-      # Not yet used.
-      ('/internal/cron/monitoring/bots/stats', CronBotsStats),
-
-      # Not yet used.
-      ('/internal/cron/monitoring/tasks/stats', CronTasksStats),
       ('/internal/cron/monitoring/bots/aggregate_dimensions',
        CronBotsDimensionAggregationHandler),
       ('/internal/cron/important/bot_groups_config',
