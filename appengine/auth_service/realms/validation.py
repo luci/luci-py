@@ -23,7 +23,11 @@ from realms import permissions_config
 
 
 def register():
-  """Register the config validation hook."""
+  """Register the config validation hook.
+
+  Note: this function is deprecated and should not be called. Validation of
+  realms config files are now done by Auth Service v2 (see b/349458173).
+  """
   # pylint: disable=unused-variable
   cfg_path = common.cfg_path()
   @validation.project_config_rule(cfg_path, realms_config_pb2.RealmsCfg)

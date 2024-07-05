@@ -33,16 +33,10 @@ from components.auth import model
 from proto import config_pb2, realms_config_pb2
 
 from realms import common
-from realms import permissions
 from realms import permissions_config
 from realms import rules
-from realms import validation
 
 import replication
-
-
-# Register the config validation hook.
-validation.register()
 
 
 # Information about the fetched or previously processed permissions.cfg.
