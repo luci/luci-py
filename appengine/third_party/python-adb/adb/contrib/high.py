@@ -58,6 +58,10 @@ _ADB_KEYS = None
 # keys.
 _ADB_KEYS_PUB = set()
 
+# Grabs the key/value pair list from lines such as:
+# Temperature{mValue=25.6, mType=0, mName=AP, mStatus=0}
+_THERMALSERVICE_TEMPERATURE_REGEX = re.compile(r'^Temperature\{(.*)\}$')
+
 
 class _PerDeviceCache(object):
   """Caches data per device, thread-safe."""
@@ -627,6 +631,13 @@ class HighDevice(object):
 
   def GetTemperatures(self):
     """Returns the device's temperatures if available as a dict."""
+    temperature_data = self._GetTemperaturesFromSysFiles()
+    if not temperature_data:
+      temperature_data = self._GetTemperaturesFromThermalService()
+    return temperature_data
+
+  def _GetTemperaturesFromSysFiles(self):
+    """Helper to get temperatures from /sys/ files."""
     # Not all devices export these files. On other devices, the only real way to
     # read it is via Java
     # developer.android.com/guide/topics/sensors/sensors_environment.html
@@ -667,6 +678,24 @@ class HighDevice(object):
         out[sensor_type.strip()] = value
     # Filter out unnecessary stuff.
     return out
+
+  def _GetTemperaturesFromThermalService(self):
+    """Helper to get temperatures from dumpsys thermalservice."""
+    temperature_data = {}
+    # dumpsys thermalservice is only expected to work on Android 10 and above.
+    if int(self.cache.build_props.get('ro.build.version.sdk', 0)) < 29:
+      return temperature_data
+
+    dumpsys_output = self.Dumpsys('thermalservice')
+    if not dumpsys_output:
+      _LOG.error(
+          'Failed to run "dumpsys thermalservice" during fallback temperature '
+          'collection')
+      return temperature_data
+
+    temperature_data = _ParseThermalServiceOutput(dumpsys_output)
+
+    return temperature_data
 
   def GetBattery(self):
     """Returns details about the battery's state."""
@@ -1052,3 +1081,67 @@ class HighDevice(object):
         kwargs['rsa_keys'] = _ADB_KEYS[:]
     device = constructor(**kwargs)
     return HighDevice(device, _InitCache(device))
+
+
+def _ParseThermalServiceOutput(output):
+  """Helper to parse the output of 'dumpsys thermalservice'
+
+  Args:
+    output: A string containing the output of 'dumpsys thermalservice'
+
+  Returns:
+    A dict mapping sensor names (strings) to sensor values (floats). May be
+    empty if data cannot be extracted for any reason.
+  """
+  temperature_data = {}
+
+  # Parse the temperature data from the block of lines such as:
+  # Current temperatures from HAL:
+  #      Temperature{mValue=25.6, mType=0, mName=AP, mStatus=0}
+  #      Temperature{mValue=23.8, mType=2, mName=BAT, mStatus=0}
+  #      ...
+  in_temperature_block = False
+  for line in output.splitlines():
+    line = line.strip()
+    # Ignore any blank lines.
+    if not line:
+      continue
+    if line.startswith('Current temperatures'):
+      in_temperature_block = True
+      continue
+    if not in_temperature_block:
+      continue
+
+    if not line.startswith('Temperature{'):
+      break
+
+    match = _THERMALSERVICE_TEMPERATURE_REGEX.match(line)
+    if not match:
+      _LOG.error('Unable to find expected temperature data in line %r',
+                 line)
+      continue
+    key_value_list = match.group(1)
+    sensor_name = None
+    sensor_value = None
+    for key_value_pair in key_value_list.split(','):
+      key_value_pair = key_value_pair.strip()
+      key, value = key_value_pair.split('=', maxsplit=1)
+      if key == 'mValue':
+        try:
+          sensor_value = float(value)
+        except ValueError:
+          _LOG.error('Unable to parse float from %r', value)
+          break
+      elif key == 'mName':
+        sensor_name = value
+
+    # This will also drop the data if the sensor value is 0, which is what we
+    # want since that's indicative of the sensor not providing useful data. This
+    # can happen during normal operation.
+    if sensor_name and sensor_value:
+      temperature_data[sensor_name] = sensor_value
+
+  if not temperature_data:
+    _LOG.warning('Did not find any data using fallback temperature path')
+
+  return temperature_data
