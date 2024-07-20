@@ -1001,12 +1001,15 @@ def _check_go(min_version='1.16.0'):
         'Could not find `go` in PATH. Is it needed to deploy Go code.')
 
 
-def _check_cloudbuildhelper(min_version='1.5.3'):
+def _check_cloudbuildhelper(min_version='1.5.4'):
   """Checks `cloudbuildhelper` is in PATH and it is fresh enough."""
   explainer = (
-      'It is needed to deploy Go GAE apps now (https://crbug.com/1057067).\n'
-      'Try activating Infra go environment first:\n'
-      '  $ eval `.../infra/go/env.py`.'
+      'It is needed to deploy Go GAE apps (https://crbug.com/1057067). '
+      '`cloudbuildhelper` is distributed via infra.git gclient DEPS. '
+      'Make sure your infra.git gclient checkout is up-to-date and activate Go '
+      'environment to put `cloudbuildhelper` in PATH:\n'
+      '  $ eval `.../infra/go/env.py`.\n'
+      'See https://chromium.googlesource.com/infra/infra/+/main/go/README.md'
   )
   try:
     # 'cloudbuildhelper v1.x.y\nCIPD package: ...'
