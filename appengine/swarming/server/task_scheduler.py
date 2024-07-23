@@ -1506,6 +1506,8 @@ def schedule_request(request,
     result_summary.key = task_pack.request_key_to_result_summary_key(key)
     if to_run:
       to_run.key = ndb.Key(to_run.key.kind(), to_run.key.id(), parent=key)
+      if request.rbe_instance:
+        to_run.populate_rbe_reservation()
     if secret_bytes:
       assert request.secret_bytes_key
       secret_bytes.key = request.secret_bytes_key

@@ -137,7 +137,9 @@ class _TaskToRunBase(ndb.Model):
   # mode. TaskToRunShard in RBE mode are always (transactionally) created with
   # a Task Queue task to actually dispatch them to RBE scheduler.
   #
-  # It is derived from TaskRequest and slice index in new_task_to_run.
+  # It is derived from TaskRequest ID and slice index in new_task_to_run and
+  # updated in schedule_request in case there's task ID collision when storing
+  # the task.
   rbe_reservation = ndb.StringProperty(required=False, indexed=False)
 
   # Everything above is immutable, everything below is mutable.
@@ -230,6 +232,11 @@ class _TaskToRunBase(ndb.Model):
   def task_id(self):
     """Returns an encoded task id for this TaskToRunShard."""
     return task_pack.pack_run_result_key(self.run_result_key)
+
+  def populate_rbe_reservation(self):
+    """Populates rbe_reservation field based on the entity key."""
+    self.rbe_reservation = rbe.gen_rbe_reservation_id(self.request_key,
+                                                      self.task_slice_index)
 
   def to_dict(self):
     """Purely used for unit testing."""
@@ -798,21 +805,17 @@ def new_task_to_run(request, task_slice_index):
   kind = get_shard_kind(h % N_SHARDS)
   key = request_to_task_to_run_key(request, task_slice_index)
 
-  # Queue number and RBE reservation ID are mutually exclusive.
-  queue_number = None
-  rbe_reservation = None
-  if request.rbe_instance:
-    rbe_reservation = rbe.gen_rbe_reservation_id(request, task_slice_index)
-  else:
-    queue_number = _gen_queue_number(h, request.created_ts, request.priority,
-                                     request.scheduling_algorithm)
+  ttr = kind(key=key, created_ts=created, dimensions=dims, expiration_ts=exp)
 
-  return kind(key=key,
-              created_ts=created,
-              dimensions=dims,
-              rbe_reservation=rbe_reservation,
-              expiration_ts=exp,
-              queue_number=queue_number)
+  # Queue number and RBE reservation ID are mutually exclusive.
+  if request.rbe_instance:
+    ttr.populate_rbe_reservation()
+  else:
+    ttr.queue_number = _gen_queue_number(h, request.created_ts,
+                                         request.priority,
+                                         request.scheduling_algorithm)
+
+  return ttr
 
 
 def dimensions_matcher(bot_dimensions):

@@ -738,6 +738,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             fields=_update_fields_pubsub(status=status, http_status_code=200)))
 
   def test_schedule_request_task_id_collision(self):
+    rbe_enqueues = self.mock_enqueue_rbe_task()
+
     self._register_bot(self.bot_dimensions)
 
     key1 = task_request.new_request_key()
@@ -749,15 +751,21 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     # Creates the request without any collisions.
     keys[:] = [key1]
-    result_summary_1 = self._quick_schedule()
+    result_summary_1 = self._quick_schedule(rbe_instance='some-instance')
     self.assertEqual(key1, result_summary_1.request_key)
     self.assertFalse(keys)
+    del rbe_enqueues[:]
 
     # Collides on the existing key, but switches to the next one.
     keys[:] = [key1, key2]
-    result_summary_2 = self._quick_schedule()
+    result_summary_2 = self._quick_schedule(rbe_instance='some-instance')
     self.assertEqual(key2, result_summary_2.request_key)
     self.assertFalse(keys)
+
+    # Submitted the correct RBE reservation (using key2 as the base task ID).
+    self.assertEqual(1, len(rbe_enqueues))
+    _, ttr = rbe_enqueues[0]
+    self.assertEqual(ttr.rbe_reservation, rbe.gen_rbe_reservation_id(key2, 0))
 
   def test_schedule_request_no_capacity(self):
     # No capacity, denied. That's the default.

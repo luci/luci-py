@@ -27,6 +27,7 @@ from components import utils
 from proto.config import pools_pb2
 from proto.internals import rbe_pb2
 from server import pools_config
+from server import task_pack
 from server.constants import OR_DIM_SEP
 
 
@@ -258,19 +259,22 @@ def get_rbe_instance_for_task(task_tags, pool_cfg):
   return None
 
 
-def gen_rbe_reservation_id(task_request, task_slice_index):
+def gen_rbe_reservation_id(task_request_key, task_slice_index):
   """Generates an RBE reservation ID representing a particular slice.
 
   It needs to globally (potentially across Swarming instances) identify
   a particular task slice. Used to idempotently submit RBE reservations.
 
   Args:
-    task_request: an original TaskRequest with all task details.
+    task_request_key: a key of the root TaskRequest.
     task_slice_index: the index of the slice to represent.
   """
+  assert task_request_key.kind() == 'TaskRequest'
+  task_id = task_pack.pack_result_summary_key(
+      task_pack.request_key_to_result_summary_key(task_request_key))
   return '%s-%s-%d' % (
       app_identity.get_application_id(),
-      task_request.task_id,
+      task_id,
       task_slice_index,
   )
 
