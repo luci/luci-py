@@ -9,11 +9,6 @@ cron:
   url: /internal/cron/refresh_replicated_authdb
   schedule: every 1 hours
 
-- description: revoke stale pubsub authorization
-  target: backend
-  url: /internal/cron/revoke_stale_pubsub_auth
-  schedule: every 30 minutes
-
 ### gae_ts_mon
 
 - description: ts_mon housekeeping
