@@ -5,6 +5,7 @@
 
 import bisect
 import datetime
+import itertools
 import logging
 import re
 
@@ -37,6 +38,15 @@ def process_task_request(tr, template_apply):
     handlers_exceptions.InternalException: if something fails unexpectedly.
     auth.AuthorizationError: if a realms action is not allowed.
   """
+
+  # Refuse tags reserved for internal use. They can only be set by Swarming
+  # itself. These are tags that have any inherent magical meaning that some
+  # other parts of Swarming rely on.
+  for tag in itertools.chain(tr.manual_tags, tr.tags):
+    if task_request.is_reserved_tag(tag):
+      raise handlers_exceptions.BadRequestException(
+          'Tag %s is reserved for internal use and can\'t be assigned manually'
+          % tag)
 
   try:
     task_request.init_new_request(tr, acl.can_schedule_high_priority_tasks(),

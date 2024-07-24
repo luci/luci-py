@@ -58,11 +58,17 @@ class TestProcessTaskRequest(test_case.TestCase):
   def test_process_task_request_BadRequest(self):
     tr = task_request.TaskRequest(
         created_ts=utils.utcnow(),
+        manual_tags=['swarming.terminate:1'],
         task_slices=[
-            task_request.TaskSlice(
-                properties=task_request.TaskProperties(
-                    dimensions_data={u'chicken': [u'egg1', u'egg2']}))
+            task_request.TaskSlice(properties=task_request.TaskProperties(
+                dimensions_data={u'chicken': [u'egg1', u'egg2']}))
         ])
+
+    # Catch reserved tags use.
+    with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,
+                                 'reserved for internal use'):
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
+    tr.manual_tags = []
 
     # Catch init_new_request() ValueError exceptions.
     with self.assertRaisesRegexp(handlers_exceptions.BadRequestException,

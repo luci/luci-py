@@ -356,6 +356,11 @@ class TaskRequestApiTest(TestCase):
         i[5:] for i in dir(self) if i.startswith('test_'))
     self.assertFalse(missing)
 
+  def test_is_reserved_tag(self):
+    self.assertFalse(task_request.is_reserved_tag('a:b'))
+    self.assertTrue(task_request.is_reserved_tag('swarming.terminate:1'))
+    self.assertTrue(task_request.is_reserved_tag('swarming.terminate'))
+
   def test_get_automatic_tags(self):
     req = _gen_request()
     expected = set((u'hostname:localhost', u'OS:Windows-3.1.1', u'pool:default',

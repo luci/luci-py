@@ -166,6 +166,12 @@ _MIN_BOT_PING_TOLERANCE_SECS = 60
 # The name should be `projects/{project}/instances/{instance}`.
 _CAS_INSTANCE_RE = re.compile(r'^projects/[a-z0-9-]+/instances/[a-z0-9-_]+$')
 
+# Tag keys that can't be set via public API because they are used internally by
+# Swarming and have some extra meaning.
+_RESERVED_TAGS = frozenset([
+    'swarming.terminate',  # used to identify tasks created by TerminateBot RPC
+])
+
 
 ### Properties validators must come before the models.
 
@@ -1582,6 +1588,11 @@ def _get_automatic_tags(request):
 
 
 ### Public API.
+
+
+def is_reserved_tag(tag):
+  """Returns True if this task tag is not allowed to be set via public API."""
+  return tag.split(':', 1)[0] in _RESERVED_TAGS
 
 
 def get_automatic_tags(request, index):
