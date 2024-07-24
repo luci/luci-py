@@ -1628,7 +1628,7 @@ def create_termination_task(bot_id, rbe_instance=None, reason=None):
                     wait_for_capacity=True),
       ],
       manual_tags=[
-          u'terminate:1',
+          u'swarming.terminate:1',
           u'rbe:%s' % (rbe_instance or 'none'),
       ])
   assert request.task_slice(0).properties.is_terminate
