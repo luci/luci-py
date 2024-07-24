@@ -135,6 +135,28 @@ def terminate_bot(bot_id, reason=None):
       raise handlers_exceptions.BadRequestException(
           'The bot termination reason is too long: %d > 1000' % len(reason))
 
+  # Skip submitting a new task if there's already a pending termination task.
+  # This matters when GCE Provider terminate bots that run for days. It calls
+  # TerminateBot every hour, resulting in a big backlog of pending termination
+  # tasks.
+  #
+  # Note that we do not care about transactions or race conditions here, since
+  # it is OK to submit a duplicate termination task once in a while if the
+  # existing one is being processed right now. Such duplicate task will just
+  # naturally eventually expire.
+  query = task_result.get_result_summaries_query(
+      start=None,
+      end=None,
+      sort='created_ts',
+      state='pending',
+      tags=['id:%s' % bot_id, 'swarming.terminate:1'],
+  )
+  keys, _ = datastore_utils.fetch_page(query, 1, None, keys_only=True)
+  if keys:
+    existing_task_id = task_pack.pack_result_summary_key(keys[0])
+    logging.info('Deduplicating termination task: %s', existing_task_id)
+    return existing_task_id
+
   try:
     # Craft a special priority 0 task to tell the bot to shutdown.
     request = task_request.create_termination_task(bot_id, rbe_instance, reason)

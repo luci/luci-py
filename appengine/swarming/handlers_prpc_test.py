@@ -604,6 +604,27 @@ class BotServicePrpcTest(PrpcTest):
     expected = swarming_pb2.TerminateResponse(task_id='5cee488008810')
     self.assertEqual(expected, actual)
 
+  def test_terminate_dedup(self):
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_admin()
+
+    # Note that getrandbits is not mocked, to get different task IDs for
+    # different task scheduling attempts.
+
+    request = swarming_pb2.TerminateRequest(bot_id="bot1")
+
+    resp1 = self.post_prpc('TerminateBot', request)
+    actual1 = swarming_pb2.TerminateResponse()
+    _decode(resp1.body, actual1)
+
+    resp2 = self.post_prpc('TerminateBot', request)
+    actual2 = swarming_pb2.TerminateResponse()
+    _decode(resp2.body, actual2)
+
+    # Both responses have the same task ID.
+    self.assertEqual(actual1, actual2)
+
   def test_terminate_privileged_user(self):
     self.set_as_bot()
     self.bot_poll()

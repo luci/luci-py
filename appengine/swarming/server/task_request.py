@@ -1628,15 +1628,15 @@ def create_termination_task(bot_id, rbe_instance=None, reason=None):
     name = u'Terminate %s' % bot_id
   request = TaskRequest(
       created_ts=now,
-      expiration_ts=now + datetime.timedelta(days=1),
+      expiration_ts=now + datetime.timedelta(days=5),
       name=name,
       priority=0,
       rbe_instance=rbe_instance,
       scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
       task_slices=[
-          TaskSlice(expiration_secs=24 * 60 * 60,
+          TaskSlice(expiration_secs=5 * 24 * 60 * 60,
                     properties=properties,
-                    wait_for_capacity=True),
+                    wait_for_capacity=False),
       ],
       manual_tags=[
           u'swarming.terminate:1',
