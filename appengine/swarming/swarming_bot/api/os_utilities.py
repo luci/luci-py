@@ -1140,17 +1140,30 @@ def get_state():
     nb_files_in_temp = len(os.listdir(tmpdir))
   except OSError:
     nb_files_in_temp = 'N/A'
+
+  # Only including a subset of the environment variables that are used by
+  # Swarming, as state is not designed to sustain large load at the moment.
+  env = {}
+  env_keys = [
+      'ISOLATED_CACHE_SIZE',
+      'LUCI_MACHINE_TOKEN',
+      'PATH',
+      'SWARMING_ALLOW_ANY_USER',
+      'SWARMING_EXTERNAL_BOT_SETUP',
+      'SWARMING_NEVER_REBOOT',
+  ]
+  for key in env_keys:
+    val = os.environ.get(key)
+    if val is not None:
+      env[key] = val
+
   state = {
       'audio': get_audio(),
       'cpu_name': get_cpuinfo().get('name'),
       'cost_usd_hour': get_cost_hour(),
       'cwd': os.getcwd(),
       'disks': get_disks_info(),
-      # Only including a subset of the environment variable, as state is not
-      # designed to sustain large load at the moment.
-      'env': {
-          'PATH': os.environ['PATH'],
-      },
+      'env': env,
       'gpu': get_gpu()[1],
       'hostname': get_hostname(),
       'ip': get_ip(),
