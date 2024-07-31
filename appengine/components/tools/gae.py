@@ -279,6 +279,13 @@ def CMDupload(parser, args):
       '--target-version', action='store',
       help='Overrides the version that is uploaded. '
            'If this is set, the --tag option is ignored.')
+  parser.add_option(
+      '--host-scheme',
+      action='store',
+      help='Specify the hostname scheme to use for links to the uploaded app. '
+      'For apps using custom domains. Any occurance of the uppercase text '
+      'VERSION in the scheme is substituted for the uploaded version. '
+      'E.g. "VERSION.staging.myapp.api.luci.app"')
   parser.add_switch_option()
   parser.add_force_option()
   parser.allow_positional_args = True
@@ -304,13 +311,19 @@ def CMDupload(parser, args):
       print('Aborted.')
       return 1
 
+  if options.host_scheme:
+    # Use the custom hostname scheme.
+    url = 'https://%s' % options.host_scheme.replace('VERSION', version)
+  else:
+    url = 'https://%s-dot-%s.appspot.com' % (version, app.app_id)
+
   app.update(version, services)
 
   print('-' * 80)
   print('New version:')
   print('  %s' % version)
   print('Uploaded as:')
-  print('  https://%s-dot-%s.appspot.com' % (version, app.app_id))
+  print('  %s' % url)
   print('Manage at:')
   print('  https://console.cloud.google.com/appengine/versions?project=' +
         app.app_id)
