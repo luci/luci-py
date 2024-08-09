@@ -245,6 +245,10 @@ def get_cpu_type():
       return 'x86'
     if cpu_type:
       return cpu_type  # e.g. `arm64`
+  elif sys.platform.startswith('aix'):
+    # platform.machine() returns the aix machine ID (uname -m), which is
+    # not useful. Modern AIX only supports powerpc64.
+    return 'ppc64'
   machine = platform.machine().lower()
   if machine in ('amd64', 'x86_64', 'i386', 'i686', 'i86pc'):
     return 'x86'

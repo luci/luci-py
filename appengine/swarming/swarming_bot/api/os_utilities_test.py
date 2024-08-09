@@ -129,6 +129,14 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertEqual(os_utilities.get_cpu_dimensions(),
                      ['mips', 'mips-32', 'mips-32-Cavium_Octeon_II_V0.1'])
 
+  def test_get_cpu_dimensions_aix_ppc64(self):
+    self.mock(sys, 'platform', 'aix')
+    self.mock(sys, 'maxsize', 2**63 - 1)
+    # A possible machine ID reported by python on aix.
+    self.mock(platform, 'machine', lambda: '00FAC25F4B00')
+    self.mock(os_utilities, 'get_cpuinfo', lambda: {})
+    self.assertEqual(os_utilities.get_cpu_dimensions(), ['ppc64', 'ppc64-64'])
+
   def test_get_cpu_dimensions_ppc64(self):
     self.mock(sys, 'platform', 'linux')
     self.mock(platform, 'machine', lambda: 'ppc64')
