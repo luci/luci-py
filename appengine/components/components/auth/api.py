@@ -288,6 +288,11 @@ class AuthDB(object):
     """
     cached_groups = {}
     for gr in auth_db.groups:
+      # TODO(b/360020140): Temporary to workaround brokeness in AuthDB.
+      try:
+        created_by = model.Identity.from_bytes(gr.created_by)
+      except ValueError:
+        created_by = model.IDENTITY_ANONYMOUS
       cached_groups[gr.name] = CachedGroup(
           members=frozenset(gr.members),
           globs=tuple(model.IdentityGlob.from_bytes(x) for x in gr.globs),
@@ -295,7 +300,7 @@ class AuthDB(object):
           description=gr.description,
           owners=gr.owners or model.ADMIN_GROUP,
           created_ts=utils.timestamp_to_datetime(gr.created_ts),
-          created_by=model.Identity.from_bytes(gr.created_by),
+          created_by=created_by,
           modified_ts=utils.timestamp_to_datetime(gr.modified_ts),
           modified_by=model.Identity.from_bytes(gr.modified_by))
 
