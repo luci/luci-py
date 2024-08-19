@@ -730,32 +730,6 @@ class BotManagementTest(test_case.TestCase):
     last_seen_ts.FromDatetime(bot1_dead['last_seen_ts'])
     self.assertEqual(bq_event.bot.info.last_seen_ts, last_seen_ts)
 
-  def test_cron_delete_old_bot_events(self):
-    # Create an old BotEvent right at the cron job cut off, and another one one
-    # second later (that will be kept).
-    _bot_event(event_type='bot_connected')
-    now = self.now
-    self.mock_now(now, 1)
-    event_key = _bot_event(event_type='bot_connected')
-    self.mock_now(now + bot_management._OLD_BOT_EVENTS_CUT_OFF, 0)
-    self.assertEqual(1, bot_management.cron_delete_old_bot_events())
-    actual = bot_management.BotEvent.query().fetch(keys_only=True)
-    self.assertEqual([event_key], actual)
-
-  def test_cron_delete_old_bot(self):
-    # Create a Bot with no BotEvent and another bot with one.
-    event_key = _bot_event(bot_id=u'id1', event_type='request_sleep')
-    # Delete the BotEvent entity.
-    _bot_event(bot_id=u'id2', event_type='request_sleep').delete()
-    # BotRoot + BotInfo.
-    self.assertEqual(2, bot_management.cron_delete_old_bot())
-    actual = bot_management.BotEvent.query().fetch(keys_only=True)
-    self.assertEqual([event_key], actual)
-    self.assertEqual(
-        [u'id1'],
-        [k.string_id() for k in
-          bot_management.BotRoot.query().fetch(keys_only=True)])
-
   def test_cron_aggregate_dimensions(self):
     _ensure_bot_info(
         bot_id='id1', dimensions={

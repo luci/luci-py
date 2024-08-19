@@ -89,20 +89,6 @@ class CronUpdateBotInfoComposite(_CronHandlerBase):
     bot_management.cron_update_bot_info()
 
 
-class CronDeleteOldBots(_CronHandlerBase):
-  """Deletes old BotRoot entity groups."""
-
-  def run_cron(self):
-    bot_management.cron_delete_old_bot()
-
-
-class CronDeleteOldBotEvents(_CronHandlerBase):
-  """Deletes old BotEvent entities."""
-
-  def run_cron(self):
-    bot_management.cron_delete_old_bot_events()
-
-
 class CronDeleteOldTasks(_CronHandlerBase):
   """Deletes old TaskRequest entities and all their decendants."""
 
@@ -308,9 +294,6 @@ def get_routes():
       ('/internal/cron/cleanup/task_dimension_sets', CronTidyTaskDimensionSets),
       ('/internal/cron/monitoring/bots/update_bot_info',
        CronUpdateBotInfoComposite),
-      ('/internal/cron/cleanup/bots/delete_old', CronDeleteOldBots),
-      ('/internal/cron/cleanup/bots/delete_old_bot_events',
-       CronDeleteOldBotEvents),
       ('/internal/cron/cleanup/tasks/delete_old', CronDeleteOldTasks),
       ('/internal/cron/monitoring/bots/aggregate_dimensions',
        CronBotsDimensionAggregationHandler),
