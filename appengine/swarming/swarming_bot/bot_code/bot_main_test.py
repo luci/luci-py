@@ -89,7 +89,6 @@ class TestBotBase(net_utils.TestCase):
             'foo': ['bar'],
             'id': ['localhost'],
             'pool': ['default'],
-            'server_version': ['version1'],
         },
         'state': {
             'bot_group_cfg_version': None,
@@ -103,10 +102,11 @@ class TestBotBase(net_utils.TestCase):
     self.mock(os_utilities,
               'get_dimensions', lambda: self.attributes['dimensions'])
     self.mock(os_utilities, 'get_state', lambda *_: self.attributes['state'])
-    self.mock(bot_main, 'get_config', lambda: {
-        'server': self.url,
-        'server_version': 'version1',
-    })
+    self.mock(
+        bot_main, 'get_config', lambda: {
+            'server': self.url,
+            'server_version': 'must-be-ignored',
+        })
     self.mock(bot_main, '_TRAP_ALL_EXCEPTIONS', False)
     self.quit_bit = None  # see make_bot
     self.bot = None  # see make_bot
@@ -125,8 +125,7 @@ class TestBotBase(net_utils.TestCase):
     self.bot = bot.Bot(
         remote_client.createRemoteClient(self.url, auth_headers_cb, 'localhost',
                                          self.root_dir), self.attributes,
-        self.url,
-        bot_main.get_config()['server_version'], self.root_dir, self.fail)
+        self.url, self.root_dir, self.fail)
     bot_main._update_bot_attributes(self.bot, 0)
     self.clock = clock.Clock(self.quit_bit)
     self.clock._now_impl = lambda: self.quit_bit.now
@@ -317,7 +316,6 @@ class TestBotMain(TestBotBase):
     expected = {
         'id': ['foo'],
         'pool': ['bar'],
-        'server_version': ['version1']
     }
     self.assertEqual(expected, bot_main._get_dimensions(self.bot))
     self.assertEqual('Yo', self.bot.bot_restart_msg())
@@ -330,7 +328,7 @@ class TestBotMain(TestBotBase):
       return {'yo': ['dawh']}
 
     self.mock(bot_config, 'get_dimensions', get_dimensions)
-    expected = {'server_version': ['version1'], 'yo': ['dawh']}
+    expected = {'yo': ['dawh']}
     self.assertEqual(expected, bot_main._get_dimensions(self.bot))
 
   def test_get_dimensions_extra(self):
@@ -346,7 +344,7 @@ class TestBotMain(TestBotBase):
         self.assertEqual(self.bot, botobj)
         return {'alternative': ['truth']}
     self.mock(bot_main, '_EXTRA_BOT_CONFIG', extra())
-    expected = {'alternative': ['truth'], 'server_version': ['version1']}
+    expected = {'alternative': ['truth']}
     self.assertEqual(expected, bot_main._get_dimensions(self.bot))
 
   def test_generate_version(self):
@@ -429,7 +427,6 @@ class TestBotMain(TestBotBase):
     expected = {
         'os': ['safe'],
         'quarantined': ['1'],
-        'server_version': ['version1'],
     }
     self.assertEqual(expected, bot_main._get_dimensions(self.bot))
     expected = {
@@ -846,7 +843,6 @@ class TestBotMain(TestBotBase):
             'foo': ['bar'],
             'id': ['localhost'],
             'pool': ['default'],
-            'server_version': ['version1'],
         }, botobj[0].dimensions)
 
   def test_poll_server_unexpected_exception(self):

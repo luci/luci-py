@@ -390,8 +390,7 @@ class Test(unittest.TestCase):
 
     self.maxDiff = None
     self.dimensions = get_bot_dimensions()
-    # The bot forcibly adds server_version, and bot_config.
-    self.dimensions[u'server_version'] = [u'N/A']
+    # The bot forcibly adds bot_config.
     self.dimensions[u'bot_config'] = [u'bot_config.py']
     # Reset the bot's isolated cache at the start of each task, so that the
     # cache reuse data becomes deterministic. Only restart the bot when it had a
@@ -413,14 +412,14 @@ class Test(unittest.TestCase):
     self.bot.wipe_cache(had_cache)
 
     # The bot restarts due to wipe_cache(True) so wait for the bot to come back
-    # online. It may takes a few loop.
+    # online. It may take a few loop iterations.
     start = time.time()
     while True:
       if time.time() - start > TIMEOUT_SECS:
         self.fail('Bot took too long to start after wipe_cache()')
       state = self.client.query_bot()
       if not state or not any(
-          (d['key'] == 'server_version' for d in state['dimensions'])):
+          (d['key'] == 'bot_config' for d in state['dimensions'])):
         time.sleep(0.1)
         continue
       if not had_cache:

@@ -61,11 +61,6 @@ class SimpleMainTest(TestCase):
     botobj = bot_main.get_bot(bot_main.get_config())
     expected = bot_main.get_attributes(botobj)
 
-    # get_config() doesn't work when called outside of a zip, so patch the
-    # server_version manually with the default value in config/config.json.
-    self.assertEqual(['N/A'], expected['dimensions']['server_version'])
-    expected['dimensions']['server_version'] = ['1']
-
     NON_DETERMINISTIC = ('cwd', 'disks', 'nb_files_in_temp', 'pid',
                          'running_time', 'started_ts', 'uptime', 'temp',
                          'original_bot_id')

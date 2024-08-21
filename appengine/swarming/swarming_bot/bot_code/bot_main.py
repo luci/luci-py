@@ -337,14 +337,11 @@ def _get_dimensions(botobj):
   """
   out = _call_hook_safe(False, botobj, 'get_dimensions')
   if _is_jsonish_dict(out):
-    out = out.copy()
-    out['server_version'] = [_get_server_version_safe()]
-    return out
+    return out.copy()
   try:
     _set_quarantined('get_dimensions(): expected a JSON dict, got %r' % out)
     out = os_utilities.get_dimensions()
     out['quarantined'] = ['1']
-    out['server_version'] = [_get_server_version_safe()]
     return out
   except Exception:
     logging.exception('os.utilities.get_dimensions() failed')
@@ -352,12 +349,7 @@ def _get_dimensions(botobj):
         'bot_error': ['bot_main:_get_dimensions'],
         'id': [_get_botid_safe()],
         'quarantined': ['1'],
-        'server_version': [_get_server_version_safe()],
     }
-
-
-def _get_server_version_safe():
-  return get_config().get('server_version', 'N/A')
 
 
 @tools.cached
@@ -693,8 +685,7 @@ def get_bot(config):
       bot.Bot(
           remote_client.createRemoteClient(config['server'], None, hostname,
                                            base_dir), attributes,
-          config['server'], config['server_version'], base_dir,
-          _on_shutdown_hook))
+          config['server'], base_dir, _on_shutdown_hook))
 
   # Make remote client callback use the returned bot object. We assume here
   # RemoteClient doesn't call its callback in the constructor (since 'botobj' is
@@ -702,8 +693,8 @@ def get_bot(config):
   botobj = bot.Bot(
       remote_client.createRemoteClient(
           config['server'], lambda: _get_authentication_headers(botobj),
-          hostname, base_dir), attributes, config['server'],
-      config['server_version'], base_dir, _on_shutdown_hook)
+          hostname, base_dir), attributes, config['server'], base_dir,
+      _on_shutdown_hook)
   return botobj
 
 
@@ -718,10 +709,7 @@ def get_config():
       raise ValueError('Invalid server entry %r' % config['server'])
   except (zipfile.BadZipfile, IOError, OSError, TypeError, ValueError):
     logging.exception('Invalid config.json!')
-    config = {
-      'server': '',
-      'server_version': 'N/A',
-    }
+    config = {'server': ''}
   if not _ERROR_HANDLER_WAS_REGISTERED and config['server']:
     on_error.report_on_exception_exit(config['server'])
     _ERROR_HANDLER_WAS_REGISTERED = True
@@ -1241,10 +1229,9 @@ def _run_bot_inner(arg_error, quit_bit):
     _ORIGINAL_BOT_ID = botobj.id
 
   # RBE expects the version string to use a specific format.
-  rbe_bot_version = '%s_%s_swarming/%s-%s' % (
+  rbe_bot_version = '%s_%s_swarming/%s' % (
       os_utilities.get_cipd_os(),
       os_utilities.get_cipd_architecture(),
-      botobj.server_version,
       botobj.bot_version,
   )
 
@@ -2361,7 +2348,6 @@ def main(argv):
   try:
     return _run_bot(error)
   finally:
-    _call_hook_safe(
-        True, bot.Bot(None, None, None, None, base_dir, None),
-        'on_bot_shutdown')
+    _call_hook_safe(True, bot.Bot(None, None, None, base_dir, None),
+                    'on_bot_shutdown')
     logging.info('main() returning')

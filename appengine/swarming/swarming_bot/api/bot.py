@@ -20,8 +20,7 @@ from api import os_utilities
 
 class Bot(object):
 
-  def __init__(self, remote, attributes, server, server_version, base_dir,
-               shutdown_hook):
+  def __init__(self, remote, attributes, server, base_dir, shutdown_hook):
     assert server is None or not server.endswith('/'), server
 
     # TODO(vadimsh): Make bot ID immutable. Changing it after the handshake is
@@ -31,7 +30,6 @@ class Bot(object):
     self._base_dir = base_dir
     self._remote = remote
     self._server = server
-    self._server_version = server_version
     self._shutdown_hook = shutdown_hook
 
     # Mutable, see BotMutator.
@@ -126,18 +124,6 @@ class Bot(object):
     "https://foo-bar.appspot.com".
     """
     return self._server
-
-  @property
-  def server_version(self):
-    """Version of the server's implementation.
-
-    The form is nnn-hhhhhhh for pristine version and nnn-hhhhhhh-tainted-uuuu
-    for non-upstreamed code base:
-      nnn: revision pseudo number
-      hhhhhhh: git commit hash
-      uuuu: username
-    """
-    return self._server_version
 
   @property
   def bot_version(self):
