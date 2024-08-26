@@ -165,11 +165,6 @@ This schema is about the audit of the events of bots.
            |id=fffff|  |id=ffffe| ... |id=00000|
            +--------+  +--------+     +--------+
 
-    +--------Root---------+
-    |DimensionAggregation |                                     bot_management.py
-    |id=<all or pool name>|
-    +---------------------+
-
 
 # Keys
 

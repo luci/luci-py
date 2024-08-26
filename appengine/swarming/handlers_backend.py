@@ -102,12 +102,6 @@ class CronNamedCachesUpdate(_CronHandlerBase):
   def run_cron(self):
     named_caches.cron_update_named_caches()
 
-class CronBotsDimensionAggregationHandler(_CronHandlerBase):
-  """Aggregates all bots dimensions (except id) in the fleet."""
-
-  def run_cron(self):
-    bot_management.cron_aggregate_dimensions()
-
 
 class CronBotGroupsConfigHandler(_CronHandlerBase):
   """Fetches bots.cfg with all includes, assembles the final config."""
@@ -295,8 +289,6 @@ def get_routes():
       ('/internal/cron/monitoring/bots/update_bot_info',
        CronUpdateBotInfoComposite),
       ('/internal/cron/cleanup/tasks/delete_old', CronDeleteOldTasks),
-      ('/internal/cron/monitoring/bots/aggregate_dimensions',
-       CronBotsDimensionAggregationHandler),
       ('/internal/cron/important/bot_groups_config',
        CronBotGroupsConfigHandler),
       ('/internal/cron/important/external_scheduler/cancellations',

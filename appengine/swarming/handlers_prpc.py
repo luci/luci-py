@@ -146,13 +146,8 @@ class BotsService(object):
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
   def GetBotDimensions(self, request, _context):
-    dr = api_common.get_dimensions(request.pool)
-    ts = message_conversion_prpc.date(dr.ts)
-    bd = [
-        swarming_pb2.StringListPair(key=d.dimension, value=d.values)
-        for d in dr.bots_dimensions
-    ]
-    return swarming_pb2.BotsDimensions(bots_dimensions=bd, ts=ts)
+    # Implemented only in Go now.
+    raise NotImplementedError()
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)

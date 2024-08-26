@@ -72,50 +72,6 @@ class BackendTest(test_env_handlers.AppTestBase):
     # The actual number doesn't matter, just make sure they are unqueued.
     self.execute_tasks()
 
-  def test_cron_monitoring_bots_aggregate_dimensions(self):
-    # Tests that the aggregation works
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
-    self.mock_now(now)
-
-    bot_management.bot_event(event_type='request_sleep',
-                             bot_id='id1',
-                             external_ip='8.8.4.4',
-                             authenticated_as='bot:whitelisted-ip',
-                             dimensions={
-                                 'foo': ['beta'],
-                                 'id': ['id1']
-                             },
-                             state={'ram': 65},
-                             version='123456789',
-                             quarantined=False,
-                             register_dimensions=True)
-    bot_management.bot_event(event_type='request_sleep',
-                             bot_id='id2',
-                             external_ip='8.8.4.4',
-                             authenticated_as='bot:whitelisted-ip',
-                             dimensions={
-                                 'foo': ['alpha'],
-                                 'id': ['id2']
-                             },
-                             state={'ram': 65},
-                             version='123456789',
-                             quarantined=True,
-                             task_id='987',
-                             register_dimensions=True)
-
-    self.app.get('/internal/cron/monitoring/bots/aggregate_dimensions',
-        headers={'X-AppEngine-Cron': 'true'}, status=200)
-    agg_key = bot_management.get_aggregation_key('all')
-    actual = agg_key.get()
-    expected = bot_management.DimensionAggregation(
-        key=agg_key,
-        dimensions=[
-            bot_management.DimensionValues(
-                dimension='foo', values=['alpha', 'beta'])
-        ],
-        ts=now)
-    self.assertEqual(expected, actual)
-
   def test_taskqueues(self):
     # Tests all the task queue tasks are securely handled.
     task_queue_routes = sorted(

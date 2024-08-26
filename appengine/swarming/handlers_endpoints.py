@@ -764,12 +764,8 @@ class SwarmingBotsService(remote.Service):
   @auth.require(acl.can_access, log_identity=True)
   def dimensions(self, request):
     """Returns the cached set of dimensions currently in use in the fleet."""
-    dr = api_common.get_dimensions(request.pool)
-    dimensions = [
-        swarming_rpcs.StringListPair(key=d.dimension, value=d.values)
-        for d in dr.bots_dimensions
-    ]
-    return swarming_rpcs.BotsDimensions(bots_dimensions=dimensions, ts=dr.ts)
+    # Implemented only in Go now.
+    raise NotImplementedError()
 
 
 def get_routes():

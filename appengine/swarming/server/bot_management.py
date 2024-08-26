@@ -25,11 +25,6 @@
            |id=fffff|  |if=ffffe| ... |id=00000|
            +--------+  +--------+     +--------+
 
-    +--------Root---------+
-    |DimensionAggregation |
-    |id=<all or pool name>|
-    +---------------------+
-
 - BotEvent is a monotonically inserted entity that is added for each event
   happening for the bot.
 - BotInfo is a 'dump-only' entity used for UI, it permits quickly show the
@@ -415,29 +410,6 @@ class BotSettings(ndb.Model):
   quarantined = ndb.BooleanProperty()
 
 
-class DimensionValues(ndb.Model):
-  """Inlined into DimensionAggregation, never stored standalone."""
-  dimension = ndb.StringProperty()
-  values = ndb.StringProperty(repeated=True)
-
-
-class DimensionAggregation(ndb.Model):
-  """Has all dimensions that are currently exposed by the bots.
-
-  There's a single root entity stored with id 'current', see KEY below.
-
-  This entity is updated via cron job /internal/cron/aggregate_bots_dimensions
-  updated every hour.
-  """
-  dimensions = ndb.LocalStructuredProperty(
-      DimensionValues, repeated=True, compressed=True)
-
-  ts = ndb.DateTimeProperty()
-
-  # Key for all dimensions. the legacy key 'current' will be removed.
-  KEY = ndb.Key('DimensionAggregation', 'current')
-
-
 ### Public APIs.
 
 
@@ -553,11 +525,6 @@ def get_bot_pools(bot_id):
 def get_settings_key(bot_id):
   """Returns the BotSettings ndb.Key for a known bot."""
   return ndb.Key(BotSettings, 'settings', parent=get_root_key(bot_id))
-
-
-def get_aggregation_key(group):
-  """Returns the DimensionAggregation ndb.Key for a group."""
-  return ndb.Key(DimensionAggregation, group)
 
 
 def filter_dimensions(q, dimensions):
@@ -1061,44 +1028,3 @@ def cron_update_bot_info():
                   cron_stats['failed'])
 
   return cron_stats['dead']
-
-
-def cron_aggregate_dimensions():
-  """Aggregates dimensions for all pools and each pool."""
-
-  # {
-  #   'all': { 'os': set(...), 'cpu': set(...), ...},
-  #   'pool1': { 'os': set(...), 'cpu': set(...), ...},
-  #   ...
-  # }
-  seen = defaultdict(lambda: defaultdict(set))
-  now = utils.utcnow()
-
-  q = BotInfo.query()
-  cursor = None
-  more = True
-  while more:
-    bots, cursor, more = q.fetch_page(1000, start_cursor=cursor)
-    for b in bots:
-      groups = get_pools_from_dimensions_flat(b.dimensions_flat)
-      groups.append('all')
-      for i in b.dimensions_flat:
-        k, v = i.split(':', 1)
-        if k == 'id':
-          continue
-        for g in groups:
-          seen[g][k].add(v)
-
-  for group, dims in seen.items():
-    dims_prop = [
-        DimensionValues(dimension=k, values=sorted(values))
-        for k, values in sorted(dims.items())
-    ]
-    logging.info('Saw dimensions %s in %s', dims_prop, group)
-    # TODO(jwata): remove the 'current' key after switching to the 'all' key.
-    if group == 'all':
-      DimensionAggregation(
-          key=DimensionAggregation.KEY, dimensions=dims_prop, ts=now).put()
-    DimensionAggregation(key=get_aggregation_key(group),
-                         dimensions=dims_prop,
-                         ts=now).put()
