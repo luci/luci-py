@@ -1583,7 +1583,7 @@ class _BotLoopState:
     """Duration since the bot finished executing the last task."""
     return self._clock.now() - self._last_task_time
 
-  def on_task_completed(self, success):
+  def on_task_completed(self, _success):
     """Called after finishing running a task."""
     # Used to track bot idleness.
     self._consecutive_idle_cycles = 0
@@ -1593,16 +1593,16 @@ class _BotLoopState:
     # - there's no task overhead
     # - if there's an exception while cleaning, it's not logged in the task
     _clean_cache(self._bot)
-    if success:
-      # Completed a task successfully so update swarming_bot.zip if necessary.
-      _update_lkgbc(self._bot)
+    # Managed to run a full bot loop cycle. The bot code is good enough.
+    _update_lkgbc(self._bot)
 
   def on_idle_poll_cycle(self):
     """Called if a **successful** poll cycle didn't produce any tasks."""
     if self._rbe_hybrid_mode:
       logging.debug('Hybrid mode: idle cycle')
     self._consecutive_idle_cycles += 1
-    _maybe_update_lkgbc(self._bot)
+    # Managed to run an idle bot loop cycle. The bot code is good enough.
+    _update_lkgbc(self._bot)
 
   def on_bot_exit(self):
     """Called when the bot is about to terminate.
@@ -2126,7 +2126,7 @@ def _update_bot(botobj, version):
   Use alternating files; first load swarming_bot.1.zip, then swarming_bot.2.zip,
   never touching swarming_bot.zip which was the originally bootstrapped file.
 
-  LKGBC is handled by _update_lkgbc() and _maybe_update_lkgbc().
+  LKGBC is handled by _update_lkgbc().
 
   Returns only in case of failure to get the new bot code.
   """
@@ -2232,52 +2232,15 @@ def _update_lkgbc(botobj):
     if fs.isfile(golden):
       org = fs.stat(golden)
       cur = fs.stat(THIS_FILE)
-      if org.st_size == org.st_size and org.st_mtime >= cur.st_mtime:
+      if org.st_mtime >= cur.st_mtime:
         return False
 
     # Copy the current file back to LKGBC.
+    logging.info('Updating LKGBC')
     shutil.copy(THIS_FILE, golden)
     return True
   except Exception as e:
     botobj.post_error('Failed to update LKGBC: %s' % e)
-    return False
-
-
-def _maybe_update_lkgbc(botobj):
-  """Updates the Last Known Good Bot Code (LKGBC) when it is older than 1 one
-  week.
-
-  This either means:
-  - The bot code is particularly hosed, for an extended period of time.
-  - All tasks are failing, which may legitimitely happen sometimes when the devs
-    don't care about a particular configuration.
-  - The bot is completely idle, so it never gets the chance to update LKGBC.
-
-  We decide that the first situation is rare enough that it's preferable to
-  explcitly handle the later two. We've seen bots being idle for extended
-  periods of time (well over a year), which introduces all sorts of
-  'interesting' problems.
-
-  Returns True if LKGBC was updated.
-  """
-  try:
-    if not fs.isfile(THIS_FILE):
-      # TODO(maruel): Try to download the code again from the server.
-      return False
-    golden = os.path.join(botobj.base_dir, 'swarming_bot.zip')
-    if fs.isfile(golden):
-      org = fs.stat(golden)
-      cur = fs.stat(THIS_FILE)
-      if org.st_size == org.st_size and org.st_mtime >= cur.st_mtime:
-        return False
-      if org.st_mtime >= time.time() - 7*24*60*60:
-        return False
-
-    # Copy the current file back to LKGBC.
-    shutil.copy(THIS_FILE, golden)
-    return True
-  except Exception as e:
-    botobj.post_error('Failed to update LKGBC while idle: %s' % e)
     return False
 
 

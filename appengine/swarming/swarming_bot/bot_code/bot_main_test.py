@@ -107,6 +107,8 @@ class TestBotBase(net_utils.TestCase):
             'server': self.url,
             'server_version': 'must-be-ignored',
         })
+    self.orig_update_lkgbc = bot_main._update_lkgbc
+    self.mock(bot_main, '_update_lkgbc', lambda _bot: False)
     self.mock(bot_main, '_TRAP_ALL_EXCEPTIONS', False)
     self.quit_bit = None  # see make_bot
     self.bot = None  # see make_bot
@@ -1205,7 +1207,6 @@ class TestBotMain(TestBotBase):
   def test_rbe_mode_swarming_task(self):
     self.mock(bot_main, '_run_manifest', lambda *_args: True)
     self.mock(bot_main, '_clean_cache', lambda *_args: None)
-    self.mock(bot_main, '_update_lkgbc', lambda *_args: None)
 
     # Switches into the RBE mode, creates and polls the session. Gets nothing.
     self.expected_requests([
@@ -2312,32 +2313,7 @@ class TestBotMain(TestBotBase):
       f.write(b'ab')
     self.mock(bot_main, 'THIS_FILE', cur)
 
-    self.assertEqual(True, bot_main._update_lkgbc(self.bot))
-    with open(lkgbc, 'rb') as f:
-      self.assertEqual(b'ab', f.read())
-
-  def test_maybe_update_lkgbc(self):
-    # Create LKGBC with a timestamp from 1h ago.
-    lkgbc = os.path.join(self.bot.base_dir, 'swarming_bot.zip')
-    with open(lkgbc, 'wb') as f:
-      f.write(b'a')
-    past = time.time() - 60 * 60
-    os.utime(lkgbc, (past, past))
-
-    cur = os.path.join(self.bot.base_dir, 'swarming_bot.1.zip')
-    with open(cur, 'wb') as f:
-      f.write(b'ab')
-    self.mock(bot_main, 'THIS_FILE', cur)
-
-    # No update even if they mismatch, LKGBC is not old enough.
-    self.assertEqual(False, bot_main._maybe_update_lkgbc(self.bot))
-    with open(lkgbc, 'rb') as f:
-      self.assertEqual(b'a', f.read())
-
-    # Fast forward a little more than 7 days.
-    now = time.time()
-    self.mock(time, 'time', lambda: now + 7 * 24 * 60 * 60 + 10)
-    self.assertEqual(True, bot_main._maybe_update_lkgbc(self.bot))
+    self.assertEqual(True, self.orig_update_lkgbc(self.bot))
     with open(lkgbc, 'rb') as f:
       self.assertEqual(b'ab', f.read())
 
