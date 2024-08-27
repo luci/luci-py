@@ -1928,7 +1928,6 @@ class TestBotMain(TestBotBase):
   def _mock_popen(self,
                   returncode=0,
                   exit_code=0,
-                  url='https://localhost:1',
                   expected_auth_params_json=None,
                   expected_rbe_session_json=None,
                   internal_error=None,
@@ -1953,9 +1952,7 @@ class TestBotMain(TestBotBase):
             bot_main.THIS_FILE,
             'task_runner',
             '--swarming-server',
-            url,
-            '--default-swarming-server',
-            'https://localhost:1',
+            self.url,
             '--in-file',
             os.path.join(self.root_dir, 'w', 'task_runner_in.json'),
             '--out-file',
@@ -2020,7 +2017,7 @@ class TestBotMain(TestBotBase):
         self.assertEqual({'os': 'Amiga', 'pool': 'default'}, dimensions)
         self.assertEqual(result, summary)
     self.mock(bot_main, '_call_hook', call_hook)
-    result = self._mock_popen(url='https://localhost:3')
+    result = self._mock_popen()
 
     manifest = {
         'command': ['echo', 'hi'],
@@ -2052,7 +2049,6 @@ class TestBotMain(TestBotBase):
         self.assertEqual(result, summary)
     self.mock(bot_main, '_call_hook', call_hook)
     result = self._mock_popen(
-        url='https://localhost:3',
         expected_auth_params_json={
             'bot_id': 'localhost',
             'task_id': '24',
@@ -2062,7 +2058,7 @@ class TestBotMain(TestBotBase):
             'swarming_http_headers_exp': int(time.time() + 3600),
             'bot_service_account': 'none',
             'system_service_account':
-                'robot@example.com',  # as in task manifest
+            'robot@example.com',  # as in task manifest
             'task_service_account': 'bot',
         })
 
@@ -2102,10 +2098,7 @@ class TestBotMain(TestBotBase):
     self.mock(rbe_session, 'finish_active_lease',
               lambda res, **_kwargs: rbe_results.append(res))
 
-    self._mock_popen(
-        url='https://localhost:3',
-        expected_rbe_session_json=rbe_session.to_dict(),
-    )
+    self._mock_popen(expected_rbe_session_json=rbe_session.to_dict())
 
     manifest = {
         'command': ['echo', 'hi'],

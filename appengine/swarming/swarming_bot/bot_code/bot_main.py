@@ -892,18 +892,6 @@ def _run_manifest(botobj, manifest, rbe_session):
     # hard timeout so add more time; hard_timeout is handled by run_isolated.
     last_ditch_timeout += max(manifest['io_timeout'] or 0, 1200)
 
-  # Get the server info to pass to the task runner so it can provide updates.
-  url = botobj.remote.server
-  if 'host' in manifest:
-    # The URL in the manifest includes the version - eg not https://chromium-
-    # swarm-dev.appspot.com, but https://<some-version>-dot-chromiium-swarm-
-    # dev.appspot.com. That way, if a new server version becomes the default,
-    # old bots will continue to work with a server version that can manipulate
-    # the old data (the new server will only ever have to read it, which is
-    # much simpler) while new bots won't accidentally contact an old server
-    # which the GAE engine hasn't gotten around to updating yet.
-    url = manifest['host']
-
   task_dimensions = manifest['dimensions']
   task_result = {}
 
@@ -966,8 +954,6 @@ def _run_manifest(botobj, manifest, rbe_session):
         THIS_FILE,
         'task_runner',
         '--swarming-server',
-        url,
-        '--default-swarming-server',
         botobj.server,
         '--in-file',
         task_in_file,

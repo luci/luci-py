@@ -302,9 +302,9 @@ def tmp_bb_agent_context_file(secret_bytes, task_id, workdir):
   return tf
 
 
-def load_and_run(in_file, swarming_server, default_swarming_server,
-                 cost_usd_hour, start, out_file, run_isolated_flags, bot_file,
-                 auth_params_file, rbe_session_state):
+def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
+                 run_isolated_flags, bot_file, auth_params_file,
+                 rbe_session_state):
   """Loads the task's metadata, prepares auth environment and executes the task.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -370,7 +370,7 @@ def load_and_run(in_file, swarming_server, default_swarming_server,
       result_summary_id = task_details.task_id[:-1] + '0'
       swarming = {
           'task': {
-              'server': default_swarming_server,
+              'server': swarming_server,
               # Uses the result_summary_id instead of run_id in the context.
               'task_id': result_summary_id,
               'bot_dimensions': bot_dimensions,
@@ -1029,11 +1029,11 @@ def main(args):
   parser.add_option(
       '--out-file', help='Name of the JSON file to write a task summary to')
   parser.add_option(
-      '--swarming-server', help='Swarming server to send data back')
-  parser.add_option('--default-swarming-server',
-                    help='Swarming server URL to put into LUCI_CONTEXT')
-  parser.add_option(
-      '--cost-usd-hour', type='float', help='Cost of this VM in $/h')
+      '--swarming-server',
+      help='Swarming server URL to send data back and to put into LUCI_CONTEXT')
+  parser.add_option('--cost-usd-hour',
+                    type='float',
+                    help='Cost of this VM in $/h')
   parser.add_option('--start', type='float', help='Time this task was started')
   parser.add_option('--bot-file',
                     help='Path to a file describing the state of the host')
@@ -1057,9 +1057,9 @@ def main(args):
 
   try:
     load_and_run(options.in_file, options.swarming_server,
-                 options.default_swarming_server, options.cost_usd_hour,
-                 options.start, options.out_file, args, options.bot_file,
-                 options.auth_params_file, options.rbe_session_state)
+                 options.cost_usd_hour, options.start, options.out_file, args,
+                 options.bot_file, options.auth_params_file,
+                 options.rbe_session_state)
     return 0
   finally:
     logging.info('quitting')

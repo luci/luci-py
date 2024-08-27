@@ -599,6 +599,7 @@ class _BotBaseHandler(_BotApiHandler):
         props.grace_period_secs,
         'hard_timeout':
         props.execution_timeout_secs,
+        # TODO(b/355013257): Stop sending this in Go version.
         'host':
         utils.get_versioned_hosturl(),
         'io_timeout':
