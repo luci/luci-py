@@ -36,20 +36,13 @@
   entities which are generated from data provided by the bot itself.
 """
 
-from collections import defaultdict
 import datetime
 import functools
-import hashlib
 import logging
-import random
 import time
 
-from google.appengine import runtime
-from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
-from google.appengine.api import memcache
 from google.appengine.ext import ndb
-from google.protobuf import json_format
 
 from components import datastore_utils
 from components import utils

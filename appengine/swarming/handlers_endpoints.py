@@ -4,16 +4,10 @@
 
 """This module defines Swarming Server endpoints handlers."""
 
-import datetime
 import functools
-import json
 import logging
-import os
-import re
 
 from google.appengine.api import datastore_errors
-from google.appengine.api import memcache
-from google.appengine.ext import ndb
 
 import endpoints
 import gae_ts_mon
@@ -27,22 +21,14 @@ from components import datastore_utils
 from components import endpoints_webapp2
 from components import utils
 
-import api_helpers
 import api_common
 import handlers_exceptions
 import message_conversion
 import swarming_rpcs
 from server import acl
 from server import bot_code
-from server import bot_management
 from server import config
-from server import pools_config
-from server import realms
-from server import task_pack
 from server import task_queues
-from server import task_request
-from server import task_result
-from server import task_scheduler
 
 
 ### Helper Methods
@@ -237,7 +223,7 @@ class SwarmingTaskService(remote.Service):
     # this API will *always* return the stale version.
     try:
       _, result = api_common.get_request_and_result(request.task_id,
-                                                    api_common.VIEW, False)
+                                                    api_common.VIEW)
     except ValueError:
       raise endpoints.BadRequestException('Invalid task ID')
     return message_conversion.task_result_to_rpc(

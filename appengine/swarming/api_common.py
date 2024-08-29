@@ -277,18 +277,13 @@ def get_task_request_async(task_id, request_key, permission):
   raise ndb.Return(request)
 
 
-def get_request_and_result(task_id, permission, trust_memcache):
+def get_request_and_result(task_id, permission):
   """Returns the task request and task result corresponding to a task ID.
-
-  For the task result, first do an explict lookup of the caches, and then decide
-  if it is necessary to fetch from the DB.
 
   Arguments:
     task_id: task ID as provided by the user.
     permission: Can be either CANCEL or VIEW: determines whether task_cancel_acl
       or get_task_acl realm checks should be used.
-    trust_memcache: bool to state if memcache should be trusted for running
-        task. If False, when a task is still pending/running, do a DB fetch.
 
   Returns:
     tuple(TaskRequest, result): result can be either for a TaskRunResult or a
@@ -304,23 +299,15 @@ def get_request_and_result(task_id, permission, trust_memcache):
     # the TaskRequest, albeit it is the TaskRequest that enforces ACL. Do the
     # task result fetch first, the worst that will happen is unnecessarily
     # fetching the task result.
-    result_future = result_key.get_async(use_cache=True,
-                                         use_memcache=True,
-                                         use_datastore=False)
+    result_future = result_key.get_async(use_cache=False,
+                                         use_memcache=False,
+                                         use_datastore=True)
 
     # The TaskRequest has P(99.9%) chance of being fetched from memcache since
     # it is immutable.
     request_future = get_task_request_async(task_id, request_key, permission)
 
     result = result_future.get_result()
-    if (not result or (result.state in task_result.State.STATES_RUNNING
-                       and not trust_memcache)):
-      # Either the entity is not in cache, or we don't trust memcache for a
-      # running task result. Do the DB fetch, which is slow.
-      result = result_key.get(use_cache=False,
-                              use_memcache=False,
-                              use_datastore=True)
-
     request = request_future.get_result()
   except ValueError as e:
     raise handlers_exceptions.BadRequestException('invalid task_id %s: %s' %
@@ -382,7 +369,7 @@ def get_output(task_id, offset, length):
     tuple(output, state): output is a bytearray ('str') of task output. state is
       the current TaskState of the task.
   """
-  _, result = get_request_and_result(task_id, VIEW, True)
+  _, result = get_request_and_result(task_id, VIEW)
   output = result.get_output(offset or 0, length or RECOMMENDED_OUTPUT_LENGTH)
   return output, result.state
 

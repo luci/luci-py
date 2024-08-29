@@ -64,18 +64,12 @@ Graph of schema:
     +---------------+     +---------------+
 """
 
-import collections
 import datetime
 import logging
-import random
-import re
 
-from google.appengine import runtime
-from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
-from google.protobuf import json_format
 
 from components import auth
 from components import datastore_utils
@@ -1709,25 +1703,4 @@ def fetch_task_results(task_ids):
 
 def fetch_task_result_summaries(keys):
   """Fetches a bunch of TaskResultSummary given their keys."""
-
-  # TODO(vadimsh): This memcache business is most likely FUD and it would be
-  # sufficient just to do a regular ndb.get_multi(...).
-
-  # Hot path. Fetch everything we can from memcache.
-  results = ndb.get_multi(keys, use_cache=False, use_datastore=False)
-
-  # Find which results need to be fetched from the datastore.
-  fetch = []
-  index = []
-  for idx, result in enumerate(results):
-    if result is None or result.state in State.STATES_RUNNING:
-      fetch.append(keys[idx])
-      index.append(idx)
-
-  # Fetch missing results from datastore in inject into correct positions.
-  if fetch:
-    more = ndb.get_multi(fetch, use_cache=False, use_memcache=False)
-    for idx, result in zip(index, more):
-      results[idx] = result
-
-  return results
+  return ndb.get_multi(keys, use_cache=False, use_memcache=False)

@@ -198,7 +198,7 @@ class TasksService(object):
   @auth.require(acl.can_access, log_identity=True)
   def GetResult(self, request, _context):
     _, result = api_common.get_request_and_result(request.task_id,
-                                                  api_common.VIEW, False)
+                                                  api_common.VIEW)
     return message_conversion_prpc.task_result_response(
         result, request.include_performance_stats)
 

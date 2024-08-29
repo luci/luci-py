@@ -29,7 +29,6 @@ Graph of the schema:
     +--------------+     +--------------+
 """
 
-import collections
 import datetime
 import heapq
 import logging
@@ -45,8 +44,6 @@ from components import datastore_utils
 from components import utils
 
 from proto.config import pools_pb2
-from server import bot_management
-from server import config
 from server import rbe
 from server import task_pack
 from server import task_queues
