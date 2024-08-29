@@ -134,8 +134,9 @@ class TestOsUtilities(auto_stub.TestCase):
     self.mock(sys, 'maxsize', 2**63 - 1)
     # A possible machine ID reported by python on aix.
     self.mock(platform, 'machine', lambda: '00FAC25F4B00')
-    self.mock(os_utilities, 'get_cpuinfo', lambda: {})
-    self.assertEqual(os_utilities.get_cpu_dimensions(), ['ppc64', 'ppc64-64'])
+    self.mock(os_utilities, 'get_cpuinfo', lambda: {'name': 'POWER8'})
+    self.assertEqual(os_utilities.get_cpu_dimensions(),
+                     ['ppc64', 'ppc64-64', 'ppc64-64-POWER8'])
 
   def test_get_cpu_dimensions_ppc64(self):
     self.mock(sys, 'platform', 'linux')

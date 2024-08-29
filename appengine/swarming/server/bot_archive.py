@@ -44,6 +44,7 @@ FILES = (
     'api/platforms/gce.py',
     'api/platforms/gpu.py',
     'api/platforms/__init__.py',
+    'api/platforms/aix.py',
     'api/platforms/linux.py',
     'api/platforms/osx.py',
     'api/platforms/posix.py',

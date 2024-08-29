@@ -16,6 +16,9 @@ if os.name != 'darwin':  # As of writing, macOS can't run on GCE.
   is_gce = lambda: gce.is_gce()  # to reuse gce.is_gce mock, if any
   from api.platforms import gce
 
+if sys.platform == 'aix':
+  from api.platforms import aix
+
 if sys.platform == 'cygwin':
   from api.platforms import win
 

@@ -394,6 +394,8 @@ def get_cpuinfo():
     info = platforms.win.get_cpuinfo()
   elif sys.platform == 'linux':
     info = platforms.linux.get_cpuinfo()
+  elif sys.platform == 'aix':
+    info = platforms.aix.get_cpuinfo()
   else:
     info = {}
   if platforms.is_gce():
