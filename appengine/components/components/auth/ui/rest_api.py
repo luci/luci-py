@@ -893,6 +893,20 @@ class ReplicationHandler(handler.AuthenticatingHandler):
       self.send_error(replication_pb2.ReplicationPushResponse.BAD_REQUEST)
       return
 
+    # Check the AuthDB in the request is not malformed.
+    try:
+      api.AuthDB.from_proto(
+          replication_state=model.AuthReplicationState(),
+          auth_db=request.auth_db,
+          additional_client_ids=[],
+      )
+    except ValueError as e:
+      logging.error('bad AuthDB from %s at rev %d: %s',
+                    request.revision.primary_id, request.revision.auth_db_rev,
+                    e)
+      self.send_error(replication_pb2.ReplicationPushResponse.BAD_REQUEST)
+      return
+
     # Handle it.
     logging.info('Received AuthDB push: rev %d', request.revision.auth_db_rev)
     if request.auth_code_version:
