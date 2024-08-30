@@ -103,7 +103,9 @@ def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
   result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
 
   # Check the TaskToRunShardXXX is pending. Fetch TaskResultSummary while at it.
-  to_run, result_summary = ndb.get_multi([to_run_key, result_summary_key])
+  to_run, result_summary = ndb.get_multi([to_run_key, result_summary_key],
+                                         use_cache=False,
+                                         use_memcache=False)
   if not to_run or not result_summary:
     logging.warning('%s/%s: already gone', request.task_id, slice_index)
     return None, None, None, False
@@ -300,7 +302,7 @@ def _reap_task(bot_dimensions,
     keys_to_fetch.append(request.secret_bytes_key)
 
   def run():
-    entities = ndb.get_multi(keys_to_fetch)
+    entities = ndb.get_multi(keys_to_fetch, use_cache=False, use_memcache=False)
     to_run, result_summary = entities[0], entities[1]
     secret_bytes = entities[2] if len(entities) == 3 else None
     orig_summary_state = result_summary.state
@@ -318,7 +320,7 @@ def _reap_task(bot_dimensions,
         # The caller already holds the claim and this is a retry. Just fetch all
         # entities that should already exist.
         run_result = task_pack.result_summary_key_to_run_result_key(
-            result_summary_key).get()
+            result_summary_key).get(use_cache=False, use_memcache=False)
         if not run_result:
           raise Error('TaskRunResult unexpectedly missing on retry')
         if run_result.current_task_slice != to_run.task_slice_index:
@@ -443,7 +445,7 @@ def _detect_dead_task_async(run_result_key):
     """Obtain the result and update task state to either KILLED or BOT_DIED.
     1x GET, 1x GETs 2~3x PUT.
     """
-    run_result = run_result_key.get()
+    run_result = run_result_key.get(use_cache=False, use_memcache=False)
     run_result._request_cache = request
 
     if run_result.state != task_result.State.RUNNING:
@@ -466,7 +468,7 @@ def _detect_dead_task_async(run_result_key):
     # mark as internal failure as the task doesn't get completed normally.
     run_result.internal_failure = True
 
-    result_summary = result_summary_key.get()
+    result_summary = result_summary_key.get(use_cache=False, use_memcache=False)
     result_summary._request_cache = request
     result_summary.modified_ts = now
     result_summary.completed_ts = now
@@ -705,8 +707,8 @@ def _buildbucket_update(request_key, run_result_state, update_id):
   if run_result_state == build_task.latest_task_status:
     return True
 
-  result_summary = task_pack.request_key_to_result_summary_key(
-      request_key).get()
+  result_summary = task_pack.request_key_to_result_summary_key(request_key).get(
+      use_cache=False, use_memcache=False)
   # Need to try to get bot_dimensions from build_task first, if not get it
   # from result_summary.
   if build_task.bot_dimensions:
@@ -957,7 +959,7 @@ def _bot_update_tx(run_result_key, bot_id, output, output_chunk_start,
   logging.info('Starting transaction attempt')
 
   run_result, result_summary = ndb.get_multi(
-      [run_result_key, result_summary_key])
+      [run_result_key, result_summary_key], use_cache=False, use_memcache=False)
   if not run_result:
     return None, None, 'is missing'
 
@@ -1132,7 +1134,8 @@ def _cancel_task_tx(request,
     # - set killing to True
     # - on next bot report, tell the bot to kill the task
     # - once the bot reports the task as terminated, set state to KILLED
-    run_result = run_result or result_summary.run_result_key.get()
+    run_result = run_result or result_summary.run_result_key.get(
+        use_cache=False, use_memcache=False)
     run_result.killing = True
     run_result.abandoned_ts = now
     run_result.modified_ts = now
@@ -1175,7 +1178,7 @@ def _get_task_from_external_scheduler(es_cfg, bot_dimensions):
   logging.info('Determined request_key, result_key %s, %s', request_key,
                result_key)
   request = request_key.get()
-  result_summary = result_key.get()
+  result_summary = result_key.get(use_cache=False, use_memcache=False)
 
   logging.info('Determined slice_number %s', slice_number)
 
@@ -1243,7 +1246,7 @@ def _ensure_active_slice(request, task_slice_index):
       return new_to_run, False
 
     result_summary = task_pack.request_key_to_result_summary_key(
-        request.key).get()
+        request.key).get(use_cache=False, use_memcache=False)
     if not result_summary:
       logging.warning(
           '_ensure_active_slice: no TaskToRunShard or TaskResultSummary')
@@ -1397,7 +1400,7 @@ def schedule_request(request,
     """
     req_key, result_summary_key = task_pack.get_request_and_result_keys(task_id)
     request.key = req_key
-    return result_summary_key.get()
+    return result_summary_key.get(use_cache=False, use_memcache=False)
 
   task_req_to_id_key = None
   if request_id:
@@ -1805,7 +1808,9 @@ def bot_claim_slice(bot_dimensions, bot_details, to_run_key, claim_id):
     # The caller already holds the claim and this is a retry. Just fetch all
     # entities that should already exist.
     run_result_key = task_pack.request_key_to_run_result_key(to_run.request_key)
-    request, run_result = ndb.get_multi([to_run.request_key, run_result_key])
+    request, run_result = ndb.get_multi([to_run.request_key, run_result_key],
+                                        use_cache=False,
+                                        use_memcache=False)
     if not run_result:
       raise Error('TaskRunResult is unexpectedly missing')
     if run_result.current_task_slice != to_run.task_slice_index:
@@ -1881,7 +1886,7 @@ def bot_update_task(run_result_key, bot_id, output, output_chunk_start,
   # Kill this task if parent task is not running nor pending.
   if request.parent_task_id:
     parent_run_key = task_pack.unpack_run_result_key(request.parent_task_id)
-    parent = ndb.get_multi((parent_run_key,))[0]
+    parent = parent_run_key.get(use_cache=False, use_memcache=False)
     need_cancel = parent.state not in task_result.State.STATES_RUNNING
     if need_cancel:
       es_cfg = external_scheduler.config_for_task(request)
@@ -1960,7 +1965,9 @@ def bot_terminate_task(run_result_key, bot_id, start_time, client_error):
 
   def run():
     run_result, result_summary = ndb.get_multi(
-        (run_result_key, result_summary_key))
+        (run_result_key, result_summary_key),
+        use_cache=False,
+        use_memcache=False)
     if bot_id and run_result.bot_id != bot_id:
       return 'Bot %s sent task kill for task %s owned by bot %s' % (
           bot_id, packed, run_result.bot_id)
@@ -2099,7 +2106,7 @@ def cancel_task(request, result_key, kill_running, bot_id):
                   ' task_id: %s' % task_id)
 
   def run():
-    result_summary = result_key.get()
+    result_summary = result_key.get(use_cache=False, use_memcache=False)
     orig_state = result_summary.state
     succeeded, was_running = _cancel_task_tx(request, result_summary,
                                              kill_running, bot_id, now, es_cfg)
@@ -2114,7 +2121,7 @@ def cancel_task(request, result_key, kill_running, bot_id):
 
 
 def cancel_tasks(limit, query, cursor=None):
-  # type: (int, ndb.Query, Optional[str], Optional[bool])
+  # type: (int, ndb.Query, Optional[str])
   #     -> Tuple[str, Sequence[task_result.TaskResultSummary]]
   """
   Raises:
@@ -2361,7 +2368,7 @@ def cron_handle_get_callbacks():
       for task_id in request_ids:
         request_key, result_key = task_pack.get_request_and_result_keys(task_id)
         request = request_key.get()
-        result = result_key.get()
+        result = result_key.get(use_cache=False, use_memcache=False)
         items.append((request, result))
         # Send mini batch to avoid TaskTooLargeError. crbug.com/1175618
         if len(items) >= 20:

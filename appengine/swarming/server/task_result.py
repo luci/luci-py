@@ -1228,7 +1228,7 @@ class TaskResultSummary(_TaskResultCommon):
     if self.state in State.STATES_RUNNING:
       return
     # Don't use process cache to retrieve the original object
-    orig = self.key.get(use_cache=False)
+    orig = self.key.get(use_cache=False, use_memcache=False)
     if not orig:
       return
     self._prev_state = orig.state
@@ -1617,7 +1617,7 @@ def yield_result_summary_by_parent_task_id(parent_task_id):
   for request_key in q:
     result_summary_key = (
         task_pack.request_key_to_result_summary_key(request_key))
-    yield result_summary_key.get()
+    yield result_summary_key.get(use_cache=False, use_memcache=False)
 
 
 def get_run_results_query(start, end, sort, state, bot_id):

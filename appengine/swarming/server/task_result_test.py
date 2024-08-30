@@ -676,8 +676,9 @@ class TaskResultApiTest(TestCase):
     # should find the children by parent_task_id
     result_summary_iter = task_result.yield_result_summary_by_parent_task_id(
         parent_summary.task_id)
-    expected = [child_summary_1, child_summary_2]
-    self.assertEqual(sorted(expected), sorted(s for s in result_summary_iter))
+    expected = [child_summary_1.key, child_summary_2.key]
+    self.assertEqual(sorted(expected),
+                     sorted(s.key for s in result_summary_iter))
 
   def test_set_from_run_result(self):
     request = _gen_request()
