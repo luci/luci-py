@@ -2015,6 +2015,44 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(response.status_int, 302)  # Found
     self.assertEqual(response.location, 'http://localhost/bot_code?bot_id=bot1')
 
+  def setup_fake_config_bundle_rev(self, stable_digest, canary_digest):
+    bot_code.ConfigBundleRev(
+        key=bot_code.config_bundle_rev_key(),
+        stable_bot=bot_code.BotArchiveInfo(
+            digest=stable_digest,
+            chunks=['stable:1', 'stable:2'],
+            bot_config_rev='stable-rev',
+        ),
+        canary_bot=bot_code.BotArchiveInfo(
+            digest=canary_digest,
+            chunks=['canary:1', 'canary:2'],
+            bot_config_rev='canary-rev',
+        ),
+    ).put()
+
+    put_chunk = lambda name, data: bot_code.BotArchiveChunk(
+        key=bot_code.bot_archive_chunk_key(name),
+        data=data,
+    ).put()
+
+    put_chunk('stable:1', 'stable-1234+')
+    put_chunk('stable:2', 'stable-5678')
+    put_chunk('canary:1', 'canary-1234+')
+    put_chunk('canary:2', 'canary-5678')
+
+  def test_bot_code_go_version(self):
+    stable_digest = '1' * 64
+    canary_digest = '2' * 64
+    self.setup_fake_config_bundle_rev(stable_digest, canary_digest)
+
+    response = self.app.get('/swarming/api/v1/bot/bot_code/' + stable_digest)
+    self.assertEqual(response.status_int, 200)
+    self.assertEqual(response.body, 'stable-1234+stable-5678')
+
+    response = self.app.get('/swarming/api/v1/bot/bot_code/' + canary_digest)
+    self.assertEqual(response.status_int, 200)
+    self.assertEqual(response.body, 'canary-1234+canary-5678')
+
   def test_bot_code_wrong_version_without_bot_id(self):
     self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
     response = self.app.get('/swarming/api/v1/bot/bot_code/' + '1' * 64)

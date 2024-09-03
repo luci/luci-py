@@ -231,6 +231,17 @@ class BotCodeHandler(_BotAuthenticatingHandler):
       return
 
     if version != expected:
+      # It might be an archive produced by the Go code.
+      info = bot_code.config_bundle_rev_key().get()
+      if info and info.stable_bot and version == info.stable_bot.digest:
+        logging.info('Stable archive built by Go')
+        self.serve_cached_blob(info.stable_bot.fetch_archive())
+        return
+      if info and info.canary_bot and version == info.canary_bot.digest:
+        logging.info('Canary archive built by Go')
+        self.serve_cached_blob(info.canary_bot.fetch_archive())
+        return
+
       # The client is requesting an unexpected hash. Redirects to /bot_code,
       # which will ensure authentication, then will redirect to the currently
       # expected version.
@@ -253,12 +264,15 @@ class BotCodeHandler(_BotAuthenticatingHandler):
 
     # We don't need to do authentication in this path, because bot already
     # knows version of bot_code, and the content may be in edge cache.
-    self.response.headers['Cache-Control'] = 'public, max-age=3600'
+    # TODO(b/362324087): Improve.
+    self.serve_cached_blob(bot_code.get_swarming_bot_zip(server))
 
+  def serve_cached_blob(self, blob):
+    self.response.headers['Cache-Control'] = 'public, max-age=3600'
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot.zip"')
-    self.response.out.write(bot_code.get_swarming_bot_zip(server))
+    self.response.out.write(blob)
 
 
 ## Bot API RPCs
