@@ -1976,88 +1976,53 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.client_get_results(task_id)
     self.assertEqual(expected, response)
 
-  def test_bot_code_as_bot(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
-    code = self.app.get('/swarming/api/v1/bot/bot_code/' + '0' * 64)
-    expected = {'config/bot_config.py',
-                'config/config.json'}.union(bot_archive.FILES)
-    with zipfile.ZipFile(StringIO.StringIO(code.body), 'r') as z:
-      self.assertEqual(expected, set(z.namelist()))
+  def test_bot_code_known(self):
+    resp = self.app.get('/swarming/api/v1/bot/bot_code/' +
+                        self.stable_bot_digest)
+    self.assertEqual(resp.status_int, 200)
+    self.assertEqual(resp.body, 'stable-1234+stable-5678')
+    resp = self.app.get('/swarming/api/v1/bot/bot_code/' +
+                        self.canary_bot_digest)
+    self.assertEqual(resp.status_int, 200)
+    self.assertEqual(resp.body, 'canary-1234+canary-5678')
 
-  def test_bot_code_as_bot_query_string(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
-    self.app.get(
-        '/swarming/api/v1/bot/bot_code/' + '0' * 64 + '?bot_id=1', status=302)
+  def test_bot_code_strips_query(self):
+    resp = self.app.get('/swarming/api/v1/bot/bot_code/' +
+                        self.stable_bot_digest + '?q=123')
+    self.assertEqual(resp.status_int, 302)  # Found
+    self.assertEqual(
+        resp.location, 'http://localhost/swarming/api/v1/bot/bot_code/' +
+        self.stable_bot_digest)
 
-  def test_bot_code_without_token(self):
+  def test_bot_code_default_no_token(self):
     self.set_as_anonymous()
     self.app.get('/bot_code', status=403)
 
-  def test_bot_code_with_token(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
+  def test_bot_code_default_with_token(self):
     self.set_as_anonymous()
     tok = bot_code.generate_bootstrap_token()
-    self.app.get('/bot_code?tok=%s' % tok, status=302)
-
-  def test_bot_code_redirect(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
-    response = self.app.get('/bot_code')
-    self.assertEqual(response.status_int, 302)  # Found
+    resp = self.app.get('/bot_code?tok=%s' % tok)
+    self.assertEqual(resp.status_int, 302)
     self.assertEqual(
-        response.location,
-        'http://localhost/swarming/api/v1/bot/bot_code/' + '0' * 64)
+        resp.location, 'http://localhost/swarming/api/v1/bot/bot_code/' +
+        self.stable_bot_digest)
 
-  def test_bot_code_wrong_version(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None, 'rev1'))
-    response = self.app.get(
-        '/swarming/api/v1/bot/bot_code/' + '1' * 64,
-        headers={'X-Luci-Swarming-Bot-ID': 'bot1'})
-    self.assertEqual(response.status_int, 302)  # Found
-    self.assertEqual(response.location, 'http://localhost/bot_code?bot_id=bot1')
+  def test_bot_code_default_with_bot_auth(self):
+    self.set_as_bot()
+    resp = self.app.get('/bot_code')
+    self.assertEqual(resp.status_int, 302)
+    self.assertEqual(
+        resp.location, 'http://localhost/swarming/api/v1/bot/bot_code/' +
+        self.stable_bot_digest)
 
-  def setup_fake_config_bundle_rev(self, stable_digest, canary_digest):
-    bot_code.ConfigBundleRev(
-        key=bot_code.config_bundle_rev_key(),
-        stable_bot=bot_code.BotArchiveInfo(
-            digest=stable_digest,
-            chunks=['stable:1', 'stable:2'],
-            bot_config_rev='stable-rev',
-        ),
-        canary_bot=bot_code.BotArchiveInfo(
-            digest=canary_digest,
-            chunks=['canary:1', 'canary:2'],
-            bot_config_rev='canary-rev',
-        ),
-    ).put()
-
-    put_chunk = lambda name, data: bot_code.BotArchiveChunk(
-        key=bot_code.bot_archive_chunk_key(name),
-        data=data,
-    ).put()
-
-    put_chunk('stable:1', 'stable-1234+')
-    put_chunk('stable:2', 'stable-5678')
-    put_chunk('canary:1', 'canary-1234+')
-    put_chunk('canary:2', 'canary-5678')
-
-  def test_bot_code_go_version(self):
-    stable_digest = '1' * 64
-    canary_digest = '2' * 64
-    self.setup_fake_config_bundle_rev(stable_digest, canary_digest)
-
-    response = self.app.get('/swarming/api/v1/bot/bot_code/' + stable_digest)
-    self.assertEqual(response.status_int, 200)
-    self.assertEqual(response.body, 'stable-1234+stable-5678')
-
-    response = self.app.get('/swarming/api/v1/bot/bot_code/' + canary_digest)
-    self.assertEqual(response.status_int, 200)
-    self.assertEqual(response.body, 'canary-1234+canary-5678')
-
-  def test_bot_code_wrong_version_without_bot_id(self):
-    self.mock(bot_code, 'get_bot_version', lambda _: ('0' * 64, None))
-    response = self.app.get('/swarming/api/v1/bot/bot_code/' + '1' * 64)
-    self.assertEqual(response.status_int, 302)  # Found
-    self.assertEqual(response.location, 'http://localhost/bot_code')
+  def test_bot_code_unknown_with_bot_auth(self):
+    self.set_as_bot()
+    unknown = '3' * 64
+    resp = self.app.get('/swarming/api/v1/bot/bot_code/' + unknown)
+    self.assertEqual(resp.status_int, 302)
+    self.assertEqual(
+        resp.location, 'http://localhost/swarming/api/v1/bot/bot_code/' +
+        self.stable_bot_digest)
 
   FAKE_BOT_ID = 'bot1'
   FAKE_SCOPES = ['scope_a', 'scope_b']

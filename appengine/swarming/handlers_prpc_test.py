@@ -2587,7 +2587,7 @@ class SwarmingServicePrpcTest(PrpcTest):
   def test_details(self):
     self.set_as_privileged_user()
     expected = swarming_pb2.ServerDetails(
-        bot_version=bot_code.get_bot_version('https://testbed.example.com')[0],
+        bot_version=bot_code.get_bot_version(bot_code.STABLE_BOT)[0],
         server_version=utils.get_app_version(),
         cas_viewer_server='https://test-cas-viewer-server.com',
     )

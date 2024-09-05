@@ -213,9 +213,20 @@ class BotCodeHandler(_BotAuthenticatingHandler):
 
   @auth.public  # auth inside check_bot_code_access()
   def get(self, version=None):
-    server = self.request.host_url
-    expected = bot_code.get_bot_version(server)[0]
-    if not version:
+    info = bot_code.config_bundle_rev_key().get()
+
+    # Bootstrap the bot archive for the local smoke test.
+    if not info and utils.is_local_dev_server():
+      info = bot_code.bootstrap_for_dev_server(self.request.host_url)
+
+    # If didn't ask for a concrete version, or asked for a version we don't
+    # know, redirect to the latest stable version. Use a redirect, instead of
+    # serving it directly, to utilize the GAE response cache.
+    known = version and version in (info.stable_bot.digest,
+                                    info.canary_bot.digest)
+    if not version or not known:
+      if version:
+        logging.warning('Requesting unknown version %s', version)
       # Historically, the bot_id query argument was used for the bot to pass its
       # ID to the server. More recent bot code uses the X-Luci-Swarming-Bot-ID
       # HTTP header instead so it doesn't bust the GAE transparent public cache.
@@ -223,49 +234,28 @@ class BotCodeHandler(_BotAuthenticatingHandler):
       bot_id = self.request.get('bot_id') or self.request.headers.get(
           self._X_LUCI_SWARMING_BOT_ID)
       self.check_bot_code_access(bot_id=bot_id, generate_token=False)
-
-      # Let default access to redirect to url with version so that we can use
-      # cache for response safely.
-      redirect_url = str(server + '/swarming/api/v1/bot/bot_code/' + expected)
-      self.redirect(redirect_url)
+      self.redirect_to_version(info.stable_bot.digest)
       return
 
-    if version != expected:
-      # It might be an archive produced by the Go code.
-      info = bot_code.config_bundle_rev_key().get()
-      if info and info.stable_bot and version == info.stable_bot.digest:
-        logging.info('Stable archive built by Go')
-        self.serve_cached_blob(info.stable_bot.fetch_archive())
-        return
-      if info and info.canary_bot and version == info.canary_bot.digest:
-        logging.info('Canary archive built by Go')
-        self.serve_cached_blob(info.canary_bot.fetch_archive())
-        return
-
-      # The client is requesting an unexpected hash. Redirects to /bot_code,
-      # which will ensure authentication, then will redirect to the currently
-      # expected version.
-      bot_id = self.request.get('bot_id') or self.request.headers.get(
-          self._X_LUCI_SWARMING_BOT_ID)
-      redirect_url = server + '/bot_code'
-      if bot_id:
-        redirect_url += '?bot_id=' + bot_id
-      self.redirect(str(redirect_url))
-      return
-
+    # If the request has a query string, redirect to an URI without it, since
+    # it is the one being cached by GAE.
     if self.request.query_string:
-      logging.info('ignoring query string: %s', self.request.query_string)
-
-      # If bot has query string, let the request redirect to url not having
-      # query string to share the content from cache.
-      redirect_url = str(server + '/swarming/api/v1/bot/bot_code/' + expected)
-      self.redirect(redirect_url)
+      logging.info('Ignoring query string: %s', self.request.query_string)
+      self.redirect_to_version(version)
       return
 
-    # We don't need to do authentication in this path, because bot already
-    # knows version of bot_code, and the content may be in edge cache.
+    # Serve the corresponding bot code, asking GAE to cache it for a while.
     # TODO(b/362324087): Improve.
-    self.serve_cached_blob(bot_code.get_swarming_bot_zip(server))
+    if version == info.stable_bot.digest:
+      self.serve_cached_blob(info.stable_bot.fetch_archive())
+    elif version == info.canary_bot.digest:
+      self.serve_cached_blob(info.canary_bot.fetch_archive())
+    else:
+      raise AssertionError('Impossible, already checked version is known')
+
+  def redirect_to_version(self, version):
+    self.redirect('%s/swarming/api/v1/bot/bot_code/%s' %
+                  (str(self.request.host_url), str(version)))
 
   def serve_cached_blob(self, blob):
     self.response.headers['Cache-Control'] = 'public, max-age=3600'
@@ -705,7 +695,10 @@ class BotHandshakeHandler(_BotBaseHandler):
         maintenance_msg=res.maintenance_msg,
         event_msg=res.quarantined_msg)
 
-    bot_ver, _, bot_config_rev = bot_code.get_bot_version(self.request.host_url)
+    channel = bot_code.get_bot_channel(res.bot_id, config.settings())
+    logging.debug('Bot channel: %s', channel)
+    bot_ver, bot_config_rev = bot_code.get_bot_version(channel)
+
     data = {
         'bot_version': bot_ver,
         'bot_config_rev': bot_config_rev,
@@ -753,7 +746,8 @@ class BotPollHandler(_BotBaseHandler):
     It makes recovery of the fleet in case of catastrophic failure much easier.
     """
     logging.debug('Request started')
-    if config.settings().force_bots_to_sleep_and_not_run_task:
+    settings = config.settings()
+    if settings.force_bots_to_sleep_and_not_run_task:
       # Ignore everything, just sleep. Tell the bot it is quarantined to inform
       # it that it won't be running anything anyway. Use a large streak so it
       # will sleep for 60s.
@@ -798,13 +792,10 @@ class BotPollHandler(_BotBaseHandler):
         logging.warning('Invalid BotInfo or BotEvent values', exc_info=True)
         self.abort_with_error(400, error=str(e))
 
-    # Bot version is host-specific because the host URL is embedded in
-    # swarming_bot.zip
-    logging.debug('Fetching bot code version')
-    # TODO(crbug.com/1087981): compare the expected bot config revision and
-    # the current bot config revision.
-    expected_version, _, _expected_bot_config_rev = bot_code.get_bot_version(
-        self.request.host_url)
+    # Ask the bot to update itself if it runs unexpected version.
+    channel = bot_code.get_bot_channel(res.bot_id, settings)
+    logging.debug('Bot channel: %s', channel)
+    expected_version, _ = bot_code.get_bot_version(channel)
     if res.version != expected_version:
       bot_event('request_update')
       self._cmd_update(expected_version)

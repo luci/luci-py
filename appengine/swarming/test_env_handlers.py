@@ -36,6 +36,7 @@ from proto.config import config_pb2
 from proto.config import pools_pb2
 from proto.config import realms_pb2
 from proto.plugin import plugin_pb2
+from server import bot_code
 from server import config
 from server import external_scheduler
 from server import large
@@ -94,6 +95,8 @@ class AppTestBase(test_case.TestCase):
         'get_default_version_hostname', lambda: 'test-swarming.appspot.com')
     utils.clear_cache(config.settings)
 
+    self.mock_config_bundle_rev('1' * 64, '2' * 64)
+
     # Note that auth.ADMIN_GROUP != admins_group.
     auth.bootstrap_group(
         auth.ADMIN_GROUP,
@@ -105,6 +108,34 @@ class AppTestBase(test_case.TestCase):
         [auth.Identity(auth.IDENTITY_USER, 'priv@example.com')])
     auth.bootstrap_group(
         users_group, [auth.Identity(auth.IDENTITY_USER, 'user@example.com')])
+
+  def mock_config_bundle_rev(self, stable_bot_digest, canary_bot_digest):
+    self.stable_bot_digest = stable_bot_digest
+    self.canary_bot_digest = canary_bot_digest
+
+    bot_code.ConfigBundleRev(
+        key=bot_code.config_bundle_rev_key(),
+        stable_bot=bot_code.BotArchiveInfo(
+            digest=self.stable_bot_digest,
+            chunks=['stable:1', 'stable:2'],
+            bot_config_rev='stable-rev',
+        ),
+        canary_bot=bot_code.BotArchiveInfo(
+            digest=self.canary_bot_digest,
+            chunks=['canary:1', 'canary:2'],
+            bot_config_rev='canary-rev',
+        ),
+    ).put()
+
+    put_chunk = lambda name, data: bot_code.BotArchiveChunk(
+        key=bot_code.bot_archive_chunk_key(name),
+        data=data,
+    ).put()
+
+    put_chunk('stable:1', 'stable-1234+')
+    put_chunk('stable:2', 'stable-5678')
+    put_chunk('canary:1', 'canary-1234+')
+    put_chunk('canary:2', 'canary-5678')
 
   def mock_tq_tasks(self):
     # Help to route TQ tasks to their implementations.

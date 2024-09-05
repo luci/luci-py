@@ -116,15 +116,11 @@ class ServerApiTest(BaseTest):
 
     expected = {
         u'bot_version':
-            unicode(bot_code.get_bot_version('https://testbed.example.com')[0]),
-        u'display_server_url_template':
-            u'',
-        u'luci_config':
-            u'a.server',
-        u'server_version':
-            unicode(utils.get_app_version()),
-        u'cas_viewer_server':
-            u'https://test-cas-viewer-server.com',
+        unicode(bot_code.get_bot_version(bot_code.STABLE_BOT)[0]),
+        u'display_server_url_template': u'',
+        u'luci_config': u'a.server',
+        u'server_version': unicode(utils.get_app_version()),
+        u'cas_viewer_server': u'https://test-cas-viewer-server.com',
     }
     self.assertEqual(expected, response.json)
 

@@ -16,23 +16,15 @@ import os.path
 
 from six.moves import urllib
 
-from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import auth
 from components import config
 from components import utils
 from server import bot_archive
-from server import config as local_config
 
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-# In theory, a memcache entry can be 1MB in size, and this sometimes works, but
-# in practice we found that it's flaky at 500kb or above. 250kb seems to be safe
-# though and doesn't appear to have any runtime impact.
-#    - aludwin@, June 2017
-MAX_MEMCACHED_SIZE_BYTES = 250000
 
 
 ### Models.
@@ -92,6 +84,11 @@ class BotArchiveChunk(ndb.Model):
 
 ### Public APIs.
 
+# Returned by get_bot_channel for stable bots.
+STABLE_BOT = 'stable'
+# Returned by get_bot_channel for canary bots.
+CANARY_BOT = 'canary'
+
 
 def config_bundle_rev_key():
   """ndb.Key of the ConfigBundleRev singleton entity."""
@@ -101,6 +98,40 @@ def config_bundle_rev_key():
 def bot_archive_chunk_key(chunk):
   """ndb.Key of BotArchiveChunk entity."""
   return ndb.Key('BotArchiverState', 1, 'BotArchiveChunk', chunk)
+
+
+def get_bot_channel(bot_id, settings):
+  """Determines what release channel a bot should be using.
+
+  Args:
+    bot_id: bot ID as was reported by the bot.
+    settings: config_pb2.SettingsCfg message with canary percent.
+
+  Returns:
+    Either STABLE_BOT or CANARY_BOT.
+  """
+  canary_percent = 0
+  if settings.HasField('bot_deployment'):
+    canary_percent = settings.bot_deployment.canary_percent
+  if _quasi_random_100(bot_id) < canary_percent:
+    return CANARY_BOT
+  return STABLE_BOT
+
+
+def get_bot_version(channel):
+  """Returns a concrete version digest for the given release channel.
+
+  Args:
+    channel: either CANARY_BOT or STABLE_BOT.
+
+  Returns:
+    (A bot archive digest, revision of bot_config.py embedded inside).
+  """
+  assert channel in (STABLE_BOT, CANARY_BOT), channel
+  info = config_bundle_rev_key().get()
+  if channel == STABLE_BOT:
+    return (info.stable_bot.digest, info.stable_bot.bot_config_rev)
+  return (info.canary_bot.digest, info.canary_bot.bot_config_rev)
 
 
 def get_bootstrap(host_url, bootstrap_token=None):
@@ -157,150 +188,48 @@ def get_bot_config():
     return File(f.read(), None, None, None), rev
 
 
-def get_bot_version(host):
-  """Retrieves the current bot version (SHA256) loaded on this server.
+def bootstrap_for_dev_server(host):
+  """Called in the local smoke test to bootstrap the bot archive."""
+  assert utils.is_local_dev_server()
 
-  The memcache is first checked for the version, otherwise the value
-  is generated and then stored in the memcache.
-
-  Returns:
-    version: hash of the current bot version.
-    additionals: dict of additional files.
-    bot_config_rev: revision of the bot_config.py.
-  """
-  signature = _get_signature(host)
-  version = memcache.get('version-' + signature, namespace='bot_code')
-  bot_config_rev = memcache.get(
-      'bot_config_rev-' + signature, namespace='bot_code')
-  if version and bot_config_rev:
-    return version, None, bot_config_rev
-
-  # Need to calculate it.
   bot_config, bot_config_rev = get_bot_config()
-  additionals = {'config/bot_config.py': bot_config.content}
-  bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
-  version = bot_archive.get_swarming_bot_version(
-      bot_dir, host, utils.get_app_version(), additionals,
-      local_config.settings())
-  memcache.set('version-' + signature, version, namespace='bot_code', time=60)
-  memcache.set(
-      'bot_config_rev-' + signature,
-      bot_config_rev,
-      namespace='bot_code',
-      time=60)
-  return version, additionals, bot_config_rev
-
-
-def get_swarming_bot_zip(host):
-  """Returns a zipped file of all the files a bot needs to run.
-
-  Returns:
-    A string representing the zipped file's contents.
-  """
-  version, additionals, bot_config_rev = get_bot_version(host)
-  cached_content, cached_bot_config_rev = get_cached_swarming_bot_zip(version)
-  # TODO(crbug.com/1087981): Compare the bot config revisions.
-  # Separate deployment to be safe.
-  if cached_content and cached_bot_config_rev:
-    logging.debug('memcached bot code %s; %d bytes with bot_config.py rev: %s',
-                  version, len(cached_content), cached_bot_config_rev)
-    return cached_content
-
-  # Get the start bot script from the database, if present. Pass an empty
-  # file if the files isn't present.
-  bot_config, bot_config_rev = get_bot_config()
-  additionals = additionals or {
-      'config/bot_config.py': bot_config.content,
-  }
-  bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   content, version = bot_archive.get_swarming_bot_zip(
-      bot_dir, host, utils.get_app_version(), additionals,
-      local_config.settings())
-  logging.info('generated bot code %s; %d bytes with bot_config.py rev: %s',
-               version, len(content), bot_config_rev)
-  cache_swarming_bot_zip(version, content, bot_config_rev)
-  return content
+      os.path.join(ROOT_DIR, 'swarming_bot'),
+      host,
+      utils.get_app_version(),
+      {'config/bot_config.py': bot_config.content},
+      None,
+  )
 
-
-def get_cached_swarming_bot_zip(version):
-  """Returns the bot contents if its been cached, or None if missing."""
-  # see cache_swarming_bot_zip for how the "meta" entry is set
-  meta = bot_memcache_get(version, 'meta').get_result()
-  if meta is None:
-    logging.info('memcache did not include metadata for version %s', version)
-    return None, None
-  num_parts, true_sig = meta.split(':')
-
-  # Get everything asynchronously. If something's missing, the hash will be
-  # wrong so no need to check that we got something from each call.
-  futures = [bot_memcache_get(version, 'content', p)
-             for p in range(int(num_parts))]
-  content = ''
-  missing = 0
-  for idx, f in enumerate(futures):
-    chunk = f.get_result()
-    if chunk is None:
-      logging.debug(
-          'bot code %s was missing chunk %d/%d', version, idx, len(futures))
-      missing += 1
-    else:
-      content += chunk
-  if missing:
-    logging.warning(
-        'bot code %s was missing %d/%d chunks', version, missing, len(futures))
-    return None, None
-  h = hashlib.sha256()
-  h.update(content)
-  if h.hexdigest() != true_sig:
-    logging.error('bot code %s had signature %s instead of expected %s',
-                  version, h.hexdigest(), true_sig)
-    return None, None
-
-  bot_config_rev = bot_memcache_get(version, 'bot_config_rev').get_result()
-
-  return content, bot_config_rev
-
-
-def cache_swarming_bot_zip(version, content, bot_config_rev):
-  """Caches the bot code to memcache."""
-  h = hashlib.sha256()
-  h.update(content)
-  p = 0
-  futures = []
+  chunks = []
+  offset = 0
   while len(content) > 0:
-    chunk_size = min(MAX_MEMCACHED_SIZE_BYTES, len(content))
-    futures.append(bot_memcache_set(content[:chunk_size],
-                                    version, 'content', p))
-    content = content[chunk_size:]
-    p += 1
-  for f in futures:
-    f.check_success()
-  meta = "%s:%s" % (p, h.hexdigest())
-  bot_memcache_set(meta, version, 'meta').check_success()
-  bot_memcache_set(bot_config_rev, version, 'bot_config_rev').check_success()
-  logging.info(
-      'bot %s with sig %s with bot_config rev: %s saved in memcached in %d '
-      'chunks', version, h.hexdigest(), bot_config_rev, p)
+    chunk_size = min(500 * 1000, len(content))
+    chunk, content = content[:chunk_size], content[chunk_size:]
+    chunks.append(
+        BotArchiveChunk(
+            key=bot_archive_chunk_key('%s:%d' % (version, offset)),
+            data=chunk,
+        ))
+    offset += len(chunk)
+  ndb.put_multi(chunks)
 
+  rev = ConfigBundleRev(
+      key=config_bundle_rev_key(),
+      stable_bot=BotArchiveInfo(
+          digest=version,
+          chunks=[ent.key.id() for ent in chunks],
+          bot_config_rev=bot_config_rev,
+      ),
+      canary_bot=BotArchiveInfo(
+          digest=version,
+          chunks=[ent.key.id() for ent in chunks],
+          bot_config_rev=bot_config_rev,
+      ),
+  )
+  rev.put()
 
-def bot_memcache_get(version, desc, part=None):
-  """Mockable async memcache getter."""
-  return ndb.get_context().memcache_get(bot_key(version, desc, part),
-                                        namespace='bot_code')
-
-
-def bot_memcache_set(value, version, desc, part=None):
-  """Mockable async memcache setter."""
-  return ndb.get_context().memcache_set(bot_key(version, desc, part),
-                                        value, namespace='bot_code')
-
-
-def bot_key(version, desc, part=None):
-  """Returns a memcache key for bot entries."""
-  key = 'code-%s-%s' % (version, desc)
-  if part is not None:
-    key = '%s-%d' % (key, part)
-  return key
+  return rev
 
 
 ### Bootstrap token.
@@ -351,6 +280,14 @@ def validate_bootstrap_token(tok):
 ### Private code
 
 
+def _quasi_random_100(s):
+  """Given a string, returns a quasi-random integer in range [0; 100)."""
+  # Use some seed to avoid being in sync with a similar generator in rbe.py.
+  digest = hashlib.sha256('bot-channel:' + s).digest()
+  num = float(ord(digest[0]) + ord(digest[1]) * 256)
+  return int(num * 99.9 / (256.0 + 256.0 * 256.0))
+
+
 def _validate_python(content):
   """Returns True if content is valid python script."""
   try:
@@ -358,11 +295,6 @@ def _validate_python(content):
   except (SyntaxError, TypeError):
     return False
   return True
-
-
-def _get_signature(host):
-  # CURRENT_VERSION_ID is unique per appcfg.py upload so it can be trusted.
-  return hashlib.sha256(host + os.environ['CURRENT_VERSION_ID']).hexdigest()
 
 
 ## Config validators
