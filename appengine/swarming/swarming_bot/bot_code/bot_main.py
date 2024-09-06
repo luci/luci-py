@@ -98,7 +98,7 @@ _CAS_KVS_CACHE_DB = 'cas_kvs_cache_db'
 # will be forcibly deleted on startup! Note that 'w' (work) is not in this list,
 # as we want it to be deleted on startup.
 # See
-# https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Bot.md
+# https://chromium.googlesource.com/infra/luci/luci-py.git/+/main/appengine/swarming/doc/Bot.md
 # for more details.
 PASSLIST = (
     '*-cacert.pem',
