@@ -91,8 +91,11 @@ def _is_project():
 
 def is_ip_whitelisted_machine():
   """Returns True if the call is made from allowed-IP machine."""
-  return auth.is_in_ip_whitelist(auth.bots_ip_whitelist(), auth.get_peer_ip(),
-                                 False)
+  peer_ip = auth.get_peer_ip()
+  yes = auth.is_in_ip_whitelist(auth.bots_ip_whitelist(), peer_ip, False)
+  if yes and peer_ip:
+    logging.warning('is_ip_whitelisted_machine: %s', auth.ip_to_string(peer_ip))
+  return yes
 
 
 def can_access():
