@@ -1613,38 +1613,45 @@ class BotTaskErrorHandler(_BotApiHandler):
 
 
 def get_routes():
-  routes = [
-      # Generic handlers (no auth)
-      ('/swarming/api/v1/bot/server_ping', ServerPingHandler),
+  routes = []
 
-      # Bot code (bootstrap and swarming_bot.zip) handlers
-      ('/bootstrap', BootstrapHandler),
-      ('/bot_code', BotCodeHandler),
-      # 40 for old sha1 digest so old bot can still update, 64 for current
-      # sha256 digest.
-      ('/swarming/api/v1/bot/bot_code/<version:[0-9a-f]{40,64}>', BotCodeHandler
-       ),
+  # Add a copy of the route under "/python/...". This is needed to allow setup
+  # traffic routing between Python and Go services. Requests that must be
+  # executed by Python will be prefixed by "/python/...".
+  def add(route, handler):
+    routes.extend([
+        (route, handler),
+        ('/python' + route, handler),
+    ])
 
-      # Bot API RPCs
+  # Generic handlers (no auth)
+  add('/swarming/api/v1/bot/server_ping', ServerPingHandler)
 
-      # Bot Session API RPC handlers
-      ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
-      ('/swarming/api/v1/bot/poll', BotPollHandler),
-      ('/swarming/api/v1/bot/claim', BotClaimHandler),
-      ('/swarming/api/v1/bot/event', BotEventHandler),
+  # Bot code (bootstrap and swarming_bot.zip) handlers
+  add('/bootstrap', BootstrapHandler)
+  add('/bot_code', BotCodeHandler)
+  # 40 for old sha1 digest so old bot can still update, 64 for current
+  # sha256 digest.
+  add('/swarming/api/v1/bot/bot_code/<version:[0-9a-f]{40,64}>', BotCodeHandler)
 
-      # Bot Security API RPC handlers
-      ('/swarming/api/v1/bot/oauth_token', BotOAuthTokenHandler),
-      ('/swarming/api/v1/bot/id_token', BotIDTokenHandler),
+  # Bot API RPCs
 
-      # Bot Task API RPC handlers
-      ('/swarming/api/v1/bot/task_update', BotTaskUpdateHandler),
-      ('/swarming/api/v1/bot/task_update/<task_id:[a-f0-9]+>',
-       BotTaskUpdateHandler),
-      ('/swarming/api/v1/bot/task_error', BotTaskErrorHandler),
-      ('/swarming/api/v1/bot/task_error/<task_id:[a-f0-9]+>',
-       BotTaskErrorHandler),
+  # Bot Session API RPC handlers
+  add('/swarming/api/v1/bot/handshake', BotHandshakeHandler)
+  add('/swarming/api/v1/bot/poll', BotPollHandler)
+  add('/swarming/api/v1/bot/claim', BotClaimHandler)
+  add('/swarming/api/v1/bot/event', BotEventHandler)
 
-      # Bot Security API RPC handler
-  ]
+  # Bot Security API RPC handlers
+  add('/swarming/api/v1/bot/oauth_token', BotOAuthTokenHandler)
+  add('/swarming/api/v1/bot/id_token', BotIDTokenHandler)
+
+  # Bot Task API RPC handlers
+  add('/swarming/api/v1/bot/task_update', BotTaskUpdateHandler)
+  add('/swarming/api/v1/bot/task_update/<task_id:[a-f0-9]+>',
+      BotTaskUpdateHandler)
+  add('/swarming/api/v1/bot/task_error', BotTaskErrorHandler)
+  add('/swarming/api/v1/bot/task_error/<task_id:[a-f0-9]+>',
+      BotTaskErrorHandler)
+
   return [webapp2.Route(*i) for i in routes]

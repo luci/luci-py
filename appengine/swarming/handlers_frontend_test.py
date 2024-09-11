@@ -66,6 +66,7 @@ class FrontendTest(test_env_handlers.AppTestBase):
         '/api/swarming/v1/server/permissions',
         '/swarming/api/v1/client/list',
         '/swarming/api/v1/bot/server_ping',
+        '/python/swarming/api/v1/bot/server_ping',
         '/user/tasks',
         '/restricted/bots',
         # TODO(vadimsh): This is temporary, it doesn't do anything at all.
@@ -87,9 +88,9 @@ class FrontendTest(test_env_handlers.AppTestBase):
     # Produces a body to POST to a /swarming/api/v1/bot/* request.
     def fake_body_for_bot_request(path):
       body = {'id': 'bot-id', 'task_id': 'task_id'}
-      if path == '/swarming/api/v1/bot/oauth_token':
+      if path.endswith('/swarming/api/v1/bot/oauth_token'):
         body.update({'account_id': 'system', 'scopes': ['a', 'b']})
-      elif path == '/swarming/api/v1/bot/id_token':
+      elif path.endswith('/swarming/api/v1/bot/id_token'):
         body.update({'account_id': 'system', 'audience': 'https://example.com'})
       return body
 
@@ -106,7 +107,8 @@ class FrontendTest(test_env_handlers.AppTestBase):
 
       headers = {}
       body = ''
-      if method == 'POST' and path.startswith('/swarming/api/v1/bot/'):
+      if method == 'POST' and (path.startswith('/swarming/api/v1/bot/') or
+                               path.startswith('/python/swarming/api/v1/bot/')):
         headers = {'Content-Type': 'application/json'}
         body = json.dumps(fake_body_for_bot_request(path))
 
