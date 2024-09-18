@@ -232,7 +232,7 @@ class BotCodeHandler(_BotAuthenticatingHandler):
       # HTTP header instead so it doesn't bust the GAE transparent public cache.
       # Support both mechanism until 2020-01-01.
       bot_id = self.request.get('bot_id') or self.request.headers.get(
-          self._X_LUCI_SWARMING_BOT_ID)
+          self._X_LUCI_SWARMING_BOT_ID) or _bot_id_from_auth_token()
       self.check_bot_code_access(bot_id=bot_id, generate_token=False)
       self.redirect_to_version(info.stable_bot.digest)
       return
@@ -263,6 +263,18 @@ class BotCodeHandler(_BotAuthenticatingHandler):
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot.zip"')
     self.response.out.write(blob)
+
+
+def _bot_id_from_auth_token():
+  """Extracts bot ID from the authenticated credentials."""
+  ident = auth.get_peer_identity()
+  if ident.kind != 'bot':
+    return None
+  # This is either 'botid.domain' or 'botid@gce.project'.
+  val = ident.name
+  if '@' in val:
+    return val.split('@')[0]
+  return val.split('.')[0]
 
 
 ## Bot API RPCs
