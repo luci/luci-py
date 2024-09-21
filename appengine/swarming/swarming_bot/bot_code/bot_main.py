@@ -389,8 +389,11 @@ def _get_rbe_worker_properties():
   if not md:
     return None
   attrs = md.get('instance', {}).get('attributes', {})
-  return remote_client.WorkerProperties(attrs.get('pool_id', ''),
-                                        attrs.get('pool_version', ''))
+  pool_id = attrs.get('pool_id', '')
+  pool_version = attrs.get('pool_version', '')
+  if pool_id or pool_version:
+    return remote_client.WorkerProperties(pool_id, pool_version)
+  return None
 
 
 def _get_state(botobj, sleep_streak):
