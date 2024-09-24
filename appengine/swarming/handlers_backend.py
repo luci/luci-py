@@ -93,7 +93,8 @@ class CronDeleteOldTasks(_CronHandlerBase):
   """Deletes old TaskRequest entities and all their decendants."""
 
   def run_cron(self):
-    task_request.cron_delete_old_task_requests()
+    # Do nothing. This is now implemented in Go.
+    pass
 
 
 class CronNamedCachesUpdate(_CronHandlerBase):
