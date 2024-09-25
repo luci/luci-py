@@ -26,7 +26,6 @@ from server import config
 from server import external_scheduler
 from server import named_caches
 from server import task_queues
-from server import task_request
 from server import task_result
 from server import task_scheduler
 import ts_mon_metrics
@@ -87,14 +86,6 @@ class CronUpdateBotInfoComposite(_CronHandlerBase):
 
   def run_cron(self):
     bot_management.cron_update_bot_info()
-
-
-class CronDeleteOldTasks(_CronHandlerBase):
-  """Deletes old TaskRequest entities and all their decendants."""
-
-  def run_cron(self):
-    # Do nothing. This is now implemented in Go.
-    pass
 
 
 class CronNamedCachesUpdate(_CronHandlerBase):
@@ -196,15 +187,6 @@ class TaskExpireTasksHandler(webapp2.RequestHandler):
     task_scheduler.task_expire_tasks(payload['entities'])
 
 
-class TaskDeleteTasksHandler(webapp2.RequestHandler):
-  """Deletes a list of tasks, given a list of their ids."""
-
-  @decorators.require_taskqueue('delete-tasks')
-  def post(self):
-    payload = json.loads(self.request.body)
-    task_request.task_delete_tasks(payload['task_ids'])
-
-
 class TaskUpdateBotMatchesHandler(webapp2.RequestHandler):
   """Assigns new task queues to existing bots."""
 
@@ -289,7 +271,6 @@ def get_routes():
       ('/internal/cron/cleanup/task_dimension_sets', CronTidyTaskDimensionSets),
       ('/internal/cron/monitoring/bots/update_bot_info',
        CronUpdateBotInfoComposite),
-      ('/internal/cron/cleanup/tasks/delete_old', CronDeleteOldTasks),
       ('/internal/cron/important/bot_groups_config',
        CronBotGroupsConfigHandler),
       ('/internal/cron/important/external_scheduler/cancellations',
@@ -305,7 +286,6 @@ def get_routes():
       ('/internal/taskqueue/important/tasks/cancel-children-tasks',
        TaskCancelChildrenTasksHandler),
       ('/internal/taskqueue/important/tasks/expire', TaskExpireTasksHandler),
-      ('/internal/taskqueue/cleanup/tasks/delete', TaskDeleteTasksHandler),
       ('/internal/taskqueue/important/task_queues/update-bot-matches',
        TaskUpdateBotMatchesHandler),
       ('/internal/taskqueue/important/task_queues/rescan-matching-task-sets',

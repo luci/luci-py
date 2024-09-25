@@ -1765,14 +1765,6 @@ class TaskRequestApiTest(TestCase):
     key = task_request.convert_to_request_key(now)
     self.assertEqual(9157134072765480958, key.id())
 
-  def test_request_key_to_datetime(self):
-    key = ndb.Key(task_request.TaskRequest, 0x7f14acec2fcfffff)
-    # Resolution is only kept at millisecond level compared to
-    # datetime_to_request_base_id() by design.
-    self.assertEqual(
-        datetime.datetime(2012, 1, 2, 3, 4, 5, 123000),
-        task_request.request_key_to_datetime(key))
-
   def test_request_id_to_key(self):
     # Simple XOR.
     self.assertEqual(
@@ -1783,66 +1775,6 @@ class TaskRequestApiTest(TestCase):
     task_request.SecretBytes(secret_bytes='a' * (20 * 1024)).put()
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.SecretBytes(secret_bytes='a' * (20 * 1024 + 1)).put()
-
-  def test_cron_delete_old_task_requests(self):
-    # Creating 1000 tasks would make this test significantly slower.
-    self.mock(task_request, '_TASKS_DELETE_CHUNK_SIZE', 5)
-
-    now = utils.utcnow()
-    task_ids = []
-    for i in range(14):
-      self.mock_now(now, i)
-      request = _gen_request_slices()
-      request.key = task_request.new_request_key()
-      request.put()
-      task_ids.append(task_pack.pack_request_key(request.key))
-
-    # Use 11 seconds offset, so that entities 12, 13 are not deleted. Yet create
-    # 3 GAE tasks to delete the chunks limited at 5 items.
-    self.mock_now(now + task_request._OLD_TASK_REQUEST_CUT_OFF, 11)
-    self.assertEqual(12, task_request.cron_delete_old_task_requests())
-    expected = [
-        (
-            ('/internal/taskqueue/cleanup/tasks/delete', 'delete-tasks'),
-            {
-                'payload': utils.encode_to_json({u'task_ids': task_ids[0:5]})
-            },
-        ),
-        (
-            ('/internal/taskqueue/cleanup/tasks/delete', 'delete-tasks'),
-            {
-                'payload': utils.encode_to_json({u'task_ids': task_ids[5:10]})
-            },
-        ),
-        (
-            ('/internal/taskqueue/cleanup/tasks/delete', 'delete-tasks'),
-            {
-                'payload': utils.encode_to_json({u'task_ids': task_ids[10:12]})
-            },
-        ),
-    ]
-    # task_ids[12:14] are not touched.
-    self.assertEqual(expected, self._enqueue_calls)
-    self._enqueue_calls = []
-
-  def test_task_delete_tasks(self):
-    # The data here should be the same as what is passed to the task queue in
-    # test_cron_delete_old_task_requests.
-    class Foo(ndb.Model):
-      pass
-
-    task_ids = []
-    for _ in range(5):
-      request = _gen_request_slices()
-      request.key = task_request.new_request_key()
-      request.put()
-      # Create a dummy child entity to ensure it's deleted too.
-      Foo(parent=request.key, id=1).put()
-      task_ids.append(task_pack.pack_request_key(request.key))
-
-    self.assertEqual(5, task_request.task_delete_tasks(task_ids))
-    self.assertEqual(0, task_request.TaskRequest.query().count())
-    self.assertEqual(0, Foo.query().count())
 
   def test_yield_request_keys_by_parent_task_id(self):
     parent_request = _gen_request()

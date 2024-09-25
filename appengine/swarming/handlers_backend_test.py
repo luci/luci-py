@@ -85,7 +85,6 @@ class BackendTest(test_env_handlers.AppTestBase):
         ('cancel-children-tasks',
          '/internal/taskqueue/important/tasks/cancel-children-tasks'),
         ('task-expire', '/internal/taskqueue/important/tasks/expire'),
-        ('delete-tasks', '/internal/taskqueue/cleanup/tasks/delete'),
         ('es-notify-tasks',
          '/internal/taskqueue/important/external_scheduler/notify-tasks'),
         ('es-notify-kick',
