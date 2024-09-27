@@ -696,14 +696,41 @@ window.customElements.define(
       if (label === "busy" || label === "idle") {
         filterStr = "task:" + label;
       }
+      if (this._filters.indexOf(filterStr) != -1) {
+        // The filter is already on the list.
+        return undefined;
+      }
+      // Make a copy of the filters.
+      // Strip out any conflicting status or task filters.
+      const withNewState = this._filters.filter((f) => {
+        const conflictingStatus = {
+          "status:alive": ["status:dead"],
+          "status:dead": ["status:alive", "task:busy", "task:idle"],
+          "task:busy": ["status:dead", "task:idle"],
+          "task:idle": ["status:dead", "task:busy"],
+        };
+        for (const [key, values] of Object.entries(conflictingStatus)) {
+          if (filterStr == key) {
+            return !values.includes(f);
+          }
+        }
+        return true;
+      });
+      withNewState.push(filterStr);
       const currentURL = new URL(window.location.href);
       if (preserveOthers) {
-        if (currentURL.searchParams.getAll("f").indexOf(filterStr) !== -1) {
-          // The filter is already on the list.
-          return undefined;
-        }
-        currentURL.searchParams.append("f", filterStr);
-        return currentURL.href;
+        const queryParams = query.fromObject({
+          // provide empty values
+          c: this._cols,
+          d: this._dir,
+          e: this._showFleetCounts, // 'e' because 'f', 'l', are taken
+          f: withNewState,
+          k: this._primaryKey,
+          s: this._sort,
+          show_all: this._showAll,
+          v: this._verbose,
+        });
+        return currentURL.pathname + "?" + queryParams;
       }
 
       const params = {

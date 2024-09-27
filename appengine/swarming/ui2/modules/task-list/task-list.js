@@ -785,7 +785,8 @@ window.customElements.define(
         at: this._allStates,
         v: this._verbose,
       });
-      return `/tasklist?${queryParams}`;
+      const currentURL = new URL(window.location.href);
+      return currentURL.pathname + "?" + queryParams;
     }
 
     _matchingBotsLink() {

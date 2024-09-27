@@ -361,7 +361,7 @@ describe("task-list", function () {
             expect(countRows[3].innerHTML).toContain("<a ", "contains a link");
             const link = $$("a", countRows[3]);
             expect(link.href).toContain(
-              "/tasklist?at=false" +
+              "at=false" +
                 "&c=name&c=createdTs&c=pendingTime" +
                 "&c=duration&c=bot&c=pool-tag" +
                 "&c=state&d=desc" +
@@ -1098,7 +1098,7 @@ describe("task-list", function () {
         expect(countRows[3].innerHTML).toContain("<a ", "contains a link");
         const link = $$("a", countRows[3]);
         expect(link.href).toContain(
-          "tasklist?at=false&c=name&c=createdTs" +
+          "at=false&c=name&c=createdTs" +
             "&c=pendingTime&c=duration&c=bot&c=pool-tag" +
             "&c=state&d=desc&et=1545237981000" +
             "&f=pool-tag%3AChrome" +

@@ -428,6 +428,33 @@ describe("bot-list", function () {
             done();
           });
         });
+
+        it("displays counts with filters", function (done) {
+          loggedInBotlist((ele) => {
+            ele._filters = ["os:Linux with space", "task:idle"];
+            ele.render();
+            const summaryTables = $(".summary table", ele);
+            expect(summaryTables).toBeTruthy();
+            expect(summaryTables).toHaveSize(2, "(num summaryTables");
+            const queryTable = summaryTables[1];
+
+            let tds = $("tr:first-child td", queryTable);
+            expect(tds).toBeTruthy();
+            expect(tds).toHaveSize(2);
+            expect(tds[0]).toMatchTextContent("Displayed:");
+            expect(tds[0].innerHTML).not.toContain("href");
+            expect(tds[1]).toMatchTextContent("10");
+
+            tds = $("tr:nth-child(3) td", queryTable);
+            const link = $$("a", tds[0]);
+            expect(link.href).toContain(
+              encodeURIComponent("os:Linux with space")
+            );
+            expect(link.href).toContain(encodeURIComponent("task:idle"));
+            expect(link.href).toContain(encodeURIComponent("status:alive"));
+            done();
+          });
+        });
       }); // end describe('default landing page')
     }); // end describe('when logged in as user')
   }); // end describe('html structure')
