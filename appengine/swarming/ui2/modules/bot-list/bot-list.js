@@ -705,9 +705,9 @@ window.customElements.define(
       const withNewState = this._filters.filter((f) => {
         const conflictingStatus = {
           "status:alive": ["status:dead"],
-          "status:dead": ["status:alive", "task:busy", "task:idle"],
-          "task:busy": ["status:dead", "task:idle"],
-          "task:idle": ["status:dead", "task:busy"],
+          "status:dead": ["status:alive"],
+          "task:busy": ["task:idle"],
+          "task:idle": ["task:busy"],
         };
         for (const [key, values] of Object.entries(conflictingStatus)) {
           if (filterStr == key) {
