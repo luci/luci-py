@@ -73,7 +73,7 @@ class SchemasHandler(webapp2.RequestHandler):
           self.redirect(str(schema.url))
           return
 
-    self.response.write('Schema %s not found\n' % name)
+    self.response.write('Requested schema not found\n')
     self.response.set_status(httplib.NOT_FOUND)
 
 
