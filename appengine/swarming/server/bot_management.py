@@ -446,7 +446,7 @@ def get_latest_info(bot_id):
   """
   # A quick check for bots that exist.
   info_key = get_info_key(bot_id)
-  bot = info_key.get()
+  bot = info_key.get(use_cache=False, use_memcache=False)
   if bot:
     return bot, True
 
@@ -506,7 +506,7 @@ def get_bot_pools(bot_id):
 
   # Note: unlike get_latest_info() here we don't care about carefully detecting
   # if a bot is dead. This allows to skip one get() when checking deleted bots.
-  bot = get_info_key(bot_id).get()
+  bot = get_info_key(bot_id).get(use_cache=False, use_memcache=False)
   if bot:
     return get_pools_from_dimensions_flat(bot.dimensions_flat)
   events = get_events_query(bot_id).fetch(1)
@@ -777,7 +777,7 @@ def bot_event(event_type,
   # here. In the worst case some intermediary state changes won't be properly
   # recorded.
   info_key = get_info_key(bot_id)
-  bot_info = info_key.get()
+  bot_info = info_key.get(use_cache=False, use_memcache=False)
   store_bot_info = True
   if not bot_info:
     # Register only id and pool dimensions at the first handshake.

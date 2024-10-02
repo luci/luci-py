@@ -280,7 +280,8 @@ def _reap_task(bot_dimensions,
   assert request.key == task_to_run.task_to_run_key_to_request_key(to_run_key)
   result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
   bot_id = bot_dimensions[u'id'][0]
-  bot_info = bot_management.get_info_key(bot_id).get()
+  bot_info = bot_management.get_info_key(bot_id).get(use_cache=False,
+                                                     use_memcache=False)
   if not bot_info:
     raise ClaimError('Bot %s doesn\'t exist.' % bot_id)
 

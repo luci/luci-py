@@ -38,7 +38,8 @@ def _get_or_raise(key):
   """Checks if ndb entity exists for key exists or else throws
   handlers_exceptions.NotFoundException.
   """
-  result = key.get()
+  # _get_or_raise is only used to get BotInfo.
+  result = key.get(use_cache=False, use_memcache=False)
   if not result:
     raise handlers_exceptions.NotFoundException('%s not found.' % key.id())
   return result

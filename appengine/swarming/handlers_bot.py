@@ -849,7 +849,8 @@ class BotPollHandler(_BotBaseHandler):
       self._cmd_sleep(sleep_streak, True)
       return
 
-    bot_info = bot_management.get_info_key(res.bot_id).get()
+    bot_info = bot_management.get_info_key(res.bot_id).get(use_cache=False,
+                                                           use_memcache=False)
     # TODO(crbug.com/1077188):
     #   avoid assigning to bots with another task assigned.
     if bot_info and bot_info.task_id:
@@ -1220,7 +1221,8 @@ class _BotTokenHandler(_BotApiHandler):
     # source of truth here, not whatever bot reports.
     if account_id == 'task':
       current_task_id = None
-      bot_info = bot_management.get_info_key(bot_id).get()
+      bot_info = bot_management.get_info_key(bot_id).get(use_cache=False,
+                                                         use_memcache=False)
       if bot_info:
         current_task_id = bot_info.task_id
       if task_id != current_task_id:
