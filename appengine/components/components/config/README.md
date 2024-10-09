@@ -2,7 +2,7 @@
 
 `config` is a library that provides centralized configuration management
 functionality for webapp2 and Cloud Endpoints apps. Acts as a client
-for [config_service](../../../config_service).
+for LUCI Config service.
 
 The library can work in two modes: remote and fs. In remote mode the library
 fetches configs from a configuration service. In fs mode it uses file system

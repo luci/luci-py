@@ -57,7 +57,6 @@ guarantee.
 The server has a few major configuration points;
   - Authorization configuration, usually distributed by
     [auth_service](../../auth_service/) instance.
-  - [config_service](../../config_service) manages server side configuration.
   - [bootstrap.py](../swarming_bot/config/bootstrap.py) which permits automatic
     single-command bot bootstrapping.
   - [bot_config.py](../swarming_bot/config/bot_config.py)

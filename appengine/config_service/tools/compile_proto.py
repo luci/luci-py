@@ -1,1 +1,0 @@
-../../components/tools/compile_proto.py
