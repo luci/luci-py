@@ -30,6 +30,12 @@ try:
 except ImportError:
   objc = None
 
+# Framework wrappers from the pyobjc module.
+try:
+  import Foundation
+except ImportError:
+  Foundation = None
+
 
 ## Private stuff.
 
@@ -809,6 +815,30 @@ def get_display_resolution():
   horizontal = Quartz.CGDisplayPixelsWide(display_id)
   vertical = Quartz.CGDisplayPixelsHigh(display_id)
   return horizontal, vertical
+
+
+def get_thermal_state():
+  """Gets the thermal state of the device.
+
+  Returns:
+    None or a string thermal_state. It is None when the thermal state cannot
+    be determined. Otherwise, |thermal_state| is a string corresponding to the
+    constants from
+    https://developer.apple.com/documentation/foundation/nsprocessinfothermalstate.
+  """
+  if Foundation is None:
+    return None
+
+  thermal_state = Foundation.NSProcessInfo.processInfo().thermalState()
+  if thermal_state == Foundation.NSProcessInfoThermalStateNominal:
+    return 'Nominal'
+  if thermal_state == Foundation.NSProcessInfoThermalStateFair:
+    return 'Fair'
+  if thermal_state == Foundation.NSProcessInfoThermalStateSerious:
+    return 'Serious'
+  if thermal_state == Foundation.NSProcessInfoThermalStateCritical:
+    return 'Critical'
+  return None
 
 
 @tools.cached

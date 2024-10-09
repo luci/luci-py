@@ -545,6 +545,12 @@ class TestOsx(unittest.TestCase):
     self.assertIsInstance(resolution[0], int)
     self.assertIsInstance(resolution[1], int)
 
+  def test_get_thermal_state(self):
+    # The thermal state is going to be dependent on the specific machine, but
+    # we *some* valid state.
+    thermal_state = osx.get_thermal_state()
+    self.assertIsInstance(thermal_state, str)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
