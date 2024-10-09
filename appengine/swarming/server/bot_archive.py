@@ -110,7 +110,6 @@ FILES = (
     'third_party/cachetools/rr.py',
     'third_party/cachetools/ttl.py',
     'third_party/certifi/cacert.pem',
-    'third_party/certifi/core.py',
     'third_party/certifi/__init__.py',
     'third_party/chardet/__init__.py',
     'third_party/colorama/ansi.py',

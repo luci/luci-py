@@ -1,14 +1,13 @@
-Name: certifi
-Short Name: certifi
-URL: https://github.com/certifi/python-certifi/archive/2018.11.29.tar.gz
-Version: 2018.11.29
-Revision: 10a1f8a56c9675fa87c42abad25183adbc3bc783
-License: MPL2.0
+This is a full replacement for `certifi` PyPI package imported by several of our
+third-party dependencies. They all import `where()` function and nothing more.
 
-Description:
+The original `certifi` code (starting from some revision) no longer works
+correctly when this package is embedded into a python zip module at a
+non-default path. This happens in swarming_bot.zip.
 
-Local Modifications:
-curl -sL URL: https://github.com/certifi/python-certifi/archive/2018.11.29.tar.gz | \
-    tar xvz --strip-components 2
-    
+We also do not really want to depend on `cacert.pem` from the certifi package at
+all. Instead we trust Google root certificates:
+
+```
 curl -sL URL: "https://pki.google.com/roots.pem" > cacert.pem
+```

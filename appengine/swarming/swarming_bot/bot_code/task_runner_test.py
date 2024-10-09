@@ -1372,7 +1372,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     else:
       expected = {
           'swarming_bot.1.zip',
-          '065eef161fd0db0753c811e430c8e537f2ce152fa2f14b99405430d49b1e95b0'
+          '1acf0d4780541758be2c0f998e1e0275232626ed3f8793d8e2fe8e2753750613'
           '-cacert.'
           'pem',
           'w',
