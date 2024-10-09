@@ -3,32 +3,3 @@
 # that can be found in the LICENSE file.
 
 cron:
-
-- description: import configs from Gitiles
-  target: backend
-  url: /internal/cron/luci-config/gitiles_import
-  schedule: every 10 minutes
-
-- description: request metadata from services
-  target: backend
-  url: /internal/cron/luci-config/update_services_metadata
-  schedule: every 10 minutes
-
-### ereporter2
-
-- description: ereporter2 cleanup
-  target: backend
-  url: /internal/cron/ereporter2/cleanup
-  schedule: every 1 hours
-
-- description: ereporter2 mail exception report
-  target: backend
-  url: /internal/cron/ereporter2/mail
-  schedule: every 1 hours synchronized
-
-### ts_mon
-
-- description: Send ts_mon metrics
-  url: /internal/cron/ts_mon/send
-  schedule: every 1 minutes
-
