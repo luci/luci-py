@@ -171,7 +171,7 @@ class LocalAuthServer:
 
     Called from internal server thread. May be called even if the server is
     already stopped (due to http.server.HTTPServer implementation that
-    stupidly leaks handler threads).
+    leaks handler threads).
 
     Args:
       method: name of the invoked RPC method, e.g. "GetOAuthToken".

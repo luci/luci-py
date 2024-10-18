@@ -748,8 +748,8 @@ def on_auth_db_change(auth_db_rev):
   """Called in a transaction that updated AuthDB."""
   # Avoid adding task queues in unit tests, since there are many-many unit tests
   # (in multiple project and repos) that indirectly make AuthDB transactions
-  # and mocking out 'enqueue_process_change_task' in all of them is stupid
-  # unscalable work. So be evil and detect unit tests right here.
+  # and mocking out 'enqueue_process_change_task' in all of them does not scale.
+  # Therefore, detect unit tests right here.
   if not utils.is_unit_test():
     enqueue_process_change_task(auth_db_rev)
 
