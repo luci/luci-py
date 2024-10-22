@@ -249,6 +249,17 @@ def get_cpu_type():
     # platform.machine() returns the aix machine ID (uname -m), which is
     # not useful. Modern AIX only supports powerpc64.
     return 'ppc64'
+  elif sys.platform.startswith('netbsd') and platform.machine() == 'evbarm':
+    # NetBSD has multiple ARM sub-platforms.
+    processor = platform.processor().lower()
+    if processor == 'aarch64':
+      return 'arm64'
+    # The following are not quite accurate, since there are also big-endian
+    # variants. E.g. earmv7hfeb is ARMv7, hardware FPU, big-endian.
+    if processor.startswith('earmv6'):
+      return 'armv6l'
+    if processor.startswith('earmv'):
+      return 'armv7l'
   machine = platform.machine().lower()
   if machine in ('amd64', 'x86_64', 'i386', 'i686', 'i86pc'):
     return 'x86'
@@ -317,6 +328,8 @@ def get_cipd_architecture():
   if cpu_type == 'x86':
     return 'amd64' if get_cpu_bitness() == '64' else '386'
   if cpu_type.startswith('armv') and cpu_type.endswith('l'):
+    if get_cipd_os() == 'netbsd':
+      return cpu_type
     # 32-bit ARM: Standardize on ARM v6 baseline.
     return 'armv6l'
   if cpu_type == 'evbarm':  # NetBSD's name for ARM, both 32 and 64-bit

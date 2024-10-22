@@ -81,6 +81,19 @@ class TestOsUtilities(auto_stub.TestCase):
       self.mock(os_utilities, 'get_cpu_bitness', lambda: bitness)
       self.assertEqual(os_utilities.get_cipd_architecture(), expected)
 
+  def test_get_cipd_architecture_netbsd(self):
+    cases = [
+        ('amd64', 'x86_64', 'amd64'),
+        ('evbarm', 'aarch64', 'arm64'),
+        ('evbarm', 'earmv6hf', 'armv6l'),
+        ('evbarm', 'earmv7hf', 'armv7l'),
+    ]
+    for machine, processor, expected in cases:
+      self.mock(sys, 'platform', 'netbsd10')
+      self.mock(platform, 'machine', lambda: machine)
+      self.mock(platform, 'processor', lambda: processor)
+      self.assertEqual(os_utilities.get_cipd_architecture(), expected)
+
   def test_get_os_values(self):
     cases = [
         ('openbsd7', '7.2', ['openbsd', 'openbsd-7', 'openbsd-7.2']),
