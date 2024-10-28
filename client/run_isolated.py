@@ -110,7 +110,7 @@ ISOLATED_TMP_DIR = 'it'
 _CAS_CLIENT_DIR = 'cc'
 # TODO(tikuta): take these parameter from luci-config?
 _CAS_PACKAGE = 'infra/tools/luci/cas/${platform}'
-_LUCI_GO_REVISION = 'git_revision:2aba496613f92a5b06d577f82b5d028225d3d577'
+_LUCI_GO_REVISION = 'git_revision:d290e92048ea30ad4f74232430604cbf7053557c'
 
 # Keep synced with task_request.py
 CACHE_NAME_RE = re.compile(r'^[a-z0-9_]{1,4096}$')
