@@ -340,6 +340,9 @@ def get_cpuinfo_uncached():
   elif cpu_platform.startswith('Ampere '):
     cpu_name = '%s GCE' % cpu_platform
     vendor = 'ARM'
+  elif cpu_platform.startswith('Google Axion'):
+    cpu_name = '%s GCE' % cpu_platform
+    vendor = 'ARM'
   assert cpu_name is not None, cpu_platform
   return {
       'name': cpu_name,
