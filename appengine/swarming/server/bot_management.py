@@ -78,6 +78,9 @@ class _BotCommon(ndb.Model):
   # State is purely informative. It is completely free form.
   state = datastore_utils.DeterministicJsonProperty(json_type=dict)
 
+  # The current bot session ID as reported when the bot connected.
+  session_id = ndb.StringProperty(indexed=False)
+
   # IP address as seen by the HTTP handler.
   external_ip = ndb.StringProperty(indexed=False)
 
@@ -473,6 +476,7 @@ def get_latest_info(bot_id):
   bot = BotInfo(key=info_key,
                 dimensions_flat=events[0].dimensions_flat,
                 state=events[0].state,
+                session_id=events[0].session_id,
                 external_ip=events[0].external_ip,
                 authenticated_as=events[0].authenticated_as,
                 version=events[0].version,
@@ -564,10 +568,10 @@ def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
   return q
 
 
-def _apply_event_updates(bot_info, event_type, now, task_id, task_name,
-                         external_ip, authenticated_as, dimensions_flat, state,
-                         version, quarantined, maintenance_msg,
-                         register_dimensions):
+def _apply_event_updates(bot_info, event_type, now, session_id, task_id,
+                         task_name, external_ip, authenticated_as,
+                         dimensions_flat, state, version, quarantined,
+                         maintenance_msg, register_dimensions):
   """Mutates BotInfo based on event details passed to bot_event(...)."""
   # Bump the expiration time every time the entity is touched. Note that this
   # field is unindexed (Cloud Datastore TTL policy doesn't need an index),
@@ -582,6 +586,8 @@ def _apply_event_updates(bot_info, event_type, now, task_id, task_name,
   # to NOT_IN_MAINTENANCE and lose the message.
   if event_type != 'bot_missing':
     bot_info.last_seen_ts = now
+    if session_id is not None:
+      bot_info.session_id = session_id
     if external_ip is not None:
       bot_info.external_ip = external_ip
     if authenticated_as is not None:
@@ -713,6 +719,7 @@ def _insert_bot_with_txn(root_key, bot_info, event):
 
 def bot_event(event_type,
               bot_id,
+              session_id=None,
               task_id=None,
               task_name=None,
               external_ip=None,
@@ -737,6 +744,7 @@ def bot_event(event_type,
   Arguments:
     event_type: event type, one of BotEvent.ALLOWED_EVENTS. Required.
     bot_id: bot id. Required.
+    session_id: the current bot session ID.
     task_id: packed task id if relevant. Set to '' to zap the stored value. If
         None, keep the previous value.
     task_name: task name if relevant. Zapped when task_id is zapped. If None,
@@ -811,6 +819,7 @@ def bot_event(event_type,
   _apply_event_updates(bot_info=bot_info,
                        event_type=event_type,
                        now=now,
+                       session_id=session_id,
                        task_id=task_id,
                        task_name=task_name,
                        external_ip=external_ip,
@@ -837,6 +846,7 @@ def bot_event(event_type,
                      event_type=event_type,
                      ts=now,
                      expire_at=now + _OLD_BOT_EVENTS_CUT_OFF,
+                     session_id=bot_info.session_id,
                      external_ip=bot_info.external_ip,
                      authenticated_as=bot_info.authenticated_as,
                      dimensions_flat=(dimensions_flat

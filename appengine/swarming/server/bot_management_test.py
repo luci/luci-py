@@ -124,6 +124,8 @@ def _gen_bot_info(**kwargs):
       False,
       'maintenance_msg':
       None,
+      'session_id':
+      None,
       'state': {
           u'ram': 65
       },
@@ -159,6 +161,7 @@ def _gen_bot_event(**kwargs):
       'message': None,
       'quarantined': False,
       'maintenance_msg': None,
+      'session_id': None,
       'state': {
           u'ram': 65
       },

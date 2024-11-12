@@ -333,7 +333,7 @@ class BotServicePrpcTest(PrpcTest):
 
   def test_bot_get(self):
     self.set_as_bot()
-    self.do_handshake()
+    self.do_handshake(session_id='test-session')
     self.set_as_privileged_user()
     request = swarming_pb2.BotRequest(bot_id="bot1", )
     resp = self.post_prpc("GetBot", request)
@@ -462,7 +462,7 @@ class BotServicePrpcTest(PrpcTest):
     t1 = self.mock_now(first_ticker())
 
     self.set_as_bot()
-    params = self.do_handshake()
+    params = self.do_handshake(session_id='test-session')
     t2 = self.mock_now(first_ticker())
 
     self.bot_poll(params=params)
@@ -525,6 +525,7 @@ class BotServicePrpcTest(PrpcTest):
             u'message': u'for the best',
             u'quarantined': False,
             u'state': state,
+            u'session_id': u'test-session',
             u'ts': fmtdate(t5),
             u'version': unicode(self.bot_version),
         },
@@ -535,6 +536,7 @@ class BotServicePrpcTest(PrpcTest):
             u'external_ip': unicode(self.source_ip),
             u'quarantined': False,
             u'state': state,
+            u'session_id': u'test-session',
             u'task_id': res['manifest']['task_id'],
             u'ts': fmtdate(t4),
             u'version': unicode(self.bot_version),
@@ -546,6 +548,7 @@ class BotServicePrpcTest(PrpcTest):
             u'external_ip': unicode(self.source_ip),
             u'quarantined': False,
             u'state': state,
+            u'session_id': u'test-session',
             u'task_id': res['manifest']['task_id'],
             u'ts': fmtdate(t3),
             u'version': unicode(self.bot_version),
@@ -557,6 +560,7 @@ class BotServicePrpcTest(PrpcTest):
             u'external_ip': unicode(self.source_ip),
             u'quarantined': False,
             u'state': state,
+            u'session_id': u'test-session',
             u'ts': fmtdate(t2),
             u'version': unicode(self.bot_version),
         },
@@ -567,6 +571,7 @@ class BotServicePrpcTest(PrpcTest):
             u'external_ip': unicode(self.source_ip),
             u'quarantined': False,
             u'state': state_no_cfg_ver,
+            u'session_id': u'test-session',
             u'ts': fmtdate(t1),
             u'version': u'123',
         },

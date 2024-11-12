@@ -130,6 +130,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'sleep_streak': 0
         },
         'version': '1',
+        'session_id': 'test-session',
     }
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', params=params).json
@@ -436,6 +437,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'maintenance_msg': None,
         'message': u"Invalid dimension value. key: foo, value: [u'bar']",
         'quarantined': True,
+        'session_id': None,
         'state': {
             u'bot_group_cfg_version': u'default',
             u'running_time': 1234.0,
@@ -1592,7 +1594,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     ticker = test_case.Ticker(self.now)
     ticks = []
     ticks.append(self.mock_now(ticker()))
-    params = self.do_handshake()
+    params = self.do_handshake(session_id='test-session')
     dimensions = params['dimensions']
     for e in handlers_bot.BotEventHandler.ALLOWED_EVENTS:
       if e == 'bot_error':
@@ -1629,6 +1631,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             'message': u'for the best',
             'quarantined': False,
             'maintenance_msg': None,
+            'session_id': u'test-session',
             'state': {
                 u'bot_group_cfg_version': u'default',
                 u'running_time': 1234.0,
@@ -1659,6 +1662,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'message': None,
         'quarantined': False,
         'maintenance_msg': None,
+        'session_id': u'test-session',
         'state': {
             u'handshaking': True,
             u'running_time': 1234.0,

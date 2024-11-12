@@ -63,8 +63,8 @@ message SessionToken {
 message Session {
   // ID of the bot as reported in /handshake.
   string bot_id = 1;
-  // The session name as reported in /handshake.
-  string session_name = 2;
+  // The session ID as reported in /handshake.
+  string session_id = 2;
   // Expiration time of this message. Refreshed on RPC calls.
   google.protobuf.Timestamp expiry = 3;
   // Information for logs and debugging.

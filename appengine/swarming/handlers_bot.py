@@ -7,6 +7,7 @@ import base64
 import datetime
 import json
 import logging
+import re
 import urlparse
 
 import six
@@ -53,6 +54,9 @@ _BOT_AUTH_METHODS = (
     auth.machine_authentication,
     auth.oauth_authentication,
 )
+
+# Allowed bot session IDs.
+_SESSION_ID_RE = re.compile(r'^[a-z0-9\-_\\]{1,50}$')
 
 
 def has_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys, name):
@@ -114,6 +118,12 @@ def has_missing_keys(minimum_keys, actual_keys, name):
   if missing:
     msg_missing = (' missing: %s' % sorted(missing)) if missing else ''
     return 'Unexpected %s%s; did you make a typo?' % (name, msg_missing)
+
+
+def is_valid_session_id(session_id):
+  if not isinstance(session_id, basestring):
+    return False
+  return bool(_SESSION_ID_RE.match(session_id))
 
 
 ## Generic handlers (no auth)
@@ -407,7 +417,7 @@ class _BotBaseHandler(_BotApiHandler):
   """
 
   EXPECTED_KEYS = {u'dimensions', u'state', u'version'}
-  OPTIONAL_KEYS = set()
+  OPTIONAL_KEYS = {u'session'}
   REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
 
   # Endpoint name to use in timeout tsmon metrics.
@@ -683,9 +693,18 @@ class BotHandshakeHandler(_BotBaseHandler):
     }
   """
 
+  OPTIONAL_KEYS = {u'session_id'}
+
   @auth.public  # auth happens in self.process()
   def post(self):
     res = self.process()
+
+    # Bot session is optional for now until it is fully rolled out.
+    session_id = res.request.get('session_id')
+    if session_id is not None:
+      if not is_valid_session_id(session_id):
+        self.abort_with_error(400, error='Bad session ID')
+        return
 
     # This boolean marks the state as "not fully initialized yet", since it
     # lacks entries reported by custom bot hooks (the bot doesn't have them
@@ -698,6 +717,7 @@ class BotHandshakeHandler(_BotBaseHandler):
     bot_management.bot_event(
         event_type='bot_connected',
         bot_id=res.bot_id,
+        session_id=session_id,
         external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
         dimensions=res.dimensions,
@@ -745,7 +765,7 @@ class BotPollHandler(_BotBaseHandler):
   assigned anymore.
   """
   TSMON_ENDPOINT_ID = 'bot/poll'
-  OPTIONAL_KEYS = {u'request_uuid', u'force'}
+  OPTIONAL_KEYS = {u'session', u'request_uuid', u'force'}
 
   @auth.public  # auth happens in self.process()
   def post(self):

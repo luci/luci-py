@@ -106,7 +106,8 @@ def bot_info_response(bot_info, deleted=False):
                               bot_id=bot_info.id,
                               dimensions=_string_list_pairs_from_dict(
                                   bot_info.dimensions),
-                              deleted=deleted)
+                              deleted=deleted,
+                              session_id=bot_info.session_id)
 
 
 def bots_response(bots, death_timeout, cursor):
@@ -149,6 +150,7 @@ def _bot_event_response(event):
       task_id=event.task_id,
       dimensions=_string_list_pairs_from_dict(event.dimensions),
       state=_state(event.state),
+      session_id=event.session_id,
   )
 
 

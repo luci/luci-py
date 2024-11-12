@@ -407,7 +407,11 @@ class AppTestBase(test_case.TestCase):
 
   # Bot
 
-  def do_handshake(self, bot='bot1', do_first_poll=False, response_copy=None):
+  def do_handshake(self,
+                   bot='bot1',
+                   session_id=None,
+                   do_first_poll=False,
+                   response_copy=None):
     """Performs bot handshake, returns data to be sent to bot handlers.
 
     Also populates self.bot_version.
@@ -425,11 +429,14 @@ class AppTestBase(test_case.TestCase):
         },
         'version': '123',
     }
-    response = self.app.post_json(
-        '/swarming/api/v1/bot/handshake', params=params).json
+    if session_id:
+      params['session_id'] = session_id
+    response = self.app.post_json('/swarming/api/v1/bot/handshake',
+                                  params=params).json
     if response_copy is not None:
       response_copy.update(response)
     self.bot_version = response['bot_version']
+    params.pop('session_id', None)
     params['version'] = self.bot_version
     params['state']['bot_group_cfg_version'] = response['bot_group_cfg_version']
     # A bit hackish but fine for unit testing purpose.
