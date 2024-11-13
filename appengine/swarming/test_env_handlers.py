@@ -39,6 +39,7 @@ from proto.plugin import plugin_pb2
 from server import bot_code
 from server import config
 from server import external_scheduler
+from server import hmac_secret
 from server import large
 from server import pools_config
 from server import realms
@@ -96,6 +97,7 @@ class AppTestBase(test_case.TestCase):
     utils.clear_cache(config.settings)
 
     self.mock_config_bundle_rev('1' * 64, '2' * 64)
+    self.mock_secret('hmac-secret')
 
     # Note that auth.ADMIN_GROUP != admins_group.
     auth.bootstrap_group(
@@ -108,6 +110,15 @@ class AppTestBase(test_case.TestCase):
         [auth.Identity(auth.IDENTITY_USER, 'priv@example.com')])
     auth.bootstrap_group(
         users_group, [auth.Identity(auth.IDENTITY_USER, 'user@example.com')])
+
+  def mock_secret(self, val):
+
+    class MockedSecret(object):
+
+      def access(_self):
+        return val
+
+    self.mock(hmac_secret, 'get_shared_hmac_secret', MockedSecret)
 
   def mock_config_bundle_rev(self, stable_bot_digest, canary_bot_digest):
     self.stable_bot_digest = stable_bot_digest

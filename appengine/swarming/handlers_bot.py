@@ -31,6 +31,7 @@ from server import bot_auth
 from server import bot_code
 from server import bot_groups_config
 from server import bot_management
+from server import bot_session
 from server import config
 from server import named_caches
 from server import rbe
@@ -752,6 +753,16 @@ class BotHandshakeHandler(_BotBaseHandler):
       data['bot_config_name'] = res.bot_group_cfg.bot_config_script
     if res.rbe_instance:
       data['rbe'] = res.rbe_params(0)
+
+    if session_id:
+      logging.info('Session ID: %s', session_id)
+      data['session'] = bot_session.marshal(
+          bot_session.create(
+              bot_id=res.bot_id,
+              session_id=session_id,
+              bot_group_cfg=res.bot_group_cfg,
+          ))
+
     self.send_response(data)
 
 

@@ -141,6 +141,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_group_cfg_version',
         u'bot_version',
         u'server_version',
+        u'session',
     ], sorted(response))
     self.assertEqual({u'dimensions': {}}, response['bot_group_cfg'])
     self.assertEqual('default', response['bot_group_cfg_version'])
