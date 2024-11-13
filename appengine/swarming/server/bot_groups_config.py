@@ -78,6 +78,10 @@ BotGroupConfig = collections.namedtuple(
         # handshake.
         'bot_config_script_content',
 
+        # SHA256 hex digest of the supplemental bot_config.py or an empty string
+        # if there's no such config.
+        'bot_config_script_sha256',
+
         # An email, "bot" or "". See 'system_service_account' in bots.proto.
         'system_service_account',
 
@@ -241,20 +245,18 @@ def refetch_from_config_service(ctx=None):
       return
 
     logging.info(
-        'Storing expanded bots.cfg, its size before compression is %d bytes.'
-        ' bots.cfg: %s', len(bots_cfg_pb), bots_cfg_pb)
+        'Storing expanded bots.cfg, its size before compression is %d bytes.',
+        len(bots_cfg_pb))
     ndb.put_multi([
-        BotsCfgHead(
-            key=_bots_cfg_head_key(),
-            bots_cfg_rev=cfg.rev,
-            digest=cfg.digest,
-            last_update_ts=now),
-        BotsCfgBody(
-            key=_bots_cfg_body_key(),
-            bots_cfg=bots_cfg_pb,
-            bots_cfg_rev=cfg.rev,
-            digest=cfg.digest,
-            last_update_ts=now),
+        BotsCfgHead(key=_bots_cfg_head_key(),
+                    bots_cfg_rev=cfg.rev,
+                    digest=cfg.digest,
+                    last_update_ts=now),
+        BotsCfgBody(key=_bots_cfg_body_key(),
+                    bots_cfg=bots_cfg_pb,
+                    bots_cfg_rev=cfg.rev,
+                    digest=cfg.digest,
+                    last_update_ts=now),
     ])
 
   update()
@@ -482,10 +484,8 @@ def _get_expanded_bots_cfg(known_digest=None):
   if body.empty:
     return True, None
 
-  logging.debug('Retrieved bots.cfg. %s', body.bots_cfg)
   bots = bots_pb2.BotsCfg()
   bots.ParseFromString(body.bots_cfg)
-  logging.debug('Parsed bots.cfg. %s', bots)
   return True, ExpandedBotsCfg(bots, body.bots_cfg_rev, body.digest)
 
 
@@ -539,27 +539,26 @@ _cache = _BotGroupsCache()
 
 # Default config to use on unconfigured server.
 def _default_bot_groups():
-  return _BotGroups(
-      digest='none',
-      rev='none',
-      direct_matches={},
-      prefix_matches=[],
-      default_group=BotGroupConfig(
-          version='default',
-          owners=(),
-          auth=(BotAuth(
-              log_if_failed=False,
-              require_luci_machine_token=False,
-              require_service_account=None,
-              require_gce_vm_token=None,
-              ip_whitelist=auth.bots_ip_whitelist()),),
-          dimensions={},
-          bot_config_script='',
-          bot_config_script_rev='',
-          bot_config_script_content='',
-          system_service_account='',
-          logs_cloud_project=None,
-          is_default=True))
+  return _BotGroups(digest='none',
+                    rev='none',
+                    direct_matches={},
+                    prefix_matches=[],
+                    default_group=BotGroupConfig(
+                        version='default',
+                        owners=(),
+                        auth=(BotAuth(log_if_failed=False,
+                                      require_luci_machine_token=False,
+                                      require_service_account=None,
+                                      require_gce_vm_token=None,
+                                      ip_whitelist=auth.bots_ip_whitelist()), ),
+                        dimensions={},
+                        bot_config_script='',
+                        bot_config_script_rev='',
+                        bot_config_script_content='',
+                        bot_config_script_sha256='',
+                        system_service_account='',
+                        logs_cloud_project=None,
+                        is_default=True))
 
 
 def _gen_version(fields):
@@ -576,10 +575,13 @@ def _gen_version(fields):
   Returns:
     A string that going to be used as 'version' field of BotGroupConfig tuple.
   """
-  # Just hash JSON representation (with sorted keys). Assumes it is stable
-  # enough. Add a prefix and trim a bit, to clarify that is it not git hash or
-  # anything like that, but just a dumb hash of the actual config.
+  # Note: this is not really correct (i.e. we don't need to restart bots if
+  # such FYI fields like `owners` change). This is also not very portable, since
+  # it depends on minute details of Python implementation. This is here for
+  # backward compatibility. Go code will use a different approach that looks
+  # only at fields that **really** affect the bot behavior.
   fields = fields.copy()
+  fields.pop('bot_config_script_sha256', None)
   fields['auth'] = [a._asdict() for a in fields['auth']]
   digest = hashlib.sha256(utils.encode_to_json(fields)).hexdigest()
   return 'hash:' + digest[:14]
@@ -609,21 +611,30 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
   return _make_bot_group_config(
       owners=tuple(msg.owners),
       auth=tuple(
-          BotAuth(
-              log_if_failed=cfg.log_if_failed,
-              require_luci_machine_token=cfg.require_luci_machine_token,
-              require_service_account=tuple(cfg.require_service_account),
-              require_gce_vm_token=(
-                  BotAuthGCE(cfg.require_gce_vm_token.project) if cfg
-                  .HasField('require_gce_vm_token') else None),
-              ip_whitelist=cfg.ip_whitelist) for cfg in msg.auth),
-      dimensions={k: sorted(v) for k, v in dimensions.items()},
+          BotAuth(log_if_failed=cfg.log_if_failed,
+                  require_luci_machine_token=cfg.require_luci_machine_token,
+                  require_service_account=tuple(cfg.require_service_account),
+                  require_gce_vm_token=(
+                      BotAuthGCE(cfg.require_gce_vm_token.project) if cfg.
+                      HasField('require_gce_vm_token') else None),
+                  ip_whitelist=cfg.ip_whitelist) for cfg in msg.auth),
+      dimensions={
+          k: sorted(v)
+          for k, v in dimensions.items()
+      },
       bot_config_script=msg.bot_config_script or '',
       bot_config_script_rev='',
       bot_config_script_content=msg.bot_config_script_content or '',
+      bot_config_script_sha256=_sha256hex(msg.bot_config_script_content),
       system_service_account=msg.system_service_account or '',
       logs_cloud_project=msg.logs_cloud_project or None,
       is_default=not msg.bot_id and not msg.bot_id_prefix)
+
+
+def _sha256hex(body):
+  if not body:
+    return ''
+  return hashlib.sha256(body).hexdigest()
 
 
 def _expand_bot_id_expr(expr):

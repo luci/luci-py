@@ -48,7 +48,7 @@ TEST_CONFIG = bots_pb2.BotsCfg(
 )
 
 EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
-    owners=(u'owner@example.com',),
+    owners=(u'owner@example.com', ),
     auth=(
         bot_groups_config.BotAuth(
             log_if_failed=False,
@@ -60,7 +60,7 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
         bot_groups_config.BotAuth(
             log_if_failed=False,
             require_luci_machine_token=False,
-            require_service_account=('z@example.com',),
+            require_service_account=('z@example.com', ),
             require_gce_vm_token=None,
             ip_whitelist=u'',
         ),
@@ -79,6 +79,7 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     bot_config_script='',
     bot_config_script_rev='',
     bot_config_script_content='',
+    bot_config_script_sha256='',
     system_service_account='',
     logs_cloud_project='google.com:chromecompute',
     is_default=False)
@@ -88,14 +89,16 @@ EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     auth=(bot_groups_config.BotAuth(
         log_if_failed=False,
         require_luci_machine_token=False,
-        require_service_account=(u'a@example.com',),
+        require_service_account=(u'a@example.com', ),
         require_gce_vm_token=None,
         ip_whitelist=u'',
-    ),),
+    ), ),
     dimensions={u'pool': []},
     bot_config_script='foo.py',
     bot_config_script_rev='',
     bot_config_script_content='print("Hi")',
+    bot_config_script_sha256=
+    '566238a1eb9839809ff20c120387d91042c3efce7d7f30d16470caec93740e1b',
     system_service_account='bot',
     logs_cloud_project='chrome-infra-logs',
     is_default=False)
@@ -108,11 +111,12 @@ EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
         require_service_account=(),
         require_gce_vm_token=None,
         ip_whitelist=u'bots',
-    ),),
+    ), ),
     dimensions={u'pool': [u'default']},
     bot_config_script='',
     bot_config_script_rev='',
     bot_config_script_content='',
+    bot_config_script_sha256='',
     system_service_account='',
     logs_cloud_project=None,
     is_default=True)
