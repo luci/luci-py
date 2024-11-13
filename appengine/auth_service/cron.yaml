@@ -4,11 +4,6 @@ cron:
   url: /internal/cron/import_groups
   schedule: every 15 minutes
 
-- description: refresh replicated authdb if it is more than 1d old
-  target: backend
-  url: /internal/cron/refresh_replicated_authdb
-  schedule: every 1 hours
-
 ### gae_ts_mon
 
 - description: ts_mon housekeeping
@@ -37,3 +32,8 @@ cron:
   target: backendv2
   url: /internal/cron/revoke-stale-authorization
   schedule: every 30 minutes
+
+- description: Refresh replicated AuthDB if it is more than 24h old.
+  target: backendv2
+  url: /internal/cron/refresh-replicated-authdb
+  schedule: every 1 hours
