@@ -27,6 +27,7 @@ from components import utils
 from components import datastore_utils
 
 from server import bot_groups_config
+from server import hmac_secret
 from server import pools_config
 from server import rbe
 from server import task_request
@@ -166,7 +167,7 @@ class PollTokenTest(test_case.TestCase):
       def access(_self):
         return self.SECRET
 
-    self.mock(rbe, '_get_shared_hmac_secret', MockedSecret)
+    self.mock(hmac_secret, 'get_shared_hmac_secret', MockedSecret)
 
   def mock_auth_identity(self, kind, name):
     auth.get_peer_identity.return_value = auth.Identity(kind, name)

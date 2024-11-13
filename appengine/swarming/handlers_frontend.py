@@ -24,7 +24,7 @@ from components import utils
 from server import acl
 from server import bot_groups_config
 from server import config
-from server import rbe
+from server import hmac_secret
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -152,7 +152,7 @@ class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     auth.warmup()
     bot_groups_config.warmup()
-    rbe.warmup()
+    hmac_secret.warmup()
     utils.get_module_version_list(None, None)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')

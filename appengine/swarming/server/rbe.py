@@ -7,7 +7,6 @@ import base64
 import collections
 import datetime
 import hashlib
-import hmac
 import logging
 import os
 import random
@@ -21,11 +20,11 @@ from google.protobuf import timestamp_pb2
 
 from components import auth
 from components import datastore_utils
-from components import gsm
 from components import utils
 
 from proto.config import pools_pb2
 from proto.internals import rbe_pb2
+from server import hmac_secret
 from server import pools_config
 from server import task_pack
 from server.constants import OR_DIM_SEP
@@ -45,14 +44,6 @@ RBEBotConfig = collections.namedtuple(
         # If True, check the Swarming scheduler queue before switching to RBE.
         'hybrid_mode',
     ])
-
-
-def warmup():
-  """Warms up local in-memory caches, best effort."""
-  try:
-    _get_shared_hmac_secret().access()
-  except Exception:
-    logging.exception('Failed to warmup up RBE HMAC key')
 
 
 def get_rbe_config_for_bot(bot_id, pools):
@@ -215,8 +206,7 @@ def generate_poll_token(bot_id, rbe_instance, enforced_dimensions,
   state_blob = state.SerializeToString()
 
   # Calculate the HMAC of serialized PollState. See rbe_pb2.TaggedMessage.
-  key = _get_shared_hmac_secret().access()
-  mac = hmac.new(key, digestmod=hashlib.sha256)
+  mac = hmac_secret.new_mac()
   mac.update("%d\n" % rbe_pb2.TaggedMessage.POLL_STATE)
   mac.update(state_blob)
   hmac_digest = mac.digest()
@@ -440,13 +430,3 @@ def _quasi_random_100(s):
   digest = hashlib.sha256(s).digest()
   num = float(ord(digest[0]) + ord(digest[1]) * 256)
   return int(num * 99.9 / (256.0 + 256.0 * 256.0))
-
-
-@utils.cache
-def _get_shared_hmac_secret():
-  """A gsm.Secret with a key used to HMAC-tag tokens."""
-  return gsm.Secret(
-      project=app_identity.get_application_id(),
-      secret='shared-hmac',
-      version='current',
-  )
