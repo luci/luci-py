@@ -31,8 +31,17 @@ def new_mac():
 @utils.cache
 def get_shared_hmac_secret():
   """A gsm.Secret with a key used to HMAC-tag tokens."""
+  if utils.is_local_dev_server():
+    return _LocalDevServer()
   return gsm.Secret(
       project=app_identity.get_application_id(),
       secret='shared-hmac',
       version='current',
   )
+
+
+class _LocalDevServer(object):
+  """Used when running the server locally e.g. in the smoke test."""
+
+  def access(self):
+    return 'local-dev-server'

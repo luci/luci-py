@@ -632,9 +632,8 @@ class TestRBESession(unittest.TestCase):
     super().tearDown()
 
   def check_serialization_works(self, session):
-    dump = os.path.join(self.temp_dir, 'dump.json')
-    session.dump(dump)
-    loaded = remote_client.RBESession.load(session._remote, dump)
+    dump = session.to_dict()
+    loaded = remote_client.RBESession.from_dict(session._remote, dump)
     self.assertEqual(session._instance, loaded._instance)
     self.assertEqual(session._dimensions, loaded._dimensions)
     self.assertEqual(session._bot_version, loaded._bot_version)

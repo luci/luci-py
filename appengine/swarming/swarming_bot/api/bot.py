@@ -10,10 +10,12 @@ import hashlib
 import inspect
 import logging
 import os
+import os
 import struct
 import sys
 import threading
 import time
+import uuid
 
 from api import os_utilities
 
@@ -31,6 +33,7 @@ class Bot(object):
     self._remote = remote
     self._server = server
     self._shutdown_hook = shutdown_hook
+    self._session_id = _gen_session_id()
 
     # Mutable, see BotMutator.
     self._lock = threading.Lock()
@@ -107,6 +110,16 @@ class Bot(object):
     """The bot's ID."""
     with self._lock:
       return self._dimensions.get('id', ['unknown'])[0]
+
+  @property
+  def session_id(self):
+    """Bot session ID generated when the bot was instantiated."""
+    return self._session_id
+
+  @property
+  def session_token(self):
+    """The current session token. It is refreshed by various RPC calls."""
+    return self._remote.session_token
 
   @property
   def remote(self):
@@ -296,6 +309,10 @@ class BotMutator(object):
   def __init__(self, bot):
     self._bot = bot
 
+  def update_session_token(self, session_token):
+    """Updates the session token used by the bot."""
+    self._bot._remote.session_token = session_token
+
   def update_bot_group_cfg(self, cfg_version, cfg):
     """Picks up the server-provided per-bot config.
 
@@ -448,3 +465,8 @@ def _make_stack():
       '  %-2d %s:%s:%s()' %
       (i, strip(f.f_code.co_filename), f.f_lineno, f.f_code.co_name)
       for i, f in enumerate(frames))
+
+
+def _gen_session_id():
+  """Generates a new bot session ID."""
+  return '%s/%d' % (uuid.uuid4().hex, os.getpid())

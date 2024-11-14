@@ -117,7 +117,7 @@ def get_task_details(*args, **kwargs):
 
 def run_command(server_url, work_dir, task_details, headers_cb, rbe_session):
   """Runs a command with an initialized client."""
-  remote = remote_client.createRemoteClient(server_url, headers_cb, 'localhost',
+  remote = remote_client.RemoteClientNative(server_url, headers_cb, 'localhost',
                                             work_dir)
   remote.bot_id = task_details.bot_id
   with luci_context.stage(local_auth=None) as ctx_file:
@@ -128,15 +128,25 @@ def run_command(server_url, work_dir, task_details, headers_cb, rbe_session):
                                    ctx_file)
 
 
-def load_and_run(server_url, work_dir, manifest, auth_params_file):
+def load_and_run(server_url,
+                 work_dir,
+                 manifest,
+                 auth_params_file,
+                 rbe_session=None):
   """Wraps task_runner.load_and_run() which runs a Swarming task."""
   in_file = os.path.join(work_dir, 'task_runner_in.json')
   with open(in_file, 'w') as f:
     json.dump(manifest, f)
   out_file = os.path.join(work_dir, 'task_runner_out.json')
+  session_file = os.path.join(work_dir, 'session.json')
+  remote_client.SessionState(
+      session_id='fake-session-id',
+      session_token='fake-session-token',
+      rbe_session=rbe_session,
+  ).dump(session_file)
   task_runner.load_and_run(in_file, server_url, 3600., time.time(), out_file,
                            ['--min-free-space', '1'] + DISABLE_CIPD_FOR_TESTS,
-                           None, auth_params_file, None)
+                           None, auth_params_file, session_file)
   with open(out_file, 'rb') as f:
     return json.load(f)
 
@@ -875,7 +885,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def _load_and_run(manifest, swarming_server, cost_usd_hour, start,
                       json_file, run_isolated_flags, bot_file, auth_params_file,
-                      rbe_session_state):
+                      session_state_file):
       self.assertEqual('foo', manifest)
       self.assertEqual(self.server.url, swarming_server)
       self.assertEqual(3600., cost_usd_hour)
@@ -884,7 +894,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual('/path/to/bot-file', bot_file)
       self.assertEqual('/path/to/auth-params-file', auth_params_file)
-      self.assertEqual('/path/to/rbe/session', rbe_session_state)
+      self.assertEqual('/path/to/session', session_state_file)
 
     self.mock(task_runner, 'load_and_run', _load_and_run)
     cmd = [
@@ -902,8 +912,8 @@ class TestTaskRunner(TestTaskRunnerBase):
         '/path/to/bot-file',
         '--auth-params-file',
         '/path/to/auth-params-file',
-        '--rbe-session-state',
-        '/path/to/rbe/session',
+        '--session-state-file',
+        '/path/to/session',
         '--',
         '--min-free-space',
         '1',
@@ -1316,8 +1326,13 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         io_timeout=60.)
     task_in_file = os.path.join(self.work_dir, 'task_runner_in.json')
     task_result_file = os.path.join(self.work_dir, 'task_runner_out.json')
+    session_state_file = os.path.join(self.work_dir, 'session.json')
     with open(task_in_file, 'w') as f:
       json.dump(manifest, f)
+
+    remote_client.SessionState(session_id='fake-session',
+                               session_token='fake-token',
+                               rbe_session=None).dump(session_state_file)
 
     bot = os.path.join(self.root_dir, 'swarming_bot.1.zip')
     code, _ = swarmingserver_bot_fake.gen_zip(self.server.url)
@@ -1333,6 +1348,8 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
         task_in_file,
         '--out-file',
         task_result_file,
+        '--session-state-file',
+        session_state_file,
         '--cost-usd-hour',
         '1',
         # Include the time taken to poll the task in the cost.
@@ -1514,10 +1531,23 @@ class TaskRunnerNoServer(auto_stub.TestCase):
     }
     realm_ctx = {'name': 'test:realm'}
 
+    rbe_session_dict = {
+        'instance': 'rbe-instance',
+        'dimensions': {},
+        'bot_version': 'bot_version',
+        'worker_properties': None,
+        'poll_token': 'poll-tok',
+        'session_token': 'session-tok',
+        'session_id': 'session-id',
+        'last_acked_status': 'OK',
+        'active_lease': None,
+        'finished_lease': None,
+        'terminated': False,
+    }
+
     def _run_command(remote, rbe_session, task_details, work_dir, cost_usd_hour,
                      start, run_isolated_flags, bot_file, ctx_file):
-      self.assertTrue(remote.uses_auth) # mainly to avoid "unused arg" warning
-      self.assertIsNone(rbe_session)
+      self.assertTrue(remote.uses_auth)  # mainly to avoid "unused arg" warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
       self.assertEqual(
@@ -1531,6 +1561,7 @@ class TaskRunnerNoServer(auto_stub.TestCase):
         ctx = json.load(f)
         self.assertDictEqual(local_auth_ctx, ctx['local_auth'])
         self.assertDictEqual(realm_ctx, ctx['realm'])
+      self.assertEqual(rbe_session_dict, rbe_session.to_dict())
       return {
           'exit_code': 1,
           'hard_timeout': False,
@@ -1548,7 +1579,7 @@ class TaskRunnerNoServer(auto_stub.TestCase):
       with mock.patch('%s.TaskDetails.load' % task_runner.__name__,
                       mock.Mock(return_value=task_details)):
         actual = load_and_run('http://localhost:1', self.root_dir, manifest,
-                              '/path/to/auth-params-file')
+                              '/path/to/auth-params-file', rbe_session_dict)
     finally:
       FakeAuthSystem.local_auth_context = None
     expected = {

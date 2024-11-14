@@ -57,7 +57,7 @@ _BOT_AUTH_METHODS = (
 )
 
 # Allowed bot session IDs.
-_SESSION_ID_RE = re.compile(r'^[a-z0-9\-_\\]{1,50}$')
+_SESSION_ID_RE = re.compile(r'^[a-z0-9\-_/]{1,50}$')
 
 
 def has_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys, name):

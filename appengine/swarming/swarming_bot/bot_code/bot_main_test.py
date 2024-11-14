@@ -98,6 +98,7 @@ class TestBotBase(net_utils.TestCase):
         },
         'version': '123',
     }
+    self.mock(bot, '_gen_session_id', lambda: 'fake-session-id')
     self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
     self.mock(os_utilities,
               'get_dimensions', lambda: self.attributes['dimensions'])
@@ -125,7 +126,7 @@ class TestBotBase(net_utils.TestCase):
   def make_bot(self, auth_headers_cb=None):
     self.quit_bit = FakeThreadingEvent()
     self.bot = bot.Bot(
-        remote_client.createRemoteClient(self.url, auth_headers_cb, 'localhost',
+        remote_client.RemoteClientNative(self.url, auth_headers_cb, 'localhost',
                                          self.root_dir), self.attributes,
         self.url, self.root_dir, self.fail)
     bot_main._update_bot_attributes(self.bot, 0)
@@ -593,12 +594,19 @@ class TestBotMain(TestBotBase):
     bot_config = bot_main._get_bot_config()
     bot_config.base_func = lambda: 'yo'
     try:
-      def do_handshake(attributes):
+
+      def do_handshake(attributes, _session_id):
         return {
-          'bot_version': attributes['version'],
-          'bot_group_cfg_version': None,
-          'bot_group_cfg': None,
-          'bot_config': textwrap.dedent("""
+            'session':
+            'fake-session-token',
+            'bot_version':
+            attributes['version'],
+            'bot_group_cfg_version':
+            None,
+            'bot_group_cfg':
+            None,
+            'bot_config':
+            textwrap.dedent("""
               from config import bot_config
               def get_dimensions(_):
                 return {
@@ -718,6 +726,9 @@ class TestBotMain(TestBotBase):
           resp,
       )
 
+    handshake_attrs = self.attributes.copy()
+    handshake_attrs['session_id'] = 'fake-session-id'
+
     self.expected_requests([
         (
             'https://localhost:1/swarming/api/v1/bot/server_ping',
@@ -728,7 +739,7 @@ class TestBotMain(TestBotBase):
         (
             'https://localhost:1/swarming/api/v1/bot/handshake',
             {
-                'data': self.attributes,
+                'data': handshake_attrs,
                 'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
@@ -743,7 +754,7 @@ class TestBotMain(TestBotBase):
         (
             'https://localhost:1/swarming/api/v1/bot/handshake',
             {
-                'data': self.attributes,
+                'data': handshake_attrs,
                 'expected_error_codes': None,
                 'follow_redirects': False,
                 'headers': {
@@ -755,6 +766,7 @@ class TestBotMain(TestBotBase):
             },
             {
                 'bot_version': '123',
+                'session': 'fake-session-token',
                 'server': self.url,
                 'server_version': 1,
                 'bot_group_cfg_version': 'abc:def',
@@ -1929,7 +1941,7 @@ class TestBotMain(TestBotBase):
                   returncode=0,
                   exit_code=0,
                   expected_auth_params_json=None,
-                  expected_rbe_session_json=None,
+                  expected_session_json=None,
                   internal_error=None,
                   internal_error_reported=False):
     result = {
@@ -1972,7 +1984,8 @@ class TestBotMain(TestBotBase):
         while cmd and cmd[0] != '--':
           flag = cmd.pop(0)
           self.assertIn(
-              flag, ('--bot-file', '--auth-params-file', '--rbe-session-state'))
+              flag,
+              ('--bot-file', '--auth-params-file', '--session-state-file'))
           with open(cmd[0], 'rb') as f:
             body = f.read()
           cmd.pop(0)
@@ -1980,8 +1993,8 @@ class TestBotMain(TestBotBase):
             self.assertEqual(b'', body)
           if flag == '--auth-params-file' and expected_auth_params_json:
             self.assertEqual(expected_auth_params_json, json.loads(body))
-          if flag == '--rbe-session-state' and expected_rbe_session_json:
-            self.assertEqual(expected_rbe_session_json, json.loads(body))
+          if flag == '--session-state-file' and expected_session_json:
+            self.assertEqual(expected_session_json, json.loads(body))
 
         self.assertEqual(True, detached)
         self.assertEqual(self.bot.base_dir, cwd)
@@ -2007,6 +2020,8 @@ class TestBotMain(TestBotBase):
 
   def test_run_manifest(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
+    with self.bot.mutate_internals() as mut:
+      mut.update_session_token('fake-session-token')
 
     def call_hook(_chained, botobj, name, *args):
       if name == 'on_after_task':
@@ -2017,7 +2032,12 @@ class TestBotMain(TestBotBase):
         self.assertEqual({'os': 'Amiga', 'pool': 'default'}, dimensions)
         self.assertEqual(result, summary)
     self.mock(bot_main, '_call_hook', call_hook)
-    result = self._mock_popen()
+    result = self._mock_popen(
+        expected_session_json={
+            'session_id': 'fake-session-id',
+            'session_token': 'fake-session-token',
+            'rbe_session': None,
+        })
 
     manifest = {
         'command': ['echo', 'hi'],
@@ -2087,6 +2107,8 @@ class TestBotMain(TestBotBase):
 
   def test_run_manifest_with_rbe(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
+    with self.bot.mutate_internals() as mut:
+      mut.update_session_token('fake-session-token')
 
     rbe_session = remote_client.RBESession(self.bot.remote, 'rbe-instance',
                                            self.bot.dimensions, 'bot_version',
@@ -2098,7 +2120,12 @@ class TestBotMain(TestBotBase):
     self.mock(rbe_session, 'finish_active_lease',
               lambda res, **_kwargs: rbe_results.append(res))
 
-    self._mock_popen(expected_rbe_session_json=rbe_session.to_dict())
+    self._mock_popen(
+        expected_session_json={
+            'session_id': 'fake-session-id',
+            'session_token': 'fake-session-token',
+            'rbe_session': rbe_session.to_dict(),
+        })
 
     manifest = {
         'command': ['echo', 'hi'],

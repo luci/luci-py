@@ -56,10 +56,6 @@ NET_CONNECTION_TIMEOUT_SEC = 4 * 60
 NET_MAX_ATTEMPTS = net.URL_OPEN_MAX_ATTEMPTS
 
 
-def createRemoteClient(server, auth, hostname, work_dir):
-  return RemoteClientNative(server, auth, hostname, work_dir)
-
-
 def utcnow():
   return datetime.datetime.utcnow()
 
@@ -109,10 +105,14 @@ class RemoteClientNative(object):
 
   If the callback returns (*, 0), effectively disables the caching of headers:
   the callback will be called for each request.
+
+  TODO: Pass session_token to requests and read an updated session_token from
+  the response.
   """
 
   def __init__(self, server, auth_headers_callback, hostname, work_dir):
     self._server = server
+    self._session_token = None
     self._auth_headers_callback = auth_headers_callback
     self._lock = threading.Lock()
     self._headers = None
@@ -134,6 +134,14 @@ class RemoteClientNative(object):
   @bot_id.setter
   def bot_id(self, bid):
     self._bot_id = bid
+
+  @property
+  def session_token(self):
+    return self._session_token
+
+  @session_token.setter
+  def session_token(self, tok):
+    self._session_token = tok
 
   def initialize(self, quit_bit=None):
     """Grabs initial auth headers, retrying on errors a bunch of times.
@@ -327,11 +335,14 @@ class RemoteClientNative(object):
         data=data)
     return resp and resp['resp'] == 1
 
-  def do_handshake(self, attributes):
-    """Performs the initial handshake. Returns a dict (contents TBD)"""
-    return self._url_read_json(
-        '/swarming/api/v1/bot/handshake',
-        data=attributes)
+  def do_handshake(self, attributes, session_id):
+    """Performs the initial handshake, initializes the session token."""
+    data = attributes.copy()
+    data['session_id'] = session_id
+    resp = self._url_read_json('/swarming/api/v1/bot/handshake', data=data)
+    if resp:
+      self._session_token = resp.get('session')
+    return resp
 
   def poll(self, attributes, force=False):
     """Polls Swarming server for commands; returns a (cmd, value) pair.
@@ -871,6 +882,8 @@ class RBESession:
 
   It is created in the constructor and, once dead, can be recreated in-place via
   recreate(). A recreated session has a different ID.
+
+  TODO: poll_token and session_token will soon be replaced by SessionState.
   """
 
   def __init__(self,
@@ -942,29 +955,13 @@ class RBESession:
         self._terminated,
     }
 
-  def dump(self, path):
-    """Dumps the state of the session to a JSON file on disk.
-
-    Raises:
-      OSError if can't open or write the file.
-    """
-    with open(path, 'w') as f:
-      json.dump(self.to_dict(), f)
-
   @staticmethod
-  def load(remote, path):
-    """Constructs RBESession from a dump created by dump().
+  def from_dict(remote, dump):
+    """Constructs RBESession from a dict created by to_dict().
 
     Raises:
-      OSError if can't open or read the file.
       ValueError if the dump doesn't appear to be valid.
     """
-    with open(path, 'r') as f:
-      try:
-        dump = json.load(f)
-      except ValueError as e:
-        raise ValueError('Not a valid JSON: %s' % e)
-
     worker_properties = None
     try:
       wp = dump.get('worker_properties')
@@ -1000,14 +997,13 @@ class RBESession:
 
     return session
 
-  def restore(self, path):
-    """Update this session (in-place) with the state stored by dump().
+  def restore(self, dump):
+    """Update this session (in-place) with the state stored by to_dict().
 
     Raises:
-      OSError if can't open or read the file.
       ValueError if the dump doesn't appear to be valid.
     """
-    loaded = RBESession.load(self._remote, path)
+    loaded = RBESession.from_dict(self._remote, dump)
     self._instance = loaded._instance
     self._session_id = loaded._session_id
     self._dimensions = loaded._dimensions
@@ -1400,3 +1396,56 @@ class RBESession:
     ))
 
     return resp.lease
+
+
+################################################################################
+## Session state serialization.
+
+
+class SessionState:
+  """Passed between the main bot process and the task runner."""
+
+  def __init__(self, session_id, session_token, rbe_session):
+    """Constructs a new SessionState.
+
+    Args:
+      session_id: Swarming bot session ID, just for logs.
+      session_token the current bot session token.
+      rbe_session: an RBESession.to_dict() value if the bot is in RBE mode.
+    """
+    self.session_id = session_id
+    self.session_token = session_token
+    self.rbe_session = rbe_session
+
+  def dump(self, path):
+    """Dumps the state of the session to a JSON file on disk.
+
+    Raises:
+      OSError if can't open or write the file.
+    """
+    with open(path, 'w') as f:
+      json.dump(
+          {
+              'session_id': self.session_id,
+              'session_token': self.session_token,
+              'rbe_session': self.rbe_session,
+          }, f)
+
+  @staticmethod
+  def load(path):
+    """Constructs SessionState from a dump created by dump().
+
+    Raises:
+      OSError if can't open or read the file.
+      ValueError if the dump doesn't appear to be valid.
+    """
+    with open(path, 'r') as f:
+      try:
+        dump = json.load(f)
+      except ValueError as e:
+        raise ValueError('Not a valid JSON: %s' % e)
+    try:
+      return SessionState(dump['session_id'], dump['session_token'],
+                          dump['rbe_session'])
+    except KeyError as e:
+      raise ValueError('Missing required key %s' % e)

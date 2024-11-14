@@ -304,7 +304,7 @@ def tmp_bb_agent_context_file(secret_bytes, task_id, workdir):
 
 def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
                  run_isolated_flags, bot_file, auth_params_file,
-                 rbe_session_state):
+                 session_state_file):
   """Loads the task's metadata, prepares auth environment and executes the task.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -314,6 +314,8 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
   auth_system = None
   bb_ctx_tf = None
   local_auth_context = None
+  session = None
+  remote = None
   rbe_session = None
   task_result = None
   work_dir = os.path.dirname(out_file)
@@ -401,18 +403,24 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to grab bot auth headers: %s' % e)
 
-      # The hostname and work dir provided here don't really matter, since the
-      # task runner is always called with a specific versioned URL.
-      remote = remote_client.createRemoteClient(
+      # Deserialize the session state (including the RBESession inside).
+      session = remote_client.SessionState.load(session_state_file)
+      logging.info('Swarming bot session ID: %s', session.session_id)
+
+      # The client to use to make backend RPCs. It will also refresh the session
+      # token as a side effect of some RPC calls.
+      remote = remote_client.RemoteClientNative(
           swarming_server, headers_cb, os_utilities.get_hostname_short(),
           work_dir)
       remote.initialize()
       remote.bot_id = task_details.bot_id
+      remote.session_token = session.session_token
 
       # If running in RBE mode, deserialize the RBESession object to use it to
       # send pings to RBE.
-      if rbe_session_state:
-        rbe_session = remote_client.RBESession.load(remote, rbe_session_state)
+      if session.rbe_session:
+        rbe_session = remote_client.RBESession.from_dict(
+            remote, session.rbe_session)
 
       # Let AuthSystem know it can now send RPCs to Swarming (to grab OAuth
       # tokens). There's a circular dependency here! AuthSystem will be
@@ -466,9 +474,12 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
       auth_system.stop()
     with open(out_file, 'w') as f:
       json.dump(task_result, f)
-    # Store updates to the session (like the most recent session token).
-    if rbe_session:
-      rbe_session.dump(rbe_session_state)
+    # Store updates to the session (like the most recent session token). Don't
+    # touch it if we crashed before full initialization.
+    if session and remote:
+      session.session_token = remote.session_token
+      session.rbe_session = rbe_session.to_dict() if rbe_session else None
+      session.dump(session_state_file)
 
 
 def kill_and_wait(proc, grace_period, reason):
@@ -1040,9 +1051,8 @@ def main(args):
   parser.add_option(
       '--auth-params-file',
       help='Path to a file with bot authentication parameters')
-  parser.add_option(
-      '--rbe-session-state',
-      help='Path to a JSON file with the state of the current RBE session')
+  parser.add_option('--session-state-file',
+                    help='Path to a file with Swarming session state')
 
   options, args = parser.parse_args(args)
   if not options.in_file or not options.out_file:
@@ -1059,7 +1069,7 @@ def main(args):
     load_and_run(options.in_file, options.swarming_server,
                  options.cost_usd_hour, options.start, options.out_file, args,
                  options.bot_file, options.auth_params_file,
-                 options.rbe_session_state)
+                 options.session_state_file)
     return 0
   finally:
     logging.info('quitting')

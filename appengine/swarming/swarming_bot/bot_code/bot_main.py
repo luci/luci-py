@@ -686,7 +686,7 @@ def get_bot(config):
   # construct the "real" bot.Bot.
   attributes = get_attributes(
       bot.Bot(
-          remote_client.createRemoteClient(config['server'], None, hostname,
+          remote_client.RemoteClientNative(config['server'], None, hostname,
                                            base_dir), attributes,
           config['server'], base_dir, _on_shutdown_hook))
 
@@ -694,7 +694,7 @@ def get_bot(config):
   # RemoteClient doesn't call its callback in the constructor (since 'botobj' is
   # undefined during the construction).
   botobj = bot.Bot(
-      remote_client.createRemoteClient(
+      remote_client.RemoteClientNative(
           config['server'], lambda: _get_authentication_headers(botobj),
           hostname, base_dir), attributes, config['server'], base_dir,
       _on_shutdown_hook)
@@ -904,9 +904,9 @@ def _run_manifest(botobj, manifest, rbe_session):
   msg = None
   auth_params_dumper = None
   must_reboot_reason = None
-  rbe_session_state = None
   # Use 'w' instead of 'work' because path length is precious on Windows.
   work_dir = os.path.join(botobj.base_dir, 'w')
+  session_state_file = os.path.join(work_dir, 'session.json')
   try:
     try:
       if fs.isdir(work_dir):
@@ -940,6 +940,22 @@ def _run_manifest(botobj, manifest, rbe_session):
     if fs.exists(task_result_file):
       fs.remove(task_result_file)
 
+    # Pass information about the Swarming bot session to the task runner. It is
+    # needed to call task_update and other RPCs. If running in RBE mode, also
+    # need to propagate the RBE session state: it will use it to ping the RBE
+    # lease (if there's an active lease) or just the entire RBE session (if
+    # there are no active leases). RBE session pinging is happening using
+    # MAINTENANCE status.
+    if rbe_session:
+      if rbe_session.active_lease:
+        logging.info('RBE lease: %r', rbe_session.active_lease.to_dict())
+      else:
+        logging.info('RBE lease: none')
+    session_state = remote_client.SessionState(
+        botobj.session_id, botobj.session_token,
+        rbe_session.to_dict() if rbe_session else None)
+    session_state.dump(session_state_file)
+
     # Start a thread that periodically puts authentication headers and other
     # authentication related information to a file on disk. task_runner reads it
     # from there before making authenticated HTTP calls.
@@ -971,22 +987,11 @@ def _run_manifest(botobj, manifest, rbe_session):
         str(time.time()),
         '--bot-file',
         bot_file,
+        '--session-state-file',
+        session_state_file,
         '--auth-params-file',
         auth_params_file,
     ]
-
-    # If running in RBE mode, need to propagate the session state to the task
-    # runner, it will use it to ping the RBE lease (if there's an active lease)
-    # or just the entire RBE session (if there are no active leases). Session
-    # pinging is happening using MAINTENANCE status.
-    if rbe_session:
-      if rbe_session.active_lease:
-        logging.info('RBE lease: %r', rbe_session.active_lease.to_dict())
-      else:
-        logging.info('RBE lease: none')
-      rbe_session_state = os.path.join(work_dir, 'rbe_session.json')
-      rbe_session.dump(rbe_session_state)
-      command.extend(['--rbe-session-state', rbe_session_state])
 
     # Flags for run_isolated.py are passed through by task_runner.py as-is
     # without interpretation.
@@ -1050,8 +1055,11 @@ def _run_manifest(botobj, manifest, rbe_session):
 
     # Load the up-to-date session state, it might have changed while the task
     # runner was driving it.
-    if rbe_session and rbe_session_state:
-      rbe_session.restore(rbe_session_state)
+    session_state = remote_client.SessionState.load(session_state_file)
+    with botobj.mutate_internals() as mut:
+      mut.update_session_token(session_state.session_token)
+    if rbe_session and session_state.rbe_session:
+      rbe_session.restore(session_state.rbe_session)
 
     failure = bool(task_result.get('exit_code')) if task_result else False
     return not internal_failure and not failure
@@ -1137,7 +1145,7 @@ def _run_bot_inner(arg_error, quit_bit):
     # fail and we'll handle it there.
     hostname = _get_botid_safe()
     base_dir = os.path.dirname(THIS_FILE)
-    remote = remote_client.createRemoteClient(config['server'], None, hostname,
+    remote = remote_client.RemoteClientNative(config['server'], None, hostname,
                                               base_dir)
     remote.ping()
   except Exception:
@@ -2073,7 +2081,8 @@ def _do_handshake(botobj, quit_bit):
   loop_clock = clock.Clock(quit_bit)
   attempt = 0
   while not quit_bit.is_set():
-    resp = botobj.remote.do_handshake(botobj.attributes)
+    logging.info('Swarming bot session ID: %s', botobj.session_id)
+    resp = botobj.remote.do_handshake(botobj.attributes, botobj.session_id)
     if resp:
       logging.info('Connected to %s', resp.get('server_version'))
       if resp.get('bot_version') != botobj.bot_version:
