@@ -129,6 +129,8 @@ class TestBotBase(net_utils.TestCase):
         remote_client.RemoteClientNative(self.url, auth_headers_cb, 'localhost',
                                          self.root_dir), self.attributes,
         self.url, self.root_dir, self.fail)
+    with self.bot.mutate_internals() as mut:
+      mut.update_session_token('fake-session-token')
     bot_main._update_bot_attributes(self.bot, 0)
     self.clock = clock.Clock(self.quit_bit)
     self.clock._now_impl = lambda: self.quit_bit.now
@@ -160,6 +162,7 @@ class TestBotBase(net_utils.TestCase):
     data = self.attributes
 
     def on_request(kwargs):
+      self.assertEqual(kwargs['data']['session'], 'fake-session-token')
       self.assertEqual(kwargs['data']['request_uuid'], REQUEST_UUID)
       self.assertEqual(kwargs['data']['dimensions'], data['dimensions'])
       if rbe_idle is not None:
@@ -216,6 +219,7 @@ class TestBotBase(net_utils.TestCase):
     data = {
         'dimensions': self.attributes['dimensions'],
         'poll_token': poll_token,
+        'session': 'fake-session-token',
     }
     if self.expected_rbe_worker_props:
       data['worker_properties'] = self.expected_rbe_worker_props
@@ -244,6 +248,7 @@ class TestBotBase(net_utils.TestCase):
         'status': status_in,
         'dimensions': self.attributes['dimensions'],
         'session_token': session_token,
+        'session': 'fake-session-token',
     }
     if self.expected_rbe_worker_props:
       data['worker_properties'] = self.expected_rbe_worker_props
@@ -569,6 +574,7 @@ class TestBotMain(TestBotBase):
                         'missing_cipd': [],
                     },
                     'task_id': 23,
+                    'session': 'fake-session-token',
                 },
                 'expected_error_codes': None,
                 'follow_redirects': False,
@@ -706,6 +712,7 @@ class TestBotMain(TestBotBase):
           'sleep_streak': sleep_streak,
           'original_bot_id': 'localhost',
       }
+      attrs['session'] = 'fake-session-token'
       attrs.update(extra)
       return attrs
 
@@ -804,6 +811,7 @@ class TestBotMain(TestBotBase):
                     'task_id': 'terminate-id',
                     'duration': 0,
                     'exit_code': 0,
+                    'session': 'fake-session-token',
                 },
                 'expected_error_codes': None,
                 'follow_redirects': False,
@@ -2020,8 +2028,6 @@ class TestBotMain(TestBotBase):
 
   def test_run_manifest(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
-    with self.bot.mutate_internals() as mut:
-      mut.update_session_token('fake-session-token')
 
     def call_hook(_chained, botobj, name, *args):
       if name == 'on_after_task':
@@ -2107,8 +2113,6 @@ class TestBotMain(TestBotBase):
 
   def test_run_manifest_with_rbe(self):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
-    with self.bot.mutate_internals() as mut:
-      mut.update_session_token('fake-session-token')
 
     rbe_session = remote_client.RBESession(self.bot.remote, 'rbe-instance',
                                            self.bot.dimensions, 'bot_version',

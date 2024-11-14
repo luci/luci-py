@@ -79,14 +79,6 @@ def has_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys, name):
                                                         msg_superfluous)
 
 
-def has_unexpected_keys(expected_keys, actual_keys, name):
-  """Return an error if unexpected keys are present or expected keys are
-  missing.
-  """
-  return has_unexpected_subset_keys(expected_keys, expected_keys, actual_keys,
-                                    name)
-
-
 def log_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys,
                                request, source, name):
   """Logs an error if unexpected keys are present or expected keys are missing.
@@ -100,13 +92,6 @@ def log_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys,
   if message:
     ereporter2.log_request(request, source=source, message=message)
   return message
-
-
-def log_unexpected_keys(expected_keys, actual_keys, request, source, name):
-  """Logs an error if unexpected keys are present or expected keys are missing.
-  """
-  return log_unexpected_subset_keys(expected_keys, expected_keys, actual_keys,
-                                    request, source, name)
 
 
 def has_missing_keys(minimum_keys, actual_keys, name):
@@ -1341,6 +1326,7 @@ class BotOAuthTokenHandler(_BotTokenHandler):
       u'id',  # bot ID
       u'scopes',  # list of requested OAuth scopes
       u'task_id',  # optional task ID, required if using 'task' account
+      u'session',  # the session token
   }
   REQUIRED_KEYS = {u'account_id', u'id', u'scopes'}
 
@@ -1378,6 +1364,7 @@ class BotIDTokenHandler(_BotTokenHandler):
       u'id',  # bot ID
       u'audience',  # the string audience to put into the token
       u'task_id',  # optional task ID, required if using 'task' account
+      u'session',  # the session token
   }
   REQUIRED_KEYS = {u'account_id', u'id', u'audience'}
 
@@ -1414,6 +1401,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
       u'named_caches_stats',
       u'output',
       u'output_chunk_start',
+      u'session',
       u'task_id',
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
@@ -1613,7 +1601,14 @@ class BotTaskErrorHandler(_BotApiHandler):
   This can be used by bot_main.py to kill the task when task_runner misbehaved.
   """
 
-  EXPECTED_KEYS = {u'id', u'message', u'task_id', u'client_error'}
+  ACCEPTED_KEYS = {
+      u'id',
+      u'message',
+      u'task_id',
+      u'client_error',
+      u'session',
+  }
+  REQUIRED_KEYS = {u'id', u'task_id'}
 
   @auth.public  # auth happens in bot_auth.authenticate_bot
   def post(self, task_id=None):
@@ -1643,9 +1638,8 @@ class BotTaskErrorHandler(_BotApiHandler):
                      message)
     ereporter2.log_request(self.request, source='bot', message=line)
 
-    msg = log_unexpected_keys(self.EXPECTED_KEYS, request, self.request, 'bot',
-                              'keys')
-
+    msg = log_unexpected_subset_keys(self.ACCEPTED_KEYS, self.REQUIRED_KEYS,
+                                     request, self.request, 'bot', 'keys')
     if msg:
       self.abort_with_error(400, error=msg)
     msg = task_scheduler.bot_terminate_task(

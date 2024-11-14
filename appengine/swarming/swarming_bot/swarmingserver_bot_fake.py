@@ -67,6 +67,7 @@ class Handler(httpserver.Handler):
 
   def do_POST(self):
     data = json.loads(self.read_body())
+    data.pop('session', None)
 
     if self.path == '/auth/api/v1/accounts/self/xsrf_token':
       return self.send_json({'xsrf_token': 'a'})

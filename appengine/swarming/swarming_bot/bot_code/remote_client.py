@@ -105,9 +105,6 @@ class RemoteClientNative(object):
 
   If the callback returns (*, 0), effectively disables the caching of headers:
   the callback will be called for each request.
-
-  TODO: Pass session_token to requests and read an updated session_token from
-  the response.
   """
 
   def __init__(self, server, auth_headers_callback, hostname, work_dir):
@@ -265,12 +262,25 @@ class RemoteClientNative(object):
         headers=self.get_headers(include_auth=True),
         timeout=NET_CONNECTION_TIMEOUT_SEC)
 
+  def _maybe_update_session_token(self, resp):
+    """Extracts a session token from the response if present.
+
+    Replaces it with "<redacted>" to avoid logging the token.
+    """
+    if resp and isinstance(resp, dict):
+      fresher = resp.get('session', None)
+      if fresher:
+        self._session_token = fresher
+        resp['session'] = '<redacted>'
+
   def post_bot_event(self, event_type, message, attributes):
-    """Logs bot-specific info to the server"""
+    """Logs bot-specific info to the server."""
     data = attributes.copy()
     data['event'] = event_type
     data['message'] = message
-    self._url_read_json('/swarming/api/v1/bot/event', data=data)
+    data['session'] = self._session_token
+    resp = self._url_read_json('/swarming/api/v1/bot/event', data=data)
+    self._maybe_update_session_token(resp)
 
   def post_task_update(self,
                        task_id,
@@ -305,9 +315,11 @@ class RemoteClientNative(object):
       data['output_chunk_start'] = stdout_and_chunk[1]
     if exit_code != None:
       data['exit_code'] = exit_code
+    data['session'] = self._session_token
 
     resp = self._url_read_json(
         '/swarming/api/v1/bot/task_update/%s' % task_id, data)
+    self._maybe_update_session_token(resp)
     logging.debug('post_task_update() = %s', resp)
     if not resp or resp.get('error'):
       raise InternalError(
@@ -322,6 +334,7 @@ class RemoteClientNative(object):
     """Logs task-specific info to the server"""
     data = {
         'id': self._bot_id,
+        'session': self._session_token,
         'message': message,
         'task_id': task_id,
         'client_error': {
@@ -333,6 +346,7 @@ class RemoteClientNative(object):
     resp = self._url_read_json(
         '/swarming/api/v1/bot/task_error/%s' % task_id,
         data=data)
+    self._maybe_update_session_token(resp)
     return resp and resp['resp'] == 1
 
   def do_handshake(self, attributes, session_id):
@@ -340,8 +354,7 @@ class RemoteClientNative(object):
     data = attributes.copy()
     data['session_id'] = session_id
     resp = self._url_read_json('/swarming/api/v1/bot/handshake', data=data)
-    if resp:
-      self._session_token = resp.get('session')
+    self._maybe_update_session_token(resp)
     return resp
 
   def poll(self, attributes, force=False):
@@ -369,6 +382,7 @@ class RemoteClientNative(object):
       the returned dict does not have the correct values set.
     """
     data = attributes.copy()
+    data['session'] = self._session_token
     if force:
       data['force'] = True
 
@@ -381,6 +395,7 @@ class RemoteClientNative(object):
     resp = self._url_read_json('/swarming/api/v1/bot/poll',
                                data=data,
                                retry_transient=False)
+    self._maybe_update_session_token(resp)
     if not resp or resp.get('error'):
       raise PollError(
           resp.get('error') if resp else 'Failed to contact server')
@@ -435,12 +450,14 @@ class RemoteClientNative(object):
       or the returned dict does not have the correct values set.
     """
     data = attributes.copy()
+    data['session'] = self._session_token
     data['claim_id'] = claim_id
     data['task_id'] = task_id
     data['task_to_run_shard'] = task_to_run_shard
     data['task_to_run_id'] = task_to_run_id
 
     resp = self._url_read_json('/swarming/api/v1/bot/claim', data=data)
+    self._maybe_update_session_token(resp)
     if not resp or resp.get('error'):
       raise ClaimError(
           resp.get('error') if resp else 'Failed to contact server')
@@ -506,8 +523,10 @@ class RemoteClientNative(object):
                                    'id': self._bot_id,
                                    'scopes': scopes,
                                    'task_id': task_id,
+                                   'session': self._session_token,
                                },
                                expected_error_codes=(400, ))
+    self._maybe_update_session_token(resp)
     if not resp:
       raise InternalError(
           'Error when minting access token for account_id: %s' % account_id)
@@ -544,8 +563,10 @@ class RemoteClientNative(object):
                                    'id': self._bot_id,
                                    'audience': audience,
                                    'task_id': task_id,
+                                   'session': self._session_token,
                                },
                                expected_error_codes=(400, ))
+    self._maybe_update_session_token(resp)
     if not resp:
       raise InternalError(
           'Error when minting ID token for account_id: %s' % account_id)
@@ -583,17 +604,22 @@ class RemoteClientNative(object):
     Raises:
       RBEServerError if the RPC fails for whatever reason.
     """
-    data = {'dimensions': dimensions, 'poll_token': poll_token}
+    data = {
+        'dimensions': dimensions,
+        'poll_token': poll_token,  # TODO: Will be deleted soon
+        'session': self._session_token,
+    }
     if bot_version:
       data['bot_version'] = bot_version
     if worker_properties:
       assert isinstance(worker_properties, WorkerProperties), worker_properties
       data['worker_properties'] = worker_properties.to_dict()
-    if session_token:
+    if session_token:  # TODO: Will be deleted soon
       data['session_token'] = session_token
     resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/create',
                                data=data,
                                retry_transient=retry_transient)
+    self._maybe_update_session_token(resp)
     if not resp:
       raise RBEServerError('Failed to create RBE session, see bot logs')
     if not isinstance(resp, dict):
@@ -645,7 +671,8 @@ class RemoteClientNative(object):
     """
     assert status in RBESessionStatus, status
     data = {
-        'session_token': session_token,
+        'session': self._session_token,
+        'session_token': session_token,  # TODO: Will be deleted soon
         'status': status.name,
         'dimensions': dimensions,
     }
@@ -657,7 +684,7 @@ class RemoteClientNative(object):
     if lease:
       assert isinstance(lease, RBELease), lease
       data['lease'] = lease.to_dict(omit_payload=True)
-    if poll_token:
+    if poll_token:  # TODO: Will be deleted soon
       data['poll_token'] = poll_token
     if not blocking:
       data['nonblocking'] = True
@@ -665,6 +692,7 @@ class RemoteClientNative(object):
     resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/update',
                                data=data,
                                retry_transient=retry_transient)
+    self._maybe_update_session_token(resp)
     if not resp:
       raise RBEServerError('Failed to update RBE session, see bot logs')
     if not isinstance(resp, dict):

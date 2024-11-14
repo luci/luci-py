@@ -120,16 +120,19 @@ class TestRemoteClient(auto_stub.TestCase):
     c = remote_client.RemoteClientNative('http://localhost:1', None,
                                          'localhost', '/')
     c.bot_id = 'bot_id'
+    c.session_token = 'session-token'
 
     def mocked_call(url_path, data, expected_error_codes, retry_transient=True):
       self.assertEqual('/swarming/api/v1/bot/oauth_token', url_path)
-      self.assertEqual({
-          'account_id': 'account_id',
-          'id': 'bot_id',
-          'scopes': ['a', 'b'],
-          'task_id': 'task_id',
-      }, data)
-      self.assertEqual((400,), expected_error_codes)
+      self.assertEqual(
+          {
+              'account_id': 'account_id',
+              'id': 'bot_id',
+              'scopes': ['a', 'b'],
+              'session': 'session-token',
+              'task_id': 'task_id',
+          }, data)
+      self.assertEqual((400, ), expected_error_codes)
       self.assertTrue(retry_transient)
       return fake_resp
     self.mock(c, '_url_read_json', mocked_call)
@@ -147,16 +150,19 @@ class TestRemoteClient(auto_stub.TestCase):
     c = remote_client.RemoteClientNative('http://localhost:1', None,
                                          'localhost', '/')
     c.bot_id = 'bot_id'
+    c.session_token = 'session-token'
 
     def mocked_call(url_path, data, expected_error_codes):
       self.assertEqual('/swarming/api/v1/bot/id_token', url_path)
-      self.assertEqual({
-          'account_id': 'account_id',
-          'audience': 'https://example.com',
-          'id': 'bot_id',
-          'task_id': 'task_id',
-      }, data)
-      self.assertEqual((400,), expected_error_codes)
+      self.assertEqual(
+          {
+              'account_id': 'account_id',
+              'audience': 'https://example.com',
+              'id': 'bot_id',
+              'session': 'session-token',
+              'task_id': 'task_id',
+          }, data)
+      self.assertEqual((400, ), expected_error_codes)
       return fake_resp
     self.mock(c, '_url_read_json', mocked_call)
 
@@ -195,6 +201,7 @@ class TestRemoteClient(auto_stub.TestCase):
   def test_rbe_create_session_ok(self):
     c = remote_client.RemoteClientNative('http://localhost:1', None,
                                          'localhost', '/')
+    c.session_token = 'swarming-session-token'
 
     def mocked_call(_url, data, retry_transient):
       self.assertEqual(
@@ -204,6 +211,7 @@ class TestRemoteClient(auto_stub.TestCase):
               },
               'bot_version': 'bot_version',
               'poll_token': 'poll_tok',
+              'session': 'swarming-session-token',
               'session_token': 'session_tok',
           }, data)
       self.assertFalse(retry_transient)
@@ -264,10 +272,12 @@ class TestRemoteClient(auto_stub.TestCase):
   def test_rbe_update_session_full_ok(self):
     c = remote_client.RemoteClientNative('http://localhost:1', None,
                                          'localhost', '/')
+    c.session_token = 'swarming-session-token'
 
     def mocked_call(_url, data, retry_transient):
       self.assertEqual(
           {
+              'session': 'swarming-session-token',
               'session_token': 'session_tok',
               'status': 'OK',
               'dimensions': {
@@ -315,10 +325,12 @@ class TestRemoteClient(auto_stub.TestCase):
   def test_rbe_update_session_minimal_ok(self):
     c = remote_client.RemoteClientNative('http://localhost:1', None,
                                          'localhost', '/')
+    c.session_token = 'swarming-session-token'
 
     def mocked_call(_url, data, retry_transient):
       self.assertEqual(
           {
+              'session': 'swarming-session-token',
               'session_token': 'session_tok',
               'status': 'OK',
               'dimensions': {
@@ -353,10 +365,12 @@ class TestRemoteClient(auto_stub.TestCase):
   def test_rbe_update_session_expired_session(self):
     c = remote_client.RemoteClientNative('http://localhost:1', None,
                                          'localhost', '/')
+    c.session_token = 'swarming-session-token'
 
     def mocked_call(_url, data, retry_transient):
       self.assertEqual(
           {
+              'session': 'swarming-session-token',
               'session_token': 'session_tok',
               'status': 'OK',
               'dimensions': {
