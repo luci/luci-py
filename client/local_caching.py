@@ -838,6 +838,7 @@ class NamedCache(Cache):
     self.state_file = os.path.join(cache_dir, self.STATE_FILE)
     self._lru = lru.LRUDict()
     self._keep = set(keep or [])
+    logging.info('NamedCache: keep = %s', keep)
     if not fs.isdir(self.cache_dir):
       fs.makedirs(self.cache_dir)
     elif fs.isfile(self.state_file):
@@ -1043,8 +1044,10 @@ class NamedCache(Cache):
   def _oldest_evictable_item(self):
     self._lock.assert_locked()
     for name, ts in self._lru.items_with_ts():
-        if name not in self._keep:
-          return name, ts
+      if name in self._keep:
+        logging.info("NamedCache: '%s' is kept", name)
+        continue
+      return name, ts
     return None, None
 
   def oldest_evictable_ts(self):
