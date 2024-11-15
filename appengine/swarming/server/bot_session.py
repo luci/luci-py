@@ -85,7 +85,7 @@ def is_expired_session(session):
   return utils.utcnow() > session.expiry.ToDatetime()
 
 
-def create(bot_id, session_id, bot_group_cfg):
+def create(bot_id, session_id, bot_group_cfg, rbe_instance):
   """Creates a new session_pb2.Session for an authorized connecting bot.
 
   Assumes all parameters have been validated already.
@@ -94,6 +94,7 @@ def create(bot_id, session_id, bot_group_cfg):
     bot_id: the bot ID as reported by the bot.
     session_id: the session ID as reported by the bot.
     bot_group_cfg: BotGroupConfig tuple with the bot config.
+    rbe_instance: the RBE instance the bot should use for bots in RBE mode.
 
   Returns:
     session_pb2.Session proto.
@@ -111,7 +112,8 @@ def create(bot_id, session_id, bot_group_cfg):
       # config can survive as long as the task (but not much longer). This will
       # be needed to allow the task to complete even if the bot is removed from
       # the config.
-      bot_config=_bot_config(bot_group_cfg, now, SESSION_TOKEN_EXPIRY),
+      bot_config=_bot_config(bot_group_cfg, rbe_instance, now,
+                             SESSION_TOKEN_EXPIRY),
       # This is used to know when to ask the bot to restart to pick up new
       # config values that affect the bot's behavior in some global way. Most
       # frequently this will be a change to the bot hooks script.
@@ -121,12 +123,13 @@ def create(bot_id, session_id, bot_group_cfg):
   return session
 
 
-def update(session, bot_group_cfg=None):
+def update(session, bot_group_cfg=None, rbe_instance=None):
   """Bumps the token expiration time, optionally also updating the config in it.
 
   Args:
     session: session_pb2.Session proto to update in-place.
     bot_group_cfg: BotGroupConfig tuple with the bot config.
+    rbe_instance: the RBE instance the bot should use for bots in RBE mode.
 
   Returns:
     The same session_pb2.Session proto.
@@ -136,7 +139,7 @@ def update(session, bot_group_cfg=None):
     # TODO: Use a larger config expiry when picking up a task. This will be
     # implemented in Go.
     session.bot_config.CopyFrom(
-        _bot_config(bot_group_cfg, now, SESSION_TOKEN_EXPIRY))
+        _bot_config(bot_group_cfg, rbe_instance, now, SESSION_TOKEN_EXPIRY))
   session.debug_info.CopyFrom(_debug_info(now))
   session.expiry.FromDatetime(now + SESSION_TOKEN_EXPIRY)
   return session
@@ -162,7 +165,7 @@ def _debug_info(now):
   return debug_info
 
 
-def _bot_config(bot_group_cfg, now, expiry):
+def _bot_config(bot_group_cfg, rbe_instance, now, expiry):
   """Constructs session_pb2.BotConfig from bot_groups_config.BotGroupConfig."""
   assert isinstance(bot_group_cfg, bot_groups_config.BotGroupConfig)
   cfg = session_pb2.BotConfig(
@@ -170,6 +173,7 @@ def _bot_config(bot_group_cfg, now, expiry):
       bot_auth=[_bot_auth(x) for x in bot_group_cfg.auth],
       system_service_account=bot_group_cfg.system_service_account,
       logs_cloud_project=bot_group_cfg.logs_cloud_project,
+      rbe_instance=rbe_instance,
   )
   cfg.expiry.FromDatetime(now + expiry)
   return cfg

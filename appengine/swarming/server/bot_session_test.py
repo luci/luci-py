@@ -100,6 +100,7 @@ EXPECTED_BOT_CONFIG = session_pb2.BotConfig(
     ],
     system_service_account='system@example.com',
     logs_cloud_project='logs-cloud-project',
+    rbe_instance='rbe',
 )
 
 
@@ -162,7 +163,7 @@ class BotSessionTest(test_case.TestCase):
     self.assertEqual(len(digest), 32)
 
   def test_create(self):
-    session = bot_session.create('bot-id', 'session-id', TEST_CONFIG)
+    session = bot_session.create('bot-id', 'session-id', TEST_CONFIG, 'rbe')
     self.assertEqual(
         session,
         session_pb2.Session(
@@ -188,7 +189,7 @@ class BotSessionTest(test_case.TestCase):
 
   def test_update(self):
     session = session_pb2.Session()
-    bot_session.update(session, TEST_CONFIG)
+    bot_session.update(session, TEST_CONFIG, 'rbe')
     self.assertEqual(
         session,
         session_pb2.Session(

@@ -102,6 +102,8 @@ message BotConfig {
   string system_service_account = 4;
   // The cloud project id where the bot saves its logs.
   string logs_cloud_project = 5;
+  // The RBE instance to establish an RBE session at.
+  string rbe_instance = 6;
 }
 
 

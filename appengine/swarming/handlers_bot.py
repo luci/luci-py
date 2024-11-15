@@ -772,6 +772,7 @@ class BotHandshakeHandler(_BotBaseHandler):
               bot_id=res.bot_id,
               session_id=session_id,
               bot_group_cfg=res.bot_group_cfg,
+              rbe_instance=res.rbe_instance,
           ))
 
     self.send_response(data)
@@ -898,7 +899,7 @@ class BotPollHandler(_BotBaseHandler):
         return
       # The session is valid. Refresh the config inside.
       session_token = bot_session.marshal(
-          bot_session.update(session, res.bot_group_cfg))
+          bot_session.update(session, res.bot_group_cfg, res.rbe_instance))
 
     if quarantined:
       bot_event('request_sleep')
