@@ -75,6 +75,16 @@ def unmarshal(session_token):
   return session
 
 
+def debug_log(session):
+  """Logs details of the token."""
+  logging.debug('Session token:\n%s', session)
+
+
+def is_expired_session(session):
+  """Returns True if this session has expired already."""
+  return utils.utcnow() > session.expiry.ToDatetime()
+
+
 def create(bot_id, session_id, bot_group_cfg):
   """Creates a new session_pb2.Session for an authorized connecting bot.
 
@@ -107,6 +117,27 @@ def create(bot_id, session_id, bot_group_cfg):
       # frequently this will be a change to the bot hooks script.
       handshake_config_hash=_handshake_config_hash(bot_group_cfg),
   )
+  session.expiry.FromDatetime(now + SESSION_TOKEN_EXPIRY)
+  return session
+
+
+def update(session, bot_group_cfg=None):
+  """Bumps the token expiration time, optionally also updating the config in it.
+
+  Args:
+    session: session_pb2.Session proto to update in-place.
+    bot_group_cfg: BotGroupConfig tuple with the bot config.
+
+  Returns:
+    The same session_pb2.Session proto.
+  """
+  now = utils.utcnow()
+  if bot_group_cfg:
+    # TODO: Use a larger config expiry when picking up a task. This will be
+    # implemented in Go.
+    session.bot_config.CopyFrom(
+        _bot_config(bot_group_cfg, now, SESSION_TOKEN_EXPIRY))
+  session.debug_info.CopyFrom(_debug_info(now))
   session.expiry.FromDatetime(now + SESSION_TOKEN_EXPIRY)
   return session
 

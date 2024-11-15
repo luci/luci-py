@@ -112,6 +112,32 @@ def is_valid_session_id(session_id):
   return bool(_SESSION_ID_RE.match(session_id))
 
 
+def refresh_session_token(request, session_token):
+  """Updates the expiration time in the token.
+
+  Unlike the refresh in /bot/poll, this one just bumps the expiration time and
+  doesn't touch or check any other fields. Unlike /bot/poll, it is expected to
+  be called by healthy enough bots.
+
+  Aborts the request if the token is invalid or expired.
+  """
+  if not session_token:
+    return None
+  try:
+    session = bot_session.unmarshal(session_token)
+  except bot_session.BadSessionToken as e:
+    logging.error('Malformed session token: %s', e)
+    request.abort_with_error(401, error='Bad session token')
+    return
+  logging.info('Session ID: %s', session.session_id)
+  if bot_session.is_expired_session(session):
+    logging.error('Expired bot session')
+    bot_session.debug_log(session)
+    request.abort_with_error(403, error='Expired session token')
+    return
+  return bot_session.marshal(bot_session.update(session))
+
+
 ## Generic handlers (no auth)
 
 
@@ -779,7 +805,7 @@ class BotPollHandler(_BotBaseHandler):
       # Ignore everything, just sleep. Tell the bot it is quarantined to inform
       # it that it won't be running anything anyway. Use a large streak so it
       # will sleep for 60s.
-      self._cmd_sleep(1000, True)
+      self._cmd_sleep(None, 1000, True)
       return
 
     deadline = utils.utcnow() + datetime.timedelta(seconds=60)
@@ -841,9 +867,42 @@ class BotPollHandler(_BotBaseHandler):
       self._cmd_bot_restart('Restarting to pick up new bots.cfg config')
       return
 
+    # If the bot is using a session, validate and refresh the session token.
+    session_token = res.request.get('session')
+    if session_token:
+      try:
+        session = bot_session.unmarshal(session_token)
+      except bot_session.BadSessionToken as e:
+        # This happens if the token is complete nonsense (or was signed by
+        # a revoked or unknown key). This should not be happening.
+        logging.error('Malformed session token: %s', e)
+        self.abort_with_error(401, error='Bad session token')
+        return
+      if res.bot_id != session.bot_id:
+        logging.error('Bot ID mismatch %s != %s', res.bot_id, session.bot_id)
+        bot_session.debug_log(session)
+        self.abort_with_error(403,
+                              error='Unexpected bot ID in the session %s' %
+                              session.bot_id)
+        return
+      logging.info('Session ID: %s', session.session_id)
+      # If the session has expired, ask the bot to restart itself to get a new
+      # session. This can happen if the bot was stuck somewhere for a while
+      # (or had no network connection). We need this because very likely the
+      # state in the session (like the RBE session ID) is stale already.
+      if bot_session.is_expired_session(session):
+        logging.error('Expired bot session: asking the bot to restart')
+        bot_session.debug_log(session)
+        bot_event('request_restart')
+        self._cmd_bot_restart('Restarting because the bot session expired')
+        return
+      # The session is valid. Refresh the config inside.
+      session_token = bot_session.marshal(
+          bot_session.update(session, res.bot_group_cfg))
+
     if quarantined:
       bot_event('request_sleep')
-      self._cmd_sleep(sleep_streak, quarantined)
+      self._cmd_sleep(session_token, sleep_streak, quarantined)
       return
 
     #
@@ -862,7 +921,7 @@ class BotPollHandler(_BotBaseHandler):
     if res.state.get('maintenance'):
       bot_event('request_sleep')
       # Tell the bot it's considered quarantined.
-      self._cmd_sleep(sleep_streak, True)
+      self._cmd_sleep(session_token, sleep_streak, True)
       return
 
     bot_info = bot_management.get_info_key(res.bot_id).get(use_cache=False,
@@ -928,7 +987,7 @@ class BotPollHandler(_BotBaseHandler):
       if not res.rbe_instance:
         # If this is a native Swarming bot, tell it to sleep a bit.
         bot_event('request_sleep')
-        self._cmd_sleep(sleep_streak, False)
+        self._cmd_sleep(session_token, sleep_streak, False)
       else:
         # If this is an RBE Swarming bot, tell it to switch to RBE or keep using
         # RBE if it already does. It is important we record an appropriate bot
@@ -938,7 +997,7 @@ class BotPollHandler(_BotBaseHandler):
           bot_event('bot_polling')  # the bot got a task from RBE recently
         else:
           bot_event('bot_idle')  # the bot is not seeing any RBE tasks
-        self._cmd_rbe(sleep_streak, res)
+        self._cmd_rbe(session_token, sleep_streak, res)
       return
 
     # This part is tricky since it intentionally runs a transaction after
@@ -948,16 +1007,17 @@ class BotPollHandler(_BotBaseHandler):
       if res.rbe_instance:
         logging.warning('RBE: termination through Swarming scheduler')
       bot_event('bot_terminate', task_id=run_result.task_id)
-      self._cmd_terminate(run_result.task_id)
+      self._cmd_terminate(session_token, run_result.task_id)
     else:
       if res.rbe_instance:
         logging.warning('RBE: task through Swarming scheduler')
       bot_event('request_task',
                 task_id=run_result.task_id,
                 task_name=request.name)
-      self._cmd_run(request, secret_bytes, run_result, res)
+      self._cmd_run(session_token, request, secret_bytes, run_result, res)
 
-  def _cmd_run(self, request, secret_bytes, run_result, bot_request_info):
+  def _cmd_run(self, session, request, secret_bytes, run_result,
+               bot_request_info):
     logging.info('Run: %s', request.task_id)
     manifest = self.prepare_manifest(request, secret_bytes, run_result,
                                      bot_request_info)
@@ -967,9 +1027,11 @@ class BotPollHandler(_BotBaseHandler):
     }
     if bot_request_info.rbe_instance:
       out['rbe'] = bot_request_info.rbe_params(0)
+    if session:
+      out['session'] = session
     self.send_response(out)
 
-  def _cmd_sleep(self, sleep_streak, quarantined):
+  def _cmd_sleep(self, session, sleep_streak, quarantined):
     duration = task_scheduler.exponential_backoff(sleep_streak)
     logging.debug('Sleep: streak: %d; duration: %ds; quarantined: %s',
                   sleep_streak, duration, quarantined)
@@ -978,23 +1040,29 @@ class BotPollHandler(_BotBaseHandler):
         'duration': duration,
         'quarantined': quarantined,  # TODO(vadimsh): Appears to be ignored.
     }
+    if session:
+      out['session'] = session
     self.send_response(out)
 
-  def _cmd_rbe(self, sleep_streak, bot_request_info):
+  def _cmd_rbe(self, session, sleep_streak, bot_request_info):
     logging.info('RBE mode: %s%s', bot_request_info.rbe_instance,
                  ' (hybrid)' if bot_request_info.rbe_hybrid_mode else '')
     out = {
         'cmd': 'rbe',
         'rbe': bot_request_info.rbe_params(sleep_streak),
     }
+    if session:
+      out['session'] = session
     self.send_response(out)
 
-  def _cmd_terminate(self, task_id):
+  def _cmd_terminate(self, session, task_id):
     logging.info('Terminate: %s', task_id)
     out = {
         'cmd': 'terminate',
         'task_id': task_id,
     }
+    if session:
+      out['session'] = session
     self.send_response(out)
 
   def _cmd_update(self, expected_version):
@@ -1034,6 +1102,9 @@ class BotClaimHandler(_BotBaseHandler):
   def post(self):
     res = self.process()
 
+    # If the bot is using a session, validate and refresh the session token.
+    session_token = refresh_session_token(self, res.request.get('session'))
+
     logging.info('Claiming task %s (shard %s, id %s)', res.request['task_id'],
                  res.request['task_to_run_shard'],
                  res.request['task_to_run_id'])
@@ -1057,7 +1128,7 @@ class BotClaimHandler(_BotBaseHandler):
       self.abort_by_timeout('bot_claim_slice', e)
     except task_scheduler.ClaimError as e:
       # The slice was already claimed by someone else (or it has expired).
-      self._cmd_skip(str(e))
+      self._cmd_skip(session_token, str(e))
       return
 
     # Update the state of the bot in the DB. It is now presumably works on
@@ -1087,32 +1158,42 @@ class BotClaimHandler(_BotBaseHandler):
 
     # Return the payload to the bot.
     if is_terminate:
-      self._cmd_terminate(run_result.task_id)
+      self._cmd_terminate(session_token, run_result.task_id)
     else:
-      self._cmd_run(request, secret_bytes, run_result, res)
+      self._cmd_run(session_token, request, secret_bytes, run_result, res)
 
-  def _cmd_skip(self, reason):
+  def _cmd_skip(self, session, reason):
     logging.info('Skip: %s', reason)
-    self.send_response({
+    out = {
         'cmd': 'skip',
         'reason': reason,
-    })
+    }
+    if session:
+      out['session'] = session
+    self.send_response(out)
 
-  def _cmd_terminate(self, task_id):
+  def _cmd_terminate(self, session, task_id):
     logging.info('Terminate: %s', task_id)
-    self.send_response({
+    out = {
         'cmd': 'terminate',
         'task_id': task_id,
-    })
+    }
+    if session:
+      out['session'] = session
+    self.send_response(out)
 
-  def _cmd_run(self, request, secret_bytes, run_result, bot_request_info):
+  def _cmd_run(self, session, request, secret_bytes, run_result,
+               bot_request_info):
     logging.info('Run: %s', request.task_id)
     manifest = self.prepare_manifest(request, secret_bytes, run_result,
                                      bot_request_info)
-    self.send_response({
+    out = {
         'cmd': 'run',
         'manifest': manifest,
-    })
+    }
+    if session:
+      out['session'] = session
+    self.send_response(out)
 
 
 class BotEventHandler(_BotBaseHandler):
@@ -1426,6 +1507,9 @@ class BotTaskUpdateHandler(_BotApiHandler):
     # auth.AuthorizationError if not.
     bot_auth.authenticate_bot(bot_id)
 
+    # If the bot is using a session, validate and refresh the session token.
+    session_token = refresh_session_token(self, request.get('session'))
+
     bot_overhead = request.get('bot_overhead')
     cipd_pins = request.get('cipd_pins')
     cipd_stats = request.get('cipd_stats')
@@ -1590,7 +1674,10 @@ class BotTaskUpdateHandler(_BotApiHandler):
     must_stop = state in (task_result.State.BOT_DIED, task_result.State.KILLED)
     if must_stop:
       logging.info('asking bot to kill the task')
-    self.send_response({'must_stop': must_stop, 'ok': True})
+    out = {'must_stop': must_stop, 'ok': True}
+    if session_token:
+      out['session'] = session_token
+    self.send_response(out)
 
 
 class BotTaskErrorHandler(_BotApiHandler):

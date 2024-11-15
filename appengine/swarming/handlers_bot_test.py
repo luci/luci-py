@@ -482,6 +482,38 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
+  def test_poll_session_refresh(self):
+    handshake_response = {}
+    params = self.do_handshake(session_id='fake-session',
+                               response_copy=handshake_response)
+    self.assertTrue('session' in handshake_response)
+    session = handshake_response['session']
+
+    self.now += datetime.timedelta(seconds=1)
+    self.mock_now(self.now)
+
+    params['session'] = session
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertNotEqual(session, response['session'])
+
+  def test_poll_session_expiry(self):
+    handshake_response = {}
+    params = self.do_handshake(session_id='fake-session',
+                               response_copy=handshake_response)
+    self.assertTrue('session' in handshake_response)
+    session = handshake_response['session']
+
+    self.now += datetime.timedelta(hours=2)
+    self.mock_now(self.now)
+
+    params['session'] = session
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertEqual(
+        response, {
+            u'cmd': u'bot_restart',
+            u'message': u'Restarting because the bot session expired',
+        })
+
   def test_poll_rbe(self):
     _, bot_auth_cfg = self.mock_bot_group_config(
         version='default',

@@ -66,6 +66,42 @@ TEST_CONFIG = _bot_group_config(
 
 TEST_TIME = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
 
+EXPECTED_BOT_CONFIG = session_pb2.BotConfig(
+    expiry={
+        'seconds': 1262405045,
+        'nanos': 6000
+    },
+    debug_info={
+        'created': {
+            'seconds': 1262401445,
+            'nanos': 6000
+        },
+        'swarming_version': 'py/v1a',
+        'request_id': '7357B3D7091D',
+    },
+    bot_auth=[
+        {
+            'require_luci_machine_token': True,
+            'log_if_failed': True
+        },
+        {
+            'require_service_account': ['sa1@example.com', 'sa2@example.com'],
+            'log_if_failed': True
+        },
+        {
+            'require_gce_vm_token': {
+                'project': 'gce-proj'
+            },
+            'log_if_failed': True
+        },
+        {
+            'ip_whitelist': 'ip-allowlist'
+        },
+    ],
+    system_service_account='system@example.com',
+    logs_cloud_project='logs-cloud-project',
+)
+
 
 class BotSessionTest(test_case.TestCase):
 
@@ -103,6 +139,15 @@ class BotSessionTest(test_case.TestCase):
     with self.assertRaises(bot_session.BadSessionToken):
       bot_session.unmarshal(serialized)
 
+  def test_is_expired_session(self):
+    good = session_pb2.Session()
+    good.expiry.FromDatetime(TEST_TIME + datetime.timedelta(seconds=1))
+    self.assertFalse(bot_session.is_expired_session(good))
+
+    bad = session_pb2.Session()
+    bad.expiry.FromDatetime(TEST_TIME - datetime.timedelta(seconds=1))
+    self.assertTrue(bot_session.is_expired_session(bad))
+
   def test_handshake_config(self):
     data = bot_session._handshake_config_extract(TEST_CONFIG)
     self.assertEqual(data, [
@@ -135,47 +180,31 @@ class BotSessionTest(test_case.TestCase):
                 'swarming_version': 'py/v1a',
                 'request_id': '7357B3D7091D',
             },
-            bot_config={
-                'expiry': {
-                    'seconds': 1262405045,
-                    'nanos': 6000
-                },
-                'debug_info': {
-                    'created': {
-                        'seconds': 1262401445,
-                        'nanos': 6000
-                    },
-                    'swarming_version': 'py/v1a',
-                    'request_id': '7357B3D7091D',
-                },
-                'bot_auth': [
-                    {
-                        'require_luci_machine_token': True,
-                        'log_if_failed': True
-                    },
-                    {
-                        'require_service_account':
-                        ['sa1@example.com', 'sa2@example.com'],
-                        'log_if_failed':
-                        True
-                    },
-                    {
-                        'require_gce_vm_token': {
-                            'project': 'gce-proj'
-                        },
-                        'log_if_failed': True
-                    },
-                    {
-                        'ip_whitelist': 'ip-allowlist'
-                    },
-                ],
-                'system_service_account':
-                'system@example.com',
-                'logs_cloud_project':
-                'logs-cloud-project',
-            },
+            bot_config=EXPECTED_BOT_CONFIG,
             handshake_config_hash=bot_session._handshake_config_hash(
                 TEST_CONFIG),
+        ))
+    bot_session.debug_log(session)
+
+  def test_update(self):
+    session = session_pb2.Session()
+    bot_session.update(session, TEST_CONFIG)
+    self.assertEqual(
+        session,
+        session_pb2.Session(
+            expiry={
+                'seconds': 1262405045,
+                'nanos': 6000
+            },
+            debug_info={
+                'created': {
+                    'seconds': 1262401445,
+                    'nanos': 6000
+                },
+                'swarming_version': 'py/v1a',
+                'request_id': '7357B3D7091D',
+            },
+            bot_config=EXPECTED_BOT_CONFIG,
         ))
 
 
