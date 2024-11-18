@@ -62,8 +62,7 @@ class SimpleMainTest(TestCase):
     expected = bot_main.get_attributes(botobj)
 
     NON_DETERMINISTIC = ('cwd', 'disks', 'nb_files_in_temp', 'pid',
-                         'running_time', 'started_ts', 'uptime', 'temp',
-                         'original_bot_id')
+                         'running_time', 'started_ts', 'uptime', 'temp')
     for key in NON_DETERMINISTIC:
       actual['state'].pop(key, None)
       expected['state'].pop(key, None)

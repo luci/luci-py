@@ -421,7 +421,6 @@ class _BotBaseHandler(_BotApiHandler):
     * sleep_streak: number of consecutive idle cycles. Native scheduler only.
     * maintenance: a bot maintenance message. If set, the bot won't get tasks.
     * quarantined: a boolean, if True the bot won't get tasks.
-    * original_bot_id: the ID the bot started with.
     * bot_group_cfg_version: the version of BotGroupConfig the bot is using now.
     * rbe_instance: the RBE instance the bot is connected to right now.
     * rbe_session: the RBE session ID, if have an active RBE session.
@@ -814,13 +813,6 @@ class BotPollHandler(_BotBaseHandler):
 
     sleep_streak = res.state.get('sleep_streak', 0)
     quarantined = bool(res.quarantined_msg)
-
-    # TODO(vadimsh): This is temporary to detect bots that dynamically change
-    # ID. See bot_main._get_state.
-    original_bot_id = res.state.get('original_bot_id')
-    if original_bot_id and original_bot_id != res.bot_id:
-      logging.error('bot_id_mismatch: original=%s, reported=%s' %
-                    (original_bot_id, res.bot_id))
 
     # Note bot existence at two places, one for stats at 1 minute resolution,
     # the other for the list of known bots.
