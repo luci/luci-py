@@ -54,7 +54,6 @@ from bot_code import file_refresher
 from bot_code import remote_client
 from bot_code import remote_client_errors
 from bot_code import singleton
-from infra_libs import ts_mon
 from utils import file_path
 from utils import fs
 from utils import net
@@ -142,10 +141,6 @@ DEFAULT_SETTINGS = {
     },
 }
 
-# Keep in sync with ../../ts_mon_metrics.py
-_IGNORED_DIMENSIONS = (
-    'android_devices', 'caches', 'id', 'server_version', 'temp_band')
-
 # Flag to decide if bot is running in test mode. This is mostly used by smoke
 # and integration tests.
 # TODO(1099655): Remove once we have fully enabled CIPD in both prod and tests.
@@ -155,64 +150,16 @@ _IN_TEST_MODE = False
 ### Monitoring
 
 
-_bucketer = ts_mon.GeometricBucketer(growth_factor=10**0.07,
-                                     num_finite_buckets=100)
-
-_hooks_durations = ts_mon.CumulativeDistributionMetric(
-    'swarming/bots/hooks/durations',
-    'Duration of bot hook calls in ms', [
-        ts_mon.StringField('hookname'),
-        ts_mon.StringField('pool'),
-    ],
-    bucketer=_bucketer,
-    units=ts_mon.MetricsDataUnits.MILLISECONDS)
-
-
-def _pool_from_dimensions(dimensions):
-  """Return a canonical string of flattened dimensions."""
-  # Keep in sync with ../../ts_mon_metrics.py
-  pairs = []
-  for key, values in dimensions.items():
-    if key in _IGNORED_DIMENSIONS:
-      continue
-    # Strip all the prefixes of other values. values is already sorted.
-    for i, value in enumerate(values):
-      if not any(v.startswith(value) for v in values[i+1:]):
-        pairs.append('%s:%s' % (key, value))
-  return '|'.join(sorted(pairs))
-
-
 def _monitor_call(func):
-  """Decorates a functions and reports the runtime to ts_mon."""
+  """Decorates a functions and reports the runtime into logs."""
   def hook(chained, botobj, name, *args, **kwargs):
     start = time.time()
     try:
       return func(chained, botobj, name, *args, **kwargs)
     finally:
       duration = max(0, (time.time() - start) * 1000)
-      if botobj and botobj.dimensions:
-        flat_dims = _pool_from_dimensions(botobj.dimensions)
-        if flat_dims:
-          logging.info('ts_mon hook_name=%r pool=%r', name, flat_dims)
-          _hooks_durations.add(
-              duration, fields={'hookname': name, 'pool': flat_dims})
       logging.info('%s(): %gs', name, round(duration/1000., 3))
   return hook
-
-
-def _init_ts_mon():
-  """Initializes ts_mon."""
-  parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
-  ts_mon.add_argparse_options(parser)
-  parser.set_defaults(
-      ts_mon_target_type='task',
-      ts_mon_task_service_name='swarming-bot',
-      ts_mon_task_job_name='default',
-      ts_mon_flush='auto',
-      ts_mon_ca_certs=tools.get_cacerts_bundle(),
-  )
-  args = parser.parse_args([])
-  ts_mon.process_argparse_options(args)
 
 
 ### bot_config handler
@@ -1117,9 +1064,6 @@ def _run_bot_inner(arg_error, quit_bit):
   - bot process shuts down (this includes a signal is received)
   """
   config = get_config()
-
-  # Do NOT enable tsmon.
-  # TODO(gregorynisbet): Clean this up to remove all the logic that uses tsmon.
 
   try:
     # First thing is to get an arbitrary url. This also ensures the network is
