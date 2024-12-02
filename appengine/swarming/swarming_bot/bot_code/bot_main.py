@@ -1245,8 +1245,6 @@ class _BotLoopState:
 
     # The version string to report to RBE for monitoring and logs.
     self._rbe_bot_version = rbe_bot_version
-    # The last RBE poll token received from Swarming.
-    self._rbe_poll_token = None
     # The RBE instance Swarming told us to use.
     self._rbe_intended_instance = None
     # The intended status of the RBE session.
@@ -1603,7 +1601,6 @@ class _BotLoopState:
     """
     # Update the intended RBE state. This state will be eventually realized in
     # rbe_poll(...), perhaps after some retries.
-    self._rbe_poll_token = rbe_state['poll_token']
     self._rbe_intended_instance = rbe_state['instance']
     self._rbe_intended_status = remote_client.RBESessionStatus.OK
     self._rbe_hybrid_mode = rbe_state['hybrid_mode']
@@ -1651,7 +1648,6 @@ class _BotLoopState:
         remote_client.RBESessionStatus.HOST_REBOOTING,
         remote_client.RBESessionStatus.BOT_TERMINATING,
     ), status
-    self._rbe_poll_token = None
     self._rbe_intended_instance = None
     self._rbe_intended_status = status
     self._rbe_hybrid_mode = False
@@ -1690,7 +1686,6 @@ class _BotLoopState:
       maintenance: if True, just ping RBE, but do not pick up any tasks.
       blocking: if True, allow waiting for a bit for new leases to appear.
     """
-    assert self._rbe_poll_token
     assert self._rbe_intended_instance
 
     if self._rbe_hybrid_mode:
@@ -1721,9 +1716,8 @@ class _BotLoopState:
       try:
         logging.info('RBE: opening session at %s', self._rbe_intended_instance)
         self._rbe_session = remote_client.RBESession(
-            self._bot.remote, self._rbe_intended_instance, self._bot.dimensions,
-            self._rbe_bot_version, self._bot.rbe_worker_properties,
-            self._rbe_poll_token)
+            self._bot.remote, self._rbe_intended_instance,
+            self._rbe_bot_version, self._bot.rbe_worker_properties)
         logging.info('RBE: session is %s', self._rbe_session.session_id)
         self._rbe_consecutive_errors = 0
       except remote_client_errors.RBEServerError as e:
@@ -1754,8 +1748,7 @@ class _BotLoopState:
         report_status = remote_client.RBESessionStatus.MAINTENANCE
       logging.info('RBE: updating %s as %s (blocking=%s)',
                    self._rbe_session.session_id, report_status, blocking)
-      lease = self._rbe_session.update(report_status, self._bot.dimensions,
-                                       self._rbe_poll_token, blocking)
+      lease = self._rbe_session.update(report_status, blocking)
 
       # This session could have been closed (either by us or by the server).
       # We should abandon this session and create a new one on the next loop

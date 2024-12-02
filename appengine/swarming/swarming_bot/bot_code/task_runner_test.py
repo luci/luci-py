@@ -417,7 +417,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       def recreate(self):
         self.alive = True
 
-      def update(self, **_kwargs):
+      def update(self, *_args):
         assert self.alive
         self.updates += 1
 
@@ -1533,11 +1533,8 @@ class TaskRunnerNoServer(auto_stub.TestCase):
 
     rbe_session_dict = {
         'instance': 'rbe-instance',
-        'dimensions': {},
         'bot_version': 'bot_version',
         'worker_properties': None,
-        'poll_token': 'poll-tok',
-        'session_token': 'session-tok',
         'session_id': 'session-id',
         'last_acked_status': 'OK',
         'active_lease': None,

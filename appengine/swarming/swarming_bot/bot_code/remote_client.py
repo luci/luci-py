@@ -575,25 +575,18 @@ class RemoteClientNative(object):
     return resp
 
   def rbe_create_session(self,
-                         dimensions,
                          bot_version,
                          worker_properties,
-                         poll_token,
-                         session_token=None,
                          retry_transient=False):
     """Creates a new RBE session via Swarming RBE backend.
 
-    Parameters of the new session are provided by the Swarming Python backend
-    via the `poll_token` returned by poll(...) with `rbe` command (or via
-    `session_token` if reopening a session that suddenly died). The swarming
-    bot process doesn't need to know them and can't interfere with them.
+    The RBE session will use the same dimensions and RBE instance as associated
+    with the bot on the backend via the last /poll call. The only way to change
+    dimensions of the RBE session is to call /poll.
 
     Arguments:
-      dimensions: a dict with bot dimensions as {str => [str]}.
       bot_version: a string with bot version for monitoring and logs.
       worker_properties: a WorkerProperties instance or None.
-      poll_token: a token reported by `rbe` poll(...) command.
-      session_token: a session token of a previous session if reopening it.
       retry_transient: True to retry many times on transient errors. This is
           a very crude retry mechanism intended to be used only if there's no
           better retry loop already.
@@ -604,18 +597,12 @@ class RemoteClientNative(object):
     Raises:
       RBEServerError if the RPC fails for whatever reason.
     """
-    data = {
-        'dimensions': dimensions,
-        'poll_token': poll_token,  # TODO: Will be deleted soon
-        'session': self._session_token,
-    }
+    data = {'session': self._session_token}
     if bot_version:
       data['bot_version'] = bot_version
     if worker_properties:
       assert isinstance(worker_properties, WorkerProperties), worker_properties
       data['worker_properties'] = worker_properties.to_dict()
-    if session_token:  # TODO: Will be deleted soon
-      data['session_token'] = session_token
     resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/create',
                                data=data,
                                retry_transient=retry_transient)
@@ -631,33 +618,22 @@ class RemoteClientNative(object):
         raise RBEServerError('Missing or incorrect `%s` in %s' % (key, resp))
       return val
 
-    return RBECreateSessionResponse(session_token=get_str('session_token'),
-                                    session_id=get_str('session_id'))
+    return RBECreateSessionResponse(session_id=get_str('session_id'))
 
   def rbe_update_session(self,
-                         session_token,
                          status,
-                         dimensions,
                          bot_version,
                          worker_properties,
                          lease=None,
-                         poll_token=None,
                          blocking=True,
                          retry_transient=False):
     """Updates the state of an RBE session.
 
-    The backend will update the state of the RBE session and refresh the session
-    token (perhaps using the data in the given `poll_token` returned by Python
-    Swarming backend).
-
     Arguments:
-      session_token: the session token returned by the previous update call.
       status: the desired bot session status as RBESessionStatus enum.
-      dimensions: a dict with bot dimensions as {str => [str]}.
       bot_version: a string with bot version for monitoring and logs.
       worker_properties: a WorkerProperties instance or None.
       lease: an optional RBELease the bot is or was working on.
-      poll_token: a token reported by latest `rbe` poll(...) command, optional.
       blocking: if True, allow waiting for a bit for new leases to appear.
       retry_transient: True to retry many times on transient errors. This is
           a very crude retry mechanism intended to be used only if there's no
@@ -672,9 +648,7 @@ class RemoteClientNative(object):
     assert status in RBESessionStatus, status
     data = {
         'session': self._session_token,
-        'session_token': session_token,  # TODO: Will be deleted soon
         'status': status.name,
-        'dimensions': dimensions,
     }
     if bot_version:
       data['bot_version'] = bot_version
@@ -684,8 +658,6 @@ class RemoteClientNative(object):
     if lease:
       assert isinstance(lease, RBELease), lease
       data['lease'] = lease.to_dict(omit_payload=True)
-    if poll_token:  # TODO: Will be deleted soon
-      data['poll_token'] = poll_token
     if not blocking:
       data['nonblocking'] = True
 
@@ -706,9 +678,6 @@ class RemoteClientNative(object):
         raise RBEServerError('Missing or incorrect `%s` in %s' % (key, resp))
       return val
 
-    # Session token may be missing if the session has expired already.
-    session_token = get_str('session_token', optional=True)
-
     try:
       status = RBESessionStatus[get_str('status')]
     except KeyError as e:
@@ -721,9 +690,7 @@ class RemoteClientNative(object):
       except (ValueError, TypeError):
         raise RBEServerError('Invalid `lease` in %s' % (resp, ))
 
-    return RBEUpdateSessionResponse(session_token=session_token,
-                                    status=status,
-                                    lease=lease)
+    return RBEUpdateSessionResponse(status=status, lease=lease)
 
 
 ################################################################################
@@ -756,13 +723,6 @@ class RBELeaseState(enum.Enum):
 RBECreateSessionResponse = collections.namedtuple(
     'RBECreateSessionResponse',
     [
-        # A base64-encoded string that encodes the RBE bot session ID and bot
-        # configuration provided via the poll token.
-        #
-        # The session token is needed to call rbe_update_session(...). This call
-        # also will periodically refresh it.
-        'session_token',
-
         # An RBE bot session ID as encoded in the session token.
         #
         # Primarily for the bot debug log. It is not used directly by anything.
@@ -773,11 +733,6 @@ RBECreateSessionResponse = collections.namedtuple(
 RBEUpdateSessionResponse = collections.namedtuple(
     'RBEUpdateSessionResponse',
     [
-        # An up-to-date session token which should be passed to the next
-        # rbe_update_session(...) call. Might be missing if the session has
-        # expired already.
-        'session_token',
-
         # The bot session status as the RBE backend sees it.
         #
         # It is one of RBESessionStatus enum variants. In particular, a non-OK
@@ -910,46 +865,33 @@ class RBESession:
 
   It is created in the constructor and, once dead, can be recreated in-place via
   recreate(). A recreated session has a different ID.
-
-  TODO: poll_token and session_token will soon be replaced by SessionState.
   """
 
   def __init__(self,
                remote,
                instance,
-               dimensions,
                bot_version,
                worker_properties,
-               poll_token,
-               session_token=None,
                session_id=None):
     """Creates a new RBE session via Swarming RBE backend.
 
     Arguments:
       remote: an instance of RemoteClientNative to use to call Swarming RBE.
       instance: an RBE instance this session will be running on.
-      dimensions: a dict with bot dimensions as {str => [str]}.
       bot_version: a string with bot version for monitoring and logs.
       worker_properties: a WorkerProperties instance or None.
-      poll_token: a token reported by `rbe` poll(...) command.
-      session_token: if set, do not call rbe_create_session, use this token.
-      session_id: if set, do not call rbe_create_session, use this ID.
+      session_id: if set, do not call rbe_create_session, use this RBE session.
 
     Raises:
       RBEServerError if the RPC fails for whatever reason.
     """
-    if not session_token or not session_id:
-      resp = remote.rbe_create_session(dimensions, bot_version,
-                                       worker_properties, poll_token)
-      session_token = resp.session_token
+    if not session_id:
+      resp = remote.rbe_create_session(bot_version, worker_properties)
       session_id = resp.session_id
     self._remote = remote
     self._instance = instance
-    self._dimensions = copy.deepcopy(dimensions)
     self._bot_version = bot_version
     self._worker_properties = worker_properties
-    self._poll_token = poll_token
-    self._session_token = session_token
     self._session_id = session_id
     self._last_acked_status = RBESessionStatus.OK
     self._active_lease = None
@@ -961,16 +903,10 @@ class RBESession:
     return {
         'instance':
         self._instance,
-        'dimensions':
-        self._dimensions,
         'bot_version':
         self._bot_version,
         'worker_properties':
         self._worker_properties.to_dict() if self._worker_properties else None,
-        'poll_token':
-        self._poll_token,
-        'session_token':
-        self._session_token,
         'session_id':
         self._session_id,
         'last_acked_status':
@@ -999,10 +935,8 @@ class RBESession:
       raise ValueError('Invalid worker_properties dict: %s' % e)
 
     try:
-      session = RBESession(remote, dump['instance'], dump['dimensions'],
-                           dump['bot_version'], worker_properties,
-                           dump['poll_token'], dump['session_token'],
-                           dump['session_id'])
+      session = RBESession(remote, dump['instance'], dump['bot_version'],
+                           worker_properties, dump['session_id'])
       last_acked_status = dump['last_acked_status']
       active_lease = dump['active_lease']
       finished_lease = dump['finished_lease']
@@ -1034,11 +968,8 @@ class RBESession:
     loaded = RBESession.from_dict(self._remote, dump)
     self._instance = loaded._instance
     self._session_id = loaded._session_id
-    self._dimensions = loaded._dimensions
     self._bot_version = loaded._bot_version
     self._worker_properties = loaded._worker_properties
-    self._poll_token = loaded._poll_token
-    self._session_token = loaded._session_token
     self._last_acked_status = loaded._last_acked_status
     self._active_lease = loaded._active_lease
     self._finished_lease = loaded._finished_lease
@@ -1048,11 +979,6 @@ class RBESession:
   def instance(self):
     """The RBE instance this session is running on."""
     return self._instance
-
-  @property
-  def dimensions(self):
-    """Last known dimensions of the session."""
-    return self._dimensions
 
   @property
   def session_id(self):
@@ -1082,7 +1008,7 @@ class RBESession:
     """An RBELease the bot should be working on now."""
     return self._active_lease
 
-  def update(self, status, dimensions, poll_token, blocking=True):
+  def update(self, status, blocking=True):
     """Updates the state of the session, picks up a new lease, if any.
 
     Should be called in the outer bot loop, when the bot is waiting for new
@@ -1101,8 +1027,6 @@ class RBESession:
 
     Arguments:
       status: the new RBE session status to report as RBESessionStatus enum.
-      dimensions: up-to-date bot dimensions as a dict {str => [str]}.
-      poll_token: the most recent poll token from Python Swarming.
       blocking: if True, allow waiting for a bit for new leases to appear.
 
     Returns:
@@ -1117,18 +1041,12 @@ class RBESession:
     if self.active_lease:
       raise RBESessionException('Calling update(...) with an active lease')
 
-    # Refresh the "last known" values to use in other methods.
-    self._poll_token = poll_token
-    self._dimensions = copy.deepcopy(dimensions)
-
     # Report the result of the finished lease (if any), and get a new lease.
     assert (not self._finished_lease
             or self._finished_lease.state == RBELeaseState.COMPLETED
             ), self._finished_lease
     lease = self._update(status=status,
-                         dimensions=self._dimensions,
                          lease=self._finished_lease,
-                         poll_token=self._poll_token,
                          blocking=blocking)
     self._finished_lease = None  # flushed the result successfully
 
@@ -1192,9 +1110,7 @@ class RBESession:
     # must still be good, since it is refreshed by _update. Report the latest
     # snapshot of the dimensions though, since the API always wants dimensions.
     self._active_lease.state = RBELeaseState.ACTIVE
-    lease = self._update(status=RBESessionStatus.OK,
-                         dimensions=self._dimensions,
-                         lease=self._active_lease)
+    lease = self._update(status=RBESessionStatus.OK, lease=self._active_lease)
 
     # If the session is gone, the lease is lost.
     if not self.alive:
@@ -1264,7 +1180,6 @@ class RBESession:
       return
 
     lease = self._update(status=RBESessionStatus.MAINTENANCE,
-                         dimensions=self._dimensions,
                          lease=self._finished_lease,
                          blocking=False,
                          retry_transient=True)
@@ -1300,7 +1215,6 @@ class RBESession:
 
     try:
       lease = self._update(status=status,
-                           dimensions=self._dimensions,
                            lease=self._finished_lease,
                            retry_transient=True)
       if lease:
@@ -1330,12 +1244,9 @@ class RBESession:
     # Try to create a replacement session using the same parameters. We need to
     # pass the previous session token to grab server-signed parameters from it
     # in case the poll token is already stale.
-    resp = self._remote.rbe_create_session(self._dimensions, self._bot_version,
-                                           self._worker_properties,
-                                           self._poll_token,
-                                           self._session_token)
+    resp = self._remote.rbe_create_session(self._bot_version,
+                                           self._worker_properties)
     self._session_id = resp.session_id
-    self._session_token = resp.session_token
     self._last_acked_status = RBESessionStatus.OK
     self._terminated = False
 
@@ -1359,13 +1270,7 @@ class RBESession:
       logging.error('Lost results of %s', self._finished_lease.id)
       self._finished_lease = None
 
-  def _update(self,
-              status,
-              dimensions,
-              poll_token=None,
-              lease=None,
-              blocking=True,
-              retry_transient=False):
+  def _update(self, status, lease=None, blocking=True, retry_transient=False):
     """Used internally by other methods.
 
     Updates `alive` and `terminating` properties based on the server response.
@@ -1373,8 +1278,6 @@ class RBESession:
 
     Arguments:
       status: the desired bot session status as RBESessionStatus enum.
-      dimensions: a dict with bot dimensions as {str => [str]}.
-      poll_token: a token reported by latest `rbe` poll(...) command, optional.
       lease: an optional RBELease the bot is or was working on.
       blocking: if True, allow waiting for a bit for new leases to appear.
       retry_transient: True to retry many times on transient errors.
@@ -1388,22 +1291,15 @@ class RBESession:
     assert status in RBESessionStatus, status
 
     # Update the session on the backend side, flush the finished lease result,
-    # refresh the session token, pick up a new lease.
+    # pick up a new lease.
     resp = self._remote.rbe_update_session(
-        self._session_token,
         status,
-        dimensions,
         self._bot_version,
         self._worker_properties,
         lease,
-        poll_token,
         blocking,
         retry_transient,
     )
-
-    # Switch to a newer session token if it was refreshed.
-    if resp.session_token:
-      self._session_token = resp.session_token
 
     logging.debug('RBE %s: %s => %s', self._session_id, status, resp.status)
     if resp.status != RBESessionStatus.OK:

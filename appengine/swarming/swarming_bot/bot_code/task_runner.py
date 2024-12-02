@@ -724,10 +724,7 @@ class _RBEPinger:
         return
       logging.info('Recreated RBE session as %s', self._rbe_session.session_id)
     try:
-      self._rbe_session.update(
-          status=remote_client.RBESessionStatus.MAINTENANCE,
-          dimensions=self._rbe_session.dimensions,
-          poll_token=None)
+      self._rbe_session.update(remote_client.RBESessionStatus.MAINTENANCE)
       if not self._rbe_session.alive:
         logging.warning('RBE session %s is dead and will be recreated later',
                         self._rbe_session.session_id)

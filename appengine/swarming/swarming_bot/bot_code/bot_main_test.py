@@ -215,12 +215,8 @@ class TestBotBase(net_utils.TestCase):
         },
     )
 
-  def expected_rbe_create_request(self, poll_token, session_token, fail=False):
-    data = {
-        'dimensions': self.attributes['dimensions'],
-        'poll_token': poll_token,
-        'session': 'fake-session-token',
-    }
+  def expected_rbe_create_request(self, fail=False):
+    data = {'session': 'fake-session-token'}
     if self.expected_rbe_worker_props:
       data['worker_properties'] = self.expected_rbe_worker_props
 
@@ -231,14 +227,11 @@ class TestBotBase(net_utils.TestCase):
         'https://localhost:1/swarming/api/v1/bot/rbe/session/create',
         on_request,
         None if fail else {
-            'session_token': session_token,
             'session_id': 'fake-rbe-session-id',
         },
     )
 
   def expected_rbe_update_request(self,
-                                  poll_token,
-                                  session_token,
                                   status_in='OK',
                                   status_out='OK',
                                   lease_in=None,
@@ -246,8 +239,6 @@ class TestBotBase(net_utils.TestCase):
                                   blocking=False):
     data = {
         'status': status_in,
-        'dimensions': self.attributes['dimensions'],
-        'session_token': session_token,
         'session': 'fake-session-token',
     }
     if self.expected_rbe_worker_props:
@@ -256,19 +247,13 @@ class TestBotBase(net_utils.TestCase):
       data['lease'] = lease_in
     if not blocking:
       data['nonblocking'] = True
-    # Shutdown requests and pings skip poll tokens.
-    if poll_token:
-      data['poll_token'] = poll_token
 
     def on_request(kwargs):
       self.assertEqual(kwargs['data'], data)
       # Emulate RBE blocking waiting for a lease.
       self.clock.sleep(10.0)
 
-    response = {
-        'session_token': session_token,
-        'status': status_out,
-    }
+    response = {'status': status_out}
     if lease_out:
       response['lease'] = lease_out
 
@@ -1040,14 +1025,13 @@ class TestBotMain(TestBotBase):
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(),
     ])
     self.poll_once()
 
@@ -1059,7 +1043,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
                     'sleep': 0.0,
@@ -1067,7 +1050,7 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request('pt0', 'st0', blocking=True),
+        self.expected_rbe_update_request(blocking=True),
     ])
     self.poll_once()
 
@@ -1078,7 +1061,7 @@ class TestBotMain(TestBotBase):
       self.assertTrue(self.loop_state._rbe_poll_timer.firing)
       polls += 1
       self.expected_requests([
-          self.expected_rbe_update_request('pt0', 'st0', blocking=True),
+          self.expected_rbe_update_request(blocking=True),
       ])
       self.poll_once()
     self.assertEqual(polls, 9)
@@ -1092,10 +1075,7 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=11),
-        self.expected_rbe_update_request('pt0',
-                                         'st0',
-                                         'BOT_TERMINATING',
-                                         blocking=True),
+        self.expected_rbe_update_request('BOT_TERMINATING', blocking=True),
         self.expected_task_update_request('terminate-id'),
     ])
     self.poll_once()
@@ -1112,14 +1092,13 @@ class TestBotMain(TestBotBase):
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(),
     ])
     self.poll_once()
 
@@ -1130,7 +1109,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
                     'sleep': 0.0,
@@ -1138,9 +1116,7 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request('pt0',
-                                         'st0',
-                                         status_out='BOT_TERMINATING',
+        self.expected_rbe_update_request(status_out='BOT_TERMINATING',
                                          blocking=True),
         self.expect_bot_event_request('bot_shutdown', 'Terminated by RBE'),
     ])
@@ -1152,10 +1128,7 @@ class TestBotMain(TestBotBase):
     # When the bot shuts down it acknowledges the session is terminating. It
     # doesn't post another bot_shutdown event.
     self.expected_requests([
-        self.expected_rbe_update_request(None,
-                                         'st0',
-                                         'BOT_TERMINATING',
-                                         blocking=True),
+        self.expected_rbe_update_request('BOT_TERMINATING', blocking=True),
     ])
     self.loop_state.on_bot_exit()
 
@@ -1165,14 +1138,13 @@ class TestBotMain(TestBotBase):
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(),
     ])
     self.poll_once()
 
@@ -1184,7 +1156,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
                     'sleep': 0.0,
@@ -1192,7 +1163,7 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request('pt0', 'st0', blocking=True),
+        self.expected_rbe_update_request(blocking=True),
     ])
     self.poll_once()
 
@@ -1208,7 +1179,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
                     'sleep': 0.0,
@@ -1216,7 +1186,7 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=2),
-        self.expected_rbe_update_request('pt0', 'st0', blocking=True),
+        self.expected_rbe_update_request(blocking=True),
     ])
     self.poll_once()
 
@@ -1232,14 +1202,13 @@ class TestBotMain(TestBotBase):
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(),
     ])
     self.poll_once()
 
@@ -1256,10 +1225,7 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request(None,
-                                         'st0',
-                                         'BOT_TERMINATING',
-                                         blocking=True),
+        self.expected_rbe_update_request('BOT_TERMINATING', blocking=True),
     ])
     self.poll_once()
 
@@ -1278,14 +1244,13 @@ class TestBotMain(TestBotBase):
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': 'pt1',
                 'instance': 'instance_1',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request('pt1', 'st1'),
-        self.expected_rbe_update_request('pt1', 'st1', blocking=True),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(blocking=True),
     ])
     self.poll_once()
 
@@ -1297,13 +1262,12 @@ class TestBotMain(TestBotBase):
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request('pt0', 'st0', fail=True),
+        self.expected_rbe_create_request(fail=True),
     ])
     self.poll_once()
 
@@ -1316,16 +1280,13 @@ class TestBotMain(TestBotBase):
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': 'pt1',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request('pt1', 'st1'),  # resets cons. errors
-        self.expected_rbe_update_request('pt1',
-                                         'st1',
-                                         status_out='BOT_TERMINATING',
+        self.expected_rbe_create_request(),  # resets cons. errors
+        self.expected_rbe_update_request(status_out='BOT_TERMINATING',
                                          blocking=True),
     ])
     self.poll_once()
@@ -1342,14 +1303,13 @@ class TestBotMain(TestBotBase):
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(),
     ])
     self.poll_once()
 
@@ -1360,7 +1320,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt1',
                     'instance': 'instance_1',
                     'hybrid_mode': False,
                     'sleep': 0.0,
@@ -1368,12 +1327,9 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request(None,
-                                         'st0',
-                                         'BOT_TERMINATING',
-                                         blocking=True),
-        self.expected_rbe_create_request('pt1', 'st1'),
-        self.expected_rbe_update_request('pt1', 'st1', blocking=True),
+        self.expected_rbe_update_request('BOT_TERMINATING', blocking=True),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(blocking=True),
     ])
     self.poll_once()
 
@@ -1388,22 +1344,20 @@ class TestBotMain(TestBotBase):
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': 'pt0',
                 'instance': 'instance_0',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0',
-                                         'st0',
-                                         lease_out={
-                                             'id': 'lease-%d' % cur_lease_id,
-                                             'payload': {
-                                                 'noop': True
-                                             },
-                                             'state': 'PENDING',
-                                         }),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(
+            lease_out={
+                'id': 'lease-%d' % cur_lease_id,
+                'payload': {
+                    'noop': True
+                },
+                'state': 'PENDING',
+            }),
     ])
     self.poll_once()
 
@@ -1419,8 +1373,6 @@ class TestBotMain(TestBotBase):
       self.assertFalse(self.loop_state.idle)
       self.expected_requests([
           self.expected_rbe_update_request(
-              'pt0',
-              'st0',
               lease_in={
                   'id': 'lease-%d' % cur_lease_id,
                   'result': {},
@@ -1448,7 +1400,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
                     'sleep': 0.0,
@@ -1457,8 +1408,6 @@ class TestBotMain(TestBotBase):
             rbe_idle=False,
             sleep_streak=0),
         self.expected_rbe_update_request(
-            'pt0',
-            'st0',
             lease_in={
                 'id': 'lease-%d' % cur_lease_id,
                 'result': {},
@@ -1478,15 +1427,11 @@ class TestBotMain(TestBotBase):
 
     # Finally RBE tells there are no more leases.
     self.expected_requests([
-        self.expected_rbe_update_request(
-            'pt0',
-            'st0',
-            lease_in={
-                'id': 'lease-%d' % cur_lease_id,
-                'result': {},
-                'state': 'COMPLETED',
-            },
-        ),
+        self.expected_rbe_update_request(lease_in={
+            'id': 'lease-%d' % cur_lease_id,
+            'result': {},
+            'state': 'COMPLETED',
+        }, ),
     ])
     self.poll_once()
 
@@ -1497,7 +1442,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': False,
                     'sleep': 0.0,
@@ -1505,30 +1449,22 @@ class TestBotMain(TestBotBase):
             },
             rbe_idle=True,
             sleep_streak=1),
-        self.expected_rbe_update_request('pt0', 'st0', blocking=True),
+        self.expected_rbe_update_request(blocking=True),
     ])
     self.poll_once()
 
-  def expected_rbe_poll_and_claim(self,
-                                  poll_token,
-                                  session_token,
-                                  lease_id,
-                                  claim_resp,
-                                  blocking=False):
+  def expected_rbe_poll_and_claim(self, lease_id, claim_resp, blocking=False):
     return [
         self.expected_poll_request({
             'cmd': 'rbe',
             'rbe': {
-                'poll_token': poll_token,
                 'instance': 'instance',
                 'hybrid_mode': False,
                 'sleep': 0.0,
             },
         }),
-        self.expected_rbe_create_request(poll_token, session_token),
-        self.expected_rbe_update_request(poll_token,
-                                         session_token,
-                                         blocking=blocking,
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(blocking=blocking,
                                          lease_out={
                                              'id': lease_id,
                                              'payload': {
@@ -1548,7 +1484,7 @@ class TestBotMain(TestBotBase):
     # Switches into the RBE mode, creates and polls the session. Gets a lease
     # right away, proceeds to claiming it, discovers it should be skipped.
     self.expected_requests(
-        self.expected_rbe_poll_and_claim('pt', 'st', 'lease-id', {
+        self.expected_rbe_poll_and_claim('lease-id', {
             'cmd': 'skip',
             'reason': 'Just skip',
         }))
@@ -1556,17 +1492,13 @@ class TestBotMain(TestBotBase):
 
     # On the next cycle reports the lease was skipped.
     self.expected_requests([
-        self.expected_rbe_update_request(
-            'pt',
-            'st',
-            lease_in={
-                'id': 'lease-id',
-                'result': {
-                    'skip_reason': 'Just skip'
-                },
-                'state': 'COMPLETED',
+        self.expected_rbe_update_request(lease_in={
+            'id': 'lease-id',
+            'result': {
+                'skip_reason': 'Just skip'
             },
-        ),
+            'state': 'COMPLETED',
+        }, ),
     ])
     self.poll_once()
 
@@ -1578,7 +1510,7 @@ class TestBotMain(TestBotBase):
     # right away, proceeds to claiming it, discovers it is termination, executes
     # it.
     self.expected_requests(
-        self.expected_rbe_poll_and_claim('pt', 'st', 'lease-id', {
+        self.expected_rbe_poll_and_claim('lease-id', {
             'cmd': 'terminate',
             'task_id': 'terminate-id',
         }) + [self.expected_task_update_request('terminate-id')])
@@ -1590,8 +1522,6 @@ class TestBotMain(TestBotBase):
     # On shutdown reports the reservation as completed.
     self.expected_requests([
         self.expected_rbe_update_request(
-            None,
-            'st',
             status_in='BOT_TERMINATING',
             lease_in={
                 'id': 'lease-id',
@@ -1620,7 +1550,7 @@ class TestBotMain(TestBotBase):
     # right away, proceeds to claiming it, discovers it is a real task, executes
     # it.
     self.expected_requests(
-        self.expected_rbe_poll_and_claim('pt', 'st', 'lease-id', {
+        self.expected_rbe_poll_and_claim('lease-id', {
             'cmd': 'run',
             'manifest': {
                 'fake': 'manifest'
@@ -1634,15 +1564,11 @@ class TestBotMain(TestBotBase):
 
     # Reports the lease is finished on completion.
     self.expected_requests([
-        self.expected_rbe_update_request(
-            'pt',
-            'st',
-            lease_in={
-                'id': 'lease-id',
-                'result': {},
-                'state': 'COMPLETED',
-            },
-        ),
+        self.expected_rbe_update_request(lease_in={
+            'id': 'lease-id',
+            'result': {},
+            'state': 'COMPLETED',
+        }, ),
     ])
     self.poll_once()
 
@@ -1662,7 +1588,7 @@ class TestBotMain(TestBotBase):
     # right away, proceeds to claiming it, discovers it is a real task, tries to
     # execute it and blows up due to a Swarming bot bug.
     self.expected_requests(
-        self.expected_rbe_poll_and_claim('pt', 'st', 'lease-id', {
+        self.expected_rbe_poll_and_claim('lease-id', {
             'cmd': 'run',
             'manifest': {
                 'fake': 'manifest'
@@ -1675,18 +1601,13 @@ class TestBotMain(TestBotBase):
 
     # Reports the lease as abandoned.
     self.expected_requests([
-        self.expected_rbe_update_request(
-            'pt',
-            'st',
-            lease_in={
-                'id': 'lease-id',
-                'result': {
-                    'bot_internal_error':
-                    'Bot crashed before finishing the lease',
-                },
-                'state': 'COMPLETED',
+        self.expected_rbe_update_request(lease_in={
+            'id': 'lease-id',
+            'result': {
+                'bot_internal_error': 'Bot crashed before finishing the lease',
             },
-        ),
+            'state': 'COMPLETED',
+        }, ),
     ])
     self.poll_once()
 
@@ -1696,7 +1617,6 @@ class TestBotMain(TestBotBase):
   def test_hybrid_mode_idle(self):
     # Starting in hybrid mode, polling Swarming next.
     self.prep_hybrid_mode({
-        'poll_token': 'pt0',
         'instance': 'instance_0',
         'hybrid_mode': True,
         'sleep': 1.0,
@@ -1710,15 +1630,14 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': True,
                     'sleep': 5.0,
                 },
             },
             force=True),
-        self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0', 'st0', status_in='MAINTENANCE'),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(status_in='MAINTENANCE'),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
@@ -1731,7 +1650,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': True,
                     'sleep': 10.0,
@@ -1740,7 +1658,7 @@ class TestBotMain(TestBotBase):
             rbe_idle=False,
             sleep_streak=0,
             force=False),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_update_request(),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
@@ -1752,7 +1670,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': True,
                     'sleep': 5.0,
@@ -1761,7 +1678,7 @@ class TestBotMain(TestBotBase):
             rbe_idle=True,
             sleep_streak=1,
             force=True),
-        self.expected_rbe_update_request('pt0', 'st0', status_in='MAINTENANCE'),
+        self.expected_rbe_update_request(status_in='MAINTENANCE'),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 1)
@@ -1774,7 +1691,6 @@ class TestBotMain(TestBotBase):
 
     # Starting in hybrid mode, polling Swarming next.
     self.prep_hybrid_mode({
-        'poll_token': 'pt0',
         'instance': 'instance_0',
         'hybrid_mode': True,
         'sleep': 1.0,
@@ -1791,15 +1707,14 @@ class TestBotMain(TestBotBase):
                     'task_id': 'some-task-id',
                 },
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': True,
                     'sleep': 5.0,
                 },
             },
             force=True),
-        self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0', 'st0', status_in='MAINTENANCE'),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(status_in='MAINTENANCE'),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
@@ -1815,7 +1730,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': True,
                     'sleep': 10.0,
@@ -1824,7 +1738,7 @@ class TestBotMain(TestBotBase):
             rbe_idle=False,
             sleep_streak=0,
             force=False),
-        self.expected_rbe_update_request('pt0', 'st0'),
+        self.expected_rbe_update_request(),
     ])
     self.poll_once()
     self.assertEqual(self.loop_state._consecutive_idle_cycles, 0)
@@ -1842,7 +1756,6 @@ class TestBotMain(TestBotBase):
     # Starting in hybrid mode, polling RBE next.
     self.prep_hybrid_mode(
         {
-            'poll_token': 'pt0',
             'instance': 'instance_0',
             'hybrid_mode': True,
             'sleep': 1.0,
@@ -1856,25 +1769,23 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': True,
                     'sleep': 5.0,
                 },
             },
             force=False),
-        self.expected_rbe_create_request('pt0', 'st0'),
-        self.expected_rbe_update_request('pt0',
-                                         'st0',
-                                         lease_out={
-                                             'id': 'lease-id',
-                                             'payload': {
-                                                 'task_id': 'some-task-id',
-                                                 'task_to_run_shard': 5,
-                                                 'task_to_run_id': 6,
-                                             },
-                                             'state': 'PENDING',
-                                         }),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(
+            lease_out={
+                'id': 'lease-id',
+                'payload': {
+                    'task_id': 'some-task-id',
+                    'task_to_run_shard': 5,
+                    'task_to_run_id': 6,
+                },
+                'state': 'PENDING',
+            }),
         self.expected_claim_request('lease-id', 'some-task-id', 5, 6, {
             'cmd': 'run',
             'manifest': {
@@ -1896,7 +1807,6 @@ class TestBotMain(TestBotBase):
             {
                 'cmd': 'rbe',
                 'rbe': {
-                    'poll_token': 'pt0',
                     'instance': 'instance_0',
                     'hybrid_mode': True,
                     'sleep': 10.0,
@@ -1905,9 +1815,7 @@ class TestBotMain(TestBotBase):
             rbe_idle=False,
             sleep_streak=0,
             force=True),
-        self.expected_rbe_update_request('pt0',
-                                         'st0',
-                                         status_in='MAINTENANCE',
+        self.expected_rbe_update_request(status_in='MAINTENANCE',
                                          lease_in={
                                              'id': 'lease-id',
                                              'result': {},
@@ -1924,7 +1832,6 @@ class TestBotMain(TestBotBase):
     # Starting in hybrid mode, polling RBE next.
     self.prep_hybrid_mode(
         {
-            'poll_token': 'pt0',
             'instance': 'instance_0',
             'hybrid_mode': True,
             'sleep': 1.0,
@@ -2114,9 +2021,7 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
 
     rbe_session = remote_client.RBESession(self.bot.remote, 'rbe-instance',
-                                           self.bot.dimensions, 'bot_version',
-                                           None, 'poll-token', 'session-token',
-                                           'session-id')
+                                           'bot_version', None, 'session-id')
     rbe_session._active_lease = remote_client.RBELease(
         'id', remote_client.RBELeaseState.ACTIVE)
     rbe_results = []
