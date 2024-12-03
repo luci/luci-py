@@ -515,7 +515,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         })
 
   def test_poll_rbe(self):
-    _, bot_auth_cfg = self.mock_bot_group_config(
+    self.mock_bot_group_config(
         version='default',
         dimensions={u'pool': [u'default']},
         is_default=True)
@@ -531,15 +531,13 @@ class BotApiTest(test_env_handlers.AppTestBase):
             ],
         ),
     )
-    self.mock(rbe, 'generate_poll_token', mock.Mock())
-    rbe.generate_poll_token.return_value = 'mocked-poll-token'
     self.mock(task_scheduler, 'exponential_backoff', lambda _: 1.23)
 
     expected_rbe_params = {
         u'instance': u'some-instance',
         u'hybrid_mode': False,
         u'sleep': 1.23,
-        u'poll_token': u'mocked-poll-token',
+        u'poll_token': u'legacy-unused-field',
     }
 
     # A bot notifies Swarming of its existence, gets RBE parameters.
@@ -554,13 +552,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'rbe': expected_rbe_params,
     }
     self.assertEqual(expected, response)
-
-    # The poll token was generated with correct parameters.
-    rbe.generate_poll_token.assert_called_with(
-        bot_id='bot1',
-        rbe_instance='some-instance',
-        enforced_dimensions={u'pool': [u'default']},
-        bot_auth_cfg=bot_auth_cfg)
 
     # The bot is idle, since it didn't report `rbe_idle`.
     bot_info = bot_management.get_info_key('bot1').get()
@@ -597,8 +588,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
         ),
         realm='test:pool/default',
     )
-    self.mock(rbe, 'generate_poll_token', mock.Mock())
-    rbe.generate_poll_token.return_value = 'mocked-poll-token'
 
     # A bot polls and registers itself in Swarming scheduler.
     self.set_as_bot()

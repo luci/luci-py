@@ -359,19 +359,10 @@ class _ProcessResult(object):
     """Generates a dict with RBE-related parameters for bots in RBE mode."""
     assert self.rbe_instance
     return {
-        'instance':
-        self.rbe_instance,
-        'hybrid_mode':
-        self.rbe_hybrid_mode,
-        'sleep':
-        task_scheduler.exponential_backoff(sleep_streak),
-        'poll_token':
-        rbe.generate_poll_token(
-            bot_id=self.bot_id,
-            rbe_instance=self.rbe_instance,
-            enforced_dimensions=self.bot_group_cfg.dimensions,
-            bot_auth_cfg=self.bot_auth_cfg,
-        ),
+        'instance': self.rbe_instance,
+        'hybrid_mode': self.rbe_hybrid_mode,
+        'sleep': task_scheduler.exponential_backoff(sleep_streak),
+        'poll_token': 'legacy-unused-field',
     }
 
 
