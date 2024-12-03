@@ -340,7 +340,7 @@ def GetLocalDevices(
 
 
 def GetRemoteDevices(banner, endpoints, default_timeout_ms, auth_timeout_ms,
-                     on_error=None, as_root=False):
+                     on_error=None, as_root=False, allow_missing_keys=False):
   """Returns the list of devices available.
 
   Caller MUST call CloseDevices(devices) on the return value or call .Close() on
@@ -354,13 +354,15 @@ def GetRemoteDevices(banner, endpoints, default_timeout_ms, auth_timeout_ms,
   - auth_timeout_ms: timeout for the user to accept the public key.
   - on_error: callback when an internal failure occurs.
   - as_root: if True, restarts adbd as root if possible.
+  - allow_missing_keys: if True, attempt to connect even if _ADB_KEYS is not
+        set.
 
   Returns one of:
     - list of HighDevice instances.
     - None if adb is unavailable.
   """
   with _ADB_KEYS_LOCK:
-    if not _ADB_KEYS:
+    if not (_ADB_KEYS or allow_missing_keys):
       return []
   # Create unopened handles for all remote devices.
   handles = [common.TcpHandle(endpoint) for endpoint in endpoints]
