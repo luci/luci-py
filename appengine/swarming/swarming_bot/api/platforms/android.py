@@ -113,7 +113,10 @@ def initialize(pub_key, priv_key):
 
 
 # TODO(bpastene): Remove bot arg when call site has been updated.
-def get_devices(bot=None, endpoints=None, enable_resets=False):
+def get_devices(bot=None,
+                endpoints=None,
+                enable_resets=False,
+                allow_missing_keys=False):
   # pylint: disable=unused-argument
   devices = []
   if not gce.is_gce():
@@ -121,8 +124,12 @@ def get_devices(bot=None, endpoints=None, enable_resets=False):
         b'swarming', 10000, 10000, as_root=False, enable_resets=enable_resets)
 
   if endpoints:
-    devices += high.GetRemoteDevices(
-        b'swarming', endpoints, 10000, 10000, as_root=False)
+    devices += high.GetRemoteDevices(b'swarming',
+                                     endpoints,
+                                     10000,
+                                     10000,
+                                     as_root=False,
+                                     allow_missing_keys=allow_missing_keys)
 
   return devices
 
