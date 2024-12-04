@@ -85,6 +85,20 @@ def is_expired_session(session):
   return utils.utcnow() > session.expiry.ToDatetime()
 
 
+def is_stale_handshake_config(session, bot_group_cfg):
+  """Returns True if the bot needs to restart to pick up new handshake config.
+
+  Handshake configs are config values that affect the bot's behavior in some
+  global way (like custom bot hooks). The bot picks them up once, when it
+  starts.
+
+  Args:
+    session: session_pb2.Session.
+    bot_group_cfg: BotGroupConfig tuple with the bot config.
+  """
+  return session.handshake_config_hash != _handshake_config_hash(bot_group_cfg)
+
+
 def create(bot_id, session_id, bot_group_cfg, rbe_instance):
   """Creates a new session_pb2.Session for an authorized connecting bot.
 
@@ -205,7 +219,6 @@ def _handshake_config_hash(bot_group_cfg):
   to how bot uses these values.
   """
   data = _handshake_config_extract(bot_group_cfg)
-  logging.debug('Handshake config: %s', data)
   return hashlib.sha256('\n'.join(data)).digest()
 
 

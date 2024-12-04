@@ -738,6 +738,7 @@ class BotHandshakeHandler(_BotBaseHandler):
         'bot_config_rev': bot_config_rev,
         'bot_config_name': 'bot_config.py',
         'server_version': utils.get_app_version(),
+        # TODO: Remove once the bot code no longer reads it.
         'bot_group_cfg_version': res.bot_group_cfg.version,
         'bot_group_cfg': {
             # Let the bot know its server-side dimensions (from bots.cfg file).
@@ -839,50 +840,56 @@ class BotPollHandler(_BotBaseHandler):
       self._cmd_update(expected_version)
       return
 
-    # If the server-side per-bot config for the bot has changed, we need
-    # to restart this particular bot, so it picks up new config in /handshake.
-    # Do this check only for bots that know about server-side per-bot configs
-    # already (such bots send 'bot_group_cfg_version' state attribute).
-    cur_bot_cfg_ver = res.state.get('bot_group_cfg_version')
-    logging.debug('bot_config version: %s, latest: %s', cur_bot_cfg_ver,
-                  res.bot_group_cfg.version)
-    if cur_bot_cfg_ver and cur_bot_cfg_ver != res.bot_group_cfg.version:
-      bot_event('request_restart')
-      self._cmd_bot_restart('Restarting to pick up new bots.cfg config')
+    # If we reached this stage, it means the bot is running a relatively recent
+    # version of the code and it therefore must be sending a session token.
+    # Verify the session token is indeed present.
+    session_token = res.request.get('session')
+    if not session_token:
+      logging.error('Missing session token')
+      self.abort_with_error(401, error='Missing session token')
       return
 
-    # If the bot is using a session, validate and refresh the session token.
-    session_token = res.request.get('session')
-    if session_token:
-      try:
-        session = bot_session.unmarshal(session_token)
-      except bot_session.BadSessionToken as e:
-        # This happens if the token is complete nonsense (or was signed by
-        # a revoked or unknown key). This should not be happening.
-        logging.error('Malformed session token: %s', e)
-        self.abort_with_error(401, error='Bad session token')
-        return
-      if res.bot_id != session.bot_id:
-        logging.error('Bot ID mismatch %s != %s', res.bot_id, session.bot_id)
-        bot_session.debug_log(session)
-        self.abort_with_error(403,
-                              error='Unexpected bot ID in the session %s' %
-                              session.bot_id)
-        return
-      logging.info('Session ID: %s', session.session_id)
-      # If the session has expired, ask the bot to restart itself to get a new
-      # session. This can happen if the bot was stuck somewhere for a while
-      # (or had no network connection). We need this because very likely the
-      # state in the session (like the RBE session ID) is stale already.
-      if bot_session.is_expired_session(session):
-        logging.error('Expired bot session: asking the bot to restart')
-        bot_session.debug_log(session)
-        bot_event('request_restart')
-        self._cmd_bot_restart('Restarting because the bot session expired')
-        return
-      # The session is valid. Refresh the config inside.
-      session_token = bot_session.marshal(
-          bot_session.update(session, res.bot_group_cfg, res.rbe_instance))
+    # Validate the session token
+    try:
+      session = bot_session.unmarshal(session_token)
+    except bot_session.BadSessionToken as e:
+      # This happens if the token is complete nonsense (or was signed by
+      # a revoked or unknown key). This should not be happening.
+      logging.error('Malformed session token: %s', e)
+      self.abort_with_error(401, error='Bad session token')
+      return
+    if res.bot_id != session.bot_id:
+      logging.error('Bot ID mismatch %s != %s', res.bot_id, session.bot_id)
+      bot_session.debug_log(session)
+      self.abort_with_error(403,
+                            error='Unexpected bot ID in the session %s' %
+                            session.bot_id)
+      return
+    logging.info('Session ID: %s', session.session_id)
+
+    # If the session has expired, ask the bot to restart itself to get a new
+    # session. This can happen if the bot was stuck somewhere for a while
+    # (or had no network connection). We need this because very likely the
+    # state in the session (like the RBE session ID) is stale already.
+    if bot_session.is_expired_session(session):
+      logging.error('Expired bot session: asking the bot to restart')
+      bot_session.debug_log(session)
+      bot_event('request_restart')
+      self._cmd_bot_restart(None, 'Restarting because the bot session expired')
+      return
+
+    # The session is valid. Refresh the config inside.
+    session_token = bot_session.marshal(
+        bot_session.update(session, res.bot_group_cfg, res.rbe_instance))
+
+    # Ask the bot to restart to pick up new configs consumed only during the
+    # handshake (like the bot hooks or custom server-assigned dimensions), if
+    # they have changed since the bot created the session.
+    if bot_session.is_stale_handshake_config(session, res.bot_group_cfg):
+      bot_event('request_restart')
+      self._cmd_bot_restart(session_token,
+                            'Restarting to pick up new bots.cfg config')
+      return
 
     if quarantined:
       bot_event('request_sleep')
@@ -1057,12 +1064,14 @@ class BotPollHandler(_BotBaseHandler):
     }
     self.send_response(out)
 
-  def _cmd_bot_restart(self, message):
+  def _cmd_bot_restart(self, session, message):
     logging.info('Restarting bot: %s', message)
     out = {
         'cmd': 'bot_restart',
         'message': message,
     }
+    if session:
+      out['session'] = session
     self.send_response(out)
 
 

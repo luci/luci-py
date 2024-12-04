@@ -420,7 +420,7 @@ class AppTestBase(test_case.TestCase):
 
   def do_handshake(self,
                    bot='bot1',
-                   session_id=None,
+                   session_id='test-session',
                    do_first_poll=False,
                    response_copy=None):
     """Performs bot handshake, returns data to be sent to bot handlers.
@@ -449,6 +449,8 @@ class AppTestBase(test_case.TestCase):
     self.bot_version = response['bot_version']
     params.pop('session_id', None)
     params['version'] = self.bot_version
+    if 'session' in response:
+      params['session'] = response['session']
     params['state']['bot_group_cfg_version'] = response['bot_group_cfg_version']
     # A bit hackish but fine for unit testing purpose.
     if response.get('bot_config'):

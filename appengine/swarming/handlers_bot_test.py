@@ -83,11 +83,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
     mock.patch.stopall()
 
   def mock_bot_group_config(self, **kwargs):
-    kwargs = kwargs.copy()
-    for f in bot_groups_config.BotGroupConfig._fields:
-      if f not in kwargs:
-        kwargs[f] = None
-    group_cfg = bot_groups_config.BotGroupConfig(**kwargs)
     auth_cfg = bot_groups_config.BotAuth(
         log_if_failed=False,
         require_luci_machine_token=True,
@@ -95,8 +90,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
         require_gce_vm_token=None,
         ip_whitelist=None,
     )
-    self.mock(bot_auth,
-              'authenticate_bot', lambda *args, **kwargs: (group_cfg, auth_cfg))
+    kwargs = kwargs.copy()
+    kwargs['auth'] = (auth_cfg, )
+    for f in bot_groups_config.BotGroupConfig._fields:
+      if f not in kwargs:
+        kwargs[f] = None
+    group_cfg = bot_groups_config.BotGroupConfig(**kwargs)
+    self.mock(bot_auth, 'authenticate_bot', lambda *args, **kwargs:
+              (group_cfg, auth_cfg))
     return group_cfg, auth_cfg
 
   def mock_pool_config(self, pool, **kwargs):
@@ -312,10 +313,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params = self.do_handshake()
     params['state']['maintenance'] = 'very busy'
     response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
     expected = {
         u'cmd': u'sleep',
         u'quarantined': True,
+        u'duration': mock.ANY,
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -340,8 +342,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected = {
         u'cmd': u'sleep',
         u'quarantined': True,
+        u'duration': mock.ANY,
+        u'session': mock.ANY,
     }
-    self.assertTrue(response.pop(u'duration'))
     self.assertEqual(expected, response)
     expected = [
         'Quarantined Bot\n'
@@ -405,10 +408,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params['dimensions']['foo'] = [['bar']]  # list is invalid.
     t1 = self.mock_now(ticker())
     response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
     expected = {
         u'cmd': u'sleep',
         u'quarantined': True,
+        u'duration': mock.ANY,
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -438,7 +442,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'maintenance_msg': None,
         'message': u"Invalid dimension value. key: foo, value: [u'bar']",
         'quarantined': True,
-        'session_id': None,
+        'session_id': 'test-session',
         'state': {
             u'bot_group_cfg_version': u'default',
             u'running_time': 1234.0,
@@ -465,20 +469,22 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # A bot polls, gets nothing.
     params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
     expected = {
         u'cmd': u'sleep',
         u'quarantined': False,
+        u'duration': mock.ANY,
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
     # Sleep again
     params['state']['sleep_streak'] += 1
     response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
     expected = {
         u'cmd': u'sleep',
         u'quarantined': False,
+        u'duration': mock.ANY,
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -550,6 +556,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected = {
         u'cmd': u'rbe',
         u'rbe': expected_rbe_params,
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -631,23 +638,34 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_poll_bot_group_config_change(self):
     params = self.do_handshake()
-    params['state']['bot_group_cfg_version'] = 'badversion'
+
+    # Change the bot group config after the handshake to something else.
+    self.mock_bot_group_config(version='default',
+                               dimensions={u'pool': [u'another-pool']},
+                               is_default=True)
+
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
         u'cmd': u'bot_restart',
         u'message': u'Restarting to pick up new bots.cfg config',
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
   def test_poll_bot_group_config_change_with_quarantined_flag(self):
     params = self.do_handshake()
-    params['state']['bot_group_cfg_version'] = 'badversion'
     params['state']['quarantined'] = True
+
+    # Change the bot group config after the handshake to something else.
+    self.mock_bot_group_config(version='default',
+                               dimensions={u'pool': [u'another-pool']},
+                               is_default=True)
 
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
         u'cmd': u'bot_restart',
         u'message': u'Restarting to pick up new bots.cfg config',
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -722,6 +740,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 'pool': ['default'],
             },
         },
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -799,6 +818,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 'pool': ['default'],
             },
         },
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -889,6 +909,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 'pool': ['default'],
             },
         },
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -1015,6 +1036,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 'pool': ['default'],
             },
         },
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -1027,41 +1049,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
         started_ts=fmtdate(self.now))
     self.assertEqual(expected, response)
 
-  def test_poll_conflicting_dimensions(self):
-    params = self.do_handshake()
-    self.assertEqual(params['dimensions']['pool'], ['default'])
-
-    self.mock_bot_group_config(
-        version='default',
-        auth=(bot_groups_config.BotAuth(
-            log_if_failed=False,
-            require_luci_machine_token=False,
-            require_service_account=None,
-            require_gce_vm_token=None,
-            ip_whitelist=None,
-        ),),
-        dimensions={u'pool': [u'server-side']},
-        is_default=True)
-
-    # Bot sends 'default' pool, but server config defined it as 'server-side'.
-    response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
-    expected = {
-        u'cmd': u'sleep',
-        u'quarantined': False,
-    }
-    self.assertEqual(expected, response)
-
   def test_poll_extra_bot_config(self):
     self.mock_bot_group_config(
         version='default',
-        auth=(bot_groups_config.BotAuth(
-            log_if_failed=False,
-            require_luci_machine_token=False,
-            require_service_account=None,
-            require_gce_vm_token=None,
-            ip_whitelist=None,
-        ),),
         dimensions={},
         bot_config_script='foo.py',
         bot_config_script_rev='abcd',
@@ -1116,6 +1106,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'duration': mock.ANY,
         'cmd': 'sleep',
         'quarantined': False,
+        'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -1331,6 +1322,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
                 },
                 u'task_id': run_result_id,
             },
+            u'session': mock.ANY,
         })
 
     # Submitted the bot event.
@@ -1348,6 +1340,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(response, {
         u'cmd': u'skip',
         u'reason': u'No task slice',
+        u'session': mock.ANY,
     })
 
   def test_claim_bad_task_to_run(self):
@@ -1507,10 +1500,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'log_request', lambda *args, **kwargs: errors.append((args, kwargs)))
     params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
     expected = {
         u'cmd': u'sleep',
         u'quarantined': False,
+        u'duration': mock.ANY,
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -1562,10 +1556,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # A bot error currently does not result in permanent quarantine. It will
     # eventually.
     response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
     expected = {
         u'cmd': u'sleep',
         u'quarantined': False,
+        u'duration': mock.ANY,
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
     self.assertEqual([], errors)
@@ -1579,10 +1574,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'log_request', lambda *args, **kwargs: errors.append((args, kwargs)))
     params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
     expected = {
         u'cmd': u'sleep',
         u'quarantined': False,
+        u'duration': mock.ANY,
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
 
@@ -1596,10 +1592,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # A bot error currently does not result in permanent quarantine. It will
     # eventually.
     response = self.post_json('/swarming/api/v1/bot/poll', params)
-    self.assertTrue(response.pop(u'duration'))
     expected = {
         u'cmd': u'sleep',
         u'quarantined': False,
+        u'duration': mock.ANY,
+        u'session': mock.ANY,
     }
     self.assertEqual(expected, response)
     expected = [
@@ -1616,7 +1613,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     ticker = test_case.Ticker(self.now)
     ticks = []
     ticks.append(self.mock_now(ticker()))
-    params = self.do_handshake(session_id='test-session')
+    params = self.do_handshake()
     dimensions = params['dimensions']
     for e in handlers_bot.BotEventHandler.ALLOWED_EVENTS:
       if e == 'bot_error':
@@ -2248,18 +2245,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
                                 expected_kind, expected_scopes,
                                 expected_audience):
     self.set_as_bot()
-    self.mock_bot_group_config(
-        version='default',
-        auth=(bot_groups_config.BotAuth(
-            log_if_failed=False,
-            require_luci_machine_token=False,
-            require_service_account=None,
-            require_gce_vm_token=None,
-            ip_whitelist=None,
-        ),),
-        dimensions={},
-        system_service_account='system@example.com',
-        is_default=True)
+    self.mock_bot_group_config(version='default',
+                               dimensions={},
+                               system_service_account='system@example.com',
+                               is_default=True)
 
     calls = []
 
