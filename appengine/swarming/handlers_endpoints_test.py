@@ -3254,14 +3254,12 @@ class BotApiTest(BaseTest):
         },
     ]
     state_dict = {
-        'bot_group_cfg_version': 'default',
         'running_time': 1234.,
         'sleep_streak': 0,
         'started_ts': 1410990411.111,
     }
     state = unicode(
         json.dumps(state_dict, sort_keys=True, separators=(',', ':')))
-    state_dict.pop('bot_group_cfg_version')
     state_dict['handshaking'] = True
     state_handshake = unicode(
         json.dumps(state_dict, sort_keys=True, separators=(',', ':')))

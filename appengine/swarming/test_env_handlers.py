@@ -451,7 +451,6 @@ class AppTestBase(test_case.TestCase):
     params['version'] = self.bot_version
     if 'session' in response:
       params['session'] = response['session']
-    params['state']['bot_group_cfg_version'] = response['bot_group_cfg_version']
     # A bit hackish but fine for unit testing purpose.
     if response.get('bot_config'):
       params['bot_config'] = response['bot_config']

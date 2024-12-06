@@ -412,7 +412,6 @@ class _BotBaseHandler(_BotApiHandler):
     * sleep_streak: number of consecutive idle cycles. Native scheduler only.
     * maintenance: a bot maintenance message. If set, the bot won't get tasks.
     * quarantined: a boolean, if True the bot won't get tasks.
-    * bot_group_cfg_version: the version of BotGroupConfig the bot is using now.
     * rbe_instance: the RBE instance the bot is connected to right now.
     * rbe_session: the RBE session ID, if have an active RBE session.
     * rbe_idle: True if the last RBE poll returned no tasks, None if not on RBE.
@@ -685,7 +684,6 @@ class BotHandshakeHandler(_BotBaseHandler):
     {
       "bot_version": <sha-1 of swarming_bot.zip uncompressed content>,
       "server_version": "138-193f1f3",
-      "bot_group_cfg_version": "0123abcdef",
       "bot_group_cfg": {
         "dimensions": { <server-defined dimensions> },
       },
@@ -738,8 +736,6 @@ class BotHandshakeHandler(_BotBaseHandler):
         'bot_config_rev': bot_config_rev,
         'bot_config_name': 'bot_config.py',
         'server_version': utils.get_app_version(),
-        # TODO: Remove once the bot code no longer reads it.
-        'bot_group_cfg_version': res.bot_group_cfg.version,
         'bot_group_cfg': {
             # Let the bot know its server-side dimensions (from bots.cfg file).
             'dimensions': res.bot_group_cfg.dimensions,
