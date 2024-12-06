@@ -42,7 +42,6 @@ class Bot(object):
     self._dimensions = (attributes or {}).get('dimensions') or {}
     self._state = (attributes or {}).get('state') or {}
     self._bot_version = (attributes or {}).get('version') or 'unknown'
-    self._bot_group_cfg_ver = None
     self._server_side_dimensions = {}
     self._bot_restart_msg = None
     self._bot_config = {}
@@ -313,7 +312,7 @@ class BotMutator(object):
     """Updates the session token used by the bot."""
     self._bot._remote.session_token = session_token
 
-  def update_bot_group_cfg(self, cfg_version, cfg):
+  def update_bot_group_cfg(self, cfg):
     """Picks up the server-provided per-bot config.
 
     This is called once, right after the handshake and it may modify values of
@@ -324,7 +323,6 @@ class BotMutator(object):
 
     See docs for '/handshake' call for the format of 'cfg' dict.
     """
-    self._bot._bot_group_cfg_ver = cfg_version
     self._bot._server_side_dimensions = (cfg or {}).get('dimensions')
     self._refresh_attributes()
 
@@ -387,7 +385,6 @@ class BotMutator(object):
       state['rbe_worker_props'] = self._bot._rbe_worker_properties.to_dict()
     else:
       state.pop('rbe_worker_props', None)
-    state['bot_group_cfg_version'] = self._bot._bot_group_cfg_ver
     if self._bot._bot_config:
       state['bot_config'] = self._bot._bot_config
     self._bot._state = state

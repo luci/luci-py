@@ -91,7 +91,6 @@ class TestBotBase(net_utils.TestCase):
             'pool': ['default'],
         },
         'state': {
-            'bot_group_cfg_version': None,
             'cost_usd_hour': 3600.,
             'rbe_instance': None,
             'sleep_streak': 0,
@@ -592,8 +591,6 @@ class TestBotMain(TestBotBase):
             'fake-session-token',
             'bot_version':
             attributes['version'],
-            'bot_group_cfg_version':
-            None,
             'bot_group_cfg':
             None,
             'bot_config':
@@ -691,7 +688,6 @@ class TestBotMain(TestBotBase):
               'name': None,
               'revision': None
           },
-          'bot_group_cfg_version': 'abc:def',
           'cost_usd_hour': 3600.0,
           'rbe_instance': None,
           'sleep_streak': sleep_streak,
@@ -760,7 +756,6 @@ class TestBotMain(TestBotBase):
                 'session': 'fake-session-token',
                 'server': self.url,
                 'server_version': 1,
-                'bot_group_cfg_version': 'abc:def',
                 'bot_group_cfg': {
                     'dimensions': {
                         'bot_side': ['A']

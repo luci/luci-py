@@ -2014,20 +2014,15 @@ def _do_handshake(botobj, quit_bit):
       script = resp.get('bot_config_name')
       if content:
         _register_extra_bot_config(content, rev, script)
-      # Remember the server-provided per-bot configuration. '/handshake' is
-      # the only place where the server returns it. The bot will be sending
-      # the 'bot_group_cfg_version' back in each /poll (as part of 'state'),
-      # so that the server can instruct the bot to restart itself when
-      # config changes.
       with botobj.mutate_internals() as mut:
         mut.update_bot_config(script, rev)
         rbe_params = resp.get('rbe')
         if rbe_params:
           mut.update_rbe_state(rbe_params['instance'],
                                rbe_params['hybrid_mode'], None)
-        cfg_version = resp.get('bot_group_cfg_version')
-        if cfg_version:
-          mut.update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
+        bot_group_cfg = resp.get('bot_group_cfg')
+        if bot_group_cfg:
+          mut.update_bot_group_cfg(bot_group_cfg)
       return rbe_params
     attempt += 1
     sleep_time = _backoff(attempt, 2.0)

@@ -87,10 +87,6 @@ starting `swarming_bot.zip` to alter the bot's behavior:
 
 All *states* are optional!
 
-*   `bot_group_cfg_version`: version identifier of the server defined
-    configuration (extract from bots.cfg), applied to the bot during initial
-    handshake. The server will ask the bot to restart if this configuration
-    changes.
 *   `cost_usd_hour`: reports the base cost of this bot in $USD/hour. This is
     used to calculate task's cost.
 *   `maintenance`: if present, regardless of its value, is similar to
