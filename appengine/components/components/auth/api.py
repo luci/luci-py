@@ -2037,10 +2037,10 @@ def require(callback, error_msg=None, log_identity=False):
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-      if not callback():
-        raise AuthorizationError(error_msg)
       if log_identity:
         logging.info('Accessed from %s' % get_current_identity().to_bytes())
+      if not callback():
+        raise AuthorizationError(error_msg)
       return func(*args, **kwargs)
 
     # Propagate reference to original function, mark function as decorated.
