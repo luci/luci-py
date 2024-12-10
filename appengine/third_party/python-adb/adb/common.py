@@ -477,10 +477,17 @@ class TcpHandle(Handle):
           'Could not send data (timeout %sms)' % (self.Timeout(timeout_ms)), e)
 
   def BulkRead(self, length, timeout_ms=None):
-    try:
-      self._connection.settimeout(self.Timeout(timeout_ms) / 1000.0)
-      return self._connection.recv(length)
-    except socket.timeout as e:
-      raise usb_exceptions.ReadFailedError(
+    self._connection.settimeout(self.Timeout(timeout_ms) / 1000.0)
+    data = b""
+    while len(data) < length:
+      try:
+        chunk = self._connection.recv(length - len(data))
+        if not chunk:
+          raise usb_exceptions.ReadFailedError(
+            'Connection closed by remote end during read', None)
+        data += chunk
+      except socket.timeout as e:
+        raise usb_exceptions.ReadFailedError(
           'Could not receive data (timeout %sms)' % (
-              self.Timeout(timeout_ms)), e)
+            self.Timeout(timeout_ms)), e)
+    return data

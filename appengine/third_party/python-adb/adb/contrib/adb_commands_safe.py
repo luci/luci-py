@@ -662,7 +662,7 @@ class AdbCommandsSafe(object):
     for i in self._Loop():
       try:
         out = self._adb_cmd.Reboot()
-      except usb_exceptions.ReadFailedError:
+      except (usb_exceptions.ReadFailedError, adb_protocol.InvalidResponseError):
         # It looks like it's possible that adbd restarts the device so fast that
         # it close the USB connection before adbd has the time to reply (yay for
         # race conditions). In that case there's no way to know if the command
