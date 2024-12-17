@@ -41,7 +41,7 @@ The client API is implemented via Cloud Endpoints over HTTPS.
   - Implementation is in [handlers_endpoints.py](../handlers_endpoints.py).
   - Messages are defined in [swarming_rpcs.py](../swarming_rpcs.py).
   - Authentication is done via OAuth2. The ACL groups are defined via
-    [auth_service](../../auth_service/) integration.
+    [LUCI Auth Service](https://go.chromium.org/luci/auth_service) integration.
 
 **All the APIs are idempotent**: retrying a call in case of error is always
 safe. This permits transparent retry in case of failure. The exception is
@@ -56,7 +56,7 @@ guarantee.
 
 The server has a few major configuration points;
   - Authorization configuration, usually distributed by
-    [auth_service](../../auth_service/) instance.
+    [LUCI Auth Service](https://go.chromium.org/luci/auth_service) instance.
   - [bootstrap.py](../swarming_bot/config/bootstrap.py) which permits automatic
     single-command bot bootstrapping.
   - [bot_config.py](../swarming_bot/config/bot_config.py)
@@ -356,8 +356,8 @@ bots having one of the OR'd dimension can poll the task.
 ### Access control
 
 The access control groups are optionally configured via single
-[auth_service](../../auth_service/). This presents a coherent view on all
-the associated services.
+[LUCI Auth Service](https://go.chromium.org/luci/auth_service). This presents a
+coherent view on all the associated services.
 
 
 ## Testing Plan

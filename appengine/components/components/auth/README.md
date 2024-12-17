@@ -3,7 +3,7 @@ auth/
 
 `auth` is a library that provides authorization and authentication functionality
 for webapp2 and Cloud Endpoints apps. Acts as a client for
-[auth_service](../../../auth_service).
+[LUCI Auth Service](https://go.chromium.org/luci/auth_service).
 
 ### To use it in your service
 
