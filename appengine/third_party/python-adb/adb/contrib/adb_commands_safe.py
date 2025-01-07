@@ -201,6 +201,10 @@ class AdbCommandsSafe(object):
     return bool(self._adb_cmd)
 
   @property
+  def has_handle(self):
+    return bool(self._handle)
+
+  @property
   def failure(self):
     return self._failure
 
@@ -479,6 +483,10 @@ class AdbCommandsSafe(object):
       self._serial = None
     self._handle.Reset(new_endpoint=new_endpoint)
     return self._Connect(False)
+
+  def ReconnectViaSerial(self):
+    """Reconnects to the device using the device serial."""
+    self._Reconnect(True)
 
   def Shell(self, cmd, timeout_ms=None):
     """Runs a command on an Android device while swallowing exceptions.

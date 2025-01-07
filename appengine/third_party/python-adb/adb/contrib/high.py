@@ -978,6 +978,36 @@ class HighDevice(object):
         return False
       time.sleep(1)
 
+  def WaitUntilFullyBootedWithResets(
+      self, num_attempts=5, per_attempt_timeout=60, **kwargs):
+    """Run WaitUntilFullyBooted multiple times, resetting between attempts.
+
+    This should be functionally similar to WaitUntilFullyBooted, but more likely
+    to resolve connection issues rather than hang for the entire duration.
+
+    Args:
+      num_attempts: How many times WaitUntilFullyBooted will be run.
+      per_attempt_timeout: The timeout in seconds for each wait attempt.
+
+    Returns:
+      True if the device is fully booted, otherwise False.
+    """
+    for attempt in range(num_attempts):
+      booted = self.WaitUntilFullyBooted(per_attempt_timeout, **kwargs)
+      if booted:
+        _LOG.info('Device fully booted on attempt %d', attempt)
+        return True
+      if attempt < num_attempts - 1:
+        _LOG.warning(
+            'Device not fully booted on attempt %d, resetting connection',
+            attempt)
+      if self._device.has_handle:
+        self.Reset()
+      else:
+        # Connection is gone, find the new port by device serial.
+        self._device.ReconnectViaSerial()
+    return False
+
   def PushKeys(self):
     """Pushes all the keys on the file system to the device.
 
