@@ -152,17 +152,19 @@ SecretKey = collections.namedtuple('SecretKey', ['name'])
 # The representation of AuthGroup used by AuthDB, preprocessed for faster
 # membership checks. We keep it in AuthDB in place of AuthGroup to reduce RAM
 # usage.
-CachedGroup = collections.namedtuple('CachedGroup', [
-  'members',  # == frozenset(m.to_bytes() for m in auth_group.members)
-  'globs',
-  'nested',
-  'description',
-  'owners',
-  'created_ts',
-  'created_by',
-  'modified_ts',
-  'modified_by',
-])
+CachedGroup = collections.namedtuple(
+    'CachedGroup',
+    [
+        'members',  # frozenset(m.to_normalized_bytes() for m in group.members)
+        'globs',
+        'nested',
+        'description',
+        'owners',
+        'created_ts',
+        'created_by',
+        'modified_ts',
+        'modified_by',
+    ])
 
 
 # GroupListing is returned by list_group.
@@ -246,7 +248,7 @@ class AuthDB(object):
     cached_groups = {}
     for entity in (groups or []):
       cached_groups[entity.key.string_id()] = CachedGroup(
-          members=frozenset(m.to_bytes() for m in entity.members),
+          members=frozenset(m.to_normalized_bytes() for m in entity.members),
           globs=tuple(entity.globs or ()),
           nested=tuple(entity.nested or ()),
           description=entity.description,
@@ -289,7 +291,7 @@ class AuthDB(object):
     cached_groups = {}
     for gr in auth_db.groups:
       cached_groups[gr.name] = CachedGroup(
-          members=frozenset(gr.members),
+          members=frozenset(model.Identity.normalize(m) for m in gr.members),
           globs=tuple(model.IdentityGlob.from_bytes(x) for x in gr.globs),
           nested=tuple(gr.nested),
           description=gr.description,
@@ -453,10 +455,9 @@ class AuthDB(object):
           if p.startswith('group:'):
             groups.append(p[6:])  # 6 == len('group:')
           else:
-            idents.append(p)
+            idents.append(model.Identity.normalize(p))
         principals_set = ConditionalPrincipalsSet(
-            tuple(groups),
-            frozenset(idents),
+            tuple(groups), frozenset(idents),
             tuple(condition(idx) for idx in b.conditions))
         for perm_idx in b.permissions:
           per_permission_sets.setdefault(perm_idx, []).append(principals_set)
@@ -490,7 +491,8 @@ class AuthDB(object):
 
     Returns:
       (
-        Members index as dict(Identity.to_bytes() str => [str with group name]),
+        Members index as
+          dict(Identity.to_normalized_bytes() str => [str with group name]),
         Globs index as OrderedDict(IndentityGlob => [str with group name],
         Nested groups index as dict(group name => [str with group name]),
         Ownership index as dict(group name => [str with group name]),
@@ -559,7 +561,7 @@ class AuthDB(object):
     Unknown groups are considered empty.
     """
     # Will be used when checking self._groups[...].members sets.
-    ident_as_bytes = identity.to_bytes()
+    ident_as_bytes = identity.to_normalized_bytes()
 
     # While the code to add groups refuses to add cycle, this code ensures that
     # it doesn't go in a cycle by keeping track of the groups currently being
@@ -616,7 +618,8 @@ class AuthDB(object):
     """Returns AuthGroup entity reconstructing it from the cache.
 
     It slightly differs from the original entity:
-      - 'members' list is always sorted.
+      - 'members' have been normalized (i.e. transformed to lowercase) and then
+        sorted.
       - 'auth_db_rev' and 'auth_db_prev_rev' are not set.
 
     Returns:
@@ -761,7 +764,7 @@ class AuthDB(object):
             add_edge(glob_id, Graph.IN, traverse(group))
 
       # Find all groups that directly mention the identity.
-      for group in members_idx.get(principal.to_bytes(), ()):
+      for group in members_idx.get(principal.to_normalized_bytes(), ()):
         add_edge(graph.root_id, Graph.IN, traverse(group))
 
     elif isinstance(principal, model.IdentityGlob):
@@ -1010,7 +1013,7 @@ class AuthDB(object):
     # applied", and all([]) correctly returns True for this case.
     if not all(cond(attributes) for cond in principals.conditions):
       return False
-    if ident.to_bytes() in principals.idents:
+    if ident.to_normalized_bytes() in principals.idents:
       return True
     for gr in principals.groups:
       if gr not in checked_groups:

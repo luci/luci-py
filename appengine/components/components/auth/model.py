@@ -221,6 +221,10 @@ class Identity(
     """Serializes this identity to byte buffer."""
     return '%s:%s' % (self.kind, self.name)
 
+  def to_normalized_bytes(self):
+    """Normalizes the serialized identity byte buffer."""
+    return self.normalize(self.to_bytes())
+
   @classmethod
   def from_bytes(cls, byte_buf):
     """Given a byte buffer returns corresponding Identity object."""
@@ -253,6 +257,13 @@ class Identity(
   def is_user(self):
     """True if this object represents user account."""
     return self.kind == IDENTITY_USER
+
+  @staticmethod
+  def normalize(identity):
+    """Returns the normalized version of the given identity value."""
+    if identity.startswith('user:'):
+      return identity.lower()
+    return identity
 
 
 # Predefined Anonymous identity.
