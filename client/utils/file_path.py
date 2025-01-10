@@ -938,9 +938,10 @@ def rmtree(root):
                   time.time() - start)
 
   # First try the soft way: tries 3 times to delete and sleep a bit in between.
+  # On Windows, try 4 times with a total 12 seconds of sleep.
   # Retries help if test subprocesses outlive main process and try to actively
   # use or write to the directory while it is being deleted.
-  max_tries = 3
+  max_tries = 4 if sys.platform == 'win32' else 3
   has_called_change_tree_permission = False
   has_called_change_acl_for_delete = False
   for i in range(max_tries):

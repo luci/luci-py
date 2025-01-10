@@ -273,7 +273,10 @@ class FilePathTest(auto_stub.TestCase):
         while not fs.isfile(os.path.join(subdir, 'a')):
           self.assertEqual(None, proc.poll())
         file_path.rmtree(subdir)
-        self.assertEqual([4, 2], sleeps)
+        # rmtree will first try to change the tree permission and sleep for
+        # 4 and 6 seconds for the 2nd and 3rd try.
+        # The last 2 seconds is for the kill_children_processes.
+        self.assertEqual([4, 6, 2], sleeps)
         # sys.stderr.getvalue() would return a fair amount of output but it is
         # not completely deterministic so we're not testing it here.
       finally:
