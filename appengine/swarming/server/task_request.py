@@ -70,12 +70,12 @@ from components import pubsub
 from components import utils
 from components.config import validation
 
-from proto.api import swarming_pb2
 from proto.config import pools_pb2
 from server import config
 from server import directory_occlusion
 from server import pools_config
 from server import service_accounts_utils
+from server import string_pairs_serializer
 from server import task_pack
 from server import task_queues
 from server.constants import OR_DIM_SEP
@@ -1088,11 +1088,34 @@ class TaskSlice(ndb.Model):
     Args:
       secret_bytes: SecretBytes entity for the request, if any.
     """
+    self.properties_hash = self.calculate_properties_hash(secret_bytes)
+
+  def calculate_properties_hash(self, secret_bytes):
+    """Calculates the hash of properties for this slice.
+
+    Return the hash without populating self.properties_hash.
+
+    Args:
+      secret_bytes: SecretBytes entity for the request, if any.
+    """
     props = self.properties.to_dict()
     if secret_bytes:
       props['secret_bytes'] = secret_bytes.secret_bytes.encode('hex')
-    self.properties_hash = self.HASHING_ALGO(
-        utils.encode_to_json(props)).digest()
+    return self.HASHING_ALGO(utils.encode_to_json(props)).digest()
+
+  def calculate_properties_hash_v2(self, secret_bytes):
+    """Calculates the hash of properties for this slice the same way as go side.
+
+    Return the hash without populating self.properties_hash.
+
+    Args:
+      secret_bytes: SecretBytes entity for the request, if any.
+    """
+    serializer = string_pairs_serializer.StringPairsSerializer()
+    serialized = serializer.to_bytes(self.properties, secret_bytes)
+    sha256_hash = hashlib.sha256()
+    sha256_hash.update(serialized)
+    return sha256_hash.digest()
 
   def get_properties_hash(self, request):
     """Returns the hash of properties for this slice.

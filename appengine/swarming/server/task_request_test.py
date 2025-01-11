@@ -924,6 +924,41 @@ class TaskRequestApiTest(TestCase):
         request_2.task_slice(0).get_properties_hash(request_2))
     self.assertTrue(request_1.task_slice(0).get_properties_hash(request_1))
 
+    self.assertEqual(
+        request_1.task_slice(0).calculate_properties_hash_v2(None),
+        request_2.task_slice(0).calculate_properties_hash_v2(None))
+
+  def test_calculate_properties_hash_v2_no_secret(self):
+    task_slice = task_request.TaskSlice(properties=task_request.TaskProperties(
+        dimensions_data={
+            u'd1': [u'v1', u'v2'],
+            u'pool': [u'pool'],
+        },
+        env_prefixes={
+            u'p1': [u'v2', u'v1'],
+        },
+    ))
+    self.assertEqual(
+        task_slice.calculate_properties_hash_v2(None).encode('hex'),
+        '079e5c6f0bb17d036cc3196c89d2d3ef15fea09d85e7a69a8ba7fe69cf5a7afd',
+    )
+
+  def test_calculate_properties_hash_v2_with_secret(self):
+    task_slice = task_request.TaskSlice(properties=task_request.TaskProperties(
+        dimensions_data={
+            u'd1': [u'v1', u'v2'],
+            u'pool': [u'pool'],
+        },
+        env_prefixes={
+            u'p1': [u'v2', u'v1'],
+        },
+    ))
+    secret_bytes = task_request.SecretBytes(secret_bytes='secret', )
+    self.assertEqual(
+        task_slice.calculate_properties_hash_v2(secret_bytes).encode('hex'),
+        'b114a396a92ef47203df9f2927e73a90b1bf6e4573daa4e714c10d1394c8da05',
+    )
+
   def test_different(self):
     # Two TestRequest with different properties.
     request_1 = _gen_request(
