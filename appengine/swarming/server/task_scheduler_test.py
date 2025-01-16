@@ -1592,6 +1592,31 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     third_ts = self.mock_now(self.now, 20)
     self._task_deduped(third_ts, task_id, '1d69ba3ea8008b10', now=second_ts)
 
+  def test_task_idempotent_result_with_new_hash(self):
+    # First task is idempotent.
+    task_id = self._task_ran_successfully()
+    # Change the result's properties_hash to the new version.
+    first_request_key, result_key = task_pack.get_request_and_result_keys(
+        task_id[:-1] + '0')
+    first_request = first_request_key.get()
+    result = result_key.get()
+    result.properties_hash = first_request.task_slices[
+        0].calculate_properties_hash_v2(None)
+    result.put()
+    # Second task is deduped against first task.
+    new_ts = self.mock_now(self.now,
+                           config.settings().reusable_task_age_secs - 1)
+    self._task_deduped(new_ts,
+                       task_id,
+                       '1d8dc670a0008a10',
+                       created_ts=utils.utcnow() -
+                       datetime.timedelta(seconds=1))
+    self.assertEqual(
+        1000.0,
+        ts_mon_metrics._task_state_change_schedule_latencies.get(
+            fields=_update_fields_schedule(
+                status=State.to_string(State.COMPLETED))).sum)
+
   def test_task_idempotent_second_slice(self):
     # A task will dedupe against a second slice, and skip the first slice.
     # First task is idempotent.

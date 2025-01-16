@@ -1436,6 +1436,13 @@ def schedule_request(request,
     t = request.task_slice(i)
     if t.properties.idempotent:
       dupe_summary = _find_dupe_task(now, t.properties_hash)
+      if not dupe_summary:
+        # Try the new hash method.
+        dupe_summary = _find_dupe_task(
+            now, t.calculate_properties_hash_v2(secret_bytes))
+        if dupe_summary:
+          logging.info(
+              "found dupe task using properties hash calculated in the new way")
       if dupe_summary:
         _dedupe_result_summary(dupe_summary, result_summary, i)
         # In this code path, there's not much to do as the task will not be run,

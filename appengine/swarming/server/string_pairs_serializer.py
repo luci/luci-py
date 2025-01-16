@@ -201,7 +201,7 @@ class StringPairsSerializer(object):
     buf = []
     for pair in self.pairs:
       buf.append(struct.pack("<i", len(pair.key)))
-      buf.append(pair.key)
+      buf.append(pair.key.encode('utf-8'))
       buf.append(struct.pack("<i", len(pair.value)))
-      buf.append(pair.value)
+      buf.append(pair.value.encode('utf-8'))
     return "".join(buf)
