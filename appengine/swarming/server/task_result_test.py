@@ -889,7 +889,7 @@ class TaskResultApiTest(TestCase):
     run_result.dead_after_ts = None
     run_result.put()
 
-    props_h = '09057c5f724649e6f5566ecc1594e73515c41d507aa68dd79b5466394edbda3c'
+    props_h = 'cbe73c661888417066e9c71b1c928867eacdbf14081a90137be83b1c4b935958'
     expected = swarming_pb2.TaskResult(
         request=swarming_pb2.TaskRequest(
             task_slices=[
@@ -906,8 +906,8 @@ class TaskResultApiTest(TestCase):
                             lower_priority=True),
                         command=[u'command1'],
                         dimensions=[
-                            swarming_pb2.StringListPair(
-                                key=u'pool', values=[u'default']),
+                            swarming_pb2.StringListPair(key=u'pool',
+                                                        values=[u'default']),
                         ],
                         execution_timeout=duration_pb2.Duration(seconds=86400),
                         grace_period=duration_pb2.Duration(seconds=30),
@@ -985,8 +985,8 @@ class TaskResultApiTest(TestCase):
                 duration=duration_pb2.Duration(nanos=56000000),
                 cache_trim=swarming_pb2.CacheTrimOverhead(
                     duration=duration_pb2.Duration(nanos=1000000)),
-                cipd=swarming_pb2.CIPDOverhead(
-                    duration=duration_pb2.Duration(nanos=2000000)),
+                cipd=swarming_pb2.CIPDOverhead(duration=duration_pb2.Duration(
+                    nanos=2000000)),
                 named_cache=swarming_pb2.NamedCacheOverhead(
                     duration=duration_pb2.Duration(nanos=3000000)),
                 cas=swarming_pb2.CASOverhead(

@@ -1592,16 +1592,16 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     third_ts = self.mock_now(self.now, 20)
     self._task_deduped(third_ts, task_id, '1d69ba3ea8008b10', now=second_ts)
 
-  def test_task_idempotent_result_with_new_hash(self):
+  def test_task_idempotent_result_with_old_hash(self):
     # First task is idempotent.
     task_id = self._task_ran_successfully()
-    # Change the result's properties_hash to the new version.
+    # Change the result's properties_hash to the old version.
     first_request_key, result_key = task_pack.get_request_and_result_keys(
         task_id[:-1] + '0')
     first_request = first_request_key.get()
     result = result_key.get()
     result.properties_hash = first_request.task_slices[
-        0].calculate_properties_hash_v2(None)
+        0].calculate_properties_hash(None)
     result.put()
     # Second task is deduped against first task.
     new_ts = self.mock_now(self.now,

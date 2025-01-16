@@ -1088,7 +1088,7 @@ class TaskSlice(ndb.Model):
     Args:
       secret_bytes: SecretBytes entity for the request, if any.
     """
-    self.properties_hash = self.calculate_properties_hash(secret_bytes)
+    self.properties_hash = self.calculate_properties_hash_v2(secret_bytes)
 
   def calculate_properties_hash(self, secret_bytes):
     """Calculates the hash of properties for this slice.

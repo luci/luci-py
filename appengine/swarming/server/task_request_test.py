@@ -618,7 +618,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        '01c7cb24beefad19fe79f8adab4e72447175a6d8b290fb22930f102fc71cf596',
+        'f859e5c00515a1b5cc1c61be541808b1777f8122c9c7e803ad10acac0cdc8534',
         req.task_slice(0).get_properties_hash(req).encode('hex'))
 
   def test_init_new_request_cas_input(self):
@@ -753,7 +753,7 @@ class TaskRequestApiTest(TestCase):
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     self.assertEqual(
-        'be94b558a518f4d2864960ce0b1a3dbdce050e2713df668d52fd4f43fc0ce2c2',
+        'c749318b788dc44e80aebba76d28e51df3db1bac7dc331e1089ffd7fc5e97179',
         req.task_slice(0).get_properties_hash(req).encode('hex'))
 
   def test_init_new_request_parent(self):
@@ -785,7 +785,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '7f75debbd69ed0838c40cacc5ff6942e0199644103b84cf49a84c5deb44f6b78',
+        '9c736873e8e125f90f9ffd6f845f866f1730a26f8b34138a8cc256ab56071bbc',
         request.task_slice(0).get_properties_hash(request).encode('hex'))
 
   def test_init_new_request_bot_service_account(self):
@@ -1083,7 +1083,7 @@ class TaskRequestApiTest(TestCase):
         outputs=[u'foo'],
     )
     # To be updated every time the schema changes.
-    props_h = '9ec1cdcbafd6a2c84132f76b21b609ad0d05382d3abfbd0d76bea337130d44f8'
+    props_h = '6086d0c27e126db36879cc5db301c078b0c6fc924a6b3c0aa685cb067dd8bcae'
     expected = swarming_pb2.TaskRequest(
         # Scheduling.
         task_slices=[
@@ -1119,8 +1119,8 @@ class TaskRequestApiTest(TestCase):
         parent_task_id=parent.task_id,
         parent_run_id=parent_run_id,
         # Notification. auth_token cannot be retrieved.
-        pubsub_notification=swarming_pb2.PubSub(
-            topic=u'projects/a/topics/abc', userdata=u'obscure_reference'),
+        pubsub_notification=swarming_pb2.PubSub(topic=u'projects/a/topics/abc',
+                                                userdata=u'obscure_reference'),
     )
 
     actual = swarming_pb2.TaskRequest()

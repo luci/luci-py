@@ -1437,12 +1437,14 @@ def schedule_request(request,
     if t.properties.idempotent:
       dupe_summary = _find_dupe_task(now, t.properties_hash)
       if not dupe_summary:
-        # Try the new hash method.
+        # Try the old hash method.
+        # TODO(b/355013435): Stop trying the old hash method after all of the
+        # results having those kind of hashes are expired.
         dupe_summary = _find_dupe_task(
-            now, t.calculate_properties_hash_v2(secret_bytes))
+            now, t.calculate_properties_hash(secret_bytes))
         if dupe_summary:
           logging.info(
-              "found dupe task using properties hash calculated in the new way")
+              "found dupe task using properties hash calculated in the old way")
       if dupe_summary:
         _dedupe_result_summary(dupe_summary, result_summary, i)
         # In this code path, there's not much to do as the task will not be run,
