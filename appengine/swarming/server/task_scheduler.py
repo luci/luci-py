@@ -2230,7 +2230,7 @@ def cron_abort_expired_task_to_run():
   delay_sec = 0.0
   if pools_config.all_pools_migrated_to_rbe():
     logging.info('Delaying the expiration check to expire through RBE instead')
-    delay_sec = 60.0
+    delay_sec = 300.0
 
   task_to_runs = []
   try:
