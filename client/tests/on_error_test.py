@@ -145,6 +145,9 @@ class OnErrorBase(auto_stub.TestCase):
     self.mock(on_error, '_HOSTNAME', None)
     self.mock(on_error, '_SERVER', None)
     self.mock(on_error, '_is_in_test', lambda: False)
+    # Some of the tests below can produce a large diff in their assertions fail,
+    # make sure that they are not hidden.
+    self.maxDiff = None
 
 
 class OnErrorTest(OnErrorBase):
@@ -325,10 +328,14 @@ class OnErrorServerTest(OnErrorBase):
     # Rerun itself, report an error with a crash, ensure the error was reported.
     httpd = start_server()
     out = self.call(httpd.url, 'crash', 1)
+    # Since Python 3.9, tracebacks display the absolute path for __main__ module
+    # frames, so we need to accommodate for that in our expected output.
+    main_py = os.path.join(os.getcwd(), "on_error", "main.py")
     expected = ('Traceback (most recent call last):\n'
-                '  File "main.py", line 0, in <module>\n'
+                f'  File "{main_py}", line 0, in <module>\n'
                 '    sys.exit(run_shell_out(*sys.argv[1:]))\n'
-                '  File "main.py", line 0, in run_shell_out\n'
+                '             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n'
+                f'  File "{main_py}", line 0, in run_shell_out\n'
                 '    raise ValueError(\'Oops\')\n'
                 'ValueError: Oops\n'
                 'Sending the crash report ... done.\n'
@@ -366,6 +373,7 @@ class OnErrorServerTest(OnErrorBase):
         'stack':
         'File "main.py", line 0, in <module>\n'
         '  sys.exit(run_shell_out(*sys.argv[1:]))\n'
+        '           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n'
         'File "main.py", line 0, in run_shell_out\n'
         '  raise ValueError(\'Oops\')',
         'user':
@@ -377,10 +385,14 @@ class OnErrorServerTest(OnErrorBase):
   def test_shell_out_crash_server_down(self):
     # Rerun itself, report an error, ensure the error was reported.
     out = self.call('https://localhost:1', 'crash', 1)
+    # Since Python 3.9, tracebacks display the absolute path for __main__ module
+    # frames, so we need to accommodate for that in our expected output.
+    main_py = os.path.join(os.getcwd(), "on_error", "main.py")
     expected = ('Traceback (most recent call last):\n'
-                '  File "main.py", line 0, in <module>\n'
+                f'  File "{main_py}", line 0, in <module>\n'
                 '    sys.exit(run_shell_out(*sys.argv[1:]))\n'
-                '  File "main.py", line 0, in run_shell_out\n'
+                '             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n'
+                f'  File "{main_py}", line 0, in run_shell_out\n'
                 '    raise ValueError(\'Oops\')\n'
                 'ValueError: Oops\n'
                 'Sending the crash report ... failed!\n'

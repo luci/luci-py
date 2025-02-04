@@ -192,9 +192,9 @@ class TestOsUtilities(auto_stub.TestCase):
     versions = os_utilities.get_python_versions()
     self.assertEqual(len(versions), 3)
     self.assertEqual(versions[0], '3')
-    self.assertEqual(versions[1], '3.8')
+    self.assertEqual(versions[1], '3.11')
     # we don't know which micro version we use in test.
-    self.assertRegex(versions[2], '3.8.[0-9]+')
+    self.assertRegex(versions[2], '3.11.[0-9]+')
 
   def test_get_ip(self):
     ip = os_utilities.get_ip()

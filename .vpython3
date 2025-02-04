@@ -3,12 +3,12 @@
 # Read more about `vpython` and how to modify this file here:
 #   https://chromium.googlesource.com/infra/infra/+/master/doc/users/vpython.md
 
-python_version:"3.8"
+python_version:"3.11"
 
 # required by nose2
 wheel: <
  name: "infra/python/wheels/coverage/${vpython_platform}"
- version: "version:5.5.chromium.2"
+ version: "version:7.3.1"
 >
 
 wheel: <
@@ -98,7 +98,7 @@ wheel: <
 
 wheel: <
   name: "infra/python/wheels/pyobjc/${vpython_platform}"
-  version: "version:7.3.chromium.1"
+  version: "version:10.0"
   match_tag: <
     platform: "macosx_10_10_intel"
   >
@@ -109,7 +109,7 @@ wheel: <
 
 wheel: <
   name: "infra/python/wheels/pywin32/${vpython_platform}"
-  version: "version:300"
+  version: "version:306"
   match_tag: <
     platform: "win_amd64"
   >
