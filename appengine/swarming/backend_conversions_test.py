@@ -162,7 +162,7 @@ class TestBackendConversions(test_case.TestCase):
                 struct_pb2.Value(string_value='latest'),
             }),
         caches=[
-            common_pb2.CacheEntry(name='name_1', path='path_1'),
+            common_pb2.CacheEntry(name='name_1', path='cache/path_1'),
             common_pb2.CacheEntry(
                 name='name_2',
                 path='path_2',

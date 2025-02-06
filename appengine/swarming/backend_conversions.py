@@ -157,10 +157,10 @@ def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
                           utils.time_time()),
       properties=task_request.TaskProperties(
           caches=[
-              task_request.CacheEntry(path=posixpath.join(
-                  _CACHE_DIR, cache.path),
-                                      name=cache.name)
-              for cache in run_task_req.caches
+              task_request.CacheEntry(
+                  path=posixpath.join(_CACHE_DIR, cache.path)
+                  if not cache.path.startswith(_CACHE_DIR) else cache.path,
+                  name=cache.name) for cache in run_task_req.caches
           ],
           dimensions_data=base_dims,
           execution_timeout_secs=run_task_req.execution_timeout.seconds,
