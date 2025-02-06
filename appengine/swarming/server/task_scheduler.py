@@ -75,7 +75,8 @@ class TaskExistsException(Error):
   pass
 
 
-def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
+def _expire_slice_tx(request, to_run_key, terminal_state, culprit_bot_id,
+                     capacity, es_cfg):
   """Expires a TaskToRunShardXXX and enqueues the next one, if necessary.
 
   Called as a ndb transaction by _expire_slice().
@@ -84,6 +85,7 @@ def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
     request: the TaskRequest instance with all slices.
     to_run_key: the TaskToRunShard to expire.
     terminal_state: the task state to set if this slice is the last one.
+    culprit_bot_id: for BOT_DIED expirations, the bot that caused it, if known.
     capacity: dict {slice index => True if can run it}, None to skip the check.
     es_cfg: ExternalSchedulerConfig for this task.
 
@@ -167,6 +169,8 @@ def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
     result_summary.state = terminal_state
     result_summary.internal_failure = (
         terminal_state == task_result.State.BOT_DIED)
+    if terminal_state == task_result.State.BOT_DIED and culprit_bot_id:
+      result_summary.bot_id = culprit_bot_id
     result_summary.modified_ts = now
     result_summary.abandoned_ts = now
     result_summary.completed_ts = now
@@ -188,8 +192,8 @@ def _expire_slice_tx(request, to_run_key, terminal_state, capacity, es_cfg):
   return result_summary, to_run, new_to_run, state_changed
 
 
-def _expire_slice(request, to_run_key, terminal_state, claim, txn_retries,
-                  txn_catch_errors, reason):
+def _expire_slice(request, to_run_key, terminal_state, culprit_bot_id, claim,
+                  txn_retries, txn_catch_errors, reason):
   """Expires a single TaskToRunShard if it is still pending.
 
   If the task has more slices, enqueues the next slice. Otherwise marks the
@@ -199,6 +203,7 @@ def _expire_slice(request, to_run_key, terminal_state, claim, txn_retries,
     request: the TaskRequest instance with all slices.
     to_run_key: the TaskToRunShard to expire.
     terminal_state: the task state to set if this slice is the last one.
+    culprit_bot_id: for BOT_DIED expirations, the bot that caused it, if known.
     claim: if True, obtain task_to_run.Claim before touching the task.
     txn_retries: how many times to retry the transaction on collisions.
     txn_catch_errors: if True, ignore datastore_utils.CommitError.
@@ -247,8 +252,8 @@ def _expire_slice(request, to_run_key, terminal_state, claim, txn_retries,
 
   try:
     summary, old_ttr, new_ttr, state_changed = datastore_utils.transaction(
-        lambda: _expire_slice_tx(request, to_run_key, terminal_state, capacity,
-                                 es_cfg),
+        lambda: _expire_slice_tx(request, to_run_key, terminal_state,
+                                 culprit_bot_id, capacity, es_cfg),
         retries=txn_retries)
   except datastore_utils.CommitError as exc:
     if not txn_catch_errors:
@@ -1713,6 +1718,7 @@ def bot_reap_task(bot_dimensions, queues, bot_details, deadline):
         summary, new_to_run = _expire_slice(request,
                                             to_run.key,
                                             task_result.State.EXPIRED,
+                                            culprit_bot_id=None,
                                             claim=False,
                                             txn_retries=1,
                                             txn_catch_errors=True,
@@ -2159,7 +2165,7 @@ def cancel_tasks(limit, query, cursor=None):
   return cursor, results
 
 
-def expire_slice(to_run_key, terminal_state, reason):
+def expire_slice(to_run_key, terminal_state, culprit_bot_id, reason):
   """Expires a slice represented by the given TaskToRunShard entity.
 
   Schedules the next slice, if possible, or terminates the task with the given
@@ -2172,6 +2178,7 @@ def expire_slice(to_run_key, terminal_state, reason):
   Arguments:
     to_run_key: an entity key of TaskToRunShard entity to expire.
     terminal_state: the task state to set if this slice is the last one.
+    culprit_bot_id: for BOT_DIED expirations, the bot that caused it, if known.
     reason: a string tsmon label used to identify how expiration happened.
 
   Raises:
@@ -2185,6 +2192,7 @@ def expire_slice(to_run_key, terminal_state, reason):
   _expire_slice(request,
                 to_run_key,
                 terminal_state,
+                culprit_bot_id=culprit_bot_id,
                 claim=False,
                 txn_retries=4,
                 txn_catch_errors=False,
@@ -2433,6 +2441,7 @@ def task_expire_tasks(task_to_runs):
           request,
           to_run_key,
           task_result.State.EXPIRED,
+          culprit_bot_id=None,
           claim=True,
           txn_retries=4,
           txn_catch_errors=True,

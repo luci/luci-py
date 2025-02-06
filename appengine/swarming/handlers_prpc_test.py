@@ -2499,6 +2499,7 @@ class InternalsServicePrpcTest(PrpcTest):
     expire_slice_mock.assert_called_once_with(
         task_to_run.task_to_run_key_from_parts(req_key, 15, 32),
         task_result.State.NO_RESOURCE,
+        '',
         'NO_RESOURCE',
     )
 
@@ -2522,6 +2523,7 @@ class InternalsServicePrpcTest(PrpcTest):
     expire_slice_mock.assert_called_once_with(
         task_to_run.task_to_run_key_from_parts(req_key, 15, 32),
         task_result.State.EXPIRED,
+        '',
         'PERMISSION_DENIED',
     )
 
@@ -2552,11 +2554,13 @@ class InternalsServicePrpcTest(PrpcTest):
             task_to_run_id=32,  # slice #2
             reason=rbe_pb2.ExpireSliceRequest.BOT_INTERNAL_ERROR,
             details='Boo',
+            culprit_bot_id='bot-id',
         ))
 
     expire_slice_mock.assert_called_once_with(
         task_to_run.task_to_run_key_from_parts(req_key, 15, 32),
         task_result.State.BOT_DIED,
+        'bot-id',
         'BOT_INTERNAL_ERROR',
     )
 
