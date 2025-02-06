@@ -80,14 +80,15 @@ class TestBackendConversions(test_case.TestCase):
                 struct_pb2.Value(string_value='agent/package/${platform}'),
                 'agent_binary_cipd_vers':
                 struct_pb2.Value(string_value='latest'),
+                'agent_binary_cipd_server':
+                struct_pb2.Value(string_value='https://cipd.example.com'),
                 'tags':
-                  struct_pb2.Value(list_value=struct_pb2.ListValue(
-                      values=[
-                          struct_pb2.Value(string_value ='k1:v1'),
-                          struct_pb2.Value(string_value ='k2:v2'),
-                      ],
-                  )),
-                'task_name': struct_pb2.Value(string_value='task_name'),
+                struct_pb2.Value(list_value=struct_pb2.ListValue(values=[
+                    struct_pb2.Value(string_value='k1:v1'),
+                    struct_pb2.Value(string_value='k2:v2'),
+                ], )),
+                'task_name':
+                struct_pb2.Value(string_value='task_name'),
             }),
         grace_period=duration_pb2.Duration(seconds=grace_secs),
         execution_timeout=duration_pb2.Duration(seconds=exec_secs),
@@ -107,12 +108,14 @@ class TestBackendConversions(test_case.TestCase):
             grace_period_secs=grace_secs,
             dimensions_data={u'required-1': [u'req-1']},
             command=[u'agent', '-fantasia', 'pegasus'],
-            cipd_input=task_request.CipdInput(packages=[
-                task_request.CipdPackage(
-                    path='.',
-                    package_name=u'agent/package/${platform}',
-                    version=u'latest')
-            ]),
+            cipd_input=task_request.CipdInput(
+                packages=[
+                    task_request.CipdPackage(
+                        path='.',
+                        package_name=u'agent/package/${platform}',
+                        version=u'latest')
+                ],
+                server='https://cipd.example.com'),
             containment=task_request.Containment(containment_type=0)))
     expected_tr = task_request.TaskRequest(
         created_ts=utils.utcnow(),
@@ -160,6 +163,8 @@ class TestBackendConversions(test_case.TestCase):
                 struct_pb2.Value(string_value='agent/package/${platform}'),
                 'agent_binary_cipd_vers':
                 struct_pb2.Value(string_value='latest'),
+                'agent_binary_cipd_server':
+                struct_pb2.Value(string_value='https://cipd.example.com'),
             }),
         caches=[
             common_pb2.CacheEntry(name='name_1', path='cache/path_1'),
@@ -198,12 +203,14 @@ class TestBackendConversions(test_case.TestCase):
             ],
             execution_timeout_secs=exec_secs,
             grace_period_secs=grace_secs,
-            cipd_input=task_request.CipdInput(packages=[
-                task_request.CipdPackage(
-                    path='.',
-                    package_name=u'agent/package/${platform}',
-                    version=u'latest')
-            ]),
+            cipd_input=task_request.CipdInput(
+                packages=[
+                    task_request.CipdPackage(
+                        path='.',
+                        package_name=u'agent/package/${platform}',
+                        version=u'latest')
+                ],
+                server='https://cipd.example.com'),
             containment=task_request.Containment(containment_type=0)))
 
     slice_1 = task_request.TaskSlice(
@@ -247,13 +254,15 @@ class TestBackendConversions(test_case.TestCase):
         backend_config=struct_pb2.Struct(
             fields={
                 'wait_for_capacity':
-                    struct_pb2.Value(bool_value=True),
+                struct_pb2.Value(bool_value=True),
                 'agent_binary_cipd_filename':
-                    struct_pb2.Value(string_value='agent'),
+                struct_pb2.Value(string_value='agent'),
                 'agent_binary_cipd_pkg':
-                    struct_pb2.Value(string_value='agent/package/${platform}'),
+                struct_pb2.Value(string_value='agent/package/${platform}'),
                 'agent_binary_cipd_vers':
-                    struct_pb2.Value(string_value='latest')
+                struct_pb2.Value(string_value='latest'),
+                'agent_binary_cipd_server':
+                struct_pb2.Value(string_value='https://cipd.example.com')
             }),
         grace_period=duration_pb2.Duration(seconds=grace_secs),
         execution_timeout=duration_pb2.Duration(seconds=exec_secs),
@@ -278,12 +287,14 @@ class TestBackendConversions(test_case.TestCase):
                 u'required-1': [u'req-1', u'req-1-2'],
                 u'required-2': [u'req-2']
             },
-            cipd_input=task_request.CipdInput(packages=[
-                task_request.CipdPackage(
-                    path='.',
-                    package_name=u'agent/package/${platform}',
-                    version=u'latest')
-            ]),
+            cipd_input=task_request.CipdInput(
+                packages=[
+                    task_request.CipdPackage(
+                        path='.',
+                        package_name=u'agent/package/${platform}',
+                        version=u'latest')
+                ],
+                server='https://cipd.example.com'),
             containment=task_request.Containment(containment_type=0)),
     )
 

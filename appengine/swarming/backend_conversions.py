@@ -167,12 +167,14 @@ def _compute_task_slices(run_task_req, backend_config, has_secret_bytes):
           grace_period_secs=run_task_req.grace_period.seconds,
           command=cmd,
           has_secret_bytes=has_secret_bytes,
-          cipd_input=task_request.CipdInput(packages=[
-              task_request.CipdPackage(
-                  path='.',
-                  package_name=backend_config.agent_binary_cipd_pkg,
-                  version=backend_config.agent_binary_cipd_vers)
-          ]),
+          cipd_input=task_request.CipdInput(
+              packages=[
+                  task_request.CipdPackage(
+                      path='.',
+                      package_name=backend_config.agent_binary_cipd_pkg,
+                      version=backend_config.agent_binary_cipd_vers)
+              ],
+              server=backend_config.agent_binary_cipd_server),
           containment=task_request.Containment(containment_type=0)),
   )
 
