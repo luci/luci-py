@@ -188,6 +188,12 @@ class _TaskToRunBase(ndb.Model):
   # Never reset once set.
   claim_id = ndb.StringProperty(required=False, indexed=False)
 
+  # Increased when resubmitting an RBE reservation if the previous one failed
+  # before the TaskToRun was claimed.
+  #
+  # Used only in RBE mode.
+  retry_count = ndb.IntegerProperty(required=False, indexed=False)
+
   def consume(self, claim_id):
     """Moves TaskToRun into non-reapable state (e.g. when canceling)."""
     self.claim_id = claim_id
@@ -237,9 +243,8 @@ class _TaskToRunBase(ndb.Model):
 
   def to_dict(self):
     """Purely used for unit testing."""
-    out = super(
-        _TaskToRunBase,
-        self).to_dict(exclude=['claim_id', 'dimensions', 'rbe_reservation'])
+    out = super(_TaskToRunBase, self).to_dict(
+        exclude=['claim_id', 'dimensions', 'rbe_reservation', 'retry_count'])
     # Consistent formatting makes it easier to reason about.
     if out['queue_number']:
       out['queue_number'] = '0x%016x' % out['queue_number']
