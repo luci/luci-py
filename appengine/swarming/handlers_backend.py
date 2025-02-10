@@ -79,6 +79,16 @@ class CronTidyTaskDimensionSets(_CronHandlerBase):
       self.response.set_status(429, 'Need to retry')
 
 
+class CronTidyBotDimensionsMatches(_CronHandlerBase):
+  """Removes stale BotDimensionsMatches from the datastore."""
+
+  def run_cron(self):
+    f = task_queues.tidy_bot_dimensions_matches_async(
+        bot_management.check_bot_alive_async)
+    if not f.get_result():
+      self.response.set_status(429, 'Need to retry')
+
+
 class CronUpdateBotInfoComposite(_CronHandlerBase):
   """Updates BotInfo.composite if needed, e.g. the bot became dead because it
   hasn't pinged for a while.
@@ -269,6 +279,8 @@ def get_routes():
       ('/internal/cron/important/scheduler/abort_expired',
        CronAbortExpiredShardToRunHandler),
       ('/internal/cron/cleanup/task_dimension_sets', CronTidyTaskDimensionSets),
+      ('/internal/cron/cleanup/bot_dimensions_matches',
+       CronTidyBotDimensionsMatches),
       ('/internal/cron/monitoring/bots/update_bot_info',
        CronUpdateBotInfoComposite),
       ('/internal/cron/important/bot_groups_config',

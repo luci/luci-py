@@ -238,7 +238,7 @@ class BotDimensionsMatches(ndb.Model):
 
   Created the first time the bot calls assert_bot(...). Deleted when the bot is
   expected to stop consuming tasks (e.g. it is deleted, quarantined, detected as
-  dead, etc.) in cleanup_after_bot(...) .
+  dead, etc.) in cleanup_after_bot(...).
   """
   # Disable useless in-process per-request cache to save some RAM.
   _use_cache = False
@@ -1148,7 +1148,8 @@ def _map_async(queries,
                max_concurrency=200,
                page_size=1000,
                timeout=300,
-               max_pages=None):
+               max_pages=None,
+               keys_only=False):
   """Applies a callback to results of a bunch of queries.
 
   This is roughly similar to ndb.Query.map_async, except it tries to make
@@ -1157,17 +1158,19 @@ def _map_async(queries,
 
   Arguments:
     queries: a list of (ndb.Query, _Logger) with queries to fetch results of.
-    cb: a callback that takes a fetched entity and optionally returns a future
-      to wait on. The future must resolve in a boolean, where True indicates
-      the item was processed successfully and False if the processing failed.
-      If the callback doesn't return a future, the item is assumed to be
-      processed successfully. The callback must not raise exceptions, they
-      will abort the whole thing. The callback may be called multiple times
-      with the same entity if this entity is returned by multiple queries.
+    cb: a callback that takes a fetched entity (or its key if keys_only is True)
+      and optionally returns a future to wait on. The future must resolve in
+      a boolean, where True indicates the item was processed successfully and
+      False if the processing failed. If the callback doesn't return a future,
+      the item is assumed to be processed successfully. The callback must not
+      raise exceptions, they will abort the whole thing. The callback may be
+      called multiple times with the same entity if this entity is returned by
+      multiple queries.
     max_concurrency: a limit on number of concurrently pending futures.
     page_size: a page size for datastore queries.
     timeout: how long (in seconds) to run the query loop before giving up.
     max_pages: a limit on number of pages to fetch (mostly for tests).
+    keys_only: if True, only fetch entity keys.
 
   Returns:
     True if all queries finished to completion and all fetched items were
@@ -1194,7 +1197,8 @@ def _map_async(queries,
         try:
           page, cursor, more = yield q.fetch_page_async(page_size,
                                                         start_cursor=cursor,
-                                                        deadline=rpc_deadline)
+                                                        deadline=rpc_deadline,
+                                                        keys_only=keys_only)
           # Avoid favoring items that appear earlier in the page. It is
           # important when _map_async is retried, e.g. as a part of TQ task
           # retry. Gives some opportunity for tail items to be processed. Mostly
@@ -1503,6 +1507,44 @@ def tidy_task_dimension_sets_async():
   # Retry the whole thing if something failed or the query timed out. This is
   # faster than waiting for the next cron tick. Will also give some monitoring
   # signal.
+  if not ok:
+    log.error('need a retry')
+  raise ndb.Return(ok)
+
+
+@ndb.tasklet
+def tidy_bot_dimensions_matches_async(bot_alive_cb):
+  """Removes BotDimensionsMatches of missing or dead bots.
+
+  Arguments:
+    bot_alive_cb: called as bot_alive_cb(bot_id) to check if this bot is alive.
+       Returns an ndb.Future that resolves into a boolean.
+
+  Returns:
+    True if cleaned up everything, False if something failed.
+  """
+  log = _Logger('tidy_bot_matches')
+
+  cleaned = []
+
+  @ndb.tasklet
+  def cleanup_async(entity_key):
+    bot_id = entity_key.string_id()
+    try:
+      alive = yield bot_alive_cb(bot_id)
+      if not alive:
+        log.info('cleaning %s', bot_id)
+        yield entity_key.delete_async()
+        cleaned.append(bot_id)
+      raise ndb.Return(True)
+    except _TXN_EXCEPTIONS:
+      log.warning('error cleaning %s', bot_id)
+      raise ndb.Return(False)
+
+  q = BotDimensionsMatches.query()
+  ok = yield _map_async([(q, log)], cleanup_async, keys_only=True)
+  log.info('cleaned %d', len(cleaned))
+
   if not ok:
     log.error('need a retry')
   raise ndb.Return(ok)

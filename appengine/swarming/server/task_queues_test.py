@@ -1230,6 +1230,23 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self._create_task_dims_set('pool:p:1', ['pool:p'])
     self.assertTrue(call('pool:p:1', [['pool:p']]))
 
+  def test_tidy_bot_dimensions_matches_async(self):
+    for i in range(0, 10):
+      self._assert_bot('bot-%d' % i)
+
+    @ndb.tasklet
+    def should_keep_async(bot_id):
+      idx = int(bot_id[len('bot-'):])
+      raise ndb.Return(idx % 2 == 0)
+
+    ok = task_queues.tidy_bot_dimensions_matches_async(
+        should_keep_async).get_result()
+    self.assertTrue(ok)
+
+    remains = list(task_queues.BotDimensionsMatches.query())
+    self.assertEqual(['bot-0', 'bot-2', 'bot-4', 'bot-6', 'bot-8'],
+                     [ent.key.string_id() for ent in remains])
+
 
 class TestMapAsync(test_env_handlers.AppTestBase):
   # Page size in queries.
@@ -1251,12 +1268,13 @@ class TestMapAsync(test_env_handlers.AppTestBase):
     return q, task_queues._Logger('')
 
   @staticmethod
-  def call(queries, cb, max_pages=None):
+  def call(queries, cb, max_pages=None, keys_only=False):
     return task_queues._map_async(queries,
                                   cb,
                                   max_concurrency=3,
                                   page_size=TestMapAsync.PAGE,
-                                  max_pages=max_pages).get_result()
+                                  max_pages=max_pages,
+                                  keys_only=keys_only).get_result()
 
   def test_single_query_sync_cb(self):
     seen = []
@@ -1266,6 +1284,16 @@ class TestMapAsync(test_env_handlers.AppTestBase):
 
     bots = self.populate({'bot%d' % i: [] for i in range(10)})
     self.assertTrue(self.call([self.query()], cb))
+    self.assertEqual(sorted(seen), bots)
+
+  def test_single_query_sync_cb_keys_only(self):
+    seen = []
+
+    def cb(key):
+      seen.append(key.string_id())
+
+    bots = self.populate({'bot%d' % i: [] for i in range(10)})
+    self.assertTrue(self.call([self.query()], cb, keys_only=True))
     self.assertEqual(sorted(seen), bots)
 
   def test_many_queries_sync_cb(self):

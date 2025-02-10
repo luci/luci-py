@@ -1031,3 +1031,11 @@ def cron_update_bot_info():
                   cron_stats['failed'])
 
   return cron_stats['dead']
+
+
+@ndb.tasklet
+def check_bot_alive_async(bot_id):
+  """Returns True if this bot exists and is alive (i.e. is sending pings)."""
+  bot = yield get_info_key(bot_id).get_async(use_cache=False,
+                                             use_memcache=False)
+  raise ndb.Return(bot and not bot.is_dead)

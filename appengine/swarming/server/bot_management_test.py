@@ -735,6 +735,17 @@ class BotManagementTest(test_case.TestCase):
   def test_filter_availability(self):
     pass # Tested in handlers_endpoints_test
 
+  def test_check_bot_alive_async(self):
+    _ensure_bot_info('alive')
+    self.assertTrue(bot_management.check_bot_alive_async('alive').get_result())
+
+    info = _ensure_bot_info('dead')
+    info.last_seen_ts = self.now - datetime.timedelta(seconds=3000)
+    info.put()
+    self.assertFalse(bot_management.check_bot_alive_async('dead').get_result())
+
+    self.assertFalse(bot_management.check_bot_alive_async('gone').get_result())
+
 
 if __name__ == '__main__':
   logging.basicConfig(
