@@ -397,6 +397,19 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertFalse(os_utilities.host_reboot(timeout=60))
     self.assertEqual(time.time(), 60)
 
+  def test_get_os_version_parts(self):
+    version = '17.5.1'
+    os_name = 'iOS'
+    expected = ['iOS-17', 'iOS-17.5', 'iOS-17.5.1']
+    self.assertEqual(os_utilities.get_os_version_parts(version, os_name),
+                     expected)
+
+    version = '15.2'
+    os_name = 'Mac'
+    expected = ['Mac-15', 'Mac-15.2']
+    self.assertEqual(os_utilities.get_os_version_parts(version, os_name),
+                     expected)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

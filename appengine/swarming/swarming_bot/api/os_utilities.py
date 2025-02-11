@@ -161,11 +161,8 @@ def get_os_values():
     # Expects '10.a.b'. Add both '10.a' and '10.a.b'.
     number = platforms.osx.get_os_version_number()
     build = platforms.osx.get_os_build_version()
-    parts = number.split('.')
-    out.append('%s-%s' % (os_name, parts[0]))
-    if len(parts) == 3:
-      out.append('%s-%s.%s' % (os_name, parts[0], parts[1]))
-    out.append('%s-%s' % (os_name, number))
+    version_parts = get_os_version_parts(number, os_name)
+    out.extend(version_parts)
     out.append('%s-%s-%s' % (os_name, number, build))
   elif sys.platform == 'linux':
     # TODO(crbug/1018836): Get rid of this, Linux is not an OS, it's a kernel.
@@ -1115,7 +1112,10 @@ def get_dimensions():
     for udid in udids:
       version = platforms.osx.get_ios_version(udid)
       if version:
-        dimensions['os'].append('iOS-%s' % version)
+        os_name = 'iOS'
+        dimensions['os'].append(os_name)
+        version_parts = get_os_version_parts(version, os_name)
+        dimensions['os'].extend(version_parts)
         dimensions['os'].sort()
       device_type = platforms.osx.get_ios_device_type(udid)
       if device_type:
@@ -1495,6 +1495,20 @@ def host_reboot_and_return(message=None):
     else:
       success = True
   return success
+
+
+def get_os_version_parts(version, os_name):
+  """Returns a list of progressively more precise versions strings."""
+  os_dimensions = []
+  parts = version.split('.')
+  # major only (e.g iOS-17)
+  os_dimensions.append('%s-%s' % (os_name, parts[0]))
+  if len(parts) == 3:
+    # major.minor (e.g. iOS-17.5)
+    os_dimensions.append('%s-%s.%s' % (os_name, parts[0], parts[1]))
+  # full (e.g. iOS-17.5.1)
+  os_dimensions.append('%s-%s' % (os_name, version))
+  return os_dimensions
 
 
 def roll_log(name):
