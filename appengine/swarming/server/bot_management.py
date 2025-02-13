@@ -62,6 +62,10 @@ _OLD_BOT_INFO_CUT_OFF = _OLD_BOT_EVENTS_CUT_OFF + datetime.timedelta(hours=4)
 ### Models.
 
 
+# Set for termination tasks.
+TASK_FLAG_TERMINATION = 0x1
+
+
 class BotRoot(ndb.Model):
   """Root entity for BotEvent, BotInfo and BotSettings.
 
@@ -217,6 +221,18 @@ class _BotCommon(ndb.Model):
     self.dimensions_flat.sort()
 
 
+class LastTaskDetails(ndb.Model):
+  """Information about the task most recently finished by the bot."""
+  # ID of the finished task.
+  task_id = ndb.StringProperty(indexed=False)
+  # Display name of the finished task.
+  task_name = ndb.StringProperty(indexed=False)
+  # Aspects of the finished task, see TASK_FLAG_*.
+  task_flags = ndb.IntegerProperty(indexed=False)
+  # A bot event that caused this task to finish (usually "task_completed").
+  finished_due = ndb.StringProperty(indexed=False)
+
+
 class BotInfo(_BotCommon):
   """This entity declare the knowledge about a bot that successfully connected.
 
@@ -241,8 +257,16 @@ class BotInfo(_BotCommon):
   # First time this bot was seen.
   first_seen_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
 
-  # Must only be set when self.task_id is set.
+  # The display name of the current task. None if no current task.
   task_name = ndb.StringProperty(indexed=False)
+  # Aspects of the current task, see TASK_FLAG_*. None if no current task.
+  task_flags = ndb.IntegerProperty(indexed=False)
+
+  # Information about the most recently finished task.
+  #
+  # Updated only after finishing a task. Starting a task doesn't change this.
+  # Unset if the bot never finished any tasks (i.e. this is a new bot).
+  last_finished_task = ndb.StructuredProperty(LastTaskDetails, indexed=False)
 
   # Avoid having huge amounts of indices to query by quarantined/idle.
   composite = ndb.IntegerProperty(repeated=True)
@@ -289,6 +313,7 @@ class BotInfo(_BotCommon):
     super(BotInfo, self)._pre_put_hook()
     if not self.task_id:
       self.task_name = None
+      self.task_flags = None
     self.composite = self.calc_composite()
 
   @classmethod
@@ -606,6 +631,12 @@ def _apply_event_updates(bot_info, event_type, now, session_id, task_id,
   if task_name is not None:
     bot_info.task_name = task_name
 
+  # Remember if the started task is a termination task.
+  if event_type == 'bot_terminate':
+    bot_info.task_flags = TASK_FLAG_TERMINATION
+  elif event_type == 'request_task':
+    bot_info.task_flags = 0
+
   # Remove the task from the BotInfo summary in the following cases
   # 1) When the task finishes (event_type=task_XXX)
   #    In these cases, the BotEvent shall have the task
@@ -618,8 +649,15 @@ def _apply_event_updates(bot_info, event_type, now, session_id, task_id,
   #    We assume it can't process assigned task anymore.
   if event_type in ('task_completed', 'task_error', 'task_killed',
                     'request_sleep', 'bot_idle', 'bot_polling', 'bot_missing'):
+    if bot_info.task_id:
+      bot_info.last_finished_task = LastTaskDetails(
+          task_id=bot_info.task_id,
+          task_name=bot_info.task_name,
+          task_flags=bot_info.task_flags,
+          finished_due=event_type)
     bot_info.task_id = None
     bot_info.task_name = None
+    bot_info.task_flags = None
 
   # idle_since_ts is updated only when bot is idle in healthy state.
   is_idle = (event_type in ('request_sleep', 'bot_idle')

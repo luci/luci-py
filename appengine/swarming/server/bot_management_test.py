@@ -108,6 +108,8 @@ def _gen_bot_info(**kwargs):
       None,
       'is_dead':
       False,
+      'last_finished_task':
+      None,
       'last_seen_ts':
       now,
       'lease_id':
@@ -130,6 +132,8 @@ def _gen_bot_info(**kwargs):
           u'ram': 65
       },
       'task_id':
+      None,
+      'task_flags':
       None,
       'task_name':
       None,
@@ -329,35 +333,49 @@ class BotManagementTest(test_case.TestCase):
         expected, bot_management.get_info_key('id1').get().to_dict())
 
   @parameterized.expand([
-      (u'task_completed', True, False, 0),
-      (u'task_error', True, False, 1),
-      (u'task_killed', True, False, 2),
-      (u'request_sleep', True, True, 3),
-      (u'task_update', False, True, 4),
+      # Starting and finishing normal tasks.
+      ('request_task', 'task_completed', True, False),
+      ('request_task', 'task_error', True, False),
+      ('request_task', 'task_killed', True, False),
+      ('request_task', 'request_sleep', True, True),
+      ('request_task', 'task_update', False, True),
+      # Starting and finishing a termination task.
+      ('bot_terminate', 'task_completed', True, False),
   ])
-  def test_bot_event_reset_task(self, event, reset_task, skip_store_event,
-                                increment):
+  def test_bot_event_reset_task(self, start_event, event, reset_task,
+                                skip_store_event):
     bot_id = u'id1'
     task_id = u'12311'
     task_name = u'yo'
+
+    task_flags = 0
+    if start_event == 'bot_terminate':
+      task_flags = bot_management.TASK_FLAG_TERMINATION
+
     d = {
         u'id': [u'id1'],
         u'os': [u'Ubuntu', u'Ubuntu-16.04'],
         u'pool': [u'default'],
     }
-    # Create two timestamps because _ensure_bot_info might create a
-    # `request_sleep` event. Make sure that it is always behind the event we
-    # will test as the last created event.
-    t1 = self.mock_now(self.now, increment * 2)
-    bot_info = _ensure_bot_info(
-        bot_id=bot_id, dimensions=d, task_id=task_id, task_name=task_name)
-    t2 = self.mock_now(self.now, increment * 2 + 1)
-    _bot_event(
-        event_type=event,
-        bot_id=bot_id,
-        dimensions=d,
-        task_id=task_id,
-        task_name=task_name)
+
+    # This creates request_sleep event and an idle bot.
+    t1 = self.mock_now(self.now, 1)
+    bot_info = _ensure_bot_info(bot_id=bot_id, dimensions=d)
+
+    # This moves the bot into "executing a task now" state.
+    _bot_event(event_type=start_event,
+               bot_id=bot_id,
+               dimensions=d,
+               task_id=task_id,
+               task_name=task_name)
+
+    # This performs the event being tested that can reset the task.
+    t2 = self.mock_now(self.now, 2)
+    _bot_event(event_type=event,
+               bot_id=bot_id,
+               dimensions=d,
+               task_id=None if event == 'request_sleep' else task_id,
+               task_name=None if event == 'request_sleep' else task_name)
 
     # check bot_info
     composite = [
@@ -367,7 +385,7 @@ class BotManagementTest(test_case.TestCase):
     ]
     if event == 'request_sleep':
       composite += [bot_management.BotInfo.IDLE]
-      idle_since_ts = t1
+      idle_since_ts = t2
     else:
       composite += [bot_management.BotInfo.BUSY]
       idle_since_ts = None
@@ -378,7 +396,13 @@ class BotManagementTest(test_case.TestCase):
                                composite=composite,
                                id=bot_id,
                                task_name=None,
-                               idle_since_ts=idle_since_ts)
+                               idle_since_ts=idle_since_ts,
+                               last_finished_task={
+                                   'finished_due': event,
+                                   'task_flags': task_flags,
+                                   'task_id': task_id,
+                                   'task_name': task_name,
+                               })
     else:
       # bot_info.task_id and bot_info.task_name should be kept
       expected = _gen_bot_info(first_seen_ts=t1,
@@ -386,6 +410,7 @@ class BotManagementTest(test_case.TestCase):
                                id=bot_id,
                                task_id=task_id,
                                task_name=task_name,
+                               task_flags=task_flags,
                                idle_since_ts=None)
 
     self.assertEqual(expected, bot_info.key.get().to_dict())
@@ -514,6 +539,7 @@ class BotManagementTest(test_case.TestCase):
     expected = _gen_bot_info(composite=expected_events,
                              task_id=u'12311',
                              task_name=u'yo',
+                             task_flags=0,
                              first_seen_ts=t1)
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
