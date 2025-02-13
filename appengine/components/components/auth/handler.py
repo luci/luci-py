@@ -336,6 +336,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         'https://www.google.com/jsapi',
         'https://apis.google.com',
         'https://www.gstatic.com', # Google charts loader
+        'https://www.googletagmanager.com', # gtag for Google Analytics
       ],
 
       'style-src': [
