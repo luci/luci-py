@@ -229,12 +229,19 @@ class BootstrapHandler(_BotAuthenticatingHandler):
 class BotCodeHandler(_BotAuthenticatingHandler):
   """Returns a zip file with all the files required by a bot.
 
+  NO LONGER KEPT UP TO DATE.
+
+  WARNING: No longer used in production (replaced by the Go handler). Kept here
+  to avoid breaking python-only integration test.
+
   Optionally specify the hash version to download. If so, the returned data is
   cacheable.
   """
 
   @auth.public  # auth inside check_bot_code_access()
   def get(self, version=None):
+    assert utils.is_local_dev_server(), 'Must not be called in production'
+
     info = bot_code.config_bundle_rev_key().get()
 
     # Bootstrap the bot archive for the local smoke test.
@@ -672,6 +679,11 @@ class _BotBaseHandler(_BotApiHandler):
 class BotHandshakeHandler(_BotBaseHandler):
   """First request to be called to get initial data like bot code version.
 
+  NO LONGER KEPT UP TO DATE.
+
+  WARNING: No longer used in production (replaced by the Go handler). Kept here
+  to avoid breaking python-only integration test.
+
   The bot is server-controlled so the server doesn't have to support multiple
   API version. When running a task, the bot sync the version specific URL.
   Once a bot finishes its currently running task, it'll be immediately upgraded
@@ -697,6 +709,8 @@ class BotHandshakeHandler(_BotBaseHandler):
 
   @auth.public  # auth happens in self.process()
   def post(self):
+    assert utils.is_local_dev_server(), 'Must not be called in production'
+
     res = self.process()
 
     # Bot session is optional for now until it is fully rolled out.
@@ -1186,7 +1200,13 @@ class BotClaimHandler(_BotBaseHandler):
 
 
 class BotEventHandler(_BotBaseHandler):
-  """On signal that a bot had an event worth logging."""
+  """On signal that a bot had an event worth logging.
+
+  NO LONGER KEPT UP TO DATE.
+
+  WARNING: No longer used in production (replaced by the Go handler). Kept here
+  to avoid breaking python-only integration test.
+  """
 
   EXPECTED_KEYS = _BotBaseHandler.EXPECTED_KEYS | {u'event', u'message'}
 
@@ -1194,6 +1214,8 @@ class BotEventHandler(_BotBaseHandler):
 
   @auth.public  # auth happens in self.process()
   def post(self):
+    assert utils.is_local_dev_server(), 'Must not be called in production'
+
     res = self.process()
     event = res.request.get('event')
     if event not in self.ALLOWED_EVENTS:
