@@ -361,6 +361,12 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         "https://fonts.gstatic.com",  # Google-hosted fonts
       ],
 
+      'connect-src': [
+        "'self'",
+        "https://www.google-analytics.com",
+        "https://*.google-analytics.com",
+      ],
+
       'object-src': ["'none'"],  # we don't generally use Flash or Java
     }
 
