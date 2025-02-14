@@ -268,6 +268,11 @@ class BotInfo(_BotCommon):
   # Unset if the bot never finished any tasks (i.e. this is a new bot).
   last_finished_task = ndb.StructuredProperty(LastTaskDetails, indexed=False)
 
+  # If the bot has been gracefully terminated, task ID of the termination task.
+  #
+  # Update by the Go side.
+  termination_task_id = ndb.StringProperty(indexed=False)
+
   # Avoid having huge amounts of indices to query by quarantined/idle.
   composite = ndb.IntegerProperty(repeated=True)
 

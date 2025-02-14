@@ -137,6 +137,8 @@ def _gen_bot_info(**kwargs):
       None,
       'task_name':
       None,
+      'termination_task_id':
+      None,
       'version':
       _VERSION,
   }
