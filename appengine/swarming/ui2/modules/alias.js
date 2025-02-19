@@ -32,6 +32,8 @@ export function applyAlias(value, key) {
 }
 
 const DEVICE_TYPE_ALIASES = {
+  a13ve: "Galaxy A13",
+  a23xq: "Galaxy A23",
   angler: "Nexus 6p",
   athene: "Moto G4",
   blueline: "Pixel 3",
@@ -39,6 +41,7 @@ const DEVICE_TYPE_ALIASES = {
   cheetah: "Pixel 7 Pro",
   crosshatch: "Pixel 3 XL",
   darcy: "NVIDIA Shield [2017]",
+  dm1q: "Galaxy S23",
   dragon: "Pixel C",
   flame: "Pixel 4",
   flo: "Nexus 7 [2013]",
@@ -90,6 +93,7 @@ const GPU_ALIASES = {
   "1002:6821": "AMD Radeon HD 8870M",
   "1002:683d": "AMD Radeon HD 7770/8760",
   "1002:7340": "AMD Radeon RX 5500 XT",
+  "1002:7480": "AMD Radeon RX 7600",
   "1002:9830": "AMD Radeon HD 8400",
   "1002:9874": "AMD Carrizo",
   "1a03": "ASPEED",
@@ -111,6 +115,7 @@ const GPU_ALIASES = {
   "10de:1ba1": "NVIDIA GeForce GTX 1070",
   "10de:1cb3": "NVIDIA Quadro P400",
   "10de:2184": "NVIDIA GeForce GTX 1660",
+  "10de:2783": "NVIDIA GeForce RTX 4070 Super",
   8086: "Intel",
   "8086:0046": "Intel Ironlake HD Graphics",
   "8086:0102": "Intel Sandy Bridge HD Graphics 2000",
