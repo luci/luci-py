@@ -50,7 +50,6 @@ import argparse
 import base64
 import collections
 import contextlib
-import distutils
 import errno
 import json
 import logging
@@ -1478,8 +1477,18 @@ def parse_args(args):
   parser = create_option_parser()
   options, args = parser.parse_args(args)
   if not isinstance(options.cipd_enabled, (bool, int)):
-    options.cipd_enabled = distutils.util.strtobool(options.cipd_enabled)
+    options.cipd_enabled = _str_to_bool(options.cipd_enabled)
   return (parser, options, args)
+
+
+def _str_to_bool(val):
+  """Converts boolean-ish string to True or False."""
+  val = val.lower()
+  if val in ('y', 'yes', 't', 'true', 'on', '1'):
+      return True
+  if val in ('n', 'no', 'f', 'false', 'off', '0'):
+      return False
+  raise ValueError('Invalid truth value %r' % val)
 
 
 def _calc_named_cache_hint(named_cache, named_caches):
