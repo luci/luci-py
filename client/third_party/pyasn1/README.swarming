@@ -6,3 +6,4 @@ Revision: https://github.com/etingof/pyasn1/archive/v0.4.5.tar.gz
 
 Local Modifications:
 - Only kept pyasn1/.
+- Replaced '\*' with '\\*' in doc strings to avoid SyntaxWarning.
