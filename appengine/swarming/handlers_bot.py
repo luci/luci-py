@@ -646,7 +646,8 @@ class _BotBaseHandler(_BotApiHandler):
                 'hash': props.cas_input_root.digest.hash,
                 'size_bytes': props.cas_input_root.digest.size_bytes,
             },
-        } if props.cas_input_root else None,
+        }
+        if props.cas_input_root and props.cas_input_root.cas_instance else None,
         'outputs':
         props.outputs,
         'realm':

@@ -447,7 +447,7 @@ const dimensionRow = (dimension) => html`
 `;
 
 const casBlock = (title, host, ref) => {
-  if (!ref.digest) {
+  if (!ref.digest || !ref.digest.hash) {
     return "";
   }
   return html` <tr>
