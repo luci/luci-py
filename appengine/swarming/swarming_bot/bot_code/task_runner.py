@@ -100,7 +100,7 @@ def get_isolated_args(work_dir, task_details, isolated_result,
 
   # Named caches options.
   # Specify --named-cache-root unconditionally so run_isolated.py never creates
-  # "named_caches" dir and always operats in "c" dir.
+  # "named_caches" dir and always operates in "c" dir.
   cmd.extend(['--named-cache-root', os.path.join(bot_dir, 'c')])
   if task_details.caches:
     for c in task_details.caches:
@@ -132,7 +132,7 @@ def get_isolated_args(work_dir, task_details, isolated_result,
         '--cipd-client-version',
         task_details.cipd_input['client_package']['version'],
         '--cipd-server',
-        task_details.cipd_input.get('server'),
+        task_details.cipd_input['server'],
     ])
 
   cmd.extend([
@@ -160,7 +160,6 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   for key, value in (task_details.env or {}).items():
     cmd.extend(('--env', '%s=%s' % (key, value)))
 
-  cmd.extend(task_details.containment.flags())
   cmd.extend(run_isolated_flags)
 
   for key, values in task_details.env_prefixes.items():
@@ -173,85 +172,46 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   return cmd
 
 
-class Containment:
-  """Containment details."""
-  _EXPECTED = frozenset((
-      'containment_type',
-  ))
-
-  def __init__(self, data):
-    if set(data) != self._EXPECTED:
-      raise InternalError(
-          'Unexpected keys: %s != %s' % (sorted(data), sorted(self._EXPECTED)))
-    self.containment_type = data['containment_type']
-
-  def flags(self):
-    """Returns flags to use for run_isolated.py."""
-    out = []
-    if self.containment_type != 'NONE':
-      pass
-    return out
-
-
 class TaskDetails:
   """A task_runner specific view of the server's TaskProperties.
 
   It only contains what the bot needs to know.
   """
-  _EXPECTED = frozenset((
-      'bot_authenticated_as',
+  _REQUIRED = (
       'bot_dimensions',
       'bot_id',
-      'caches',
-      'cas_input_root',
-      'cipd_input',
-      'command',
-      'containment',
-      'dimensions',
-      'env',
-      'env_prefixes',
       'grace_period',
       'hard_timeout',
-      'host',
       'io_timeout',
-      'outputs',
-      'realm',
-      'relative_cwd',
-      'resultdb',
-      'secret_bytes',
-      'service_accounts',
       'task_id',
-  ))
+  )
 
   def __init__(self, data):
     logging.info('TaskDetails(%s)', data)
     if not isinstance(data, dict):
       raise InternalError('Expected dict in task_runner_in.json, got %r' % data)
-    if set(data) != self._EXPECTED:
-      raise InternalError(
-          'Unexpected keys: %s != %s' % (sorted(data), sorted(self._EXPECTED)))
+    for k in self._REQUIRED:
+      if k not in data:
+        raise InternalError('Task manifest missing required key %s:\n%r' %
+                            (k, data))
 
-    # Get all the data first so it fails early if the task details is invalid.
     self.bot_dimensions = data['bot_dimensions']
     self.bot_id = data['bot_id']
-
-    # Raw command.
-    self.command = data['command'] or []
-    self.relative_cwd = data['relative_cwd']
-    self.cas_input_root = data['cas_input_root']
-    self.cipd_input = data['cipd_input']
-    self.caches = data['caches']
-    self.env = data['env']
+    self.caches = data.get('caches') or []
+    self.cas_input_root = data.get('cas_input_root')
+    self.cipd_input = data.get('cipd_input')
+    self.command = data.get('command') or []
+    self.env = data.get('env') or {}
     self.env_prefixes = data.get('env_prefixes') or {}
     self.grace_period = data['grace_period']
     self.hard_timeout = data['hard_timeout']
     self.io_timeout = data['io_timeout']
+    self.outputs = data.get('outputs') or []
+    self.realm = data.get('realm')
+    self.relative_cwd = data.get('relative_cwd')
+    self.resultdb = data.get('resultdb')
+    self.secret_bytes = data.get('secret_bytes')
     self.task_id = data['task_id']
-    self.outputs = data['outputs']
-    self.secret_bytes = data['secret_bytes']
-    self.resultdb = data['resultdb']
-    self.realm = data['realm']
-    self.containment = Containment(data['containment'])
 
   @staticmethod
   def load(path):
