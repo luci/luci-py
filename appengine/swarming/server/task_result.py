@@ -1315,12 +1315,7 @@ class TaskResultSummary(_TaskResultCommon):
     else:
       self.costs_usd = [run_result.cost_usd]
 
-    # Update the automatic tags, removing the ones from the other
-    # TaskProperties.
     t = request.task_slice(run_result.current_task_slice or 0)
-    if run_result.current_task_slice != self.current_task_slice:
-      self.tags = task_request.get_automatic_tags(
-          request, run_result.current_task_slice)
     if (self.state == State.COMPLETED and
         not self.failure and
         not self.internal_failure and

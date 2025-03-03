@@ -1608,19 +1608,6 @@ def is_reserved_tag(tag):
   return tag.split(':', 1)[0] in _RESERVED_TAGS
 
 
-def get_automatic_tags(request, index):
-  """Returns tags that should automatically be added to the TaskRequest for one
-  specific TaskSlice.
-  """
-  tags = set((
-      u'priority:%s' % request.priority,
-      u'service_account:%s' % (request.service_account or u'none'),
-      u'user:%s' % (request.user or u'none'),
-  ))
-  tags.update(_get_automatic_tags_from_slice(request.task_slice(index)))
-  return tags
-
-
 def create_termination_task(bot_id, rbe_instance=None, reason=None):
   """Returns a task to terminate the given bot.
 
