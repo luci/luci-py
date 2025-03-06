@@ -202,6 +202,9 @@ message Pool {
   //
   // Scheduling a Swarming task using an informational dimension will result
   // in InvalidArgument error.
+  //
+  // KI: informational dimensions for bots belonging in multiple pools are
+  // not supported.
   repeated string informational_dimension_re = 15;
 }
 
