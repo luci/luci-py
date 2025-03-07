@@ -181,6 +181,8 @@ message Pool {
     // To use effective bot id, each bot in this pool MUST have no more than one
     // value for the dimension.
     //
+    // effective_bot_id_dimension MUST NOT be an informational dimension.
+    //
     // KI: effective bot id for bots belonging in multiple pools are
     // not supported.
     string effective_bot_id_dimension = 4;
