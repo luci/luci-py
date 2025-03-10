@@ -21,7 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z9go.chromium.org/luci/swarming/proto/internals;internalspb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x1dproto/internals/session.proto\x12\x1aswarming.internals.session\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17proto/config/bots.proto\"\x8e\x02\n\x0cSessionToken\x12J\n\x0bhmac_tagged\x18\x01 \x01(\x0b\x32\x33.swarming.internals.session.SessionToken.HmacTaggedH\x00\x12P\n\x0e\x61\x65\x61\x64_encrypted\x18\x02 \x01(\x0b\x32\x36.swarming.internals.session.SessionToken.AeadEncryptedH\x00\x1a\x32\n\nHmacTagged\x12\x0f\n\x07session\x18\x01 \x01(\x0c\x12\x13\n\x0bhmac_sha256\x18\x02 \x01(\x0c\x1a$\n\rAeadEncrypted\x12\x13\n\x0b\x63ipher_text\x18\x01 \x01(\x0c\x42\x06\n\x04kind\"\xc0\x02\n\x07Session\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\x12*\n\x06\x65xpiry\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x39\n\ndebug_info\x18\x04 \x01(\x0b\x32%.swarming.internals.session.DebugInfo\x12\x39\n\nbot_config\x18\x05 \x01(\x0b\x32%.swarming.internals.session.BotConfig\x12\x1d\n\x15handshake_config_hash\x18\x06 \x01(\x0c\x12\x1a\n\x12rbe_bot_session_id\x18\x07 \x01(\t\x12\x34\n\x10last_seen_config\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\xf0\x01\n\tBotConfig\x12*\n\x06\x65xpiry\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x39\n\ndebug_info\x18\x02 \x01(\x0b\x32%.swarming.internals.session.DebugInfo\x12*\n\x08\x62ot_auth\x18\x03 \x03(\x0b\x32\x18.swarming.config.BotAuth\x12\x1e\n\x16system_service_account\x18\x04 \x01(\t\x12\x1a\n\x12logs_cloud_project\x18\x05 \x01(\t\x12\x14\n\x0crbe_instance\x18\x06 \x01(\t\"f\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10swarming_version\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\tB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
+  serialized_pb=b'\n\x1dproto/internals/session.proto\x12\x1aswarming.internals.session\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17proto/config/bots.proto\"\x8e\x02\n\x0cSessionToken\x12J\n\x0bhmac_tagged\x18\x01 \x01(\x0b\x32\x33.swarming.internals.session.SessionToken.HmacTaggedH\x00\x12P\n\x0e\x61\x65\x61\x64_encrypted\x18\x02 \x01(\x0b\x32\x36.swarming.internals.session.SessionToken.AeadEncryptedH\x00\x1a\x32\n\nHmacTagged\x12\x0f\n\x07session\x18\x01 \x01(\x0c\x12\x13\n\x0bhmac_sha256\x18\x02 \x01(\x0c\x1a$\n\rAeadEncrypted\x12\x13\n\x0b\x63ipher_text\x18\x01 \x01(\x0c\x42\x06\n\x04kind\"\xc0\x02\n\x07Session\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x12\n\nsession_id\x18\x02 \x01(\t\x12*\n\x06\x65xpiry\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x39\n\ndebug_info\x18\x04 \x01(\x0b\x32%.swarming.internals.session.DebugInfo\x12\x39\n\nbot_config\x18\x05 \x01(\x0b\x32%.swarming.internals.session.BotConfig\x12\x1d\n\x15handshake_config_hash\x18\x06 \x01(\x0c\x12\x1a\n\x12rbe_bot_session_id\x18\x07 \x01(\t\x12\x34\n\x10last_seen_config\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"\xb6\x02\n\tBotConfig\x12*\n\x06\x65xpiry\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x39\n\ndebug_info\x18\x02 \x01(\x0b\x32%.swarming.internals.session.DebugInfo\x12*\n\x08\x62ot_auth\x18\x03 \x03(\x0b\x32\x18.swarming.config.BotAuth\x12\x1e\n\x16system_service_account\x18\x04 \x01(\t\x12\x1a\n\x12logs_cloud_project\x18\x05 \x01(\t\x12\x14\n\x0crbe_instance\x18\x06 \x01(\t\x12\x1c\n\x14rbe_effective_bot_id\x18\x07 \x01(\t\x12&\n\x1erbe_effective_bot_id_dimension\x18\x08 \x01(\t\"f\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10swarming_version\x18\x02 \x01(\t\x12\x12\n\nrequest_id\x18\x03 \x01(\tB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,proto_dot_config_dot_bots__pb2.DESCRIPTOR,])
 
@@ -272,6 +272,20 @@ _BOTCONFIG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='rbe_effective_bot_id', full_name='swarming.internals.session.BotConfig.rbe_effective_bot_id', index=6,
+      number=7, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='rbe_effective_bot_id_dimension', full_name='swarming.internals.session.BotConfig.rbe_effective_bot_id_dimension', index=7,
+      number=8, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -285,7 +299,7 @@ _BOTCONFIG = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=716,
-  serialized_end=956,
+  serialized_end=1026,
 )
 
 
@@ -330,8 +344,8 @@ _DEBUGINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=958,
-  serialized_end=1060,
+  serialized_start=1028,
+  serialized_end=1130,
 )
 
 _SESSIONTOKEN_HMACTAGGED.containing_type = _SESSIONTOKEN
