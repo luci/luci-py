@@ -61,6 +61,8 @@ PoolConfig = collections.namedtuple(
         'rbe_migration',
         # Controls scheduling algorithm, pools_pb2.Pool.SchedulingAlgorithm.
         'scheduling_algorithm',
+        # A list of Regex expressions to match information dimension keys.
+        'informational_dimension_re',
     ])
 
 
@@ -81,6 +83,7 @@ def init_pool_config(**kwargs):
       'default_cipd': None,
       'rbe_migration': None,
       'scheduling_algorithm': None,
+      'informational_dimension_re': None,
   }
   args.update(kwargs)
   return PoolConfig(**args)
@@ -659,6 +662,9 @@ def _fetch_pools_config():
                          if msg.HasField('rbe_migration') else None),
           scheduling_algorithm=(msg.scheduling_algorithm
                                 or pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN),
+          informational_dimension_re=(
+              msg.informational_dimension_re if msg.informational_dimension_re
+              else None),
       )
   return _PoolsCfg(pools, (default_cipd))
 

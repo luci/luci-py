@@ -67,6 +67,15 @@ def process_task_request(tr, template_apply):
   assert pool_cfg.scheduling_algorithm is not None
   tr.scheduling_algorithm = pool_cfg.scheduling_algorithm
 
+  # Check informational dimensions.
+  for pattern in pool_cfg.informational_dimension_re or []:
+    for s in tr.task_slices:
+      for dim in s.properties.dimensions:
+        if re.match(pattern, dim):
+          raise handlers_exceptions.BadRequestException(
+            'Dimension %s is informational, cannot use it for task creation'
+            % dim)
+
   # Decide if the task should use the RBE Scheduler.
   tr.rbe_instance = rbe.get_rbe_instance_for_task(tr.tags, pool_cfg)
   if tr.rbe_instance:

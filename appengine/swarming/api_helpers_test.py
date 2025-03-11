@@ -95,6 +95,16 @@ class TestProcessTaskRequest(test_case.TestCase):
                                  'ResultDB is enabled, but realm is not'):
       api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
 
+    # Catch informational dimensions.
+    self.mock_pool_config('default',
+                          informational_dimensions_re=r'label-*')
+    tr.task_slices[0].properties.dimensions_data['label-dim'] = ['value']
+    with self.assertRaisesRegexp(
+      handlers_exceptions.BadRequestException,
+      'Dimension label-dim is informational, cannot use it for task creation'):
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
+
+
   def test_process_task_request(self):
     pool_cfg = self.mock_pool_config('default')
     tr = self.basic_task_request()
@@ -170,12 +180,14 @@ class TestProcessTaskRequest(test_case.TestCase):
     self.assertEqual(tr.rbe_instance, 'rbe-inst')
     self.assertIn(u'rbe:rbe-inst', tr.tags)
 
-  def mock_pool_config(self, name, rbe_migration=None):
+  def mock_pool_config(self, name, rbe_migration=None,
+                       informational_dimensions_re=None):
     mocked = pools_config.init_pool_config(
         name=name,
         rev='rev',
         rbe_migration=rbe_migration,
         scheduling_algorithm=pools_pb2.Pool.SCHEDULING_ALGORITHM_LIFO,
+        informational_dimension_re=informational_dimensions_re,
     )
 
     def mocked_get_pool_config(pool):
