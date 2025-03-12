@@ -29,7 +29,10 @@ from proto.config import pools_pb2
 
 class RBETest(test_case.TestCase):
   @staticmethod
-  def pool_config(rbe_instance, rbe_mode_percent=100, allocs=None):
+  def pool_config(rbe_instance,
+                  rbe_mode_percent=100,
+                  allocs=None,
+                  effective_bot_id_dimension=None):
     rbe_mgration = None
     if rbe_instance is not None:
       rbe_mgration = pools_pb2.Pool.RBEMigration(
@@ -41,6 +44,7 @@ class RBETest(test_case.TestCase):
                   percent=percent,
               ) for mode, percent in (allocs or {}).items()
           ],
+          effective_bot_id_dimension=effective_bot_id_dimension,
       )
     return pools_config.init_pool_config(rbe_migration=rbe_mgration)
 
@@ -61,7 +65,8 @@ class RBETest(test_case.TestCase):
                                                'SWARMING': 10,
                                                'HYBRID': 60,
                                                'RBE': 30,
-                                           })
+                                           },
+                                           effective_bot_id_dimension='dut_id')
     # Swarming mode.
     quasi_random_100.return_value = 9
     cfg = rbe.get_rbe_config_for_bot('bot-id', ['many-modes'])
@@ -76,6 +81,7 @@ class RBETest(test_case.TestCase):
     cfg = rbe.get_rbe_config_for_bot('bot-id', ['many-modes'])
     self.assertEqual(cfg.instance, 'instance')
     self.assertFalse(cfg.hybrid_mode)
+    self.assertEqual(cfg.effective_bot_id_dimension, 'dut_id')
 
     # Older RBE migration config without allocations => use Swarming mode.
     pools['old-config'] = self.pool_config('instance')
@@ -116,6 +122,20 @@ class RBETest(test_case.TestCase):
     cfg = rbe.get_rbe_config_for_bot('bot-id', ['pool-c', 'pool-d'])
     self.assertEqual(cfg.instance, 'instance-c')
     self.assertFalse(cfg.hybrid_mode)
+
+    # Multi-pool bot uses effective_bot_id_dimension.
+    pools['pool-e'] = self.pool_config('instance-c',
+                                       allocs={
+                                           'RBE': 100,
+                                       },
+                                       effective_bot_id_dimension='dut_id')
+    pools['pool-f'] = self.pool_config('instance-c',
+                                       allocs={
+                                           'RBE': 100,
+                                       },
+                                       effective_bot_id_dimension='dut_id')
+    cfg = rbe.get_rbe_config_for_bot('bot-id', ['pool-e', 'pool-f'])
+    self.assertIsNone(cfg.effective_bot_id_dimension)
 
   @mock.patch('random.uniform')
   def test_get_rbe_instance_for_task(self, uniform):

@@ -276,6 +276,9 @@ class BotInfo(_BotCommon):
   # Avoid having huge amounts of indices to query by quarantined/idle.
   composite = ndb.IntegerProperty(repeated=True)
 
+  # The derived bot ID to use to communicate with RBE.
+  rbe_effective_bot_id = ndb.StringProperty(indexed=False)
+
   def calc_composite(self):
     """Returns the value for BotInfo.composite, which permits quick searches."""
     return [
@@ -601,7 +604,8 @@ def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
 def _apply_event_updates(bot_info, event_type, now, session_id, task_id,
                          task_name, external_ip, authenticated_as,
                          dimensions_flat, state, version, quarantined,
-                         maintenance_msg, register_dimensions):
+                         maintenance_msg, register_dimensions,
+                         rbe_effective_bot_id, set_rbe_effective_bot_id):
   """Mutates BotInfo based on event details passed to bot_event(...)."""
   # Bump the expiration time every time the entity is touched. Note that this
   # field is unindexed (Cloud Datastore TTL policy doesn't need an index),
@@ -678,6 +682,13 @@ def _apply_event_updates(bot_info, event_type, now, session_id, task_id,
     logging.debug('bot_event: Updating dimensions. from: %s, to: %s',
                   bot_info.dimensions_flat, dimensions_flat)
     bot_info.dimensions_flat = dimensions_flat
+
+  # Update rbe_effective_bot_id only when `set_rbe_effective_bot_id` is True.
+  if (set_rbe_effective_bot_id
+      and bot_info.rbe_effective_bot_id != rbe_effective_bot_id):
+    logging.debug('bot_event: Updating rbe_effective_bot_id. from: %s, to: %s',
+                  bot_info.rbe_effective_bot_id, rbe_effective_bot_id)
+    bot_info.rbe_effective_bot_id = rbe_effective_bot_id
 
 
 def _snapshot_bot_info(bot_info):
@@ -773,7 +784,9 @@ def bot_event(event_type,
               quarantined=None,
               maintenance_msg=None,
               event_msg=None,
-              register_dimensions=False):
+              register_dimensions=False,
+              rbe_effective_bot_id=None,
+              set_rbe_effective_bot_id=False):
   """Updates the state of the bot in the datastore.
 
   This call usually means the bot is alive (not dead), except for `bot_missing`
@@ -811,6 +824,10 @@ def bot_event(event_type,
     register_dimensions: bool to specify whether to update dimensions stored in
         BotInfo. This affects discoverability of this bot by the scheduler. If
         `dimensions` is empty, `register_dimensions` is ignored.
+    rbe_effective_bot_id: The effective bot ID to use to communicate with RBE.
+    set_rbe_effective_bot_id: bool to specify whether to set
+        rbe_effective_bot_id.
+
 
   Returns:
     ndb.Key to BotEvent entity if one was added.
@@ -872,7 +889,9 @@ def bot_event(event_type,
                        version=version,
                        quarantined=quarantined,
                        maintenance_msg=maintenance_msg,
-                       register_dimensions=register_dimensions)
+                       register_dimensions=register_dimensions,
+                       rbe_effective_bot_id=rbe_effective_bot_id,
+                       set_rbe_effective_bot_id=set_rbe_effective_bot_id)
 
   # Snapshot the state after changes, used in _should_store_event.
   state_after = _snapshot_bot_info(bot_info)

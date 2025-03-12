@@ -32,6 +32,8 @@ RBEBotConfig = collections.namedtuple(
         'instance',
         # If True, check the Swarming scheduler queue before switching to RBE.
         'hybrid_mode',
+        # Dimension key to be used to derive bot id when communicating with RBE.
+        'effective_bot_id_dimension',
     ])
 
 
@@ -80,21 +82,23 @@ def get_rbe_config_for_bot(bot_id, pools):
       return BotMode.HYBRID
     return BotMode.RBE
 
-  # For each pool (usually just one) calculate the mode and RBE instance the bot
-  # should be using there.
+  # For each pool (usually just one) calculate the mode, RBE instance and
+  # effective_bot_id_dimension the bot should be using there.
   assert isinstance(pools, list), pools
-  per_pool = []  # (BotMode, rbe_instance or None)
+  # (BotMode, rbe_instance or None, effective_bot_id_dimension or None)
+  per_pool = []
   for pool in pools:
     cfg = pools_config.get_pool_config(pool)
     if cfg and cfg.rbe_migration:
       mode = derive_mode(cfg.rbe_migration.bot_mode_allocation)
-      per_pool.append((mode, cfg.rbe_migration.rbe_instance))
+      per_pool.append((mode, cfg.rbe_migration.rbe_instance,
+                       cfg.rbe_migration.effective_bot_id_dimension))
     else:
-      per_pool.append((BotMode.SWARMING, None))
+      per_pool.append((BotMode.SWARMING, None, None))
 
   # If all pools agree on a single mode, use it whatever it is. Otherwise use
   # HYBRID, since it is compatible with all modes.
-  modes = list(set(m for m, _ in per_pool))
+  modes = list(set(m for m, _, _ in per_pool))
   if len(modes) == 1:
     mode = modes[0]
   else:
@@ -112,14 +116,31 @@ def get_rbe_config_for_bot(bot_id, pools):
   # validating the config. Instead log an error now and pick some arbitrary
   # RBE instance. That way at least some tasks will still be executing.
   rbe_instances = sorted(
-      set(inst for m, inst in per_pool if m != BotMode.SWARMING))
+      set(inst for m, inst, _ in per_pool if m != BotMode.SWARMING))
   assert rbe_instances
   if len(rbe_instances) > 1:
     logging.error('RBE: bot %s: bot pools disagree on RBE instance: %r', bot_id,
                   rbe_instances)
   rbe_instance = rbe_instances[0]
   logging.info('RBE: bot %s is using RBE instance %s', bot_id, rbe_instance)
-  return RBEBotConfig(instance=rbe_instance, hybrid_mode=mode == BotMode.HYBRID)
+
+  # Check if the bot only belongs to one pool when using effective_bot_id
+  # feature. If not, this is a configuration error. Unfortunately it is hard to
+  # detect it statically when validating the config. Log the error now and don't
+  # use effective_bot_id feature for the bot.
+  effective_bot_id_dimensions = [
+      dim for m, _, dim in per_pool if m != BotMode.SWARMING
+  ]
+  if len(effective_bot_id_dimensions) > 1:
+    logging.error(
+        'RBE: bot %s: bot belongs to multiple pools cannot use'
+        'effective_bot_id_dimension', bot_id)
+  effective_bot_id_dimension = (effective_bot_id_dimensions[0] if
+                                len(effective_bot_id_dimensions) == 1 else None)
+
+  return RBEBotConfig(instance=rbe_instance,
+                      hybrid_mode=mode == BotMode.HYBRID,
+                      effective_bot_id_dimension=effective_bot_id_dimension)
 
 
 def get_rbe_instance_for_task(task_tags, pool_cfg):

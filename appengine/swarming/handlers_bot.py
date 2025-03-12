@@ -351,6 +351,8 @@ class _ProcessResult(object):
   quarantined_msg = None
   # Bot maintenance message (or None if the bot is not under maintenance).
   maintenance_msg = None
+  # Dimension key to be used to derive bot id when communicating with RBE.
+  rbe_effective_bot_id_dimension = None
 
   def __init__(self, **kwargs):
     for k, v in kwargs.items():
@@ -517,7 +519,9 @@ class _BotBaseHandler(_BotApiHandler):
         bot_group_cfg=bot_group_cfg,
         bot_auth_cfg=bot_auth_cfg,
         bot_details=bot_details,
-        maintenance_msg=state.get('maintenance'))
+        maintenance_msg=state.get('maintenance'),
+        rbe_effective_bot_id_dimension=rbe_cfg.effective_bot_id_dimension
+        if rbe_cfg else None)
 
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for
@@ -817,6 +821,25 @@ class BotPollHandler(_BotBaseHandler):
     sleep_streak = res.state.get('sleep_streak', 0)
     quarantined = bool(res.quarantined_msg)
 
+    rbe_effective_bot_id = None
+    if res.rbe_effective_bot_id_dimension:
+      pools = res.dimensions.get('pool')
+      # rbe.get_rbe_config_for_bot has already checked the single pool
+      # constraint.
+      assert len(
+          pools
+      ) == 1, 'bot using rbe_effective_bot_id must belong to only one pool'
+      pool = pools[0]
+
+      effective_bot_ids = res.dimensions.get(res.rbe_effective_bot_id_dimension,
+                                             [])
+      if len(effective_bot_ids) == 1:
+        rbe_effective_bot_id = pool + '--' + effective_bot_ids[0]
+      else:
+        logging.error(
+            'Effective bot ID dimension %s must have only one value, got %r',
+            res.rbe_effective_bot_id_dimension, effective_bot_ids)
+
     # Note bot existence at two places, one for stats at 1 minute resolution,
     # the other for the list of known bots.
 
@@ -835,7 +858,9 @@ class BotPollHandler(_BotBaseHandler):
             event_msg=res.quarantined_msg,
             task_id=task_id,
             task_name=task_name,
-            register_dimensions=True)
+            register_dimensions=True,
+            rbe_effective_bot_id=rbe_effective_bot_id,
+            set_rbe_effective_bot_id=True)
       except self.TIMEOUT_EXCEPTIONS as e:
         self.abort_by_timeout('bot_event:%s' % event_type, e)
       except datastore_errors.BadValueError as e:
@@ -891,7 +916,10 @@ class BotPollHandler(_BotBaseHandler):
 
     # The session is valid. Refresh the config inside.
     session_token = bot_session.marshal(
-        bot_session.update(session, res.bot_group_cfg, res.rbe_instance))
+        bot_session.update(
+            session, res.bot_group_cfg, res.rbe_instance, rbe_effective_bot_id,
+            res.rbe_effective_bot_id_dimension
+            if rbe_effective_bot_id else None))
 
     # Ask the bot to restart to pick up new configs consumed only during the
     # handshake (like the bot hooks or custom server-assigned dimensions), if

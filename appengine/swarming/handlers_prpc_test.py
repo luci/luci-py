@@ -689,9 +689,9 @@ class BotServicePrpcTest(PrpcTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
 
     def mocked_rbe_config(*_args):
-      return rbe.RBEBotConfig(
-          instance='some/rbe/instance',
-          hybrid_mode=False)
+      return rbe.RBEBotConfig(instance='some/rbe/instance',
+                              hybrid_mode=False,
+                              effective_bot_id_dimension=None)
     self.mock(rbe, 'get_rbe_config_for_bot', mocked_rbe_config)
 
     self.set_as_admin()

@@ -39,6 +39,7 @@ from server import bot_auth
 from server import bot_code
 from server import bot_groups_config
 from server import bot_management
+from server import bot_session
 from server import external_scheduler
 from server import pools_config
 from server import rbe
@@ -510,6 +511,55 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'cmd': u'bot_restart',
             u'message': u'Restarting because the bot session expired',
         })
+
+  def test_poll_with_effective_bot_id(self):
+    self.mock_bot_group_config(version='default',
+                               dimensions={u'pool': [u'default']},
+                               is_default=True)
+    self.mock_pool_config(
+        pool='default',
+        rbe_migration=pools_pb2.Pool.RBEMigration(
+            rbe_instance='some-instance',
+            bot_mode_allocation=[
+                {
+                    'mode': 'RBE',
+                    'percent': 100
+                },
+            ],
+            effective_bot_id_dimension='dut_id',
+        ),
+    )
+
+    handshake_response = {}
+    params = self.do_handshake(response_copy=handshake_response)
+
+    # The bot doesn't save effective_bot_id since the dimension is missing
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    bot_info = bot_management.get_info_key('bot1').get()
+    self.assertIsNone(bot_info.rbe_effective_bot_id)
+    session = bot_session.unmarshal(response['session'])
+    self.assertEqual(session.bot_config.rbe_effective_bot_id, '')
+    self.assertEqual(session.bot_config.rbe_effective_bot_id_dimension, '')
+
+    # The bot doesn't save effective_bot_id since the dimension has multiple
+    # values.
+    params['dimensions']['dut_id'] = ['dut1', 'dut2']
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    bot_info = bot_management.get_info_key('bot1').get()
+    self.assertIsNone(bot_info.rbe_effective_bot_id)
+    session = bot_session.unmarshal(response['session'])
+    self.assertEqual(session.bot_config.rbe_effective_bot_id, '')
+    self.assertEqual(session.bot_config.rbe_effective_bot_id_dimension, '')
+
+    # The bot saves effective_bot_id.
+    params['dimensions']['dut_id'] = ['dut1']
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    bot_info = bot_management.get_info_key('bot1').get()
+    self.assertEqual(bot_info.rbe_effective_bot_id, 'default--dut1')
+    session = bot_session.unmarshal(response['session'])
+    self.assertEqual(session.bot_config.rbe_effective_bot_id, 'default--dut1')
+    self.assertEqual(session.bot_config.rbe_effective_bot_id_dimension,
+                     'dut_id')
 
   def test_poll_rbe(self):
     self.mock_bot_group_config(

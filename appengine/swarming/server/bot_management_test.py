@@ -141,6 +141,8 @@ def _gen_bot_info(**kwargs):
       None,
       'version':
       _VERSION,
+      'rbe_effective_bot_id':
+      None,
   }
   out.update(kwargs)
   return out
@@ -593,6 +595,26 @@ class BotManagementTest(test_case.TestCase):
         dimensions=dimensions_invalid)
     self.assertEqual(bot_info_key.get().dimensions_flat,
                      [u'id:id1', u'os:Android', u'pool:default'])
+
+  def test_bot_event_set_effective_bot_id(self):
+    bot_id = 'id1'
+    bot_info_key = bot_management.get_info_key(bot_id)
+    _bot_event(bot_id=bot_id, event_type='bot_connected')
+    self.assertIsNotNone(bot_info_key.get())
+
+    # rbe_effective_bot_id is not set when set_rbe_effective_bot_id is False.
+    _bot_event(bot_id=bot_id,
+               event_type='bot_polling',
+               rbe_effective_bot_id="pool--dut",
+               set_rbe_effective_bot_id=False)
+    self.assertIsNone(bot_info_key.get().rbe_effective_bot_id)
+
+    # rbe_effective_bot_id is set when set_rbe_effective_bot_id is True.
+    _bot_event(bot_id=bot_id,
+               event_type='bot_polling',
+               rbe_effective_bot_id="pool--dut",
+               set_rbe_effective_bot_id=True)
+    self.assertEqual(bot_info_key.get().rbe_effective_bot_id, "pool--dut")
 
   def test_get_info_key(self):
     self.assertEqual(

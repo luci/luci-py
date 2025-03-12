@@ -137,7 +137,11 @@ def create(bot_id, session_id, bot_group_cfg, rbe_instance):
   return session
 
 
-def update(session, bot_group_cfg=None, rbe_instance=None):
+def update(session,
+           bot_group_cfg=None,
+           rbe_instance=None,
+           rbe_effective_bot_id=None,
+           rbe_effective_bot_id_dimension=None):
   """Bumps the token expiration time, optionally also updating the config in it.
 
   Args:
@@ -153,7 +157,8 @@ def update(session, bot_group_cfg=None, rbe_instance=None):
     # TODO: Use a larger config expiry when picking up a task. This will be
     # implemented in Go.
     session.bot_config.CopyFrom(
-        _bot_config(bot_group_cfg, rbe_instance, now, SESSION_TOKEN_EXPIRY))
+        _bot_config(bot_group_cfg, rbe_instance, now, SESSION_TOKEN_EXPIRY,
+                    rbe_effective_bot_id, rbe_effective_bot_id_dimension))
   session.debug_info.CopyFrom(_debug_info(now))
   session.expiry.FromDatetime(now + SESSION_TOKEN_EXPIRY)
   return session
@@ -179,7 +184,12 @@ def _debug_info(now):
   return debug_info
 
 
-def _bot_config(bot_group_cfg, rbe_instance, now, expiry):
+def _bot_config(bot_group_cfg,
+                rbe_instance,
+                now,
+                expiry,
+                rbe_effective_bot_id=None,
+                rbe_effective_bot_id_dimension=None):
   """Constructs session_pb2.BotConfig from bot_groups_config.BotGroupConfig."""
   assert isinstance(bot_group_cfg, bot_groups_config.BotGroupConfig)
   cfg = session_pb2.BotConfig(
@@ -188,6 +198,8 @@ def _bot_config(bot_group_cfg, rbe_instance, now, expiry):
       system_service_account=bot_group_cfg.system_service_account,
       logs_cloud_project=bot_group_cfg.logs_cloud_project,
       rbe_instance=rbe_instance,
+      rbe_effective_bot_id=rbe_effective_bot_id,
+      rbe_effective_bot_id_dimension=rbe_effective_bot_id_dimension,
   )
   cfg.expiry.FromDatetime(now + expiry)
   return cfg
