@@ -104,6 +104,25 @@ class TestProcessTaskRequest(test_case.TestCase):
       'Dimension label-dim is informational, cannot use it for task creation'):
       api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
 
+    # Catch bad effective bot ID.
+    self.mock_pool_config('default',
+                          rbe_migration=pools_pb2.Pool.RBEMigration(
+                              rbe_instance='rbe-inst',
+                              rbe_mode_percent=100,
+                              effective_bot_id_dimension='dut_id',
+                          ))
+    tr.task_slices[0].properties.dimensions_data['dut_id'] = ['dut1', 'dut2']
+    with self.assertRaisesRegexp(
+        handlers_exceptions.BadRequestException,
+        'Dimension dut_id cannot be specified more than once'):
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
+
+    tr.task_slices[0].properties.dimensions_data['dut_id'] = ['dut1|dut2']
+    with self.assertRaisesRegexp(
+        handlers_exceptions.BadRequestException,
+        'Dimension dut_id cannot be specified more than once'):
+      api_helpers.process_task_request(tr, task_request.TEMPLATE_AUTO)
+
 
   def test_process_task_request(self):
     pool_cfg = self.mock_pool_config('default')

@@ -76,6 +76,17 @@ def process_task_request(tr, template_apply):
             'Dimension %s is informational, cannot use it for task creation'
             % dim)
 
+  # Check effective bot ID.
+  if (pool_cfg.rbe_migration
+      and pool_cfg.rbe_migration.effective_bot_id_dimension):
+    for s in tr.task_slices:
+      for dim, values in s.properties.dimensions.items():
+        if dim == pool_cfg.rbe_migration.effective_bot_id_dimension:
+          if len(values) > 1 or task_request.OR_DIM_SEP in values[0]:
+            raise handlers_exceptions.BadRequestException(
+                'Dimension %s cannot be specified more than once' % dim)
+
+
   # Decide if the task should use the RBE Scheduler.
   tr.rbe_instance = rbe.get_rbe_instance_for_task(tr.tags, pool_cfg)
   if tr.rbe_instance:
