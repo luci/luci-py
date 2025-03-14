@@ -6,6 +6,7 @@
 import logging
 import os
 import plistlib
+import subprocess
 import sys
 import textwrap
 import unittest
@@ -100,6 +101,14 @@ class TestOsx(unittest.TestCase):
   def test_get_ios_device_type(self):
     self.mock_check_output.return_value = 'iPhone12,1\n'
     self.assertEqual(osx.get_ios_device_type('1234abcd'), 'iPhone12,1')
+
+  def test_is_ios_device_attached_return_true(self):
+    self.mock_check_output.return_value = 1
+    self.assertTrue(osx.is_ios_device_attached())
+
+  def test_is_ios_device_attached_return_false(self):
+    self.mock_check_output.return_value = 0
+    self.assertFalse(osx.is_ios_device_attached())
 
   def test_get_hardware_model_string(self):
     self.mock_check_output.return_value = 'MacBookPro15,1\n'

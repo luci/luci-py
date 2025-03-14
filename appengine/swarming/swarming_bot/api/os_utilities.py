@@ -1122,6 +1122,13 @@ def get_dimensions():
         device_types.add(device_type)
     if device_types:
       dimensions['device'] = sorted(device_types)
+    # if an iDevice is connected through usbmuxd, but the OS has some issues
+    # such as Apple bugs, it will not be recognized by libimobiledevice
+    if not dimensions.get('device') and platforms.osx.is_ios_device_attached():
+      # restart usbmuxd as a workaround such that libimobiledevice might
+      # work again and iOS dimensions can be populated on the next run.
+      platforms.osx.kill_usbmuxd()
+
 
   if sys.platform == 'win32':
     integrity = platforms.win.get_integrity_level()

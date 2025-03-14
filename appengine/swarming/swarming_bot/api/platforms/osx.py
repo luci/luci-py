@@ -481,6 +481,18 @@ def get_ios_device_type(udid):
     pass
 
 
+def is_ios_device_attached():
+  """Return True if an iPhone/iPad is attached to the host through usb."""
+  cmd = '/usr/sbin/ioreg -p IOUSB | grep -o -E -c "iP(ad|hone)@[0-9]+"'
+  try:
+    output = subprocess.check_output(cmd, shell=True, text=True)
+    if int(output) > 0:
+      return True
+  except subprocess.CalledProcessError:
+    return False
+  return False
+
+
 @tools.cached
 def get_hardware_model_string():
   """Returns the Mac model string.
@@ -919,3 +931,20 @@ def generate_launchd_plist(command, cwd, plistname):
       '  <dict>\n' + ''.join('    %s\n' % l for l in entries) + '  </dict>\n'
       '</plist>\n')
   return header
+
+
+def kill_usbmuxd():
+  """kills the current usbmuxd process
+
+  This will actually restart the process right away
+  """
+  try:
+    cmd = [
+        'sudo',
+        '/usr/bin/killall',
+        '-v',
+        'usbmuxd',
+    ]
+    subprocess.check_call(cmd)
+  except subprocess.CalledProcessError:
+    logging.exception('Unable to restart usbmuxd')
