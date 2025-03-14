@@ -1,15 +1,16 @@
 Name: python-rsa
 Short Name: rsa
-URL: https://github.com/sybrenstuvel/python-rsa/releases/tag/version-3.4.2
-Version: 3.4.2
-Revision: fd70d79610ac1af8b072aa27fadf660b4a64797c
+URL: https://files.pythonhosted.org/packages/aa/65/7d973b89c4d2351d7fb232c2e452547ddfa243e93131e7cfa766da627b52/rsa-4.9.tar.gz
+Version: 4.9
 License: Apache License
 
 Description:
-Python-RSA is a pure-Python RSA implementation. It supports encryption and
-decryption, signing and verifying signatures, and key generation according to
-PKCS#1 version 1.5.
+[Python-RSA](https://stuvel.eu/rsa) is a pure-Python RSA implementation. It supports
+encryption and decryption, signing and verifying signatures, and key
+generation according to PKCS#1 version 1.5. It can be used as a Python
+library as well as on the commandline. The code was mostly written by
+Sybren A.  Stüvel.
 
 Local Modifications:
 - Kept rsa/.
-- Kept LICENSE and README.rst.
+- Kept LICENSE and README.md.
