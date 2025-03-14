@@ -19,6 +19,8 @@ from components import utils
 
 from proto.config import pools_pb2
 from proto.internals import rbe_pb2
+from server import bot_groups_config
+from server import bot_management
 from server import pools_config
 from server import task_pack
 from server.constants import OR_DIM_SEP
@@ -224,9 +226,14 @@ def enqueue_rbe_task(task_request, task_to_run):
   # Properties of this particular slice.
   props = task_request.task_slice(task_to_run.task_slice_index).properties
 
+  effective_bot_id_dimension = _get_effective_bot_id_dimension(
+      props, task_request.pool)
+
   # Convert dimensions to a format closer to what RBE wants. They are already
   # validated to be correct by that point by _validate_dimensions.
   requested_bot_id = None
+  effective_bot_id = None
+  effective_bot_id_from_bot = None
   constraints = []
   for k, v in sorted(props.dimensions.items()):
     assert isinstance(v, list), props.dimensions
@@ -234,6 +241,14 @@ def enqueue_rbe_task(task_request, task_to_run):
       assert len(v) == 1, props.dimensions
       assert OR_DIM_SEP not in v[0], props.dimensions
       requested_bot_id = v[0]
+      if effective_bot_id_dimension:
+        effective_bot_id_from_bot = _get_effective_bot_id_from_bot(
+            requested_bot_id)
+    elif effective_bot_id_dimension == k:
+      assert len(v) == 1, ('expect exactly one value for dimension %s, got %r' %
+                           (effective_bot_id_dimension, v))
+      if task_request.pool:
+        effective_bot_id = task_request.pool + '--' + v[0]
     else:
       # {k: [a, b|c]} => k:a AND (k:b | k:c).
       for alternatives in v:
@@ -242,6 +257,20 @@ def enqueue_rbe_task(task_request, task_to_run):
                 key=k,
                 allowed_values=alternatives.split(OR_DIM_SEP),
             ))
+
+  if effective_bot_id and effective_bot_id_from_bot and (
+      effective_bot_id != effective_bot_id_from_bot):
+    logging.error(
+        'Conflicting effective bot IDs: %s (according to bot %s) and %s '
+        '(according to task)' %
+        (effective_bot_id_from_bot, requested_bot_id, effective_bot_id))
+    raise
+
+  if effective_bot_id_from_bot:
+    requested_bot_id = effective_bot_id_from_bot
+
+  if effective_bot_id:
+    requested_bot_id = effective_bot_id
 
   # This is format recognized by go.chromium.org/luci/server/tq. It routes
   # based on `class`.
@@ -291,6 +320,52 @@ def enqueue_rbe_task(task_request, task_to_run):
       payload=utils.encode_to_json(payload))
   if not ok:
     raise datastore_utils.CommitError('Failed to enqueue RBE reservation')
+
+
+def _get_effective_bot_id_dimension(props, pool):
+  effective_bot_id_dimension = None
+  if not pool:
+    bot_ids = props.dimensions.get('id')
+    assert len(bot_ids) == 1, (
+        'expect task without pool dimension to have exactly one id dimension,'
+        ' got %r' % bot_ids)
+    bot_id = bot_ids[0]
+    bot_group_cfg = bot_groups_config.get_bot_group_config(bot_id)
+    if bot_group_cfg:
+      pools = bot_group_cfg.dimensions.get('pool')
+      rbe_cfg = get_rbe_config_for_bot(bot_id, pools)
+      if rbe_cfg:
+        effective_bot_id_dimension = rbe_cfg.effective_bot_id_dimension
+  else:
+    pool_cfg = pools_config.get_pool_config(pool)
+    if pool_cfg and pool_cfg.rbe_migration:
+      effective_bot_id_dimension = (
+          pool_cfg.rbe_migration.effective_bot_id_dimension)
+  return effective_bot_id_dimension
+
+
+def _get_effective_bot_id_from_bot(bot_id):
+  bot_info = bot_management.get_info_key(bot_id).get(use_cache=False,
+                                                     use_memcache=False)
+  if not bot_info:
+    logging.error('Faield to get bot info for %s', bot_id)
+    return None
+
+  if not bot_info.rbe_effective_bot_id:
+    # If cannot find the effective Bot ID for the bot,
+    # it could be because
+    # * the bot is still in handshake;
+    # * the effective_bot_id_dimension is newly added and the bot has not call
+    #   bot/poll yet;
+    # * the bot doesn't provide valid effective Bot ID dimension (missing or
+    #   multiple);
+    # * the bot belongs to multiple pools to make the effective Bot ID feature
+    #   not usable;
+    # Add a log here and move on, the task will either be rejected by RBE with
+    # NO_RESOURCES or execute with botID.
+    logging.debug('Effective bot ID for %s not found', bot_id)
+
+  return bot_info.rbe_effective_bot_id
 
 
 def enqueue_rbe_cancel(task_request, task_to_run):
