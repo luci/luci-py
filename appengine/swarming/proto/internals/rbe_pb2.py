@@ -23,7 +23,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z9go.chromium.org/luci/swarming/proto/internals;internalspb',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x19proto/internals/rbe.proto\x12\x16swarming.internals.rbe\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18proto/config/pools.proto\"\xae\x03\n\x0e\x45nqueueRBETask\x12\x34\n\x07payload\x18\x01 \x01(\x0b\x32#.swarming.internals.rbe.TaskPayload\x12\x14\n\x0crbe_instance\x18\x02 \x01(\t\x12*\n\x06\x65xpiry\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10requested_bot_id\x18\x04 \x01(\t\x12\x46\n\x0b\x63onstraints\x18\x05 \x03(\x0b\x32\x31.swarming.internals.rbe.EnqueueRBETask.Constraint\x12\x10\n\x08priority\x18\x06 \x01(\x05\x12G\n\x14scheduling_algorithm\x18\x07 \x01(\x0e\x32).swarming.config.Pool.SchedulingAlgorithm\x12\x34\n\x11\x65xecution_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x1a\x31\n\nConstraint\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x16\n\x0e\x61llowed_values\x18\x02 \x03(\t\"\xec\x01\n\rCancelRBETask\x12\x14\n\x0crbe_instance\x18\x01 \x01(\t\x12\x16\n\x0ereservation_id\x18\x02 \x01(\t\x12\x43\n\ndebug_info\x18\x03 \x01(\x0b\x32/.swarming.internals.rbe.CancelRBETask.DebugInfo\x1ah\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1b\n\x13py_swarming_version\x18\x02 \x01(\t\x12\x11\n\ttask_name\x18\x03 \x01(\t\"\xd7\x02\n\x0bTaskPayload\x12\x16\n\x0ereservation_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x13\n\x0bslice_index\x18\x03 \x01(\x05\x12\x19\n\x11task_to_run_shard\x18\x04 \x01(\x05\x12\x16\n\x0etask_to_run_id\x18\x05 \x01(\x03\x12\x41\n\ndebug_info\x18\x06 \x01(\x0b\x32-.swarming.internals.rbe.TaskPayload.DebugInfo\x12\x0c\n\x04noop\x18\x07 \x01(\x08\x1a\x85\x01\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1b\n\x13py_swarming_version\x18\x02 \x01(\t\x12\x1b\n\x13go_swarming_version\x18\x03 \x01(\t\x12\x11\n\ttask_name\x18\x04 \x01(\t\"=\n\nTaskResult\x12\x13\n\x0bskip_reason\x18\x01 \x01(\t\x12\x1a\n\x12\x62ot_internal_error\x18\x02 \x01(\t\"\xca\x02\n\x12\x45xpireSliceRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x19\n\x11task_to_run_shard\x18\x02 \x01(\x05\x12\x16\n\x0etask_to_run_id\x18\x03 \x01(\x03\x12\x41\n\x06reason\x18\x04 \x01(\x0e\x32\x31.swarming.internals.rbe.ExpireSliceRequest.Reason\x12\x0f\n\x07\x64\x65tails\x18\x05 \x01(\t\x12\x16\n\x0e\x63ulprit_bot_id\x18\x06 \x01(\t\"\x83\x01\n\x06Reason\x12\x16\n\x12REASON_UNSPECIFIED\x10\x00\x12\x0f\n\x0bNO_RESOURCE\x10\x01\x12\x15\n\x11PERMISSION_DENIED\x10\x02\x12\x14\n\x10INVALID_ARGUMENT\x10\x03\x12\x16\n\x12\x42OT_INTERNAL_ERROR\x10\x04\x12\x0b\n\x07\x45XPIRED\x10\x05\x32^\n\tInternals\x12Q\n\x0b\x45xpireSlice\x12*.swarming.internals.rbe.ExpireSliceRequest\x1a\x16.google.protobuf.EmptyB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
+  serialized_pb=b'\n\x19proto/internals/rbe.proto\x12\x16swarming.internals.rbe\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18proto/config/pools.proto\"\xc9\x03\n\x0e\x45nqueueRBETask\x12\x34\n\x07payload\x18\x01 \x01(\x0b\x32#.swarming.internals.rbe.TaskPayload\x12\x14\n\x0crbe_instance\x18\x02 \x01(\t\x12*\n\x06\x65xpiry\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x18\n\x10requested_bot_id\x18\x04 \x01(\t\x12\x46\n\x0b\x63onstraints\x18\x05 \x03(\x0b\x32\x31.swarming.internals.rbe.EnqueueRBETask.Constraint\x12\x10\n\x08priority\x18\x06 \x01(\x05\x12G\n\x14scheduling_algorithm\x18\x07 \x01(\x0e\x32).swarming.config.Pool.SchedulingAlgorithm\x12\x34\n\x11\x65xecution_timeout\x18\x08 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x19\n\x11wait_for_capacity\x18\t \x01(\x08\x1a\x31\n\nConstraint\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x16\n\x0e\x61llowed_values\x18\x02 \x03(\t\"\xec\x01\n\rCancelRBETask\x12\x14\n\x0crbe_instance\x18\x01 \x01(\t\x12\x16\n\x0ereservation_id\x18\x02 \x01(\t\x12\x43\n\ndebug_info\x18\x03 \x01(\x0b\x32/.swarming.internals.rbe.CancelRBETask.DebugInfo\x1ah\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1b\n\x13py_swarming_version\x18\x02 \x01(\t\x12\x11\n\ttask_name\x18\x03 \x01(\t\"\xd7\x02\n\x0bTaskPayload\x12\x16\n\x0ereservation_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x13\n\x0bslice_index\x18\x03 \x01(\x05\x12\x19\n\x11task_to_run_shard\x18\x04 \x01(\x05\x12\x16\n\x0etask_to_run_id\x18\x05 \x01(\x03\x12\x41\n\ndebug_info\x18\x06 \x01(\x0b\x32-.swarming.internals.rbe.TaskPayload.DebugInfo\x12\x0c\n\x04noop\x18\x07 \x01(\x08\x1a\x85\x01\n\tDebugInfo\x12+\n\x07\x63reated\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1b\n\x13py_swarming_version\x18\x02 \x01(\t\x12\x1b\n\x13go_swarming_version\x18\x03 \x01(\t\x12\x11\n\ttask_name\x18\x04 \x01(\t\"=\n\nTaskResult\x12\x13\n\x0bskip_reason\x18\x01 \x01(\t\x12\x1a\n\x12\x62ot_internal_error\x18\x02 \x01(\t\"\xca\x02\n\x12\x45xpireSliceRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x19\n\x11task_to_run_shard\x18\x02 \x01(\x05\x12\x16\n\x0etask_to_run_id\x18\x03 \x01(\x03\x12\x41\n\x06reason\x18\x04 \x01(\x0e\x32\x31.swarming.internals.rbe.ExpireSliceRequest.Reason\x12\x0f\n\x07\x64\x65tails\x18\x05 \x01(\t\x12\x16\n\x0e\x63ulprit_bot_id\x18\x06 \x01(\t\"\x83\x01\n\x06Reason\x12\x16\n\x12REASON_UNSPECIFIED\x10\x00\x12\x0f\n\x0bNO_RESOURCE\x10\x01\x12\x15\n\x11PERMISSION_DENIED\x10\x02\x12\x14\n\x10INVALID_ARGUMENT\x10\x03\x12\x16\n\x12\x42OT_INTERNAL_ERROR\x10\x04\x12\x0b\n\x07\x45XPIRED\x10\x05\x32^\n\tInternals\x12Q\n\x0b\x45xpireSlice\x12*.swarming.internals.rbe.ExpireSliceRequest\x1a\x16.google.protobuf.EmptyB;Z9go.chromium.org/luci/swarming/proto/internals;internalspbb\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,proto_dot_config_dot_pools__pb2.DESCRIPTOR,])
 
@@ -69,8 +69,8 @@ _EXPIRESLICEREQUEST_REASON = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1454,
-  serialized_end=1585,
+  serialized_start=1481,
+  serialized_end=1612,
 )
 _sym_db.RegisterEnumDescriptor(_EXPIRESLICEREQUEST_REASON)
 
@@ -109,8 +109,8 @@ _ENQUEUERBETASK_CONSTRAINT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=555,
-  serialized_end=604,
+  serialized_start=582,
+  serialized_end=631,
 )
 
 _ENQUEUERBETASK = _descriptor.Descriptor(
@@ -177,6 +177,13 @@ _ENQUEUERBETASK = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='wait_for_capacity', full_name='swarming.internals.rbe.EnqueueRBETask.wait_for_capacity', index=8,
+      number=9, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -190,7 +197,7 @@ _ENQUEUERBETASK = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=174,
-  serialized_end=604,
+  serialized_end=631,
 )
 
 
@@ -235,8 +242,8 @@ _CANCELRBETASK_DEBUGINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=739,
-  serialized_end=843,
+  serialized_start=766,
+  serialized_end=870,
 )
 
 _CANCELRBETASK = _descriptor.Descriptor(
@@ -280,8 +287,8 @@ _CANCELRBETASK = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=607,
-  serialized_end=843,
+  serialized_start=634,
+  serialized_end=870,
 )
 
 
@@ -333,8 +340,8 @@ _TASKPAYLOAD_DEBUGINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1056,
-  serialized_end=1189,
+  serialized_start=1083,
+  serialized_end=1216,
 )
 
 _TASKPAYLOAD = _descriptor.Descriptor(
@@ -406,8 +413,8 @@ _TASKPAYLOAD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=846,
-  serialized_end=1189,
+  serialized_start=873,
+  serialized_end=1216,
 )
 
 
@@ -445,8 +452,8 @@ _TASKRESULT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1191,
-  serialized_end=1252,
+  serialized_start=1218,
+  serialized_end=1279,
 )
 
 
@@ -513,8 +520,8 @@ _EXPIRESLICEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1255,
-  serialized_end=1585,
+  serialized_start=1282,
+  serialized_end=1612,
 )
 
 _ENQUEUERBETASK_CONSTRAINT.containing_type = _ENQUEUERBETASK
@@ -607,8 +614,8 @@ _INTERNALS = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=1587,
-  serialized_end=1681,
+  serialized_start=1614,
+  serialized_end=1708,
   methods=[
   _descriptor.MethodDescriptor(
     name='ExpireSlice',
