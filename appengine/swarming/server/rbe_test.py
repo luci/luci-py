@@ -226,6 +226,7 @@ class EnqueueTest(test_case.TestCase):
                                      effective_bot_id_dimension='dut_id')
 
     req, ttr = self.make_request()
+    req.task_slices[2].wait_for_capacity = True
     datastore_utils.transaction(lambda: rbe.enqueue_rbe_task(req, ttr))
 
     args, kwargs = enqueue_task.call_args
@@ -284,6 +285,8 @@ class EnqueueTest(test_case.TestCase):
                     123,
                     u'schedulingAlgorithm':
                     u'SCHEDULING_ALGORITHM_LIFO',
+                    u'waitForCapacity':
+                    True,
                 },
                 u'class': u'rbe-enqueue',
             },

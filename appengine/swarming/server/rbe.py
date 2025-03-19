@@ -224,7 +224,8 @@ def enqueue_rbe_task(task_request, task_to_run):
   expiry.FromDatetime(task_to_run.expiration_ts)
 
   # Properties of this particular slice.
-  props = task_request.task_slice(task_to_run.task_slice_index).properties
+  task_slice = task_request.task_slice(task_to_run.task_slice_index)
+  props = task_slice.properties
 
   effective_bot_id_dimension = _get_effective_bot_id_dimension(
       props, task_request.pool)
@@ -303,6 +304,7 @@ def enqueue_rbe_task(task_request, task_to_run):
                       props.execution_timeout_secs + props.grace_period_secs +
                       30  # some extra to compensate for bot's own overhead
                   ), ),
+              wait_for_capacity=task_slice.wait_for_capacity,
           )),
   }
 
