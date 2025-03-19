@@ -131,11 +131,11 @@ def get_rbe_config_for_bot(bot_id, pools):
   # detect it statically when validating the config. Log the error now and don't
   # use effective_bot_id feature for the bot.
   effective_bot_id_dimensions = [
-      dim for m, _, dim in per_pool if m != BotMode.SWARMING
+      dim for m, _, dim in per_pool if m != BotMode.SWARMING and dim
   ]
   if len(effective_bot_id_dimensions) > 1:
     logging.error(
-        'RBE: bot %s: bot belongs to multiple pools cannot use'
+        'RBE: bot %s: bot belongs to multiple pools cannot use '
         'effective_bot_id_dimension', bot_id)
   effective_bot_id_dimension = (effective_bot_id_dimensions[0] if
                                 len(effective_bot_id_dimensions) == 1 else None)
