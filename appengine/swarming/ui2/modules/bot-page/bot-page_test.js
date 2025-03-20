@@ -180,9 +180,12 @@ describe("bot-page", function () {
         createElement((ele) => {
           // other stuff is hidden
           let content = $("main > *");
-          expect(content).toHaveSize(4); // 3 top level sections and a message
+          expect(content).toHaveSize(5); // 4 top level sections and a message
           for (const div of content) {
-            if (div.tagName !== "H2") {
+            if (
+              div.tagName !== "H2" &&
+              div.tagName !== "FLEET-CONSOLE-BANNER"
+            ) {
               expect(div).toHaveAttribute("hidden");
             }
           }
@@ -190,9 +193,12 @@ describe("bot-page", function () {
           ele.render();
           // even if an id was given
           content = $("main > *");
-          expect(content).toHaveSize(4); // 3 top level sections and a message
+          expect(content).toHaveSize(5); // 4 top level sections and a message
           for (const div of content) {
-            if (div.tagName !== "H2") {
+            if (
+              div.tagName !== "H2" &&
+              div.tagName !== "FLEET-CONSOLE-BANNER"
+            ) {
               expect(div).toHaveAttribute("hidden");
             }
           }

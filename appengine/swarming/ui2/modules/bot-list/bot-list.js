@@ -32,6 +32,7 @@ import "elements-sk/select-sk";
 import "elements-sk/styles/buttons";
 import "../bot-mass-delete";
 import "../dialog-pop-over";
+import "../fleet-console-banner";
 import "../sort-toggle";
 import "../swarming-app";
 
@@ -294,6 +295,9 @@ const template = (ele) => html`
   <!-- Allow clicking anywhere to dismiss the column selector-->
   <main @click=${(e) => ele._showColSelector && ele._toggleColSelector(e)}>
     <h2 class=message ?hidden=${ele.loggedInAndAuthorized}>${ele._message}</h2>
+    <fleet-console-banner
+      ?hidden=${ele._projectId !== "chromeos-swarming"}
+    ></fleet-console-banner>
 
     ${ele.loggedInAndAuthorized ? header(ele) : ""}
 
@@ -435,6 +439,9 @@ window.customElements.define(
       // Allows us to abort fetches that are tied to filters when filters change.
       this._fetchController = null;
       this._ignoreScrolls = 0;
+
+      const idx = location.hostname.indexOf(".appspot.com");
+      this._projectId = location.hostname.substring(0, idx) || "not_found";
     }
 
     connectedCallback() {

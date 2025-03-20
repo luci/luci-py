@@ -14,6 +14,7 @@ import "elements-sk/icon/remove-circle-outline-icon-sk";
 import "elements-sk/styles/buttons";
 import "../bot-page-summary";
 import "../dialog-pop-over";
+import "../fleet-console-banner";
 import "../swarming-app";
 
 import {
@@ -396,6 +397,9 @@ const template = (ele) => html`
   </header>
   <main>
     <h2 class=message ?hidden=${ele.loggedInAndAuthorized}>${ele._message}</h2>
+    <fleet-console-banner
+      ?hidden=${ele._projectId !== "chromeos-swarming"}
+    ></fleet-console-banner>
 
     <div class=top ?hidden=${!ele.loggedInAndAuthorized}>
       ${idAndButtons(ele)}
@@ -491,6 +495,9 @@ window.customElements.define(
       this._message = "You must sign in to see anything useful.";
       // Allows us to abort fetches that are tied to the id when the id changes.
       this._fetchController = null;
+
+      const idx = location.hostname.indexOf(".appspot.com");
+      this._projectId = location.hostname.substring(0, idx) || "not_found";
     }
 
     connectedCallback() {
