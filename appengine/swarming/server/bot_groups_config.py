@@ -4,7 +4,6 @@
 
 """Functions to fetch and interpret bots.cfg file with list of bot groups."""
 
-import ast
 import collections
 import hashlib
 import logging
@@ -991,10 +990,6 @@ def _validate_bots_cfg(cfg, ctx):
 
       # Validate 'bot_config_script': the supplemental bot_config.py.
       if entry.bot_config_script:
-        # Another check in bot_code.py confirms that the script itself is valid
-        # python before it is accepted by the config service. See
-        # _validate_scripts validator there. We later recheck this (see below)
-        # when assembling the final expanded bots.cfg.
         if not entry.bot_config_script.endswith('.py'):
           ctx.error('invalid bot_config_script name: must end with .py')
         if os.path.basename(entry.bot_config_script) != entry.bot_config_script:
@@ -1003,13 +998,3 @@ def _validate_bots_cfg(cfg, ctx):
         # We can't validate that the file exists here. We'll do it later in
         # _fetch_and_expand_bots_cfg when assembling the final config from
         # individual files.
-
-      # Validate 'bot_config_script_content': the content must be valid python.
-      # This validation is hit when validating the expanded bot config.
-      if entry.bot_config_script_content:
-        try:
-          ast.parse(entry.bot_config_script_content)
-        except (SyntaxError, TypeError) as e:
-          ctx.error(
-              'invalid bot config script "%s": %s' %
-              (entry.bot_config_script, e))

@@ -673,30 +673,6 @@ class CacheTest(test_case.TestCase):
     # The script was fetched only once.
     self.assertEqual({'bots.cfg': 1, u'scripts/script.py': 1}, calls)
 
-  def test_expands_bot_config_scripts_fail(self):
-    self.mock_config({
-        'bots.cfg': (
-            'rev1',
-            bots_pb2.BotsCfg(
-                bot_group=[
-                    bots_pb2.BotGroup(
-                        auth=[
-                            bots_pb2.BotAuth(require_luci_machine_token=True)
-                        ],
-                        bot_config_script='script.py',
-                    ),
-                ],)),
-        'scripts/script.py': ('rev2', '!!not python!!'),
-    })
-
-    ctx = ValidationCtx()
-    with self.assertRaises(bot_groups_config.BadConfigError):
-      bot_groups_config.refetch_from_config_service(ctx)
-    ctx.assert_errors(self, [
-      'bot_group #0: invalid bot config script "script.py": invalid syntax'
-      ' (<unknown>, line 1)',
-    ])
-
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

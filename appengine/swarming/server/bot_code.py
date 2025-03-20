@@ -8,7 +8,6 @@ It includes everything that is AppEngine specific. The non-GAE code is in
 bot_archive.py.
 """
 
-import ast
 import collections
 import hashlib
 import logging
@@ -286,23 +285,3 @@ def _quasi_random_100(s):
   digest = hashlib.sha256('bot-channel:' + s).digest()
   num = float(ord(digest[0]) + ord(digest[1]) * 256)
   return int(num * 99.9 / (256.0 + 256.0 * 256.0))
-
-
-def _validate_python(content):
-  """Returns True if content is valid python script."""
-  try:
-    ast.parse(content)
-  except (SyntaxError, TypeError):
-    return False
-  return True
-
-
-## Config validators
-
-
-@config.validation.self_rule('regex:scripts/.+\\.py')
-def _validate_scripts(content, ctx):
-  try:
-    ast.parse(content)
-  except (SyntaxError, TypeError) as e:
-    ctx.error('invalid %s: %s' % (ctx.path, e))
