@@ -1508,6 +1508,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
   ACCEPTED_KEYS = {
       u'bot_overhead',
       u'cache_trim_stats',
+      u'canceled',
       u'cas_output_root',
       u'cipd_pins',
       u'cipd_stats',
