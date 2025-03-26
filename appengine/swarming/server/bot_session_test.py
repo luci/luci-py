@@ -189,9 +189,10 @@ class BotSessionTest(test_case.TestCase):
 
   def test_update(self):
     session = session_pb2.Session()
-    bot_session.update(session, TEST_CONFIG, 'rbe', 'pool--dut_123', 'dut_id')
+    bot_session.update(session, TEST_CONFIG, 'rbe', 'pool:dut_id:dut_123',
+                       'dut_id')
     bot_config = EXPECTED_BOT_CONFIG
-    bot_config.rbe_effective_bot_id = 'pool--dut_123'
+    bot_config.rbe_effective_bot_id = 'pool:dut_id:dut_123'
     bot_config.rbe_effective_bot_id_dimension = 'dut_id'
 
     self.assertEqual(

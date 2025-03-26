@@ -249,7 +249,8 @@ def enqueue_rbe_task(task_request, task_to_run):
       assert len(v) == 1, ('expect exactly one value for dimension %s, got %r' %
                            (effective_bot_id_dimension, v))
       if task_request.pool:
-        effective_bot_id = task_request.pool + '--' + v[0]
+        effective_bot_id = '%s:%s:%s' % (task_request.pool,
+                                         effective_bot_id_dimension, v[0])
     else:
       # {k: [a, b|c]} => k:a AND (k:b | k:c).
       for alternatives in v:
@@ -346,6 +347,7 @@ def _get_effective_bot_id_dimension(props, pool):
   return effective_bot_id_dimension
 
 
+@ndb.non_transactional
 def _get_effective_bot_id_from_bot(bot_id):
   bot_info = bot_management.get_info_key(bot_id).get(use_cache=False,
                                                      use_memcache=False)

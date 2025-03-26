@@ -342,7 +342,7 @@ class EnqueueTest(test_case.TestCase):
                     u'expiry':
                     u'2112-01-01T01:07:10Z',
                     u'requestedBotId':
-                    u'pool--dut1',
+                    u'pool:dut_id:dut1',
                     u'constraints': [
                         {
                             u'key': u'dim1',
@@ -401,7 +401,7 @@ class EnqueueTest(test_case.TestCase):
                              state={'state': 'real'},
                              version='1234',
                              register_dimensions=True,
-                             rbe_effective_bot_id="pool--dut1",
+                             rbe_effective_bot_id="pool:dut_id:dut1",
                              set_rbe_effective_bot_id=True)
 
     req, ttr = self.make_request()
@@ -436,7 +436,7 @@ class EnqueueTest(test_case.TestCase):
                     u'expiry':
                     u'2112-01-01T01:07:10Z',
                     u'requestedBotId':
-                    u'pool--dut1',
+                    u'pool:dut_id:dut1',
                     u'constraints': [
                         {
                             u'key': u'dim1',

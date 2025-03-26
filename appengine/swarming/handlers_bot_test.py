@@ -555,9 +555,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params['dimensions']['dut_id'] = ['dut1']
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     bot_info = bot_management.get_info_key('bot1').get()
-    self.assertEqual(bot_info.rbe_effective_bot_id, 'default--dut1')
+    self.assertEqual(bot_info.rbe_effective_bot_id, 'default:dut_id:dut1')
     session = bot_session.unmarshal(response['session'])
-    self.assertEqual(session.bot_config.rbe_effective_bot_id, 'default--dut1')
+    self.assertEqual(session.bot_config.rbe_effective_bot_id,
+                     'default:dut_id:dut1')
     self.assertEqual(session.bot_config.rbe_effective_bot_id_dimension,
                      'dut_id')
 

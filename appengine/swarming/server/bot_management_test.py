@@ -605,16 +605,16 @@ class BotManagementTest(test_case.TestCase):
     # rbe_effective_bot_id is not set when set_rbe_effective_bot_id is False.
     _bot_event(bot_id=bot_id,
                event_type='bot_polling',
-               rbe_effective_bot_id="pool--dut",
+               rbe_effective_bot_id="pool:dut_id:dut",
                set_rbe_effective_bot_id=False)
     self.assertIsNone(bot_info_key.get().rbe_effective_bot_id)
 
     # rbe_effective_bot_id is set when set_rbe_effective_bot_id is True.
     _bot_event(bot_id=bot_id,
                event_type='bot_polling',
-               rbe_effective_bot_id="pool--dut",
+               rbe_effective_bot_id="pool:dut_id:dut",
                set_rbe_effective_bot_id=True)
-    self.assertEqual(bot_info_key.get().rbe_effective_bot_id, "pool--dut")
+    self.assertEqual(bot_info_key.get().rbe_effective_bot_id, "pool:dut_id:dut")
 
   def test_get_info_key(self):
     self.assertEqual(

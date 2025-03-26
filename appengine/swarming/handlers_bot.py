@@ -834,7 +834,8 @@ class BotPollHandler(_BotBaseHandler):
       effective_bot_ids = res.dimensions.get(res.rbe_effective_bot_id_dimension,
                                              [])
       if len(effective_bot_ids) == 1:
-        rbe_effective_bot_id = pool + '--' + effective_bot_ids[0]
+        rbe_effective_bot_id = '%s:%s:%s' % (
+            pool, res.rbe_effective_bot_id_dimension, effective_bot_ids[0])
       else:
         logging.error(
             'Effective bot ID dimension %s must have only one value, got %r',
