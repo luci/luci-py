@@ -16,10 +16,23 @@ import bot
 
 
 def make_bot(remote=None):
-  return bot.Bot(remote, {'dimensions': {
-      'id': ['bot1'],
-      'pool': ['private']
-  }}, 'https://localhost:1', 'base_dir')
+  return bot.Bot(remote or FakeRemote(),
+                 {'dimensions': {
+                     'id': ['bot1'],
+                     'pool': ['private']
+                 }}, 'https://localhost:1', 'base_dir')
+
+
+class FakeRemote:
+  post_bot_event_cb = None
+
+  @property
+  def bot_id(self):
+    return 'bot1'
+
+  def post_bot_event(self, event_type, message, attributes):
+    if self.post_bot_event_cb:
+      self.post_bot_event_cb(event_type, message, attributes)
 
 
 class TestBot(unittest.TestCase):
@@ -38,28 +51,28 @@ class TestBot(unittest.TestCase):
     prefix = 'US has failed us\nCalling stack:\n  0  '
     calls = []
 
-    class FakeRemote(object):
-      # pylint: disable=no-self-argument
-      def post_bot_event(self2, event_type, message, attributes):
-        try:
-          self.assertEqual('bot_error', event_type)
-          expected = {
-              'dimensions': {
-                  'id': ['bot1'],
-                  'pool': ['private']
-              },
-              'state': {
-                  'rbe_instance': None,
-              },
-              'version': 'unknown',
-          }
-          self.assertEqual(expected, attributes)
-          self.assertTrue(message.startswith(prefix), repr(message))
-          calls.append(event_type)
-        except Exception as e:
-          calls.append(str(e))
+    def post_bot_event(event_type, message, attributes):
+      try:
+        self.assertEqual('bot_error', event_type)
+        expected = {
+            'dimensions': {
+                'id': ['bot1'],
+                'pool': ['private']
+            },
+            'state': {
+                'rbe_instance': None,
+            },
+            'version': 'unknown',
+        }
+        self.assertEqual(expected, attributes)
+        self.assertTrue(message.startswith(prefix), repr(message))
+        calls.append(event_type)
+      except Exception as e:
+        calls.append(str(e))
+
 
     remote = FakeRemote()
+    remote.post_bot_event_cb = post_bot_event
     make_bot(remote).post_error('US has failed us')
     self.assertEqual(['bot_error'], calls)
 
@@ -86,8 +99,12 @@ class TestBot(unittest.TestCase):
 
     # Dimension in bot_group_cfg ('A') wins over custom one ('B').
     with obj.mutate_internals() as mut:
-      mut.update_dimensions({'foo': ['baz'], 'pool': ['B']})
-    self.assertEqual({'foo': ['baz'], 'pool': ['A']}, obj.dimensions)
+      mut.update_dimensions({'id': ['bot1'], 'foo': ['baz'], 'pool': ['B']})
+    self.assertEqual({
+        'id': ['bot1'],
+        'foo': ['baz'],
+        'pool': ['A']
+    }, obj.dimensions)
 
   def test_lifecycle_callbacks(self):
     obj = make_bot()

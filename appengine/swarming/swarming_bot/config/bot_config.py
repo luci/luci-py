@@ -3,9 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""This file is meant to be overriden by the server's specific copy.
-
-You can upload a new version via /restricted/upload/bot_config.
+"""This file is meant to be overridden by the server's specific copy.
 
 There's 3 types of functions in this file:
   - get_*() to return properties to describe this bot.
@@ -42,9 +40,9 @@ def get_dimensions(bot):
 
   The dimensions are what are used to select the bot that can run each task.
 
-  The bot id will be automatically selected based on the hostname with
-  os_utilities.get_dimensions(). If you want something more special, specify it
-  in your bot_config.py and override the item 'id'.
+  The bot ID will be automatically selected based on the hostname or
+  SWARMING_BOT_ID environment variable. There's no way to change bot ID from
+  hooks.
 
   The dimensions returned here will be joined with server defined dimensions
   (extracted from bots.cfg config file based on the bot id). Server defined
@@ -52,7 +50,7 @@ def get_dimensions(bot):
   more information.
 
   See
-  https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Magic-Values.md
+  https://chromium.googlesource.com/infra/luci/luci-py.git/+/main/appengine/swarming/doc/Magic-Values.md
 
   Arguments:
   - bot: bot.Bot instance or None. See ../api/bot.py.

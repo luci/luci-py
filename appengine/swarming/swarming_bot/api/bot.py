@@ -25,9 +25,6 @@ class Bot(object):
   def __init__(self, remote, attributes, server, base_dir):
     assert server is None or not server.endswith('/'), server
 
-    # TODO(vadimsh): Make bot ID immutable. Changing it after the handshake is
-    # undefined behavior on Swarming and an error on RBE.
-
     # Immutable.
     self._base_dir = base_dir
     self._remote = remote
@@ -106,8 +103,7 @@ class Bot(object):
   @property
   def id(self):
     """The bot's ID."""
-    with self._lock:
-      return self._dimensions.get('id', ['unknown'])[0]
+    return self._remote.bot_id
 
   @property
   def session_id(self):
@@ -358,14 +354,18 @@ class BotMutator(object):
 
   def update_dimensions(self, new_dimensions):
     """Updates `bot.dimensions` by merging-in automatically set dimensions."""
+    proposed_id = new_dimensions.get('id', ['unknown'])
+    if proposed_id != [self._bot.id]:
+      logging.error(
+          'Bot "id" dimension cannot be changed dynamically from %s to %s',
+          [self._bot.id], proposed_id)
     dimensions = new_dimensions.copy()
     dimensions.update(self._bot._server_side_dimensions)
+    dimensions['id'] = [self._bot.id]
     bot_config_name = self._bot._bot_config.get('name')
     if bot_config_name:
       dimensions['bot_config'] = [bot_config_name]
     self._bot._dimensions = dimensions
-    if self._bot._remote:
-      self._bot._remote.bot_id = dimensions.get('id', [None])[0]
 
   def update_state(self, new_state):
     """Updates `bot.state` by merging-in automatically set keys."""

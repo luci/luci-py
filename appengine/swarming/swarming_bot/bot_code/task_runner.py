@@ -369,11 +369,9 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file,
 
       # The client to use to make backend RPCs. It will also refresh the session
       # token as a side effect of some RPC calls.
-      remote = remote_client.RemoteClientNative(
-          swarming_server, headers_cb, os_utilities.get_hostname_short(),
-          work_dir)
+      remote = remote_client.RemoteClientNative(swarming_server, headers_cb,
+                                                task_details.bot_id, work_dir)
       remote.initialize()
-      remote.bot_id = task_details.bot_id
       remote.session_token = session.session_token
 
       # If running in RBE mode, deserialize the RBESession object to use it to

@@ -101,9 +101,8 @@ def get_task_details(*args, **kwargs):
 
 def run_command(server_url, work_dir, task_details, headers_cb, rbe_session):
   """Runs a command with an initialized client."""
-  remote = remote_client.RemoteClientNative(server_url, headers_cb, 'localhost',
-                                            work_dir)
-  remote.bot_id = task_details.bot_id
+  remote = remote_client.RemoteClientNative(server_url, headers_cb,
+                                            task_details.bot_id, work_dir)
   with luci_context.stage(local_auth=None) as ctx_file:
     return task_runner.run_command(remote,
                                    rbe_session, task_details, work_dir, 3600.,

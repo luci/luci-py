@@ -43,7 +43,7 @@ from utils import zip_package
 
 
 REQUEST_UUID = '7905e667-d415-48f1-9df7-f914541d6331'
-
+FAKE_BOT_ID = 'fake-bot-id'
 
 class FakeThreadingEvent(object):
   def __init__(self):
@@ -87,7 +87,7 @@ class TestBotBase(net_utils.TestCase):
     self.attributes = {
         'dimensions': {
             'foo': ['bar'],
-            'id': ['localhost'],
+            'id': [FAKE_BOT_ID],
             'pool': ['default'],
         },
         'state': {
@@ -99,6 +99,7 @@ class TestBotBase(net_utils.TestCase):
     }
     self.mock(bot, '_gen_session_id', lambda: 'fake-session-id')
     self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
+    self.mock(os_utilities, 'get_bot_id', lambda: FAKE_BOT_ID)
     self.mock(os_utilities,
               'get_dimensions', lambda: self.attributes['dimensions'])
     self.mock(os_utilities, 'get_state', lambda *_: self.attributes['state'])
@@ -125,7 +126,7 @@ class TestBotBase(net_utils.TestCase):
   def make_bot(self, auth_headers_cb=None):
     self.quit_bit = FakeThreadingEvent()
     self.bot = bot.Bot(
-        remote_client.RemoteClientNative(self.url, auth_headers_cb, 'localhost',
+        remote_client.RemoteClientNative(self.url, auth_headers_cb, FAKE_BOT_ID,
                                          self.root_dir), self.attributes,
         self.url, self.root_dir)
     with self.bot.mutate_internals() as mut:
@@ -545,7 +546,7 @@ class TestBotMain(TestBotBase):
   def test_post_error_task(self):
     self.mock(time, 'time', lambda: 126.0)
     self.mock(logging, 'error', lambda *_, **_kw: None)
-    self.assertEqual('localhost', self.bot.id)
+    self.assertEqual(FAKE_BOT_ID, self.bot.id)
     self.expected_requests([
         (
             'https://localhost:1/swarming/api/v1/bot/task_error/23',
@@ -564,7 +565,7 @@ class TestBotMain(TestBotBase):
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42',
-                    'X-Luci-Swarming-Bot-ID': 'localhost',
+                    'X-Luci-Swarming-Bot-ID': FAKE_BOT_ID,
                 },
                 'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
                 'max_attempts': remote_client.NET_MAX_ATTEMPTS,
@@ -705,7 +706,7 @@ class TestBotMain(TestBotBase):
               'follow_redirects': False,
               'headers': {
                   'Cookie': 'GOOGAPPUID=42',
-                  'X-Luci-Swarming-Bot-ID': 'localhost',
+                  'X-Luci-Swarming-Bot-ID': FAKE_BOT_ID,
               },
               'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
               'max_attempts': 1,
@@ -731,7 +732,7 @@ class TestBotMain(TestBotBase):
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42',
-                    'X-Luci-Swarming-Bot-ID': 'localhost',
+                    'X-Luci-Swarming-Bot-ID': FAKE_BOT_ID,
                 },
                 'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
                 'max_attempts': remote_client.NET_MAX_ATTEMPTS,
@@ -746,7 +747,7 @@ class TestBotMain(TestBotBase):
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42',
-                    'X-Luci-Swarming-Bot-ID': 'localhost',
+                    'X-Luci-Swarming-Bot-ID': FAKE_BOT_ID,
                 },
                 'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
                 'max_attempts': remote_client.NET_MAX_ATTEMPTS,
@@ -786,7 +787,7 @@ class TestBotMain(TestBotBase):
             'https://localhost:1/swarming/api/v1/bot/task_update/terminate-id',
             {
                 'data': {
-                    'id': 'localhost',
+                    'id': FAKE_BOT_ID,
                     'task_id': 'terminate-id',
                     'duration': 0,
                     'exit_code': 0,
@@ -796,7 +797,7 @@ class TestBotMain(TestBotBase):
                 'follow_redirects': False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42',
-                    'X-Luci-Swarming-Bot-ID': 'localhost',
+                    'X-Luci-Swarming-Bot-ID': FAKE_BOT_ID,
                 },
                 'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
                 'max_attempts': remote_client.NET_MAX_ATTEMPTS,
@@ -820,7 +821,7 @@ class TestBotMain(TestBotBase):
                 False,
                 'headers': {
                     'Cookie': 'GOOGAPPUID=42',
-                    'X-Luci-Swarming-Bot-ID': 'localhost',
+                    'X-Luci-Swarming-Bot-ID': FAKE_BOT_ID,
                 },
                 'timeout':
                 remote_client.NET_CONNECTION_TIMEOUT_SEC,
@@ -842,7 +843,7 @@ class TestBotMain(TestBotBase):
         {
             'bot_side': ['A'],
             'foo': ['bar'],
-            'id': ['localhost'],
+            'id': [FAKE_BOT_ID],
             'pool': ['default'],
         }, botobj[0].dimensions)
 
@@ -1977,7 +1978,7 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, '_call_hook', call_hook)
     result = self._mock_popen(
         expected_auth_params_json={
-            'bot_id': 'localhost',
+            'bot_id': FAKE_BOT_ID,
             'task_id': '24',
             'swarming_http_headers': {
                 'A': 'a'
@@ -2187,17 +2188,17 @@ class TestBotMain(TestBotBase):
           'https://localhost:1/swarming/api/v1/bot/bot_code'
           '/123', url)
       self.assertEqual(new_zip, f)
-      self.assertEqual({
-          'Cookie': 'GOOGAPPUID=42',
-          'X-Luci-Swarming-Bot-ID': 'localhost',
-      }, headers)
+      self.assertEqual(
+          {
+              'Cookie': 'GOOGAPPUID=42',
+              'X-Luci-Swarming-Bot-ID': FAKE_BOT_ID,
+          }, headers)
       self.assertEqual(remote_client.NET_CONNECTION_TIMEOUT_SEC, timeout)
       # Create a valid zip that runs properly.
       with zipfile.ZipFile(f, 'w') as z:
         z.writestr('__main__.py', 'print("hi")')
       return True
     self.mock(net, 'url_retrieve', url_retrieve)
-    self.bot.remote.bot_id = self.bot.id
     bot_main._update_bot(self.bot, '123')
     self.assertEqual([1], restarts)
 

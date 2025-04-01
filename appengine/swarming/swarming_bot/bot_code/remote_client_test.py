@@ -85,11 +85,17 @@ class TestRemoteClient(auto_stub.TestCase):
         '/')
     self.assertTrue(c.uses_auth)
 
-    self.assertEqual({'Cookie': 'GOOGAPPUID=899'}, c.get_headers())
-    self.assertEqual({
-        'A': 'a',
-        'Cookie': 'GOOGAPPUID=899'
-    }, c.get_headers(include_auth=True))
+    self.assertEqual(
+        {
+            'Cookie': 'GOOGAPPUID=899',
+            'X-Luci-Swarming-Bot-ID': 'localhost',
+        }, c.get_headers())
+    self.assertEqual(
+        {
+            'A': 'a',
+            'Cookie': 'GOOGAPPUID=899',
+            'X-Luci-Swarming-Bot-ID': 'localhost',
+        }, c.get_headers(include_auth=True))
 
   def test_get_authentication_headers(self):
     self.mock(time, 'time', lambda: 100000)
@@ -117,9 +123,8 @@ class TestRemoteClient(auto_stub.TestCase):
         'expiry': 12345,
     }
 
-    c = remote_client.RemoteClientNative('http://localhost:1', None,
-                                         'localhost', '/')
-    c.bot_id = 'bot_id'
+    c = remote_client.RemoteClientNative('http://localhost:1', None, 'bot_id',
+                                         '/')
     c.session_token = 'session-token'
 
     def mocked_call(url_path, data, expected_error_codes, retry_transient=True):
@@ -147,9 +152,8 @@ class TestRemoteClient(auto_stub.TestCase):
         'expiry': 12345,
     }
 
-    c = remote_client.RemoteClientNative('http://localhost:1', None,
-                                         'localhost', '/')
-    c.bot_id = 'bot_id'
+    c = remote_client.RemoteClientNative('http://localhost:1', None, 'bot_id',
+                                         '/')
     c.session_token = 'session-token'
 
     def mocked_call(url_path, data, expected_error_codes):

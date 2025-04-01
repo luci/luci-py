@@ -1017,6 +1017,15 @@ def get_state_all_devices_android(devices):
 ###
 
 
+@tools.cached
+def get_bot_id():
+  """Returns the bot ID, perhaps taking it from SWARMING_BOT_ID."""
+  from_env = os.environ.get('SWARMING_BOT_ID')
+  if from_env:
+    return from_env
+  return get_hostname_short()
+
+
 def get_dimensions():
   """Returns the default dimensions."""
   dimensions = {
@@ -1024,17 +1033,12 @@ def get_dimensions():
       'cores': [str(get_num_processors())],
       'cpu': get_cpu_dimensions(),
       'gpu': get_gpu()[0],
-      'id': [get_hostname_short()],
+      'id': [get_bot_id()],
       'os': get_os_values(),
       # This value is frequently overridden by bots.cfg via luci-config.
       'pool': ['default'],
       'python': get_python_versions(),
   }
-
-  # Conditional dimensions:
-  id_override = os.environ.get('SWARMING_BOT_ID')
-  if id_override:
-    dimensions['id'] = [id_override]
 
   caches = get_named_caches_info()
   if caches:

@@ -291,19 +291,9 @@ def _get_dimensions(botobj):
     logging.exception('os.utilities.get_dimensions() failed')
     return {
         'bot_error': ['bot_main:_get_dimensions'],
-        'id': [_get_botid_safe()],
+        'id': [os_utilities.get_bot_id()],
         'quarantined': ['1'],
     }
-
-
-@tools.cached
-def _get_botid_safe():
-  """Paranoid version of get_hostname_short()."""
-  try:
-    return os_utilities.get_hostname_short()
-  except Exception as e:
-    logging.exception('os.utilities.get_hostname_short() failed')
-    return 'error_%s' % str(e)
 
 
 def _get_settings(botobj):
@@ -597,25 +587,34 @@ def get_attributes(botobj):
 def get_bot(config):
   """Returns a valid Bot instance.
 
-  Should only be called once in the process lifetime.
+  Should only be called once in the process lifetime. Updates SWARMING_BOT_ID
+  env var to be set to the bot ID.
 
   It can be called by ../__main__.py, something to keep in mind.
   """
+  bot_id = os_utilities.get_bot_id()
+  logging.info('Running the bot with ID %s', bot_id)
+
+  # This environment variable is accessible to the tasks executed by this bot.
+  # Hooks can also theoretically examine it, so set it relatively early.
+  os.environ['SWARMING_BOT_ID'] = bot_id
+
   # This variable is used to bootstrap the initial bot.Bot object, which then is
   # used to get the dimensions and state.
   attributes = {
-    'dimensions': {'id': ['none']},
-    'state': {},
-    'version': generate_version(),
+      'dimensions': {
+          'id': [bot_id]
+      },
+      'state': {},
+      'version': generate_version(),
   }
-  hostname = _get_botid_safe()
   base_dir = THIS_DIR
 
-  # Use temporary Bot object to call get_attributes. Attributes are needed to
+  # Use a temporary Bot object to call get_attributes. Attributes are needed to
   # construct the "real" bot.Bot.
   attributes = get_attributes(
       bot.Bot(
-          remote_client.RemoteClientNative(config['server'], None, hostname,
+          remote_client.RemoteClientNative(config['server'], None, bot_id,
                                            base_dir), attributes,
           config['server'], base_dir))
 
@@ -624,8 +623,8 @@ def get_bot(config):
   # undefined during the construction).
   botobj = bot.Bot(
       remote_client.RemoteClientNative(
-          config['server'], lambda: _get_authentication_headers(botobj),
-          hostname, base_dir), attributes, config['server'], base_dir)
+          config['server'], lambda: _get_authentication_headers(botobj), bot_id,
+          base_dir), attributes, config['server'], base_dir)
 
   with botobj.mutate_internals() as mut:
     # Call the on_bot_shutdown hook when the bot exits or reboots.
@@ -1072,23 +1071,23 @@ def _init_bot(arg_error, quit_bit):
   config = get_config()
 
   try:
-    # First thing is to get an arbitrary url. This also ensures the network is
-    # up and running, which is necessary before trying to get the FQDN below.
-    # There's no need to do error handling here - the "ping" is just to "wake
-    # up" the network; if there's something seriously wrong, the handshake will
-    # fail and we'll handle it there.
-    hostname = _get_botid_safe()
-    base_dir = os.path.dirname(THIS_FILE)
-    remote = remote_client.RemoteClientNative(config['server'], None, hostname,
-                                              base_dir)
-    remote.ping()
+    # Ping the server first. This also ensures the network is up and running,
+    # which is necessary before trying to get the bots FQDN in
+    # os_utilities.get_bot_id().
+    #
+    # There's no need to do error handling here - the "ping" is just to
+    # "wake up" the network; if there's something seriously wrong, the handshake
+    # will fail and we'll handle it there.
+    resp = net.url_read(config['server'] + '/swarming/api/v1/bot/server_ping')
+    if resp is None:
+      logging.error('Error pinging the server (is network up?)')
   except Exception:
     # url_read() already traps pretty much every exceptions. This except
     # clause is kept there "just in case".
     logging.exception('Unexpected exception pinging the server')
 
   # If we are on GCE, we want to make sure GCE metadata server responds, since
-  # we use the metadata to derive bot ID, dimensions and state.
+  # we use the metadata to derive dimensions and state.
   if platforms.is_gce():
     logging.info('Running on GCE, waiting for the metadata server')
     platforms.gce.wait_for_metadata(quit_bit)
@@ -1153,9 +1152,6 @@ def _run_bot_inner(botobj, quit_bit):
 
   _cleanup_bot_directory(botobj)
   _clean_cache(botobj)
-
-  # This environment variable is accessible to the tasks executed by this bot.
-  os.environ['SWARMING_BOT_ID'] = botobj.id
 
   # RBE expects the version string to use a specific format.
   rbe_bot_version = '%s_%s_swarming/%s' % (

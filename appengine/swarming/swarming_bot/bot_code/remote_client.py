@@ -60,7 +60,7 @@ def utcnow():
   return datetime.datetime.utcnow()
 
 
-def make_appengine_id(hostname, work_dir):
+def make_appengine_id(bot_id, work_dir):
   """Generate a value to use in the GOOGAPPUID cookie for AppEngine.
 
   AppEngine looks for this cookie: if it contains a value in the range 0-999,
@@ -68,7 +68,7 @@ def make_appengine_id(hostname, work_dir):
   https://cloud.google.com/appengine/docs/flexible/python/splitting-traffic
 
   The bot code will send requests with a value generated locally:
-    GOOGAPPUID = sha1('YYYY-MM-DD-hostname:work_dir') % 1000
+    GOOGAPPUID = sha1('YYYY-MM-DD-bot_id:work_dir') % 1000
   (from go/swarming-release-canaries)
 
   This scheme should result in the values being roughly uniformly distributed.
@@ -77,13 +77,13 @@ def make_appengine_id(hostname, work_dir):
   be unlucky and get a unrepresentative sample).
 
   Args:
-    hostname: The short hostname of the bot.
+    bot_id: The bot ID.
     work_dir: The working directory used by the bot.
 
   Returns:
     An integer in the range [0, 999].
   """
-  s = '%s-%s:%s' % (utcnow().strftime('%Y-%m-%d'), hostname, work_dir)
+  s = '%s-%s:%s' % (utcnow().strftime('%Y-%m-%d'), bot_id, work_dir)
   googappuid = int(hashlib.sha1(s.encode('utf-8')).hexdigest(), 16) % 1000
   logging.debug('GOOGAPPUID = sha1(%s) %% 1000 = %d', s, googappuid)
   return googappuid
@@ -107,7 +107,7 @@ class RemoteClientNative(object):
   the callback will be called for each request.
   """
 
-  def __init__(self, server, auth_headers_callback, hostname, work_dir):
+  def __init__(self, server, auth_headers_callback, bot_id, work_dir):
     self._server = server
     self._session_token = None
     self._auth_headers_callback = auth_headers_callback
@@ -115,9 +115,8 @@ class RemoteClientNative(object):
     self._headers = None
     self._exp_ts = None
     self._disabled = not auth_headers_callback
-    self._bot_hostname = hostname
     self._bot_work_dir = work_dir
-    self._bot_id = None
+    self._bot_id = bot_id
     self._poll_request_uuid = None
 
   @property
@@ -127,10 +126,6 @@ class RemoteClientNative(object):
   @property
   def bot_id(self):
     return self._bot_id
-
-  @bot_id.setter
-  def bot_id(self, bid):
-    self._bot_id = bid
 
   @property
   def session_token(self):
@@ -183,11 +178,12 @@ class RemoteClientNative(object):
     Returns:
       A dict of HTTP headers.
     """
-    googappuid = make_appengine_id(self._bot_hostname, self._bot_work_dir)
-    headers = {'Cookie': 'GOOGAPPUID=%d' % googappuid}
-    if self._bot_id:
-      headers['X-Luci-Swarming-Bot-ID'] = self._bot_id
-
+    headers = {
+        'Cookie':
+        'GOOGAPPUID=%d' % make_appengine_id(self._bot_id, self._bot_work_dir),
+        'X-Luci-Swarming-Bot-ID':
+        self._bot_id,
+    }
     if include_auth:
       headers.update(self.get_authentication_headers())
     return headers
@@ -485,12 +481,6 @@ class RemoteClientNative(object):
     url_path = '/swarming/api/v1/bot/bot_code/%s' % bot_version
     if not self._url_retrieve(new_zip_path, url_path):
       raise BotCodeError(new_zip_path, self._server + url_path, bot_version)
-
-  def ping(self):
-    """Unlike all other methods, this one isn't authenticated."""
-    resp = net.url_read(self._server + '/swarming/api/v1/bot/server_ping')
-    if resp is None:
-      logging.error('No response from server_ping')
 
   def mint_oauth_token(self, task_id, account_id, scopes):
     """Asks the server to generate an access token for a service account.
