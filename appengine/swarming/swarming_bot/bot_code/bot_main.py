@@ -172,15 +172,15 @@ _BOT_CONFIG = None
 # variable is initialized inside _do_handshake().
 _EXTRA_BOT_CONFIG = None
 # Super Sticky quarantine string. This variable is initialized inside
-# _set_quarantined() and be set at various places when a hook throws an
-# exception. Restarting the bot will clear the quarantine, which includes
-# updated the bot due to new bot_config or new bot code.
+# _set_quarantined_until_restart() and be set at various places when a hook
+# throws an exception. Restarting the bot will clear the quarantine, which
+# includes updated the bot due to new bot_config or new bot code.
 _QUARANTINED = None
 
 
-def _set_quarantined(reason):
+def _set_quarantined_until_restart(reason):
   """Sets the Super Sticky Quarantine string."""
-  logging.error('_set_quarantined(%s)', reason)
+  logging.error('_set_quarantined_until_restart(%s)', reason)
   global _QUARANTINED
   _QUARANTINED = _QUARANTINED or reason
 
@@ -212,7 +212,7 @@ def _register_extra_bot_config(content, rev, script):
     exec(compiled, _EXTRA_BOT_CONFIG.__dict__)
     logging.debug('extra bot_config %s at rev %s was injected.', script, rev)
   except (SyntaxError, TypeError) as e:
-    _set_quarantined(
+    _set_quarantined_until_restart(
         'handshake returned invalid injected bot_config.py: %s' % e)
 
 
@@ -266,7 +266,6 @@ def _call_hook_safe(chained, botobj, name, *args):
   try:
     return _call_hook(chained, botobj, name, *args)
   except Exception as e:
-    traceback.print_exc()
     logging.exception('%s() threw', name)
     msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
     if botobj:
@@ -275,25 +274,23 @@ def _call_hook_safe(chained, botobj, name, *args):
 
 
 def _get_dimensions(botobj):
-  """Returns bot_config.py's get_dimensions() dict.
+  """Calls bot_config.py's get_dimensions() hook and validates the result.
 
-  Traps exceptions, quarantining the bot if they happen.
+  Returns:
+    (New dimensions dict, None) if the hook succeeded and dimensions are valid.
+    (Current dimensions dict, error message string) on errors.
   """
-  out = _call_hook_safe(False, botobj, 'get_dimensions')
-  if _is_jsonish_dict(out):
-    return out.copy()
   try:
-    _set_quarantined('get_dimensions(): expected a JSON dict, got %r' % out)
-    out = os_utilities.get_dimensions()
-    out['quarantined'] = ['1']
-    return out
-  except Exception:
-    logging.exception('os.utilities.get_dimensions() failed')
-    return {
-        'bot_error': ['bot_main:_get_dimensions'],
-        'id': [os_utilities.get_bot_id()],
-        'quarantined': ['1'],
-    }
+    dims = _call_hook(False, botobj, 'get_dimensions')
+    dim_err = _validate_dimensions(dims)
+    if dim_err:
+      logging.error('Bad dimensions: %s:\n%s', dim_err, dims)
+      return botobj.dimensions, dim_err
+    return dims, None
+  except Exception as e:
+    logging.exception('get_dimensions() hook exception')
+    msg = 'got exception: %s\n%s' % (e, traceback.format_exc()[-2048:])
+    return botobj.dimensions, msg
 
 
 def _get_settings(botobj):
@@ -330,22 +327,24 @@ def _get_rbe_worker_properties():
   return None
 
 
-def _get_state(botobj, sleep_streak):
+def _get_state(botobj, sleep_streak, dims_error):
   """Returns dict with a state of the bot reported to the server with each poll.
 
   Traps exceptions, quarantining the bot if they happen.
   """
-  state = _call_hook_safe(False, botobj, 'get_state')
-  if not _is_jsonish_dict(state):
-    _set_quarantined('get_state(): expected a JSON dict, got %r' % state)
-    state = {'broken': state}
+  try:
+    state = _call_hook(False, botobj, 'get_state')
+    if not _is_jsonish_dict(state):
+      state = {'quarantined': 'get_state(): expected a dict, got %r' % state}
+  except Exception as e:
+    logging.exception('get_state() exception')
+    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+    state = {'quarantined': 'get_state() exception: %s' % msg}
 
-  if not state.get('quarantined'):
-    if not _is_base_dir_ok(botobj):
-      # Use super hammer in case of dangerous environment.
-      _set_quarantined('Can\'t run from the base directory')
-    if _QUARANTINED:
-      state['quarantined'] = _QUARANTINED
+  if not state.get('quarantined') and _QUARANTINED:
+    state['quarantined'] = _QUARANTINED
+  if not state.get('quarantined') and dims_error:
+    state['quarantined'] = 'get_dimensions() error: %s' % dims_error
 
   if not state.get('quarantined'):
     try:
@@ -354,6 +353,8 @@ def _get_state(botobj, sleep_streak):
       err = _get_disks_quarantine(botobj, disks)
       if err:
         state['quarantined'] = err
+        # TODO: Do this somewhere else, not in a _get_state that is purely for
+        # collecting the state of the bot.
         _cleanup_purgeable_space(botobj)
     except Exception as e:
       logging.exception('checking free or purgeable space failed')
@@ -406,17 +407,14 @@ def _get_disks_quarantine(botobj, disks):
 
 
 def _update_bot_attributes(botobj, sleep_streak):
-  """Queries environment and hooks for dimensions and state and updates Bot.
+  """Updates Bot with current dimensions and state queried from the hooks.
 
   This is generally pretty slow.
   """
-  dims = _get_dimensions(botobj)
-  state = _get_state(botobj, sleep_streak)
-  logging.debug('Dimensions %s', dims)
-  logging.debug('State %s', state)
+  attrs = get_attributes(botobj, sleep_streak)
   with botobj.mutate_internals() as mut:
-    mut.update_dimensions(dims)
-    mut.update_state(state)
+    mut.update_dimensions(attrs['dimensions'])
+    mut.update_state(attrs['state'])
 
 
 def _cleanup_purgeable_space(botobj):
@@ -503,9 +501,6 @@ def _dict_deep_merge(x, y):
 
 def _is_base_dir_ok(botobj):
   """Returns False if the bot must be quarantined at all cost."""
-  if not botobj:
-    # This can happen very early in the process lifetime.
-    return THIS_DIR != os.path.expanduser('~')
   return botobj.base_dir != os.path.expanduser('~')
 
 
@@ -518,6 +513,26 @@ def _is_jsonish_dict(d):
   except Exception:
     return False
   return True
+
+
+def _validate_dimensions(dims):
+  """Returns a string error message if dimensions have wrong type.
+
+  Does very basic verification to ensure the type is `{str: [str]}`. This is
+  needed for the server to be able to deserialize dimensions correctly. The
+  server will do the rest of the validation.
+  """
+  if not isinstance(dims, dict):
+    return 'not a dict'
+  for k, v in dims.items():
+    if not isinstance(k, str):
+      return 'bad dimension key %r: not a string' % (k, )
+    if not isinstance(v, (list, tuple)):
+      return 'bad value for key %r (not a list or a tuple): %r' % (k, v)
+    for val in v:
+      if not isinstance(val, str):
+        return 'bad value for key %r (not a string): %r' % (k, val)
+  return None
 
 
 ### Public functions used by __main__.py
@@ -567,20 +582,20 @@ def generate_version():
     return 'Error: %s' % e
 
 
-def get_attributes(botobj):
-  """Returns the attributes sent to the server in /handshake.
+def get_attributes(botobj, sleep_streak=0):
+  """Queries environment and hooks for current dimensions and state.
 
-  Each called function catches all exceptions so the bot doesn't die on startup,
-  which is annoying to recover. In that case, we set a special property to catch
-  these and help the admin fix the swarming_bot code more quickly.
-
-  Arguments:
-  - botobj: bot.Bot instance.
+  They are sent to the server during the handshake and subsequently when polling
+  for work.
   """
+  dims, dims_error = _get_dimensions(botobj)
+  state = _get_state(botobj, sleep_streak, dims_error)
+  logging.debug('Dimensions %s', dims)
+  logging.debug('State %s', state)
   return {
-    'dimensions': _get_dimensions(botobj),
-    'state': _get_state(botobj, 0),
-    'version': generate_version(),
+      'dimensions': dims,
+      'state': state,
+      'version': generate_version(),
   }
 
 
@@ -636,6 +651,11 @@ def get_bot(config):
     # the autorestart script (!)
     mut.add_lifecycle_callback(lambda botobj, event: setup_bot(botobj, True)
                                if event == 'reboot' else None)
+
+  # Forbid running from '~', since the bot will delete all of it, which will be
+  # very bad if this is happening on some workstation.
+  if not _is_base_dir_ok(botobj):
+    _set_quarantined_until_restart('Can\'t run from the home directory')
 
   return botobj
 
@@ -1980,7 +2000,7 @@ class _BotLoopState:
     self._should_have_exited_but_didnt('Failed to restart the bot process')
 
   def _should_have_exited_but_didnt(self, message):
-    _set_quarantined(message)
+    _set_quarantined_until_restart(message)
     self._bad_bot_state_errors += 1
 
 

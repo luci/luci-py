@@ -97,6 +97,7 @@ class TestBotBase(net_utils.TestCase):
         },
         'version': '123',
     }
+    self.mock(zip_package, 'generate_version', lambda: '123')
     self.mock(bot, '_gen_session_id', lambda: 'fake-session-id')
     self.mock(uuid, 'uuid4', lambda: uuid.UUID(REQUEST_UUID))
     self.mock(os_utilities, 'get_bot_id', lambda: FAKE_BOT_ID)
@@ -269,7 +270,6 @@ class TestBotMain(TestBotBase):
     super(TestBotMain, self).setUp()
     # __main__ does it for us.
     os.mkdir('logs')
-    self.mock(zip_package, 'generate_version', lambda: '123')
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(os_utilities, 'host_reboot', self.fail)
     self.mock(subprocess42, 'call', self.fail)
@@ -310,7 +310,7 @@ class TestBotMain(TestBotBase):
         'id': ['foo'],
         'pool': ['bar'],
     }
-    self.assertEqual(expected, bot_main._get_dimensions(self.bot))
+    self.assertEqual(expected, bot_main._get_dimensions(self.bot)[0])
     self.assertEqual('Yo', self.bot.bot_restart_msg())
     self.assertEqual([(self.bot, 'Yo')], restarts)
 
@@ -322,7 +322,7 @@ class TestBotMain(TestBotBase):
 
     self.mock(bot_config, 'get_dimensions', get_dimensions)
     expected = {'yo': ['dawh']}
-    self.assertEqual(expected, bot_main._get_dimensions(self.bot))
+    self.assertEqual(expected, bot_main._get_dimensions(self.bot)[0])
 
   def test_get_dimensions_extra(self):
     from config import bot_config
@@ -338,10 +338,7 @@ class TestBotMain(TestBotBase):
         return {'alternative': ['truth']}
     self.mock(bot_main, '_EXTRA_BOT_CONFIG', extra())
     expected = {'alternative': ['truth']}
-    self.assertEqual(expected, bot_main._get_dimensions(self.bot))
-
-  def test_generate_version(self):
-    self.assertEqual('123', bot_main.generate_version())
+    self.assertEqual(expected, bot_main._get_dimensions(self.bot)[0])
 
   def test_get_state(self):
     from config import bot_config
@@ -350,7 +347,7 @@ class TestBotMain(TestBotBase):
       return {'yo': 'dawh'}
     self.mock(bot_config, 'get_state', get_state)
     expected = {'sleep_streak': 0.1, 'yo': 'dawh'}
-    self.assertEqual(expected, bot_main._get_state(self.bot, 0.1))
+    self.assertEqual(expected, bot_main._get_state(self.bot, 0.1, None))
 
   def test_get_state_quarantine(self):
     botobj = bot_main.get_bot(bot_main.get_config())
@@ -395,40 +392,57 @@ class TestBotMain(TestBotBase):
         'sleep_streak':
             1,
     }
-    self.assertEqual(expected, bot_main._get_state(botobj, 1))
+    self.assertEqual(expected, bot_main._get_state(botobj, 1, None))
 
-  def test_get_state_quarantine_sticky(self):
-    # A crash in get_dimensions() causes sticky quarantine in get_state.
+  def test_get_dimensions_hook_bad_result(self):
     from config import bot_config
 
     def get_dimensions(botobj):
       self.assertEqual(self.bot, botobj)
-      # Non-JSON serializable.
-      return {'invalid': b'blob'}
+      return {'invalid': 'not-a-list'}
 
     self.mock(bot_config, 'get_dimensions', get_dimensions)
 
-    def get_dimensions_os():
-      return {'os': ['safe']}
-
-    self.mock(os_utilities, 'get_dimensions', get_dimensions_os)
     def get_state(botobj):
       self.assertEqual(self.bot, botobj)
       return {'yo': 'dawh'}
     self.mock(bot_config, 'get_state', get_state)
 
     expected = {
-        'os': ['safe'],
-        'quarantined': ['1'],
+        'dimensions': {
+            'foo': ['bar'],
+            'id': [FAKE_BOT_ID],
+            'pool': ['default']
+        },
+        'state': {
+            'quarantined':
+            "get_dimensions() error: bad value for key 'invalid' "
+            "(not a list or a tuple): 'not-a-list'",
+            'sleep_streak': 0,
+            'yo': 'dawh',
+        },
+        'version': '123',
     }
-    self.assertEqual(expected, bot_main._get_dimensions(self.bot))
-    expected = {
-        'quarantined':
-        "get_dimensions(): expected a JSON dict, got {'invalid': b'blob'}",
-        'sleep_streak': 0.1,
-        'yo': 'dawh',
-    }
-    self.assertEqual(expected, bot_main._get_state(self.bot, 0.1))
+    self.assertEqual(expected, bot_main.get_attributes(self.bot))
+
+  def test_hooks_raising_exceptions(self):
+    from config import bot_config
+
+    def get_dimensions(botobj):
+      raise ValueError('Boom 1')
+
+    self.mock(bot_config, 'get_dimensions', get_dimensions)
+
+    def get_state(botobj):
+      raise ValueError('Boom 2')
+
+    self.mock(bot_config, 'get_state', get_state)
+
+    attrs = bot_main.get_attributes(self.bot)
+    expected = {'foo': ['bar'], 'id': [FAKE_BOT_ID], 'pool': ['default']}
+    self.assertEqual(expected, attrs['dimensions'])
+    self.assertTrue(attrs['state']['quarantined'].startswith(
+        'get_state() exception: Boom 2'))
 
   def test_get_disks_quarantine_empty(self):
     root = 'c:\\' if sys.platform == 'win32' else '/'
@@ -2302,6 +2316,31 @@ class TestRBEWorkerProperties(TestBotBase):
         'pool_id': 'rbe-pool-id',
         'pool_version': 'rbe-pool-version'
     })
+
+
+class TestValidateDimensions(unittest.TestCase):
+
+  def test_works(self):
+    cases = [
+        ({}, None),
+        ({
+            'id': ['a', 'b'],
+            'stuff': ('c', )
+        }, None),
+        (None, 'not a dict'),
+        ([], 'not a dict'),
+        ({
+            1: ['a']
+        }, 'bad dimension key 1: not a string'),
+        ({
+            'a': 'b'
+        }, 'bad value for key \'a\' (not a list or a tuple): \'b\''),
+        ({
+            'a': [b'blob']
+        }, 'bad value for key \'a\' (not a string): b\'blob\''),
+    ]
+    for dims, err in cases:
+      self.assertEqual(bot_main._validate_dimensions(dims), err)
 
 
 if __name__ == '__main__':
