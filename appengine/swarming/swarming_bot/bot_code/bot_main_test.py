@@ -302,12 +302,12 @@ class TestBotMain(TestBotBase):
     def get_dimensions(botobj):
       self.assertEqual(self.bot, botobj)
       self.bot.bot_restart('Yo')
-      return {'id': ['foo'], 'pool': ['bar']}
+      return {'id': [FAKE_BOT_ID], 'pool': ['bar']}
     self.mock(bot_config, 'get_dimensions', get_dimensions)
     restarts = []
     self.mock(bot_main, '_bot_restart', lambda *args: restarts.append(args))
     expected = {
-        'id': ['foo'],
+        'id': [FAKE_BOT_ID],
         'pool': ['bar'],
     }
     self.assertEqual(expected, bot_main._get_dimensions(self.bot)[0])
@@ -318,26 +318,26 @@ class TestBotMain(TestBotBase):
     from config import bot_config
     def get_dimensions(botobj):
       self.assertEqual(self.bot, botobj)
-      return {'yo': ['dawh']}
+      return {'id': [FAKE_BOT_ID], 'yo': ['dawh']}
 
     self.mock(bot_config, 'get_dimensions', get_dimensions)
-    expected = {'yo': ['dawh']}
+    expected = {'id': [FAKE_BOT_ID], 'yo': ['dawh']}
     self.assertEqual(expected, bot_main._get_dimensions(self.bot)[0])
 
   def test_get_dimensions_extra(self):
     from config import bot_config
     def get_dimensions(botobj):
       self.assertEqual(self.bot, botobj)
-      return {'yo': ['dawh']}
+      return {'id': [FAKE_BOT_ID], 'yo': ['dawh']}
     self.mock(bot_config, 'get_dimensions', get_dimensions)
 
     # The extra version takes priority.
     class extra(object):
       def get_dimensions(self2, botobj): # pylint: disable=no-self-argument
         self.assertEqual(self.bot, botobj)
-        return {'alternative': ['truth']}
+        return {'id': [FAKE_BOT_ID], 'alternative': ['truth']}
     self.mock(bot_main, '_EXTRA_BOT_CONFIG', extra())
-    expected = {'alternative': ['truth']}
+    expected = {'id': [FAKE_BOT_ID], 'alternative': ['truth']}
     self.assertEqual(expected, bot_main._get_dimensions(self.bot)[0])
 
   def test_get_state(self):
@@ -420,6 +420,39 @@ class TestBotMain(TestBotBase):
             "(not a list or a tuple): 'not-a-list'",
             'sleep_streak': 0,
             'yo': 'dawh',
+        },
+        'version': '123',
+    }
+    self.assertEqual(expected, bot_main.get_attributes(self.bot))
+
+  def test_get_dimensions_changing_bot_id(self):
+    from config import bot_config
+
+    def get_dimensions(_botobj):
+      return {'id': ['another']}
+
+    self.mock(bot_config, 'get_dimensions', get_dimensions)
+
+    def get_state(_botobj):
+      return {'yo': 'dawh'}
+
+    self.mock(bot_config, 'get_state', get_state)
+
+    expected = {
+        'dimensions': {
+            'foo': ['bar'],
+            'id': [FAKE_BOT_ID],
+            'pool': ['default']
+        },
+        'state': {
+            'quarantined':
+            'get_dimensions() error: "id" dimension cannot be '
+            'changed dynamically from [\'fake-bot-id\'] to '
+            '[\'another\']',
+            'sleep_streak':
+            0,
+            'yo':
+            'dawh',
         },
         'version': '123',
     }

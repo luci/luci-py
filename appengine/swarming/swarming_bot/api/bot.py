@@ -354,11 +354,6 @@ class BotMutator(object):
 
   def update_dimensions(self, new_dimensions):
     """Updates `bot.dimensions` by merging-in automatically set dimensions."""
-    proposed_id = new_dimensions.get('id', ['unknown'])
-    if proposed_id != [self._bot.id]:
-      logging.error(
-          'Bot "id" dimension cannot be changed dynamically from %s to %s',
-          [self._bot.id], proposed_id)
     dimensions = new_dimensions.copy()
     dimensions.update(self._bot._server_side_dimensions)
     dimensions['id'] = [self._bot.id]

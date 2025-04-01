@@ -286,6 +286,12 @@ def _get_dimensions(botobj):
     if dim_err:
       logging.error('Bad dimensions: %s:\n%s', dim_err, dims)
       return botobj.dimensions, dim_err
+    proposed_id = dims.get('id', ['unknown'])
+    if proposed_id != [botobj.id]:
+      dim_err = '"id" dimension cannot be changed dynamically from %s to %s' % (
+          [botobj.id], proposed_id)
+      logging.error('Bad dimensions: %s:\n%s', dim_err, dims)
+      return botobj.dimensions, dim_err
     return dims, None
   except Exception as e:
     logging.exception('get_dimensions() hook exception')
