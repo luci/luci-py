@@ -476,15 +476,6 @@ def _get_authentication_headers(botobj):
   return _call_hook(False, botobj, 'get_authentication_headers') or (None, None)
 
 
-def _on_shutdown_hook(b):
-  """Called when the bot is restarting."""
-  _call_hook_safe(True, b, 'on_bot_shutdown')
-  # Aggressively set itself up so we ensure the auto-reboot configuration is
-  # fine before restarting the host. This is important as some tasks delete the
-  # autorestart script (!)
-  setup_bot(True)
-
-
 def _min_free_disk(infos, settings):
   """Returns the calculated minimum free disk space for this partition.
 
@@ -542,7 +533,7 @@ def _is_jsonish_dict(d):
 ### Public functions used by __main__.py
 
 
-def setup_bot(skip_reboot):
+def setup_bot(botobj, skip_reboot):
   """Calls bot_config.setup_bot() to have the bot self-configure itself.
 
   Reboots the host if bot_config.setup_bot() returns False, unless skip_reboot
@@ -556,7 +547,7 @@ def setup_bot(skip_reboot):
     logging.info('Skipping setup_bot, SWARMING_EXTERNAL_BOT_SETUP is set')
     return
 
-  botobj = get_bot(get_config())
+  botobj = botobj or get_bot(get_config())
   try:
     from config import bot_config
   except Exception as e:
@@ -619,13 +610,14 @@ def get_bot(config):
   }
   hostname = _get_botid_safe()
   base_dir = THIS_DIR
+
   # Use temporary Bot object to call get_attributes. Attributes are needed to
   # construct the "real" bot.Bot.
   attributes = get_attributes(
       bot.Bot(
           remote_client.RemoteClientNative(config['server'], None, hostname,
                                            base_dir), attributes,
-          config['server'], base_dir, _on_shutdown_hook))
+          config['server'], base_dir))
 
   # Make remote client callback use the returned bot object. We assume here
   # RemoteClient doesn't call its callback in the constructor (since 'botobj' is
@@ -633,8 +625,19 @@ def get_bot(config):
   botobj = bot.Bot(
       remote_client.RemoteClientNative(
           config['server'], lambda: _get_authentication_headers(botobj),
-          hostname, base_dir), attributes, config['server'], base_dir,
-      _on_shutdown_hook)
+          hostname, base_dir), attributes, config['server'], base_dir)
+
+  with botobj.mutate_internals() as mut:
+    # Call the on_bot_shutdown hook when the bot exits or reboots.
+    mut.add_lifecycle_callback(
+        lambda botobj, _: _call_hook_safe(True, botobj, 'on_bot_shutdown'))
+
+    # Aggressively set itself up so we ensure the auto-reboot configuration is
+    # fine before restarting the host. This is important as some tasks delete
+    # the autorestart script (!)
+    mut.add_lifecycle_callback(lambda botobj, event: setup_bot(botobj, True)
+                               if event == 'reboot' else None)
+
   return botobj
 
 
@@ -1052,16 +1055,19 @@ def _run_bot(arg_error):
   # TODO(maruel): Set quit_bit when stdin is closed on Windows.
 
   with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
-    return _run_bot_inner(arg_error, quit_bit)
+    botobj = _init_bot(arg_error, quit_bit)
+    if botobj:
+      try:
+        _run_bot_inner(botobj, quit_bit)
+      finally:
+        botobj.run_lifecycle_callbacks('exit')
+  return 0
 
 
-def _run_bot_inner(arg_error, quit_bit):
-  """Runs the bot until an event occurs.
+def _init_bot(arg_error, quit_bit):
+  """Initializes the bot.Bot instance.
 
-  One of the three following even can occur:
-  - host reboots
-  - bot process restarts (this includes self-update)
-  - bot process shuts down (this includes a signal is received)
+  Returns either bot.Bot on success or None if got a termination signal.
   """
   config = get_config()
 
@@ -1079,7 +1085,7 @@ def _run_bot_inner(arg_error, quit_bit):
   except Exception:
     # url_read() already traps pretty much every exceptions. This except
     # clause is kept there "just in case".
-    logging.exception('server_ping threw')
+    logging.exception('Unexpected exception pinging the server')
 
   # If we are on GCE, we want to make sure GCE metadata server responds, since
   # we use the metadata to derive bot ID, dimensions and state.
@@ -1087,8 +1093,8 @@ def _run_bot_inner(arg_error, quit_bit):
     logging.info('Running on GCE, waiting for the metadata server')
     platforms.gce.wait_for_metadata(quit_bit)
     if quit_bit.is_set():
-      logging.info('Early quit 1')
-      return 0
+      logging.info('Got quit signal when waiting for GCE metadata')
+      return None
 
   # Next we make sure the bot can make authenticated calls by grabbing the auth
   # headers, retrying on errors a bunch of times. We don't give up if it fails
@@ -1103,6 +1109,17 @@ def _run_bot_inner(arg_error, quit_bit):
   if arg_error:
     botobj.post_error('Bootstrapping error: %s' % arg_error)
 
+  return botobj
+
+
+def _run_bot_inner(botobj, quit_bit):
+  """Runs the bot until an event occurs.
+
+  One of the three following events can occur:
+  - host reboots
+  - bot process restarts (this includes self-update)
+  - bot process shuts down (this includes a signal is received)
+  """
   # Pick up RBE-related worker properties from the environment. Do it as soon as
   # possible to report them to Swarming during the handshake as part of the
   # state. This may be useful in debugging.
@@ -1115,10 +1132,6 @@ def _run_bot_inner(arg_error, quit_bit):
         logging.info('No RBE worker properties discovered')
       mut.update_rbe_worker_properties(props)
 
-  if quit_bit.is_set():
-    logging.info('Early quit 2')
-    return 0
-
   _call_hook_safe(True, botobj, 'on_bot_startup')
 
   # Initial attributes passed to bot.Bot in get_bot above were constructed for
@@ -1127,15 +1140,12 @@ def _run_bot_inner(arg_error, quit_bit):
   # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's why
   # we do it here and not in 'get_bot'.
   _update_bot_attributes(botobj, 0)
-  if quit_bit.is_set():
-    logging.info('Early quit 3')
-    return 0
 
   rbe_params = _do_handshake(botobj, quit_bit)
 
   if quit_bit.is_set():
-    logging.info('Early quit 4')
-    return 0
+    logging.info('Got quit signal when doing the handshake')
+    return
 
   # Let the bot to finish the initialization, now that it knows its server
   # defined dimensions.
@@ -1143,10 +1153,6 @@ def _run_bot_inner(arg_error, quit_bit):
 
   _cleanup_bot_directory(botobj)
   _clean_cache(botobj)
-
-  if quit_bit.is_set():
-    logging.info('Early quit 5')
-    return 0
 
   # This environment variable is accessible to the tasks executed by this bot.
   os.environ['SWARMING_BOT_ID'] = botobj.id
@@ -1161,13 +1167,8 @@ def _run_bot_inner(arg_error, quit_bit):
   # Spin until getting a termination signal. Shutdown RBE on exit.
   state = _BotLoopState(botobj, rbe_params, rbe_bot_version, quit_bit)
   with botobj.mutate_internals() as mut:
-    mut.set_exit_hook(lambda _: state.on_bot_exit())
+    mut.add_lifecycle_callback(lambda _, event: state.on_bot_exit(event))
   state.run()
-
-  # Do the final cleanup, if any.
-  _bot_exit_hook(botobj)
-
-  return 0
 
 
 def _trap_all_exceptions(method):
@@ -1525,7 +1526,7 @@ class _BotLoopState:
     # Managed to run an idle bot loop cycle. The bot code is good enough.
     _update_lkgbc(self._bot)
 
-  def on_bot_exit(self):
+  def on_bot_exit(self, event):
     """Called when the bot is about to terminate.
 
     In particular, this is called after the bot:
@@ -1538,12 +1539,14 @@ class _BotLoopState:
       * Asked to reboot the machine by some hook.
 
     These calls happen through a convoluted chain of hooks and callbacks. See
-    Bot.set_exit_hook, Bot.host_reboot (can be called from bot hooks, calls the
-    exit hook itself), _bot_exit_hook (and its callers in this file).
+    Bot.add_lifecycle_callback, Bot.run_lifecycle_callbacks, Bot.host_reboot
+    (can be called from bot hooks, calls the exit callback itself).
+
+    Here `event` is either "exit" or "reboot".
     """
     if not self._bot.shutdown_event_posted:
       self._bot.post_event('bot_shutdown', 'Signal was received')
-    if self._quit_bit.is_set():
+    if event == 'exit':
       self.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
     else:
       self.rbe_disable(remote_client.RBESessionStatus.HOST_REBOOTING)
@@ -2083,8 +2086,8 @@ def _bot_restart(botobj, message, filepath=None):
 
   botobj.post_event('bot_shutdown', 'About to restart: %s' % message)
 
-  # Do the final cleanup, if any.
-  _bot_exit_hook(botobj)
+  # Do the final cleanup, if any. Note we aren't rebooting the host here.
+  botobj.run_lifecycle_callbacks('exit')
 
   # Sleep a bit to make sure new bot process connects to a GAE instance with
   # the fresh bot group config cache (it gets refreshed each second). This makes
@@ -2095,7 +2098,6 @@ def _bot_restart(botobj, message, filepath=None):
   # Don't forget to release the singleton before restarting itself.
   SINGLETON.release()
 
-  # Do not call on_bot_shutdown.
   # On OSX, launchd will be unhappy if we quit so the old code bot process has
   # to outlive the new code child process. Launchd really wants the main process
   # to survive, and it'll restart it if it disappears. os.exec*() replaces the
@@ -2116,17 +2118,6 @@ def _bot_restart(botobj, message, filepath=None):
   elif ret:
     botobj.post_error('Bot failed to respawn after update: %s' % ret)
   sys.exit(ret)
-
-
-def _bot_exit_hook(botobj):
-  """Calls the registered bot exit hook."""
-  with botobj.mutate_internals() as mut:
-    exit_hook = mut.get_exit_hook()
-  if exit_hook:
-    try:
-      exit_hook(botobj)
-    except Exception as e:
-      logging.exception('exit hook failed: %s', e)
 
 
 def _update_lkgbc(botobj):
@@ -2220,9 +2211,4 @@ def main(argv):
   error = None
   if len(args.unsupported) != 0:
     error = 'Unexpected arguments: %s' % args
-  try:
-    return _run_bot(error)
-  finally:
-    _call_hook_safe(True, bot.Bot(None, None, None, base_dir, None),
-                    'on_bot_shutdown')
-    logging.info('main() returning')
+  return _run_bot(error)

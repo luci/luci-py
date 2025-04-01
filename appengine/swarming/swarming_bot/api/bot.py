@@ -22,7 +22,7 @@ from api import os_utilities
 
 class Bot(object):
 
-  def __init__(self, remote, attributes, server, base_dir, shutdown_hook):
+  def __init__(self, remote, attributes, server, base_dir):
     assert server is None or not server.endswith('/'), server
 
     # TODO(vadimsh): Make bot ID immutable. Changing it after the handshake is
@@ -32,12 +32,11 @@ class Bot(object):
     self._base_dir = base_dir
     self._remote = remote
     self._server = server
-    self._shutdown_hook = shutdown_hook
     self._session_id = _gen_session_id()
 
     # Mutable, see BotMutator.
     self._lock = threading.Lock()
-    self._exit_hook = None
+    self._lifecycle_callbacks = []
     self._idle = False
     self._dimensions = (attributes or {}).get('dimensions') or {}
     self._state = (attributes or {}).get('state') or {}
@@ -233,21 +232,9 @@ class Bot(object):
     """
     self.post_event('bot_rebooting', message)
 
-    # The shutdown hook is called when the host machine is restarting.
-    if self._shutdown_hook:
-      try:
-        self._shutdown_hook(self)
-      except Exception as e:
-        logging.exception('shutdown hook failed: %s', e)
-
-    # The exit hook is called when the bot process itself is exiting (which
-    # also happens when the machine is restarting).
-    exit_hook = self._exit_hook
-    if exit_hook:
-      try:
-        exit_hook(self)
-      except Exception as e:
-        logging.exception('exit hook failed: %s', e)
+    # Run the callbacks to prepare for the reboot. They will shutdown RBE
+    # session and prepare the bot to auto-start after the reboot.
+    self.run_lifecycle_callbacks('reboot')
 
     # os_utilities.host_reboot should never return, unless the reboot is not
     # happening (e.g. sudo shutdown requires a password). If rebooting the host
@@ -300,6 +287,17 @@ class Bot(object):
     """
     with self._lock:
       yield BotMutator(self)
+
+  def run_lifecycle_callbacks(self, event):
+    """Executes registered lifecycle callbacks."""
+    assert event in ('reboot', 'exit'), event
+    with self._lock:
+      cbs = self._lifecycle_callbacks[:]
+    for cb in reversed(cbs):
+      try:
+        cb(self, event)
+      except Exception as e:
+        logging.exception('%s lifecycle callback failed: %s', event, e)
 
 
 class BotMutator(object):
@@ -389,17 +387,19 @@ class BotMutator(object):
       state['bot_config'] = self._bot._bot_config
     self._bot._state = state
 
-  def set_exit_hook(self, hook):
-    """Registers a hook called before the bot process terminates.
+  def add_lifecycle_callback(self, callback):
+    """Registers a callback called before the bot terminates or reboots.
 
-    If the bot is very broken (e.g. can't reboot), this hook can be called
-    multiple times or even periodically. It must be idempotent.
+    Callbacks will be executed in reverse order of their registration.
+
+    If the bot is very broken (e.g. can't reboot), callbacks can be called
+    multiple times or even periodically. They must be idempotent.
+
+    Args:
+      callback: a callback that will be called like `callback(botobj, event)`,
+        where `event` will be either "exit" or "reboot".
     """
-    self._bot._exit_hook = hook
-
-  def get_exit_hook(self):
-    """Returns the registered exit hook."""
-    return self._bot._exit_hook
+    self._bot._lifecycle_callbacks.append(callback)
 
   def _refresh_attributes(self):
     """Updates automatically set keys in `bot.dimensions` and `bot.state`."""

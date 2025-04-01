@@ -147,7 +147,7 @@ def CMDsetup(_args):
   """Setup the bot to auto-start but doesn't start the bot."""
   logging_utils.prepare_logging(os.path.join('logs', 'bot_config.log'))
   from bot_code import bot_main
-  bot_main.setup_bot(True)
+  bot_main.setup_bot(None, True)
   return 0
 
 
@@ -219,7 +219,7 @@ def CMDstart_slave(args):
 
   try:
     from bot_code import bot_main
-    bot_main.setup_bot(options.survive)
+    bot_main.setup_bot(None, options.survive)
   except Exception:
     logging.exception('bot_main.py failed.')
 

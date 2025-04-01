@@ -19,7 +19,7 @@ def make_bot(remote=None):
   return bot.Bot(remote, {'dimensions': {
       'id': ['bot1'],
       'pool': ['private']
-  }}, 'https://localhost:1', 'base_dir', None)
+  }}, 'https://localhost:1', 'base_dir')
 
 
 class TestBot(unittest.TestCase):
@@ -89,13 +89,14 @@ class TestBot(unittest.TestCase):
       mut.update_dimensions({'foo': ['baz'], 'pool': ['B']})
     self.assertEqual({'foo': ['baz'], 'pool': ['A']}, obj.dimensions)
 
-  def test_exit_hook_update(self):
+  def test_lifecycle_callbacks(self):
     obj = make_bot()
-    hook = lambda _: None
+    calls = []
     with obj.mutate_internals() as mut:
-      mut.set_exit_hook(hook)
-    with obj.mutate_internals() as mut:
-      self.assertEqual(hook, mut.get_exit_hook())
+      mut.add_lifecycle_callback(lambda _bot, ev: calls.append('0 %s' % ev))
+      mut.add_lifecycle_callback(lambda _bot, ev: calls.append('1 %s' % ev))
+    obj.run_lifecycle_callbacks('exit')
+    self.assertEqual(calls, ['1 exit', '0 exit'])
 
 
 if __name__ == '__main__':

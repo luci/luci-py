@@ -127,7 +127,7 @@ class TestBotBase(net_utils.TestCase):
     self.bot = bot.Bot(
         remote_client.RemoteClientNative(self.url, auth_headers_cb, 'localhost',
                                          self.root_dir), self.attributes,
-        self.url, self.root_dir, self.fail)
+        self.url, self.root_dir)
     with self.bot.mutate_internals() as mut:
       mut.update_session_token('fake-session-token')
     bot_main._update_bot_attributes(self.bot, 0)
@@ -526,7 +526,7 @@ class TestBotMain(TestBotBase):
     self.mock(bot.Bot, 'post_event',
               lambda *a, **kw: post_event.append((a, kw)))
     self.expected_requests([])
-    bot_main.setup_bot(False)
+    bot_main.setup_bot(None, False)
     expected = [
       (('Starting new swarming bot: %s' % bot_main.THIS_FILE,),
         {'timeout': 900}),
@@ -1125,7 +1125,7 @@ class TestBotMain(TestBotBase):
     self.expected_requests([
         self.expected_rbe_update_request('BOT_TERMINATING', blocking=True),
     ])
-    self.loop_state.on_bot_exit()
+    self.loop_state.on_bot_exit('exit')
 
   def test_rbe_mode_idle_dimensions_change(self):
     # Switches into the RBE mode, creates and polls the session. Gets nothing.
