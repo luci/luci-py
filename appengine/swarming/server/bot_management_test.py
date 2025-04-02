@@ -143,6 +143,8 @@ def _gen_bot_info(**kwargs):
       _VERSION,
       'rbe_effective_bot_id':
       None,
+      'last_abandoned_task':
+      None,
   }
   out.update(kwargs)
   return out

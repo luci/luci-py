@@ -279,6 +279,9 @@ class BotInfo(_BotCommon):
   # The derived bot ID to use to communicate with RBE.
   rbe_effective_bot_id = ndb.StringProperty(indexed=False)
 
+  # Used by the Go side exclusively, Python side just round-trips it.
+  last_abandoned_task = ndb.StringProperty(indexed=False)
+
   def calc_composite(self):
     """Returns the value for BotInfo.composite, which permits quick searches."""
     return [
