@@ -423,7 +423,7 @@ def run_command(
       with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
         try:
           exit_code = proc.wait(hard_timeout or None)
-          logging.info("finished with exit code %d after hard_timeout %s",
+          logging.info("finished with exit code %d before hard_timeout %s",
                        exit_code, hard_timeout)
         except subprocess42.TimeoutExpired:
           if not had_signal:
@@ -440,8 +440,9 @@ def run_command(
         with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, ignore):
           try:
             exit_code = proc.wait(grace_period or None)
-            logging.info("finished with exit code %d after grace_period %s",
-                         exit_code, grace_period)
+            logging.info(
+                "finished with exit code %d before grace_period exhausted %s",
+                exit_code, grace_period)
           except subprocess42.TimeoutExpired:
             # Now kill for real. The user can distinguish between the
             # following states:
@@ -1485,9 +1486,9 @@ def _str_to_bool(val):
   """Converts boolean-ish string to True or False."""
   val = val.lower()
   if val in ('y', 'yes', 't', 'true', 'on', '1'):
-      return True
+    return True
   if val in ('n', 'no', 'f', 'false', 'off', '0'):
-      return False
+    return False
   raise ValueError('Invalid truth value %r' % val)
 
 
