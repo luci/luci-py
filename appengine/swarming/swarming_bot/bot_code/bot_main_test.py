@@ -297,23 +297,6 @@ class TestBotMain(TestBotBase):
     print(msg)
     self.fail('post_error_task was called')
 
-  def test_hook_restart(self):
-    from config import bot_config
-    def get_dimensions(botobj):
-      self.assertEqual(self.bot, botobj)
-      self.bot.bot_restart('Yo')
-      return {'id': [FAKE_BOT_ID], 'pool': ['bar']}
-    self.mock(bot_config, 'get_dimensions', get_dimensions)
-    restarts = []
-    self.mock(bot_main, '_bot_restart', lambda *args: restarts.append(args))
-    expected = {
-        'id': [FAKE_BOT_ID],
-        'pool': ['bar'],
-    }
-    self.assertEqual(expected, bot_main._get_dimensions(self.bot)[0])
-    self.assertEqual('Yo', self.bot.bot_restart_msg())
-    self.assertEqual([(self.bot, 'Yo')], restarts)
-
   def test_get_dimensions(self):
     from config import bot_config
     def get_dimensions(botobj):

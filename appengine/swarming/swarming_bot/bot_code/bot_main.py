@@ -226,36 +226,28 @@ def _call_hook(chained, botobj, name, *args, **kwargs):
   If `chained` is False, the injected bot_config version is called first, and
   only if not present the general bot_config version is called.
   """
-  try:
-    if not chained:
-      # Injected version has higher priority.
-      hook = getattr(_EXTRA_BOT_CONFIG, name, None)
-      if hook:
-        return hook(botobj, *args, **kwargs)
-      hook = getattr(_get_bot_config(), name, None)
-      if hook:
-        return hook(botobj, *args, **kwargs)
-      # The hook is not defined.
-      return None
-
-    # In the case of chained=True, call both hooks. Call the generic one first,
-    # then the specialized.
-    ret = None
-    hook = getattr(_get_bot_config(), name, None)
-    if hook:
-      ret = hook(botobj, *args, **kwargs)
+  if not chained:
+    # Injected version has higher priority.
     hook = getattr(_EXTRA_BOT_CONFIG, name, None)
     if hook:
-      # Ignores the previous return value.
-      ret = hook(botobj, *args, **kwargs)
-    return ret
-  finally:
-    # TODO(maruel): Handle host_reboot() request the same way.
-    if botobj:
-      msg = botobj.bot_restart_msg()
-      if msg:
-        # The hook requested a bot restart. Do it right after the hook call.
-        _bot_restart(botobj, msg)
+      return hook(botobj, *args, **kwargs)
+    hook = getattr(_get_bot_config(), name, None)
+    if hook:
+      return hook(botobj, *args, **kwargs)
+    # The hook is not defined.
+    return None
+
+  # In the case of chained=True, call both hooks. Call the generic one first,
+  # then the specialized.
+  ret = None
+  hook = getattr(_get_bot_config(), name, None)
+  if hook:
+    ret = hook(botobj, *args, **kwargs)
+  hook = getattr(_EXTRA_BOT_CONFIG, name, None)
+  if hook:
+    # Ignores the previous return value.
+    ret = hook(botobj, *args, **kwargs)
+  return ret
 
 
 def _call_hook_safe(chained, botobj, name, *args):
@@ -1447,6 +1439,12 @@ class _BotLoopState:
       if self._quit_bit.is_set():
         break
 
+      # Restart the bot if any of the hooks (usually on_after_task) asked us
+      # by setting the restart message.
+      msg = self._bot.bot_restart_msg()
+      if msg:
+        self.cmd_bot_restart(msg)
+
       # If we ran a command, need to poll from the scheduler ASAP without
       # sleeping. In pure RBE mode this is already taken care of via
       # self._rbe_poll_timer.reset(...) above. Same for pure Swarming mode. In
@@ -1566,8 +1564,7 @@ class _BotLoopState:
 
     Here `event` is either "exit" or "reboot".
     """
-    if not self._bot.shutdown_event_posted:
-      self._bot.post_event('bot_shutdown', 'Signal was received')
+    self._bot.post_event('bot_shutdown', 'Signal was received')
     if event == 'exit':
       self.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
     else:
@@ -1887,8 +1884,7 @@ class _BotLoopState:
       if self._bot.rbe_worker_properties:
         mut.update_auto_cleanup(True)
     # Set the quit bit only after the server acknowledged the termination.
-    if not self._bot.shutdown_event_posted:
-      self._bot.post_event('bot_shutdown', 'Terminated by RBE')
+    self._bot.post_event('bot_shutdown', 'Terminated by RBE')
     self._quit_bit.set()
 
   ##############################################################################

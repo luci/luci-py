@@ -177,11 +177,6 @@ class Bot(object):
     """
     return os.path.join(self.base_dir, 'swarming_bot.zip')
 
-  @property
-  def shutdown_event_posted(self):
-    """True if already submitted `bot_shutdown` or `bot_rebooting` events."""
-    return self._shutdown_event_posted
-
   def get_pseudo_rand(self, width):
     """Returns a constant pseudo-random factor for the bot within +/-width.
 
@@ -198,8 +193,11 @@ class Bot(object):
 
   def post_event(self, event_type, message):
     """Posts an event to the server."""
+    is_shutdown = event_type in ('bot_shutdown', 'bot_rebooting')
+    if is_shutdown and self._shutdown_event_posted:
+      return  # do not spam repeated messages if shutdown fails and gets retried
     self._remote.post_bot_event(event_type, message, self.attributes)
-    if event_type in ('bot_shutdown', 'bot_rebooting'):
+    if is_shutdown:
       self._shutdown_event_posted = True
 
   def post_error(self, message):
