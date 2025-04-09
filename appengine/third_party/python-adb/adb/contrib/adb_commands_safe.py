@@ -845,21 +845,16 @@ class AdbCommandsSafe(object):
           # usb1.USBDeviceHandle.
           self._handle.Open()
           return True
-        except common.usb1.USBErrorNoDevice as e:
+        except (common.usb1.USBErrorNoDevice,
+                common.usb1.USBErrorNotFound,
+                ConnectionRefusedError) as e:
           _LOG.warning(
-              '%s._OpenHandle(): USBErrorNoDevice: %s', self.port_path, e)
-          # Do not kill adb, it just means the USB host is likely resetting and
-          # the device is temporarily unavailable. We can't use
-          # handle.serial_number since this communicates with the device.
-          # Might take a while for the device to come back. Exit early.
-          break
-        except common.usb1.USBErrorNotFound as e:
-          _LOG.warning(
-              '%s._OpenHandle(): USBErrorNotFound: %s', self.port_path, e)
-          # Do not kill adb, it just means the USB host is likely resetting (?)
+              '%s._OpenHandle(): %s: %s', self.port_path, e.__class__.__name__,
+              e)
+          # Do not kill adb, it just means the USB/TCP host is likely resetting
           # and the device is temporarily unavailable. We can't use
-          # handle.serial_number since this communicates with the device.
-          # Might take a while for the device to come back. Exit early.
+          # handle.serial_number since this communicates with the device. Might
+          # take a while for the device to come back. Exit early.
           break
         except common.usb1.USBErrorBusy as e:
           _LOG.warning('%s._OpenHandle(): USBErrorBusy: %s', self.port_path, e)
