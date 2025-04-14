@@ -75,6 +75,7 @@ class TestOsUtilities(auto_stub.TestCase):
         ('evbarm', '32', 'armv6l'),
         ('riscv', '64', 'riscv64'),
         ('loongarch64', '64', 'loong64'),
+        ('s390x', '64', 's390x'),
     ]
     for cpu_type, bitness, expected in cases:
       self.mock(os_utilities, 'get_cpu_type', lambda: cpu_type)

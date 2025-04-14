@@ -339,7 +339,7 @@ def get_cipd_architecture():
     return 'loong64'
 
   # TODO(vadimsh): Detection of following architectures is likely broken:
-  #   mips64, mips64le, mipsle, ppc64, ppc64le, s390x.
+  #   mips64, mips64le, mipsle, ppc64, ppc64le.
   return cpu_type
 
 

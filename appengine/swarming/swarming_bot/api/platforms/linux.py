@@ -194,7 +194,7 @@ def get_audio():
 def get_cpuinfo():
   values = common._safe_parse(_read_cpuinfo())
   cpu_info = {}
-  if 'vendor_id' in values:
+  if 'vendor_id' in values and 'flags' in values:
     # Intel.
     cpu_info['flags'] = values['flags']
     cpu_info['model'] = [
@@ -212,6 +212,9 @@ def get_cpuinfo():
   elif "POWER" in values.get('cpu', ''):
     # ppc64/ppc64le
     cpu_info['name'] = values.get('cpu', '').split(' ')[0]
+  elif "S390" in values.get('vendor_id', ''):
+    # s390x
+    cpu_info['name'] = values.get('vendor_id', '').split('/')[1]
   elif values:
     # CPU implementer == 0x41 means ARM.
     if 'Features' in values:
