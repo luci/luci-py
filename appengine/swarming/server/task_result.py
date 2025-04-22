@@ -66,6 +66,7 @@ Graph of schema:
 
 import datetime
 import logging
+import zlib
 
 from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
@@ -89,6 +90,15 @@ _BOT_TASK_ALLOWED_SORTS = {'created_ts', 'started_ts', 'completed_ts'}
 # - pending_running is either the pending state (invalid) or running.
 # - deduped relies on try_number which is not part of `task_run_result`.
 _BOT_TASK_DISALLOWED_STATES = {'pending', 'pending_running', 'deduped'}
+
+_ZLIB_COMPRESSION_MARKERS = (
+    # As produced by zlib. Indicates compressed byte sequence using DEFLATE at
+    # default compression level, with a 32K window size.
+    # From https://github.com/madler/zlib/blob/master/doc/rfc1950.txt
+    b"x\x9c",
+    # Other compression levels produce the following marker.
+    b"x^",
+)
 
 
 class State(object):
@@ -226,6 +236,12 @@ class TaskOutputChunk(ndb.Model):
   def chunk_number(self):
     return self.key.integer_id() - 1
 
+  @property
+  def chunk_content(self):
+    if not self.chunk.startswith(_ZLIB_COMPRESSION_MARKERS):
+      return self.chunk
+
+    return zlib.decompress(self.chunk)
 
 class OperationStats(ndb.Model):
   """Statistics for an operation.
@@ -873,7 +889,7 @@ class _TaskResultCommon(ndb.Model):
     parts = []
     for e in ndb.get_multi(keys):
       if e:
-        parts.append(e.chunk)
+        parts.append(e.chunk_content)
       else:
         if not void:
           void = '\x00' * TaskOutput.CHUNK_SIZE
@@ -1407,12 +1423,13 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
       # Fill up for missing entities.
       entities[i] = TaskOutputChunk(key=key)
     chunk = entities[i]
+    chunk_content = chunk.chunk_content
     # Magically combine everything.
     end = start + len(output_chunk)
-    if len(chunk.chunk) < start:
+    if len(chunk_content) < start:
       # Insert blank data automatically.
-      chunk.gaps.extend((len(chunk.chunk), start))
-      chunk.chunk = chunk.chunk + '\x00' * (start-len(chunk.chunk))
+      chunk.gaps.extend((len(chunk_content), start))
+      chunk_content = chunk_content + '\x00' * (start - len(chunk_content))
 
     # Strip gaps that are being written to.
     new_gaps = []
@@ -1446,7 +1463,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
         new_gaps.extend((gap_start, gap_end))
 
     chunk.gaps = new_gaps
-    chunk.chunk = chunk.chunk[:start] + output_chunk + chunk.chunk[end:]
+    chunk.chunk = chunk_content[:start] + output_chunk + chunk_content[end:]
   return entities, number_chunks
 
 
