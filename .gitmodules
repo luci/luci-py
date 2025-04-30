@@ -1,0 +1,3 @@
+[submodule "appengine/third_party/python-adb"]
+	path = appengine/third_party/python-adb
+	url = https://chromium.googlesource.com/infra/luci/python-adb.git

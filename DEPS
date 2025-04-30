@@ -2,6 +2,9 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+# Any git deps in this repo should be added as submodules.
+git_dependencies = "SUBMODULES"
+
 use_relative_paths = True
 
 deps = {
