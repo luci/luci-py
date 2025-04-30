@@ -58,6 +58,7 @@ import os
 import platform
 import re
 import shutil
+import signal
 import sys
 import tempfile
 import time
@@ -401,6 +402,7 @@ def run_command(
                           hard_timeout, grace_period, lower_priority,
                           containment)
 
+  timeout_kill_sent = False
   exit_code = None
   had_hard_timeout = False
   with tools.Profiler('RunTest'):
@@ -423,7 +425,7 @@ def run_command(
       with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
         try:
           exit_code = proc.wait(hard_timeout or None)
-          logging.info("finished with exit code %d before hard_timeout %s",
+          logging.info('finished with exit code %d before hard_timeout %s',
                        exit_code, hard_timeout)
         except subprocess42.TimeoutExpired:
           if not had_signal:
@@ -432,7 +434,6 @@ def run_command(
           logging.warning('Sending SIGTERM')
           proc.terminate()
 
-      kill_sent = False
       # Ignore signals in grace period. Forcibly give the grace period to the
       # child process.
       if exit_code is None:
@@ -441,7 +442,7 @@ def run_command(
           try:
             exit_code = proc.wait(grace_period or None)
             logging.info(
-                "finished with exit code %d before grace_period exhausted %s",
+                'finished with exit code %d before grace_period exhausted %s',
                 exit_code, grace_period)
           except subprocess42.TimeoutExpired:
             # Now kill for real. The user can distinguish between the
@@ -452,13 +453,13 @@ def run_command(
             # - processed exited late, exit code will be -9 on posix.
             logging.warning('Grace exhausted; sending SIGKILL')
             proc.kill()
-            kill_sent = True
+            timeout_kill_sent = True
       logging.info('Waiting for process exit')
       exit_code = proc.wait()
 
       # the process group / job object may be dangling so if we didn't kill
       # it already, give it a poke now.
-      if not kill_sent:
+      if not timeout_kill_sent:
         proc.kill()
     except OSError as e:
       # This is not considered to be an internal error. The executable simply
@@ -476,9 +477,22 @@ def run_command(
             '<See the task\'s page for commands to help diagnose this issue '
             'by reproducing the task locally>\n')
       exit_code = 1
+
   logging.info(
       'Command finished with exit code %d (%s)',
       exit_code, hex(0xffffffff & exit_code))
+
+  if sys.platform != 'win32':
+    if exit_code == -int(signal.SIGKILL):
+      if timeout_kill_sent:
+        logging_utils.user_logs(
+            'The task root process was killed by SIGKILL due to exceeding '
+            'the graceful termination timeout')
+      else:
+        logging_utils.user_logs(
+            'The task root process was killed by SIGKILL. It may mean the '
+            'process ran out of memory was killed by the oom-killer')
+
   return exit_code, had_hard_timeout
 
 
@@ -879,7 +893,7 @@ def map_and_run(data, constant_run_path):
         # Handle this as a task failure, not an internal failure.
         sys.stderr.write(
             '<No command was specified!>\n'
-            '<Please secify a command when triggering your Swarming task>\n')
+            '<Please specify a command when triggering your Swarming task>\n')
         result['exit_code'] = 1
         return result
 
