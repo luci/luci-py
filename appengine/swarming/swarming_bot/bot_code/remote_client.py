@@ -320,6 +320,8 @@ class RemoteClientNative(object):
     if not resp or resp.get('error'):
       raise InternalError(
           resp.get('error') if resp else 'Failed to contact server')
+    if resp.get('must_stop', False) and resp.get('stop_reason', '') != '':
+      logging.warning('Server induced stop; reason: %s', resp['stop_reason'])
     return not resp.get('must_stop', False)
 
   def post_task_error(self,
