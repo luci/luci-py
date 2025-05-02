@@ -715,14 +715,15 @@ def run_command(remote, rbe_session, task_details, work_dir, cost_usd_hour,
   }
   if not remote.post_task_update(task_details.task_id, params):
     # Don't even bother, the task was already canceled.
-    logging.debug('Task has been already canceled. Won\'t start it. '
-                  'task_id: %s. Sending update...', task_details.task_id)
+    logging.debug(
+        'Task has been canceled already. Won\'t start it. '
+        'task_id: %s. Sending update...', task_details.task_id)
     # crbug.com/1052208:
     # Send task update again for the server to know that the task has stopped.
     # Sending 'canceled' signal to the server for the task to be 'CANCELED'
     # instead of 'KILLED'.
     params['canceled'] = True
-    remote.post_task_update(task_details.task_id, params, exit_code=-1)
+    remote.post_task_update(task_details.task_id, params)
     return {
         'exit_code': -1,
         'hard_timeout': False,

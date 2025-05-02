@@ -965,8 +965,7 @@ class TestTaskRunnerKilled(TestTaskRunnerBase):
     expected = {
         'id': 'localhost',
         'task_id': task_details.task_id,
-        'canceled': True,
-        'exit_code': -1
+        'canceled': True
     }
     actual = self.getTaskResults(task_details.task_id)
     self.assertLessEqual(0, actual.pop('cost_usd'))
