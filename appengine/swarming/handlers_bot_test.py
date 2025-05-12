@@ -434,6 +434,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'machine_type': None,
         'maintenance_msg': None,
         'message': u"Invalid dimension value. key: foo, value: [u'bar']",
+        'owners': [],
         'quarantined': True,
         'session_id': 'test-session',
         'state': {
@@ -1692,6 +1693,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
             'message': u'for the best',
             'quarantined': False,
             'maintenance_msg': None,
+            'owners': [],
             'session_id': u'test-session',
             'state': {
                 u'running_time': 1234.0,
@@ -1722,6 +1724,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'message': None,
         'quarantined': False,
         'maintenance_msg': None,
+        'owners': [],
         'session_id': u'test-session',
         'state': {
             u'handshaking': True,

@@ -194,6 +194,8 @@ class TaskResultApiTest(TestCase):
         None,
         'bot_logs_cloud_project':
         None,
+        'bot_owners':
+        [],
         'cipd_pins':
         None,
         'completed_ts':
@@ -274,6 +276,7 @@ class TaskResultApiTest(TestCase):
         },
         'bot_id': u'localhost',
         'bot_idle_since_ts': None,
+        'bot_owners': [],
         'bot_version': u'abc',
         'bot_logs_cloud_project': None,
         'cas_output_root': None,

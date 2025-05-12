@@ -288,6 +288,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         None,
         'bot_logs_cloud_project':
         None,
+        'bot_owners':
+        [],
         'cipd_pins':
         None,
         'completed_ts':
@@ -373,6 +375,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'bot_idle_since_ts': self.now,
         'bot_version': u'abc',
         'bot_logs_cloud_project': None,
+        'bot_owners': [],
         'cas_output_root': None,
         'cipd_pins': None,
         'completed_ts': None,

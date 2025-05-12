@@ -514,6 +514,9 @@ class _TaskResultCommon(ndb.Model):
   # The cloud project id where the bot saves its logs.
   bot_logs_cloud_project = ndb.StringProperty(indexed=False)
 
+  # The list of bot owners from bots.cfg entry for the bot
+  bot_owners = ndb.StringProperty(repeated=True, indexed=False)
+
   # Active server version(s). Note that during execution, the active server
   # version may have changed, this list will list all versions seen as the task
   # was updated.

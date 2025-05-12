@@ -130,6 +130,9 @@ class _BotCommon(ndb.Model):
   # None is set during running task or hooks.
   idle_since_ts = ndb.DateTimeProperty(indexed=False)
 
+  # The list of bot owners from bots.cfg entry for the bot
+  owners = ndb.StringProperty(repeated=True, indexed=False)
+
   # When this entity can be cleaned up via Cloud Datastore TTL policy.
   expire_at = ndb.DateTimeProperty(indexed=False)
 
