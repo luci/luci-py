@@ -184,22 +184,24 @@ def get_dimensions(devices):
       # Only advertize devices that can be used.
       dimensions['android'].append(device.serial)
 
-      # Update device OS for Android Go Wembley devices to the version we
-      # install, which is Android U as of now
-      if 'wembley_2GB' in dimensions.get('device_type', []):
-        dimensions['device_os'] = {
-            key
-            for key in dimensions.get('device_os', [])
-            if key.lower() != 'master'
-        }
-        dimensions['device_os'].add('Android U')
-
-  # Add the first character of each device_os to the dimension.
-  android_vers = {
-      os[0]
-      for os in dimensions.get('device_os', []) if os and os[0].isupper()
-  }
-  dimensions['device_os'] = dimensions['device_os'].union(android_vers)
+  # Devices running images built from Android's trunk won't have normal
+  # build IDs.
+  if (dimensions.get('device_os') and all(v.lower() in ['main', 'master']
+                                          for v in dimensions['device_os'])):
+    os_prop_names = [
+        'ro.build.version.codename',  # Desert codename for the release
+        'ro.build.version.incremental'  # Monotonically increasing build num
+    ]
+    for p in os_prop_names:
+      if p in properties:
+        dimensions['device_os'].add(properties[p].strip())
+  else:
+    # Add the first character of each device_os to the dimension.
+    android_vers = {
+        os[0]
+        for os in dimensions.get('device_os', []) if os and os[0].isupper()
+    }
+    dimensions['device_os'] = dimensions['device_os'].union(android_vers)
 
   # Add all prefixes of complex OS versions like 8.1.0
   device_os_version = dimensions.get('device_os_version', set())
@@ -265,9 +267,19 @@ def get_dimensions(devices):
 def get_state(devices):
   """Returns state information about all the devices connected to the host.
   """
-  keys = ('board.platform', 'build.product', 'build.fingerprint', 'build.id',
-          'build.type', 'build.version.release', 'build.version.sdk',
-          'product.board', 'product.cpu.abi', 'product.device')
+  keys = (
+      'board.platform',
+      'build.product',
+      'build.fingerprint',
+      'build.id',
+      'build.type',
+      'build.version.release',
+      'build.version.sdk',
+      'product.board',
+      'product.cpu.abi',
+      'product.device',
+      'system.build.fingerprint',
+  )
 
   def fn(device):
     if not device.is_valid or device.failure:

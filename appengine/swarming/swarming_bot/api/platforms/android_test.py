@@ -169,27 +169,15 @@ class TestGetDimensions(unittest.TestCase):
             PLAYSTORE_PACKAGE: '1.2.3'
         })
 
-  def get_mock_wembley(self):
-    return self.mock_android_device(
-        {
-            'ro.product.brand': 'google',
-            'ro.build.id': 'Master',
-            'ro.build.product': 'wembley_2GB',
-            'ro.build.type': 'userdebug',
-            'ro.build.version.sdk': '34',
-            'ro.product.device': 'wembley_2GB'
-        }, 'mock_wembley', {
-            GMS_PACKAGE: '22.26.15',
-            PLAYSTORE_PACKAGE: '1.2.3'
-        })
-
-  def get_mock_wembley_uppercase(self):
+  def get_mock_android_trunk(self):
     return self.mock_android_device(
         {
             'ro.product.brand': 'google',
             'ro.build.id': 'MASTER',
             'ro.build.product': 'wembley_2GB',
             'ro.build.type': 'userdebug',
+            'ro.build.version.codename': 'Baklava',
+            'ro.build.version.incremental': '123456789',
             'ro.build.version.sdk': '34',
             'ro.product.device': 'wembley_2GB'
         }, 'mock_wembley', {
@@ -201,7 +189,7 @@ class TestGetDimensions(unittest.TestCase):
     wembley_result = {
         'android_devices': ['1'],
         'device_gms_core_version': ['22.26.15'],
-        'device_os': ['A', 'Android U'],
+        'device_os': ['123456789', 'Baklava', 'MASTER'],
         'device_os_flavor': ['google'],
         'device_os_type': ['userdebug'],
         'device_playstore_version': ['1.2.3'],
@@ -209,10 +197,7 @@ class TestGetDimensions(unittest.TestCase):
         'os': ['Android'],
     }
     self.assertEqual(wembley_result,
-                     android.get_dimensions([self.get_mock_wembley()]))
-    self.assertEqual(
-        wembley_result,
-        android.get_dimensions([self.get_mock_wembley_uppercase()]))
+                     android.get_dimensions([self.get_mock_android_trunk()]))
 
   def test_shield_get_dimensions(self):
     self.assertEqual(
