@@ -136,6 +136,8 @@ ExternalSchedulerConfig = collections.namedtuple(
         # Whether to allow fall back to other es-owned tasks if external
         # scheduler has no tasks for a bot.
         'allow_es_fallback',
+        # Percentage of the external scheduler to be disabled.
+        'disable_percent',
     ])
 
 # Describes how task templates apply to a pool.
@@ -522,7 +524,8 @@ def _resolve_external_schedulers(external_schedulers):
   return tuple(
       ExternalSchedulerConfig(
           e.address, e.id, frozenset(e.dimensions), frozenset(e.all_dimensions),
-          frozenset(e.any_dimensions), e.enabled, e.allow_es_fallback)
+          frozenset(e.any_dimensions), e.enabled, e.allow_es_fallback,
+          e.disable_percent)
       for e in external_schedulers)
 
 

@@ -1114,7 +1114,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
         all_dimensions=[],
         any_dimensions=[],
         enabled=True,
-        allow_es_fallback=False)
+        allow_es_fallback=False,
+        disable_percent=0)
     mock.patch('server.external_scheduler.config_for_bot').start(
     ).return_value = es_cfg
     mock.patch('server.external_scheduler.config_for_task').start(

@@ -137,6 +137,7 @@ class PoolsConfigTest(test_case.TestCase):
             any_dimensions=frozenset(),
             enabled=True,
             allow_es_fallback=True,
+            disable_percent=0,
         ), ),
         rbe_migration=pools_pb2.Pool.RBEMigration(
             rbe_instance='some/instance',

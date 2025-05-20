@@ -1336,6 +1336,13 @@ class TaskRequest(ndb.Model):
   # If True, the TaskRequest has an associated BuildTask.
   has_build_task = ndb.BooleanProperty(default=False, indexed=False)
 
+  # If True, the TaskRequest will not be scheduled by the external scheduler
+  # even if their pool config has external scheduler configured.
+  # Used by the server to gradually remove external scheduler support.
+  # Has no effect on tasks using native scheduler or RBE.
+  disable_external_scheduler = ndb.BooleanProperty(
+      default=False, indexed=False)
+
   @property
   def num_task_slices(self):
     """Returns the number of TaskSlice, supports old entities."""

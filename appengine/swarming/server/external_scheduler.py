@@ -110,6 +110,9 @@ def config_for_task(request):
     pools_config.ExternalSchedulerConfig for external scheduler to use for
     this bot, if it exists, or None otherwise.
   """
+  if request.disable_external_scheduler:
+    return None
+
   s0 = request.task_slice(0)
   pool = s0.properties.pool
   if not pool:

@@ -1504,6 +1504,13 @@ def schedule_request(request,
   if not request.rbe_instance:
     es_cfg = external_scheduler.config_for_task(request)
 
+  if es_cfg and es_cfg.disable_percent > 0:
+    disable_es = random.randrange(100) < es_cfg.disable_percent
+    if disable_es:
+      logging.info('Disable external scheduler for the request')
+      es_cfg = None
+      request.disable_external_scheduler = True
+
   # This occasionally triggers a task queue. May throw, which is surfaced to the
   # user but it is safe as the task request wasn't stored yet.
   if task_asserted_future:

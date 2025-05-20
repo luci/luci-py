@@ -129,7 +129,8 @@ class ExternalSchedulerApiTest(test_env_handlers.AppTestBase):
         all_dimensions=None,
         any_dimensions=None,
         enabled=True,
-        allow_es_fallback=True)
+        allow_es_fallback=True,
+        disable_percent=None)
 
     # Make the values deterministic.
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6))
@@ -263,6 +264,7 @@ class ExternalSchedulerApiTestBatchMode(test_env_handlers.AppTestBase):
         'any_dimensions': None,
         'enabled': True,
         'allow_es_fallback': True,
+        'disable_percent': 0,
     }
     self.cfg_foo = pools_config.ExternalSchedulerConfig(**base)
     base['id'] = u'hoe'

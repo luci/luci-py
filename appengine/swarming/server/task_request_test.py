@@ -552,6 +552,8 @@ class TaskRequestApiTest(TestCase):
         None,
         'rbe_instance':
         None,
+        'disable_external_scheduler':
+        False,
     }
     actual = req.to_dict()
     actual.pop('created_ts')
@@ -686,6 +688,8 @@ class TaskRequestApiTest(TestCase):
         None,
         'rbe_instance':
         None,
+        'disable_external_scheduler':
+        False,
     }
     actual = req.to_dict()
     # expiration_ts - created_ts == scheduling_expiration_secs.

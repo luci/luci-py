@@ -320,7 +320,8 @@ def new_task_request_from_rpc(msg, now):
       has_build_task=False,
       scheduling_algorithm=None,
       rbe_instance=None,
-      txn_uuid=None)
+      txn_uuid=None,
+      disable_external_scheduler=None)
 
   return req, secret_bytes, template_apply
 
