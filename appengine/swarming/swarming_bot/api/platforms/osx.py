@@ -524,7 +524,7 @@ def get_os_build_version():
   Returns:
     Build version as a string like '19F101'
   """
-  out = subprocess.check_output(['sysctl', '-n', 'kern.osversion'],
+  out = subprocess.check_output(['sw_vers', '-buildVersion'],
                                 universal_newlines=True).splitlines()
   assert len(out) == 1, out
   return out[0]
