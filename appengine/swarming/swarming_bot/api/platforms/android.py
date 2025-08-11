@@ -159,6 +159,7 @@ def get_dimensions(devices):
       'device_os_flavor': ['product.brand', 'product.system.brand'],
       'device_os_type': ['build.type'],
       'device_os_version': ['build.version.release'],
+      'device_os_incremental_version': ['build.version.incremental'],
       'device_type': ['product.device', 'build.product', 'product.board'],
   }
   for dim in dimension_properties:
