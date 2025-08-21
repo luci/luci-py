@@ -11,7 +11,6 @@ import ctypes.util
 import logging
 import multiprocessing
 import os
-import pipes
 import re
 import shlex
 import subprocess
@@ -580,9 +579,9 @@ esac
 
 exit 0
 """ % {
-      'cmd': ' '.join(pipes.quote(c) for c in command),
-      'cwd': pipes.quote(cwd),
-      'user': pipes.quote(user),
+      'cmd': ' '.join(shlex.quote(c) for c in command),
+      'cwd': shlex.quote(cwd),
+      'user': shlex.quote(user),
   }
 
 
@@ -599,7 +598,7 @@ def generate_autostart_desktop(command, name):
           'NoDisplay=false\n'
           'Comment=Created by os_utilities.py in swarming_bot.zip\n'
           'X-GNOME-Autostart-enabled=true\n') % {
-              'cmd': ' '.join(pipes.quote(c) for c in command),
+              'cmd': ' '.join(shlex.quote(c) for c in command),
               'name': name,
           }
 

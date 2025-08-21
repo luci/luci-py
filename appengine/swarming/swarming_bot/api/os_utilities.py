@@ -21,9 +21,9 @@ import locale
 import logging
 import multiprocessing
 import os
-import pipes
 import platform
 import re
+import shlex
 import signal
 import socket
 import subprocess
@@ -674,7 +674,7 @@ def get_machine_type():
 @tools.cached
 def get_locale():
   """Returns the OS's UI active locale."""
-  locales = locale.getdefaultlocale()
+  locales = locale.getlocale()
   if locales[0]:
     return '.'.join(locales)
 
@@ -1386,7 +1386,7 @@ def setup_auto_startup_initd_linux(command, cwd, user=None, name='swarming'):
   if not os.path.isabs(cwd):
     raise ValueError('Refusing relative path')
   script = platforms.linux.generate_initd(command, cwd, user)
-  filepath = pipes.quote(os.path.join('/etc/init.d', name))
+  filepath = shlex.quote(os.path.join('/etc/init.d', name))
   with tempfile.NamedTemporaryFile() as f:
     if not _write(f.name, script):
       return False
@@ -1395,9 +1395,9 @@ def setup_auto_startup_initd_linux(command, cwd, user=None, name='swarming'):
     # request.
     # TODO(maruel): Likely not the sanest thing, reevaluate.
     cmd = [
-      'sudo', '/bin/sh', '-c',
-      "cp %s %s && chmod 0755 %s && update-rc.d %s defaults" % (
-        pipes.quote(f.name), filepath, filepath, name)
+        'sudo', '/bin/sh', '-c',
+        "cp %s %s && chmod 0755 %s && update-rc.d %s defaults" %
+        (shlex.quote(f.name), filepath, filepath, name)
     ]
     subprocess.check_call(cmd)
     print('To remove, use:')
