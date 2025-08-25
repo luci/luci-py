@@ -1075,7 +1075,7 @@ def _get_recur_size_with_scandir(path):
   stack = [path]
   while stack:
     try:
-      for entry in os.scandir(stack.pop()):
+      for entry in os.scandir(fs.extend(stack.pop())):
         if _is_symlink_entry(entry):
           n_links += 1
           continue
@@ -1088,6 +1088,6 @@ def _get_recur_size_with_scandir(path):
         else:
           n_others += 1
           logging.warning('non directory/file entry: %s', entry)
-    except PermissionError:
+    except (PermissionError, FileNotFoundError):
       logging.warning('Failed to scan directory', exc_info=True)
   return total, n_dirs, n_files, n_links, n_others

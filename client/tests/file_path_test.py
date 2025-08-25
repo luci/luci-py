@@ -7,6 +7,7 @@
 import getpass
 import io
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -453,6 +454,27 @@ class FilePathTest(auto_stub.TestCase):
   @unittest.skipUnless(sys.platform == 'win32', 'Windows specific')
   def test_get_recursive_size_win_hardlink(self):
     self._check_get_recursive_size(symlink='hardlink')
+
+  @unittest.skipUnless(sys.platform == 'win32', 'Windows specific')
+  def test_scan_large_directory(self):
+    path_fragment = "woof" * 50
+    # self.tempdir doesn't end with a \.
+    parent_dir = (self.tempdir + "\\" + path_fragment + "\\" + path_fragment +
+                  "\\" + path_fragment + "\\" + path_fragment + "\\" +
+                  path_fragment + "\\" + path_fragment + "\\" + path_fragment +
+                  "\\" + path_fragment + "\\" + path_fragment + "\\" +
+                  path_fragment)
+    child_dir = f"{parent_dir}\\{path_fragment}"
+    grandchild = f"{parent_dir}\\{path_fragment}\\{path_fragment}.txt"
+    # Write a file in a temporary temporary directory
+    # before moving it into place.
+    with open(self.tempdir + "\\" + "a.txt", "wb") as fh:
+      fh.write(b"a")
+    os.makedirs(fs.extend(child_dir), exist_ok=True)
+    shutil.move(self.tempdir + "\\" + "a.txt", fs.extend(grandchild))
+    # See if this raises an exception
+    self.assertEqual(file_path._get_recur_size_with_scandir(parent_dir),
+                     (1, 1, 1, 0, 0))
 
 
 if __name__ == '__main__':
