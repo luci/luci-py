@@ -968,12 +968,14 @@ class NamedCache(Cache):
 
         # Calculate the size of the named cache to keep. It's important because
         # if size is zero (it's empty), we do not want to add it back to the
-        # named caches cache.
+        # named caches cache. This also returns None if the named cache size
+        # can't be calculated, which usually means it is broken in some way.
         size = file_path.get_recursive_size(src)
-        logging.info('- Size is %d', size)
+        if size is not None:
+          logging.info('- Size is %d', size)
         if not size:
-          # Do not save empty named cache.
-          return size
+          # Do not save empty or broken named cache.
+          return 0
 
         # Move the dir and create an entry for the named cache.
         rel_cache = self._allocate_dir()
