@@ -79,7 +79,6 @@ from utils import file_path
 from utils import fs
 from utils import logging_utils
 from utils import net
-from utils import on_error
 from utils import subprocess42
 
 
@@ -626,13 +625,12 @@ def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
 
     try:
       _run_go_cmd_and_wait(cmd, tmp_dir)
-    except subprocess42.CalledProcessError as ex:
+    except subprocess42.CalledProcessError:
       if not kvs_dir:
         open_json_and_check(result_json_path, False)
         raise
       open_json_and_check(result_json_path, True)
       logging.exception('Failed to run cas, removing kvs cache dir and retry.')
-      on_error.report("Failed to run cas %s" % ex)
       _run_go_cmd_and_wait(cmd, tmp_dir)
 
     result_json = open_json_and_check(result_json_path, False)
@@ -951,7 +949,6 @@ def map_and_run(data, constant_run_path):
     result['missing_cas'] = [e.to_dict()]
     logging.exception('internal failure: %s', e)
     result['internal_failure'] = str(e)
-    on_error.report(None)
 
   except errors.NonRecoverableCipdException as e:
     # We could not find the CIPD package. The swarming task should not
@@ -959,13 +956,11 @@ def map_and_run(data, constant_run_path):
     result['missing_cipd'] = [e.to_dict()]
     logging.exception('internal failure: %s', e)
     result['internal_failure'] = str(e)
-    on_error.report(None)
   except Exception as e:
     # An internal error occurred. Report accordingly so the swarming task will
     # be retried automatically.
     logging.exception('internal failure: %s', e)
     result['internal_failure'] = str(e)
-    on_error.report(None)
 
   # Clean up
   finally:
@@ -1014,7 +1009,6 @@ def map_and_run(data, constant_run_path):
       if out_dir:
         logging.exception('Leaking out_dir %s: %s', out_dir, e)
       result['internal_failure'] = str(e)
-      on_error.report(None)
     finally:
       cleanup_duration = time.time() - cleanup_start
       result['stats']['cleanup']['duration'] = cleanup_duration
@@ -1312,8 +1306,7 @@ def create_option_parser():
   parser.add_option(
       '--report-on-exception',
       action='store_true',
-      help='Whether report exception during execution to isolate server. '
-      'This flag should only be used in swarming bot.')
+      help='Does nothing, kept for backward compatibility')
 
   group = optparse.OptionGroup(parser,
                                'Data source - Content Addressed Storage')
@@ -1565,14 +1558,6 @@ def main(args):
   # logging_utils.prepare_logging() which expects no logs before its call.
   logging_utils.user_logs('Starting run_isolated script')
 
-  SWARMING_SERVER = os.environ.get('SWARMING_SERVER')
-  SWARMING_TASK_ID = os.environ.get('SWARMING_TASK_ID')
-  if options.report_on_exception and SWARMING_SERVER:
-    task_url = None
-    if SWARMING_TASK_ID:
-      task_url = '%s/task?id=%s' % (SWARMING_SERVER, SWARMING_TASK_ID)
-    on_error.report_on_exception_exit(SWARMING_SERVER, source=task_url)
-
   if not file_path.enable_symlink():
     logging.warning('Symlink support is not enabled')
 
@@ -1722,7 +1707,6 @@ def main(args):
               'Error while removing named cache %r at %r. The cache will be'
               ' lost.' % (path, name))
           logging.exception(error)
-          on_error.report(error)
       uninstall_duration = time.time() - uninstall_start
       stats['uninstall']['duration'] = uninstall_duration
       logging.info('named_caches: uninstall took %d seconds',
@@ -1776,7 +1760,6 @@ def main(args):
   except (cipd.Error, local_caching.NamedCacheError,
           local_caching.NoMoreSpace) as ex:
     print(ex.message, file=sys.stderr)
-    on_error.report(None)
     return 1
   finally:
     if tmp_cipd_cache_dir is not None:

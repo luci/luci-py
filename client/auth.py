@@ -21,7 +21,6 @@ from depot_tools import subcommand
 
 # pylint: disable=ungrouped-imports
 from utils import logging_utils
-from utils import on_error
 from utils import net
 from utils import oauth
 from utils import subprocess42

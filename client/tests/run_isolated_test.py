@@ -36,7 +36,6 @@ from utils import file_path
 from utils import fs
 from utils import large
 from utils import logging_utils
-from utils import on_error
 from utils import subprocess42
 from utils import tools
 
@@ -374,7 +373,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
   def test_main_naked(self):
     self.mock_popen_with_oserr()
-    self.mock(on_error, 'report', lambda _: None)
     # The most naked .isolated file that can exist.
     self.mock(tools, 'disable_buffering', lambda: None)
 

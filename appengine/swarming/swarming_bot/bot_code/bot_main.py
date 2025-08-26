@@ -57,18 +57,12 @@ from bot_code import singleton
 from utils import file_path
 from utils import fs
 from utils import net
-from utils import on_error
 from utils import subprocess42
 from utils import tools
 from utils import zip_package
 
 
 ### Globals
-
-
-# Used to opportunistically set the error handler to notify the server when the
-# process exits due to an exception.
-_ERROR_HANDLER_WAS_REGISTERED = False
 
 
 # If False (happens in tests), avoid catching broad Exception in the bot loop.
@@ -661,7 +655,6 @@ def get_bot(config):
 @tools.cached
 def get_config():
   """Returns the data from config.json."""
-  global _ERROR_HANDLER_WAS_REGISTERED
   try:
     with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
       config = json.load(f.open('config/config.json', 'r'))
@@ -670,9 +663,6 @@ def get_config():
   except (zipfile.BadZipfile, IOError, OSError, TypeError, ValueError):
     logging.exception('Invalid config.json!')
     config = {'server': ''}
-  if not _ERROR_HANDLER_WAS_REGISTERED and config['server']:
-    on_error.report_on_exception_exit(config['server'])
-    _ERROR_HANDLER_WAS_REGISTERED = True
   return config
 
 

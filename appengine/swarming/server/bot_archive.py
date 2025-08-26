@@ -407,7 +407,6 @@ FILES = (
     'utils/lru.py',
     'utils/net.py',
     'utils/oauth.py',
-    'utils/on_error.py',
     'utils/subprocess42.py',
     'utils/threading_utils.py',
     'utils/tools.py',

@@ -35,7 +35,6 @@ from bot_code import remote_client
 from libs import luci_context
 from utils import file_path
 from utils import net
-from utils import on_error
 from utils import subprocess42
 from utils import zip_package
 
@@ -1013,8 +1012,6 @@ def main(args):
   options, args = parser.parse_args(args)
   if not options.in_file or not options.out_file:
     parser.error('task_runner is meant to be used by swarming_bot.')
-
-  on_error.report_on_exception_exit(options.swarming_server)
 
   logging.info('starting')
   now = monotonic_time()
