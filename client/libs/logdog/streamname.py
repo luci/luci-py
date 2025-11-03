@@ -5,9 +5,7 @@
 import collections
 import re
 import string
-
-# third_party/
-from six.moves import urllib
+import urllib
 
 _STREAM_SEP = '/'
 _ALNUM_CHARS = string.ascii_letters + string.digits
