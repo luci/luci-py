@@ -1,0 +1,16 @@
+Name: pyparsing
+Short Name: pyparsing
+URL: https://github.com/pyparsing/pyparsing
+Version: 2.4.7
+Revision: 6a844ee35ca5125490a28dbd6dd2d15b6498e605
+License: MIT License
+
+Description:
+A Python Parsing Module.
+
+Local Modifications:
+- Remove everything except pyparsing.py and LICENSE
+- Rename pyparsing.py to __init__.py
+
+Notes:
+Required by httplib2 library.
