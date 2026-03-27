@@ -776,9 +776,9 @@ def get_ssd():
     return ()
   # https://learn.microsoft.com/en-us/windows-hardware/drivers/storage/msft-physicaldisk
   try:
-    return sorted(d.DeviceId
-                  for d in wbem.query('SELECT * FROM MSFT_PhysicalDisk')
-                  if d.MediaType == 4 or d.Model == 'nvme_card')
+    return sorted(
+        d.DeviceId for d in wbem.query('SELECT * FROM MSFT_PhysicalDisk')
+        if d.MediaType == 4 or d.Model in ['nvme_card', 'nvme_card-pd'])
   except AttributeError:
     return ()
 
