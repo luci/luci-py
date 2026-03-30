@@ -45,7 +45,7 @@ class TestGCE(auto_stub.TestCase):
           'description':
           '',
           'zone':
-          'projects/123456/zones/us-west1-c',
+          'projects/123456/zones/us-fakegcezone1-a',
           'maintenanceEvent':
           'NONE',
           'image':
@@ -113,7 +113,7 @@ class TestGCE(auto_stub.TestCase):
   }
 
   def setUp(self):
-    super(TestGCE, self).tearDown()
+    super(TestGCE, self).setUp()
     self.mock_get_metadata = mock.patch(
         'api.platforms.gce.get_metadata', return_value=self._METADATA).start()
 
@@ -137,10 +137,10 @@ class TestGCE(auto_stub.TestCase):
     self.assertEqual(gce.get_image(), 'test-image')
 
   def test_get_zone(self):
-    self.assertEqual(gce.get_zone(), 'us-west1-c')
+    self.assertEqual(gce.get_zone(), 'us-fakegcezone1-a')
 
   def test_get_zones(self):
-    expected = ['us', 'us-west', 'us-west1', 'us-west1-c']
+    expected = ['us', 'us-fakegcezone', 'us-fakegcezone1', 'us-fakegcezone1-a']
     self.assertEqual(gce.get_zones(), expected)
 
   def test_get_zones_europe(self):

@@ -337,10 +337,7 @@ def get_cpuinfo_uncached():
   elif cpu_platform.startswith('AMD '):
     cpu_name = '%s GCE' % cpu_platform
     vendor = 'AuthenticAMD'
-  elif cpu_platform.startswith('Ampere '):
-    cpu_name = '%s GCE' % cpu_platform
-    vendor = 'ARM'
-  elif cpu_platform.startswith('Google Axion'):
+  elif cpu_platform.startswith(('Ampere ', 'Google Axion', 'Google Tamar')):
     cpu_name = '%s GCE' % cpu_platform
     vendor = 'ARM'
   assert cpu_name is not None, cpu_platform
