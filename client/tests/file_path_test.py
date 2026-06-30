@@ -275,9 +275,11 @@ class FilePathTest(auto_stub.TestCase):
           self.assertEqual(None, proc.poll())
         file_path.rmtree(subdir)
         # rmtree will first try to change the tree permission and sleep for
-        # 4 and 6 seconds for the 2nd and 3rd try.
-        # The last 2 seconds is for the kill_children_processes.
-        self.assertEqual([4, 6, 2], sleeps)
+        # 4, 6, 8, and 10 seconds for tries 2 through 5 on Windows, max_tries=6
+        # The last 2 seconds is for kill_children_processes.
+        expected_sleeps = [4, 6, 8, 10, 2
+                           ] if sys.platform == 'win32' else [4, 6, 2]
+        self.assertEqual(expected_sleeps, sleeps)
         # sys.stderr.getvalue() would return a fair amount of output but it is
         # not completely deterministic so we're not testing it here.
       finally:
