@@ -15,43 +15,45 @@ from components import net
 from components import utils
 
 
-AUTH_SCOPE = 'https://www.googleapis.com/auth/gerritcodereview'
+AUTH_SCOPE = "https://www.googleapis.com/auth/gerritcodereview"
 RESPONSE_PREFIX = ")]}'"
 
 
-Owner = collections.namedtuple('Owner', ['name', 'email', 'username'])
+Owner = collections.namedtuple("Owner", ["name", "email", "username"])
 
 
 Revision = collections.namedtuple(
-    'Revision',
-    [
-      # Commit sha, such as d283186300411e4d05ef0ced6c29fe77e8767a43.
-      'commit',
-      # Ordinal of the revision within a GerritChange, starting from 1.
-      'number',
-      # A ref where this commit can be fetched.
-      'fetch_ref',
-    ])
+  "Revision",
+  [
+    # Commit sha, such as d283186300411e4d05ef0ced6c29fe77e8767a43.
+    "commit",
+    # Ordinal of the revision within a GerritChange, starting from 1.
+    "number",
+    # A ref where this commit can be fetched.
+    "fetch_ref",
+  ],
+)
 
 
 Change = collections.namedtuple(
-    'Change',
-    [
-      # A "long" change id, such as
-      # chromium/src~main~If1bfd2e7d0ad2c14908e5d45a513b5335d36ff01
-      'id',
-      # A "short" change id, such as If1bfd2e7d0ad2c14908e5d45a513b5335d36ff01
-      'change_id',
-      'project',
-      'branch',
-      'subject',
-      # Owner of the Change, of type Owner.
-      'owner',
-      # Sha of the current revision's commit.
-      'current_revision',
-      # A list of Revision objects.
-      'revisions',
-    ])
+  "Change",
+  [
+    # A "long" change id, such as
+    # chromium/src~main~If1bfd2e7d0ad2c14908e5d45a513b5335d36ff01
+    "id",
+    # A "short" change id, such as If1bfd2e7d0ad2c14908e5d45a513b5335d36ff01
+    "change_id",
+    "project",
+    "branch",
+    "subject",
+    # Owner of the Change, of type Owner.
+    "owner",
+    # Sha of the current revision's commit.
+    "current_revision",
+    # A list of Revision objects.
+    "revisions",
+  ],
+)
 
 
 def get_change(*args, **kwargs):
@@ -61,47 +63,53 @@ def get_change(*args, **kwargs):
 
 @ndb.tasklet
 def get_change_async(
-    hostname, change_id, include_all_revisions=True,
-    include_owner_details=False):
+  hostname, change_id, include_all_revisions=True, include_owner_details=False
+):
   """Gets a single Gerrit change by id.
 
   Returns Change object, or None if change was not found.
   """
-  path = 'changes/%s' % change_id
+  path = "changes/%s" % change_id
   if include_owner_details:
-    path += '/detail'
+    path += "/detail"
   params = {}
   if include_all_revisions:
-    params['o'] = 'ALL_REVISIONS'
+    params["o"] = "ALL_REVISIONS"
   data = yield fetch_json_async(hostname, path, params=params)
   if data is None:
     raise ndb.Return(None)
 
   owner = None
-  ownerData = data.get('owner')
+  ownerData = data.get("owner")
   if ownerData:  # pragma: no branch
     owner = Owner(
-        name=ownerData.get('name'),
-        email=ownerData.get('email'),
-        username=ownerData.get('username'))
+      name=ownerData.get("name"),
+      email=ownerData.get("email"),
+      username=ownerData.get("username"),
+    )
 
   revisions = [
     Revision(
-        commit=key,
-        number=int(value['_number']),
-        fetch_ref=value['fetch']['http']['ref'],
-    ) for key, value in data.get('revisions', {}).items()]
+      commit=key,
+      number=int(value["_number"]),
+      fetch_ref=value["fetch"]["http"]["ref"],
+    )
+    for key, value in data.get("revisions", {}).items()
+  ]
   revisions.sort(key=lambda r: r.number)
 
-  raise ndb.Return(Change(
-      id=data['id'],
-      project=data.get('project'),
-      branch=data.get('branch'),
-      subject=data.get('subject'),
-      change_id=data.get('change_id'),
-      current_revision=data.get('current_revision'),
+  raise ndb.Return(
+    Change(
+      id=data["id"],
+      project=data.get("project"),
+      branch=data.get("branch"),
+      subject=data.get("subject"),
+      change_id=data.get("change_id"),
+      current_revision=data.get("current_revision"),
       revisions=revisions,
-      owner=owner))
+      owner=owner,
+    )
+  )
 
 
 def set_review(*args, **kwargs):
@@ -111,7 +119,8 @@ def set_review(*args, **kwargs):
 
 @ndb.tasklet
 def set_review_async(
-    hostname, change_id, revision, message=None, labels=None, notify=None):
+  hostname, change_id, revision, message=None, labels=None, notify=None
+):
   """Sets review on a revision.
 
   Args:
@@ -129,16 +138,16 @@ def set_review_async(
   """
   if notify is not None:
     notify = str(notify).upper()
-  assert notify in (None, 'NONE', 'OWNER', 'OWNER_REVIEWERS', 'ALL')
+  assert notify in (None, "NONE", "OWNER", "OWNER_REVIEWERS", "ALL")
   body = {
-    'labels': labels,
-    'message': message,
-    'notify': notify,
+    "labels": labels,
+    "message": message,
+    "notify": notify,
   }
-  body = {k:v for k, v in body.items() if v is not None}
+  body = {k: v for k, v in body.items() if v is not None}
 
-  path = 'changes/%s/revisions/%s/review' % (change_id, revision)
-  yield fetch_json_async(hostname, path, method='POST', payload=body)
+  path = "changes/%s/revisions/%s/review" % (change_id, revision)
+  yield fetch_json_async(hostname, path, method="POST", payload=body)
 
 
 @ndb.tasklet
@@ -154,10 +163,10 @@ def fetch_async(hostname, path, **kwargs):
   Raises:
     net.Error on communication errors.
   """
-  assert not path.startswith('/'), path
-  assert 'scopes' not in kwargs, kwargs['scopes']
+  assert not path.startswith("/"), path
+  assert "scopes" not in kwargs, kwargs["scopes"]
   try:
-    url = urllib.parse.urljoin('https://' + hostname, 'a/' + path)
+    url = urllib.parse.urljoin("https://" + hostname, "a/" + path)
     result = yield net.request_async(url, scopes=[AUTH_SCOPE], **kwargs)
     raise ndb.Return(result)
   except net.NotFoundError:
@@ -183,23 +192,25 @@ def fetch_json_async(hostname, path, payload=None, headers=None, **kwargs):
     net.Error on communication errors.
   """
   headers = (headers or {}).copy()
-  headers['Accept'] = 'application/json'
+  headers["Accept"] = "application/json"
   if payload is not None:
-    headers['Content-Type'] = 'application/json; charset=utf-8'
+    headers["Content-Type"] = "application/json; charset=utf-8"
   content = yield fetch_async(
-      hostname=hostname,
-      path=path,
-      payload=utils.encode_to_json(payload) if payload is not None else None,
-      headers=headers,
-      **kwargs)
+    hostname=hostname,
+    path=path,
+    payload=utils.encode_to_json(payload) if payload is not None else None,
+    headers=headers,
+    **kwargs,
+  )
   if content is None:
     raise ndb.Return(None)
   if not content.startswith(RESPONSE_PREFIX):
-    msg = (
-        'Unexpected response format. Expected prefix %s. Received: %s' %
-        (RESPONSE_PREFIX, content))
+    msg = "Unexpected response format. Expected prefix %s. Received: %s" % (
+      RESPONSE_PREFIX,
+      content,
+    )
     raise net.Error(msg, status_code=200, response=content)
-  raise ndb.Return(json.loads(content[len(RESPONSE_PREFIX):]))
+  raise ndb.Return(json.loads(content[len(RESPONSE_PREFIX) :]))
 
 
 def fetch_json(*args, **kwargs):

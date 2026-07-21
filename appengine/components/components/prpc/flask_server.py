@@ -12,9 +12,14 @@ except ImportError:
 
 
 class FlaskServer(ServerBase):
-  def get_routes(self, prefix=''):
-    return [('%s/prpc/<service>/<method>' % prefix, self._prpcHandler,
-             ['POST', 'OPTIONS'])]
+  def get_routes(self, prefix=""):
+    return [
+      (
+        "%s/prpc/<service>/<method>" % prefix,
+        self._prpcHandler,
+        ["POST", "OPTIONS"],
+      )
+    ]
 
   def _response_body_and_status_writer(self, response, body=None, status=None):
     if body is not None:
@@ -26,9 +31,9 @@ class FlaskServer(ServerBase):
     request = flask.request
     response = flask.make_response()
 
-    if request.method == 'POST':
+    if request.method == "POST":
       self._post_handler(service, method, request, response)
-    elif request.method == 'OPTIONS':
+    elif request.method == "OPTIONS":
       self._options_handler(request, response)
 
     return response

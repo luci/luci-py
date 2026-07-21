@@ -8,6 +8,7 @@ import sys
 import unittest
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 from google.appengine.ext import ndb
@@ -25,51 +26,54 @@ class ConfigTest(test_case.TestCase):
   def test_bootstrap(self):
     class Config(config.GlobalConfig):
       param = ndb.StringProperty()
+
       def set_defaults(self):
-        self.param = 'abc'
+        self.param = "abc"
+
     conf = Config.cached()
-    self.assertEqual('abc', conf.param)
+    self.assertEqual("abc", conf.param)
     self.assertEqual(conf.to_dict(), conf.fetch().to_dict())
 
   def test_fetch_store(self):
     class Config(config.GlobalConfig):
       param = ndb.StringProperty()
+
     conf = Config.fetch()
     self.assertIsNone(conf)
     conf = Config.cached()
     self.assertIsNotNone(conf)
-    conf.param = '1234'
+    conf.param = "1234"
     now = self.mock_now(datetime.datetime(2010, 1, 1))
-    conf.store(updated_by='someone')
+    conf.store(updated_by="someone")
     self.mock_now(datetime.datetime(2010, 1, 1), 100)
     conf = Config.fetch()
-    self.assertEqual('1234', conf.param)
+    self.assertEqual("1234", conf.param)
     self.assertEqual(now, conf.updated_ts)
 
   def test_expiration(self):
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6))
 
     class Config(config.GlobalConfig):
-      param = ndb.StringProperty(default='default')
+      param = ndb.StringProperty(default="default")
 
     # Bootstrap the config.
     Config.cached()
 
     # fetch-update cycle, necessary to avoid modifying cached copy in-place.
     conf = Config.fetch()
-    conf.param = 'new-value'
-    conf.store(updated_by='someone')
+    conf.param = "new-value"
+    conf.store(updated_by="someone")
 
     # Right before expiration.
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6), 59)
-    self.assertEqual('default', Config.cached().param)
+    self.assertEqual("default", Config.cached().param)
 
     # After expiration.
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6), 61)
-    self.assertEqual('new-value', Config.cached().param)
+    self.assertEqual("new-value", Config.cached().param)
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()

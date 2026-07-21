@@ -11,6 +11,7 @@ from . import remote
 
 class CronUpdateConfigs(webapp2.RequestHandler):
   """Imports configs from Gitiles."""
+
   @decorators.require_cronjob
   def get(self):
     remote.cron_update_last_good_configs()
@@ -19,6 +20,5 @@ class CronUpdateConfigs(webapp2.RequestHandler):
 def get_backend_routes():
   # This requires a cron job to this URL.
   return [
-    webapp2.Route(
-        r'/internal/cron/config/update', CronUpdateConfigs),
+    webapp2.Route(r"/internal/cron/config/update", CronUpdateConfigs),
   ]

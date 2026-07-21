@@ -15,5 +15,5 @@ sys.path.insert(0, ROOT_DIR)
 from components import natsort
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   doctest.testmod(natsort)

@@ -18,6 +18,7 @@ except ImportError:
 # Auth component is using google.protobuf package, it requires some python
 # package magic hacking.
 from components import utils
+
 utils.fix_protobuf_package()
 
 from api import *

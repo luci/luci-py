@@ -24,58 +24,64 @@ _BINARY_MEDIA_TYPE = encoding.Encoding.media_type(encoding.Encoding.BINARY)
 # Most clients should use Client class instead.
 # Use new_request to create a new request.
 Request = collections.namedtuple(
-    'Request',
-    [
-        # hostname of the pRPC server, e.g. "app.example.com".
-        # Must not contain a scheme.
-        'hostname',
-        # True if the client must use HTTP, as opposed to HTTPS.
-        # Useful for local servers.
-        'insecure',
-        # Full name of the service, including the package name,
-        # e.g. "mypackage.MyService".
-        'service_name',
-        # Name of the RPC method.
-        'method_name',
-        # The request message.
-        'request_message',
-        # Target response message.
-        'response_message',
-        # A dict of call metadata. Will be available to the server.
-        'metadata',
-        # RPC timeout in seconds (10s by default).
-        'timeout',
-        # OAuth2 scopes for the access token (ok skip auth if None).
-        'scopes',
-        # components.auth.ServiceAccountKey with credentials.
-        'service_account_key',
-        # delegation token returned by components.auth.delegate.
-        'delegation_token',
-        # how many times to retry on errors (4 times by default).
-        'max_attempts',
-        # the luci project under whose authority to perform the request.
-        'project_id',
-    ])
+  "Request",
+  [
+    # hostname of the pRPC server, e.g. "app.example.com".
+    # Must not contain a scheme.
+    "hostname",
+    # True if the client must use HTTP, as opposed to HTTPS.
+    # Useful for local servers.
+    "insecure",
+    # Full name of the service, including the package name,
+    # e.g. "mypackage.MyService".
+    "service_name",
+    # Name of the RPC method.
+    "method_name",
+    # The request message.
+    "request_message",
+    # Target response message.
+    "response_message",
+    # A dict of call metadata. Will be available to the server.
+    "metadata",
+    # RPC timeout in seconds (10s by default).
+    "timeout",
+    # OAuth2 scopes for the access token (ok skip auth if None).
+    "scopes",
+    # components.auth.ServiceAccountKey with credentials.
+    "service_account_key",
+    # delegation token returned by components.auth.delegate.
+    "delegation_token",
+    # how many times to retry on errors (4 times by default).
+    "max_attempts",
+    # the luci project under whose authority to perform the request.
+    "project_id",
+  ],
+)
 
 
 def new_request(
-    hostname, service_name, method_name, request_message, response_message,
-    **kwargs):
+  hostname,
+  service_name,
+  method_name,
+  request_message,
+  response_message,
+  **kwargs,
+):
   """Creates a Request object. Provides defaults for optional fields."""
   ret = Request(
-      hostname=hostname,
-      insecure=False,
-      service_name=service_name,
-      method_name=method_name,
-      request_message=request_message,
-      response_message=response_message,
-      metadata=None,
-      timeout=None,
-      scopes=None,
-      service_account_key=None,
-      delegation_token=None,
-      max_attempts=None,
-      project_id=None,
+    hostname=hostname,
+    insecure=False,
+    service_name=service_name,
+    method_name=method_name,
+    request_message=request_message,
+    response_message=response_message,
+    metadata=None,
+    timeout=None,
+    scopes=None,
+    service_account_key=None,
+    delegation_token=None,
+    max_attempts=None,
+    project_id=None,
   )
   return ret._replace(**kwargs)
 
@@ -126,38 +132,39 @@ def rpc_async(req, response_metadata=None):
 
   headers = (req.metadata or {}).copy()
   encoding.encode_bin_metadata(headers)
-  headers['Content-Type'] = _BINARY_MEDIA_TYPE
-  headers['Accept'] = _BINARY_MEDIA_TYPE
-  headers['X-Prpc-Grpc-Timeout'] = '%dS' % timeout
+  headers["Content-Type"] = _BINARY_MEDIA_TYPE
+  headers["Accept"] = _BINARY_MEDIA_TYPE
+  headers["X-Prpc-Grpc-Timeout"] = "%dS" % timeout
 
   try:
     res_bytes = yield net.request_async(
-        url='http%s://%s/prpc/%s/%s' % (
-            '' if req.insecure else 's',
-            req.hostname,
-            req.service_name,
-            req.method_name,
-        ),
-        method='POST',
-        payload=req.request_message.SerializeToString(),
-        headers=headers,
-        scopes=req.scopes,
-        service_account_key=req.service_account_key,
-        delegation_token=req.delegation_token,
-        deadline=timeout,
-        max_attempts=req.max_attempts or 4,
-        response_headers=response_metadata,
-        project_id=req.project_id,
+      url="http%s://%s/prpc/%s/%s"
+      % (
+        "" if req.insecure else "s",
+        req.hostname,
+        req.service_name,
+        req.method_name,
+      ),
+      method="POST",
+      payload=req.request_message.SerializeToString(),
+      headers=headers,
+      scopes=req.scopes,
+      service_account_key=req.service_account_key,
+      delegation_token=req.delegation_token,
+      deadline=timeout,
+      max_attempts=req.max_attempts or 4,
+      response_headers=response_metadata,
+      project_id=req.project_id,
     )
     # Unfortunately, net module does not expose headers of HTTP 200
     # responses.
     # Assume (HTTP OK => pRPC OK).
   except net.Error as ex:
-    msg = (ex.response or '<empty>').decode('utf-8', 'ignore')
+    msg = (ex.response or "<empty>").decode("utf-8", "ignore")
 
     # Sometime requests fail before reaching the pRPC server. We recognize few
     # such cases.
-    if 'X-Prpc-Grpc-Code' not in ex.headers:
+    if "X-Prpc-Grpc-Code" not in ex.headers:
       if ex.status_code is None:
         raise RpcError(str(ex), codes.StatusCode.UNAVAILABLE, {})
       if ex.status_code == 500:
@@ -167,11 +174,12 @@ def rpc_async(req, response_metadata=None):
 
     # Otherwise it must be a reply from the server with a valid code header.
     try:
-      code = codes.INT_TO_CODE[int(ex.headers['X-Prpc-Grpc-Code'])]
+      code = codes.INT_TO_CODE[int(ex.headers["X-Prpc-Grpc-Code"])]
     except (ValueError, KeyError, TypeError):
       raise ProtocolError(
-          'response with HTTP code %r does not contain a valid X-Prpc-Grpc-Code'
-          ' header, its body: %r' % (ex.status_code, msg))
+        "response with HTTP code %r does not contain a valid X-Prpc-Grpc-Code"
+        " header, its body: %r" % (ex.status_code, msg)
+      )
     raise RpcError(msg, code, ex.headers)
 
   # Status code is OK.
@@ -191,8 +199,8 @@ def service_account_credentials(service_account_key=None):
   The returned value can be used as "credentials" argument in RPC method calls.
   """
   return lambda req: req._replace(
-      scopes=[net.EMAIL_SCOPE],
-      service_account_key=service_account_key,
+    scopes=[net.EMAIL_SCOPE],
+    service_account_key=service_account_key,
   )
 
 
@@ -217,10 +225,12 @@ def composite_call_credentials(*call_credentials):
 
   The returned value can be used as "credentials" argument in RPC method calls.
   """
+
   def fn(req):
     for mut in call_credentials:
       req = mut(req)
     return req
+
   return fn
 
 
@@ -245,12 +255,13 @@ class Client(object):
   """
 
   def __init__(
-      self,
-      hostname,
-      service_description,
-      insecure=False,
-      timeout=10,
-      max_attempts=4):
+    self,
+    hostname,
+    service_description,
+    insecure=False,
+    timeout=10,
+    max_attempts=4,
+  ):
     """Initializes a new pRPC Client.
 
     Args:
@@ -268,11 +279,11 @@ class Client(object):
     self._timeout = timeout
     self._max_attempts = max_attempts
 
-    desc = service_description['service_descriptor']
+    desc = service_description["service_descriptor"]
     self._full_service_name = desc.name
-    pkg = service_description['file_descriptor'].package
+    pkg = service_description["file_descriptor"].package
     if pkg:
-      self._full_service_name = '%s.%s' % (pkg, desc.name)
+      self._full_service_name = "%s.%s" % (pkg, desc.name)
 
     for method_desc in desc.method:
       self._generate_rpc_method(method_desc)
@@ -280,35 +291,40 @@ class Client(object):
   def _generate_rpc_method(self, method_desc):
     sym_db = symbol_database.Default()
     response_py_type = sym_db.GetSymbol(method_desc.output_type[1:])
-    assert response_py_type, 'response type for %s.%s not found' % (
-        self._full_service_name, method_desc.name)
+    assert response_py_type, "response type for %s.%s not found" % (
+      self._full_service_name,
+      method_desc.name,
+    )
 
-    def method_async(request,
-                     timeout=None,
-                     metadata=None,
-                     credentials=None,
-                     response_metadata=None):
+    def method_async(
+      request,
+      timeout=None,
+      metadata=None,
+      credentials=None,
+      response_metadata=None,
+    ):
       # The signature of this function was originally supposed to match
       # https://grpc.io/grpc/python/grpc.html#grpc.UnaryUnaryMultiCallable.__call__
       # But a new optional argument has been added to return the response's
       # metadata.
 
       prpc_req = new_request(
-          hostname=self._hostname,
-          insecure=self._insecure,
-          service_name=self._full_service_name,
-          method_name=method_desc.name,
-          request_message=request,
-          response_message=response_py_type(),
-          metadata=metadata,
-          timeout=timeout or self._timeout,
-          max_attempts=self._max_attempts,
+        hostname=self._hostname,
+        insecure=self._insecure,
+        service_name=self._full_service_name,
+        method_name=method_desc.name,
+        request_message=request,
+        response_message=response_py_type(),
+        metadata=metadata,
+        timeout=timeout or self._timeout,
+        max_attempts=self._max_attempts,
       )
 
       if credentials:
-        assert hasattr(credentials, '__call__'), (
-          'credentials must be created using credentials functions in '
-          'components.prpc.client module')
+        assert hasattr(credentials, "__call__"), (
+          "credentials must be created using credentials functions in "
+          "components.prpc.client module"
+        )
         prpc_req = credentials(prpc_req)
 
       return rpc_async(prpc_req, response_metadata=response_metadata)
@@ -318,6 +334,6 @@ class Client(object):
 
     # Expose two instance methods for each RPC method: one async and one sync.
     method.__name__ = str(method_desc.name)
-    method_async.__name__ = method.__name__ + 'Async'
+    method_async.__name__ = method.__name__ + "Async"
     setattr(self, method.__name__, method)
     setattr(self, method_async.__name__, method_async)

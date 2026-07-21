@@ -24,12 +24,15 @@ from . import fs
 from . import remote
 
 
-Project = collections.namedtuple('Project', [
-  'id',  # Unique project id, defined in projects.cfg
-  'repo_type',   # e.g. 'GITILES'
-  'repo_url',   # e.g. 'https://chromium.googlesource.com/chromium/src'
-  'name',  # e.g. 'Chromium browser'
-])
+Project = collections.namedtuple(
+  "Project",
+  [
+    "id",  # Unique project id, defined in projects.cfg
+    "repo_type",  # e.g. 'GITILES'
+    "repo_url",  # e.g. 'https://chromium.googlesource.com/chromium/src'
+    "name",  # e.g. 'Chromium browser'
+  ],
+)
 
 
 @ndb.tasklet
@@ -45,7 +48,8 @@ def _get_config_provider_async():  # pragma: no cover
 
 @ndb.tasklet
 def get_async(
-    config_set, path, dest_type=None, revision=None, store_last_good=False):
+  config_set, path, dest_type=None, revision=None, store_last_good=False
+):
   """Reads a revision and contents of a config.
 
   If |store_last_good| is True (default is False), does not make remote calls,
@@ -86,13 +90,18 @@ def get_async(
   if store_last_good:
     if revision:  # pragma: no cover
       raise ValueError(
-          'store_last_good parameter cannot be set to True if revision is '
-          'specified')
+        "store_last_good parameter cannot be set to True if revision is "
+        "specified"
+      )
 
   provider = yield _get_config_provider_async()
   result = yield provider.get_async(
-      config_set, path, revision=revision, dest_type=dest_type,
-      store_last_good=store_last_good)
+    config_set,
+    path,
+    revision=revision,
+    dest_type=dest_type,
+    store_last_good=store_last_good,
+  )
   raise ndb.Return(result)
 
 
@@ -113,7 +122,7 @@ def get_self_config(*args, **kwargs):
 
 def get_project_config_async(project_id, *args, **kwargs):
   """A shorthand for get_async for a project config set."""
-  return get_async('projects/%s' % project_id, *args, **kwargs)
+  return get_async("projects/%s" % project_id, *args, **kwargs)
 
 
 def get_project_config(*args, **kwargs):
@@ -123,8 +132,8 @@ def get_project_config(*args, **kwargs):
 
 def get_ref_config_async(project_id, ref, *args, **kwargs):
   """A shorthand for get_async for a project ref config set."""
-  assert ref and ref.startswith('refs/'), ref
-  return get_async('projects/%s/%s' % (project_id, ref), *args, **kwargs)
+  assert ref and ref.startswith("refs/"), ref
+  return get_async("projects/%s/%s" % (project_id, ref), *args, **kwargs)
 
 
 def get_ref_config(*args, **kwargs):
@@ -137,7 +146,7 @@ def get_projects_async():
   """Returns a list of registered projects (type Project)."""
   provider = yield _get_config_provider_async()
   project_dicts = yield provider.get_projects_async()
-  empty = Project('', '', '', '')
+  empty = Project("", "", "", "")
   raise ndb.Return([empty._replace(**p) for p in project_dicts])
 
 
@@ -170,15 +179,18 @@ def get_project_configs_async(path, dest_type=None):
   configs = yield provider.get_project_configs_async(path)
   result = {}
   for config_set, (revision, content) in configs.items():
-    assert config_set and config_set.startswith('projects/'), config_set
-    project_id = config_set[len('projects/'):]
+    assert config_set and config_set.startswith("projects/"), config_set
+    project_id = config_set[len("projects/") :]
     assert project_id
     try:
       config = common._convert_config(content, dest_type)
     except common.ConfigFormatError as ex:
       logging.exception(
-          'Could not parse config at %s in config set %s: %r',
-          path, config_set, content)
+        "Could not parse config at %s in config set %s: %r",
+        path,
+        config_set,
+        content,
+      )
       result[project_id] = (revision, None, ex)
     else:
       result[project_id] = (revision, config, None)

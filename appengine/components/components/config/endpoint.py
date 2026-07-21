@@ -27,6 +27,7 @@ METADATA_FORMAT_VERSION = "1.0"
 
 class ConfigSettingsMessage(messages.Message):
   """Configuration service location. Resembles common.ConfigSettings"""
+
   # Example: 'luci-config.appspot.com'
   service_hostname = messages.StringField(1)
   # Example: 'user:luci-config@appspot.gserviceaccount.com'
@@ -70,9 +71,9 @@ def is_trusted_requester():
     # account to make the validation request. Revert this change after the old
     # LUCI Config service is fully deprecated and all traffic have been
     # migrated to the new LUCI Config service.
-    allowed_group = 'service-accounts-luci-config'
-    if 'dev' in settings.service_hostname:
-      allowed_group += '-dev'
+    allowed_group = "service-accounts-luci-config"
+    if "dev" in settings.service_hostname:
+      allowed_group += "-dev"
     if auth.is_group_member(allowed_group, identity):
       return True
 
@@ -81,6 +82,7 @@ def is_trusted_requester():
 
 class ConfigPattern(messages.Message):
   """A pattern for one config file. See ServiceDynamicMetadata."""
+
   config_set = messages.StringField(1, required=True)
   path = messages.StringField(2, required=True)
 
@@ -104,44 +106,48 @@ class ServiceDynamicMetadata(messages.Message):
   supports_gzip_compression = messages.BooleanField(3, default=False)
 
 
-@auth.endpoints_api(name='config', version='v1', title='Configuration service')
+@auth.endpoints_api(name="config", version="v1", title="Configuration service")
 class ConfigApi(remote.Service):
   """Configuration service."""
 
   @auth.endpoints_method(
-      ConfigSettingsMessage, ConfigSettingsMessage,
-      http_method='POST')
+    ConfigSettingsMessage, ConfigSettingsMessage, http_method="POST"
+  )
   @auth.require(lambda: auth.is_superuser() or auth.is_admin())
   def settings(self, request):
     """Reads/writes config service location. Accessible only by admins."""
     settings = common.ConfigSettings.fetch() or common.ConfigSettings()
     delta = {}
     if request.service_hostname is not None:
-      delta['service_hostname'] = request.service_hostname
+      delta["service_hostname"] = request.service_hostname
     if request.trusted_config_account is not None:
       try:
-        delta['trusted_config_account'] = auth.Identity.from_bytes(
-            request.trusted_config_account)
+        delta["trusted_config_account"] = auth.Identity.from_bytes(
+          request.trusted_config_account
+        )
       except ValueError as ex:
         raise endpoints.BadRequestException(
-            'Invalid trusted_config_account %s: %s' % (
-              request.trusted_config_account,
-              ex.message))
+          "Invalid trusted_config_account %s: %s"
+          % (request.trusted_config_account, ex.message)
+        )
     changed = settings.modify(
-        updated_by=auth.get_current_identity().to_bytes(),
-        **delta)
+      updated_by=auth.get_current_identity().to_bytes(), **delta
+    )
     if changed:
-      logging.warning('Updated config settings')
+      logging.warning("Updated config settings")
     settings = common.ConfigSettings.fetch() or settings
     return ConfigSettingsMessage(
-        service_hostname=settings.service_hostname,
-        trusted_config_account=(
-            settings.trusted_config_account.to_bytes()
-            if settings.trusted_config_account else None)
+      service_hostname=settings.service_hostname,
+      trusted_config_account=(
+        settings.trusted_config_account.to_bytes()
+        if settings.trusted_config_account
+        else None
+      ),
     )
 
   @auth.endpoints_method(
-      ValidateRequestMessage, ValidateResponseMessage, http_method='POST')
+    ValidateRequestMessage, ValidateResponseMessage, http_method="POST"
+  )
   @auth.require(is_trusted_requester)
   def validate(self, request):
     """Validates a config.
@@ -156,31 +162,35 @@ class ConfigApi(remote.Service):
     for m in ctx.result().messages:
       text = m.text
       if isinstance(m.text, str):
-        text = text.decode('ascii', errors='replace')
-      res.messages.append(ValidationMessage(
+        text = text.decode("ascii", errors="replace")
+      res.messages.append(
+        ValidationMessage(
           path=request.path,
           severity=common.Severity.lookup_by_number(m.severity),
           text=text,
-      ))
+        )
+      )
     return res
 
   @auth.endpoints_method(
-      message_types.VoidMessage, ServiceDynamicMetadata,
-      http_method='GET', path='metadata')
+    message_types.VoidMessage,
+    ServiceDynamicMetadata,
+    http_method="GET",
+    path="metadata",
+  )
   @auth.require(is_trusted_requester)
   def get_metadata(self, _request):
-    """Describes a service. Used by config service to discover other services.
-    """
+    """Describes a service. Used by config service to discover other services."""
     meta = ServiceDynamicMetadata(version=METADATA_FORMAT_VERSION)
     http_headers = dict(self.request_state.headers)
-    assert 'host' in http_headers or 'Host' in http_headers, http_headers
+    assert "host" in http_headers or "Host" in http_headers, http_headers
     meta.validation = meta.Validator(
-        url='https://{hostname}/_ah/api/{name}/{version}/{path}validate'.format(
-            hostname=http_headers.get('host') or http_headers['Host'],
-            name=self.api_info.name,
-            version=self.api_info.version,
-            path=self.api_info.path or '',
-        )
+      url="https://{hostname}/_ah/api/{name}/{version}/{path}validate".format(
+        hostname=http_headers.get("host") or http_headers["Host"],
+        name=self.api_info.name,
+        version=self.api_info.version,
+        path=self.api_info.path or "",
+      )
     )
     for p in sorted(validation.DEFAULT_RULE_SET.patterns()):
       meta.validation.patterns.append(ConfigPattern(**p._asdict()))

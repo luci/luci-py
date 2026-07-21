@@ -19,15 +19,15 @@ from google.appengine import runtime
 PATHS_TO_STRIP = (
   # On AppEngine, cwd is always the application's root directory.
   os.getcwd() + os.path.sep,
-  os.path.dirname(os.path.dirname(os.path.dirname(runtime.__file__))) +
-      os.path.sep,
-  os.path.dirname(os.path.dirname(os.path.dirname(webapp2.__file__))) +
-      os.path.sep,
+  os.path.dirname(os.path.dirname(os.path.dirname(runtime.__file__)))
+  + os.path.sep,
+  os.path.dirname(os.path.dirname(os.path.dirname(webapp2.__file__)))
+  + os.path.sep,
   # Fallback to stripping at appid.
   os.path.dirname(os.getcwd()) + os.path.sep,
   # stdlib, will contain 'python2.7' as prefix.
   os.path.dirname(os.path.dirname(os.__file__)) + os.path.sep,
-  '.' + os.path.sep,
+  "." + os.path.sep,
 )
 
 
@@ -35,8 +35,9 @@ PATHS_TO_STRIP = (
 
 
 RE_STACK_TRACE_FILE = (
-    r'^(?P<prefix>  File \")(?P<file>[^\"]+)(?P<suffix>\"\, line )'
-    r'(?P<line_no>\d+)(?:|(?P<rest>\, in )(?P<function>.+))$')
+  r"^(?P<prefix>  File \")(?P<file>[^\"]+)(?P<suffix>\"\, line )"
+  r"(?P<line_no>\d+)(?:|(?P<rest>\, in )(?P<function>.+))$"
+)
 
 
 def _relative_path(path):
@@ -46,21 +47,23 @@ def _relative_path(path):
   """
   for i in PATHS_TO_STRIP:
     if path.startswith(i):
-      return path[len(i):]
+      return path[len(i) :]
   return path
 
 
 def _reformat_stack(stack):
   """Post processes the stack trace through _relative_path()."""
   out = stack.splitlines(True)
+
   def replace(l):
     m = re.match(RE_STACK_TRACE_FILE, l, re.DOTALL)
     if m:
       groups = list(m.groups())
       groups[1] = _relative_path(groups[1])
-      return ''.join(groups)
+      return "".join(groups)
     return l
-  return ''.join(map(replace, out))
+
+  return "".join(map(replace, out))
 
 
 class _Formatter(object):
@@ -68,6 +71,7 @@ class _Formatter(object):
 
   Is is very important that this class does not throw exceptions.
   """
+
   def __init__(self, original):
     self._original = original
 

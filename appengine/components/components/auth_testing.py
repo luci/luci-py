@@ -15,11 +15,12 @@ from components.auth import model
 
 
 # Will be set as current identity in mock_get_current_identity by default.
-DEFAULT_MOCKED_IDENTITY = model.Identity.from_bytes('user:mocked@example.com')
+DEFAULT_MOCKED_IDENTITY = model.Identity.from_bytes("user:mocked@example.com")
 
 
 def generate_xsrf_token_for_test(
-    ident=DEFAULT_MOCKED_IDENTITY, xsrf_token_data=None):
+  ident=DEFAULT_MOCKED_IDENTITY, xsrf_token_data=None
+):
   """Generates XSRF token to use when sending requests in unit tests."""
   assert utils.is_local_dev_server()
   # See also handler.AuthenticatingHandler.generate_xsrf_token.
@@ -28,7 +29,7 @@ def generate_xsrf_token_for_test(
 
 def mock_get_current_identity(test_case, ident=DEFAULT_MOCKED_IDENTITY):
   """Mocks get_current_identity() to return ident."""
-  test_case.mock(api, '_get_current_identity', lambda: ident)
+  test_case.mock(api, "_get_current_identity", lambda: ident)
 
 
 def mock_is_admin(test_case, value=True):
@@ -38,11 +39,13 @@ def mock_is_admin(test_case, value=True):
   # @auth.require(auth.is_admin). So mock is_group_member(model.ADMIN_GROUP, *)
   # instead (it is called by is_admin).
   orig = api.is_group_member
+
   def mocked_is_group_member(group, ident):
     if group == model.ADMIN_GROUP:
       return value
     return orig(group, ident)
-  test_case.mock(api, 'is_group_member', mocked_is_group_member)
+
+  test_case.mock(api, "is_group_member", mocked_is_group_member)
 
 
 # reset_local_state must be called only in tests, so expose it here.

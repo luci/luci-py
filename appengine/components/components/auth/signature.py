@@ -26,27 +26,27 @@ from components import utils
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
-  'CertificateBundle',
-  'CertificateError',
-  'get_google_oauth2_certs',
-  'get_own_public_certificates',
-  'get_service_account_certificates',
-  'get_service_public_certificates',
-  'sign_blob',
+  "CertificateBundle",
+  "CertificateError",
+  "get_google_oauth2_certs",
+  "get_own_public_certificates",
+  "get_service_account_certificates",
+  "get_service_public_certificates",
+  "sign_blob",
 ]
 
 
 # Base URL to fetch Google service account certs from.
-_GOOGLE_ROBOT_CERTS_URL = 'https://www.googleapis.com/robot/v1/metadata/x509/'
+_GOOGLE_ROBOT_CERTS_URL = "https://www.googleapis.com/robot/v1/metadata/x509/"
 # URL to fetch Google root OAuth2 certs from.
-_GOOGLE_OAUTH2_CERTS_URL = 'https://www.googleapis.com/oauth2/v1/certs'
+_GOOGLE_OAUTH2_CERTS_URL = "https://www.googleapis.com/oauth2/v1/certs"
 
 # For how long to cache the certificates. Due to the way how local memory cache
 # and memcache are used, the actual expiration time can be up to 2 times larger.
 # This is fine, since certs lifetime are usually 12h or more.
 _CERTS_CACHE_EXP_SEC = 3600
 
-_certs_cache = {} # cache key => (CertificateBundle, cache expiration time)
+_certs_cache = {}  # cache key => (CertificateBundle, cache expiration time)
 _certs_cache_lock = threading.Lock()
 
 
@@ -85,7 +85,7 @@ class CertificateBundle(object):
   def __init__(self, jsonish):
     self._jsonish = jsonish
     self._lock = threading.Lock()
-    self._verifiers = {} # key_id => PKCS1_v1_5 verifier
+    self._verifiers = {}  # key_id => PKCS1_v1_5 verifier
 
   @property
   def service_account_name(self):
@@ -96,7 +96,7 @@ class CertificateBundle(object):
     May return None for CertificateBundle objects fetched from old services
     that do not provide this information. The support was added in v1.2.9.
     """
-    return self._jsonish.get('service_account_name')
+    return self._jsonish.get("service_account_name")
 
   @property
   def app_id(self):
@@ -105,7 +105,7 @@ class CertificateBundle(object):
     May return None for CertificateBundle objects fetched from old services
     that do not provide this information. The support was added in v1.2.11.
     """
-    return self._jsonish.get('app_id')
+    return self._jsonish.get("app_id")
 
   def to_jsonish(self):
     """Returns JSON-serializable representation of this bundle.
@@ -153,24 +153,26 @@ class CertificateBundle(object):
       if not verifier:
         # Grab PEM-encoded x509 cert.
         x509_cert = None
-        for cert in self._jsonish['certificates']:
-          if cert['key_name'] == key_name:
-            x509_cert = cert['x509_certificate_pem']
+        for cert in self._jsonish["certificates"]:
+          if cert["key_name"] == key_name:
+            x509_cert = cert["x509_certificate_pem"]
             break
         else:
-          raise CertificateError('The key %r was not found' % key_name)
+          raise CertificateError("The key %r was not found" % key_name)
 
         # See https://stackoverflow.com/a/12921889.
 
         # Convert PEM to DER. There's a function for this in 'ssl' module
         # (ssl.PEM_cert_to_DER_cert), but 'ssl' is not importable in GAE sandbox
         # on dev server (C extension is not whitelisted).
-        lines = x509_cert.strip().split('\n')
-        if (len(lines) < 3 or
-            lines[0] != '-----BEGIN CERTIFICATE-----' or
-            lines[-1] != '-----END CERTIFICATE-----'):
-          raise CertificateError('Invalid certificate format')
-        der = base64.b64decode(''.join(lines[1:-1]))
+        lines = x509_cert.strip().split("\n")
+        if (
+          len(lines) < 3
+          or lines[0] != "-----BEGIN CERTIFICATE-----"
+          or lines[-1] != "-----END CERTIFICATE-----"
+        ):
+          raise CertificateError("Invalid certificate format")
+        der = base64.b64decode("".join(lines[1:-1]))
 
         # Extract subjectPublicKeyInfo field from X.509 certificate
         # (see RFC3280).
@@ -210,8 +212,9 @@ def sign_blob(blob, deadline=None):
 def get_google_oauth2_certs():
   """Returns CertificateBundle with Google's public OAuth2 certificates."""
   return _use_cached_or_fetch(
-      'v1:google_auth2_certs',
-      lambda: _fetch_certs_from_json(_GOOGLE_OAUTH2_CERTS_URL))
+    "v1:google_auth2_certs",
+    lambda: _fetch_certs_from_json(_GOOGLE_OAUTH2_CERTS_URL),
+  )
 
 
 @utils.cache_with_expiration(3600)
@@ -224,21 +227,23 @@ def get_own_public_certificates():
       certs = app_identity.get_public_certificates(deadline=1.5)
       break
     except apiproxy_errors.DeadlineExceededError as e:
-      logging.warning('%s', e)
+      logging.warning("%s", e)
       if attempt == 3:
         raise
-  return CertificateBundle({
-    'app_id': app_identity.get_application_id(),
-    'service_account_name': utils.get_service_account_name(),
-    'certificates': [
-      {
-        'key_name': cert.key_name,
-        'x509_certificate_pem': cert.x509_certificate_pem,
-      }
-      for cert in certs
-    ],
-    'timestamp': utils.datetime_to_timestamp(utils.utcnow()),
-  })
+  return CertificateBundle(
+    {
+      "app_id": app_identity.get_application_id(),
+      "service_account_name": utils.get_service_account_name(),
+      "certificates": [
+        {
+          "key_name": cert.key_name,
+          "x509_certificate_pem": cert.x509_certificate_pem,
+        }
+        for cert in certs
+      ],
+      "timestamp": utils.datetime_to_timestamp(utils.utcnow()),
+    }
+  )
 
 
 def get_service_public_certificates(service_url):
@@ -250,8 +255,9 @@ def get_service_public_certificates(service_url):
   Raises CertificateError on errors.
   """
   return _use_cached_or_fetch(
-      'v1:service_certs:%s' % service_url,
-      lambda: _fetch_service_certs(service_url))
+    "v1:service_certs:%s" % service_url,
+    lambda: _fetch_service_certs(service_url),
+  )
 
 
 def get_service_account_certificates(service_account_name):
@@ -263,17 +269,19 @@ def get_service_account_certificates(service_account_name):
   """
   url = _GOOGLE_ROBOT_CERTS_URL + urllib.parse.quote_plus(service_account_name)
   refresh = lambda: _fetch_certs_from_json(
-      url=url, service_account_name=service_account_name)
+    url=url, service_account_name=service_account_name
+  )
   return _use_cached_or_fetch(
-      'v1:service_account_certs:%s' % service_account_name, refresh)
+    "v1:service_account_certs:%s" % service_account_name, refresh
+  )
 
 
 def _fetch_service_certs(service_url):
-  protocol = 'https://'
+  protocol = "https://"
   if utils.is_local_dev_server():
-    protocol = ('http://', 'https://')
+    protocol = ("http://", "https://")
   assert service_url.startswith(protocol), (service_url, protocol)
-  url = '%s/auth/api/v1/server/certificates' % service_url
+  url = "%s/auth/api/v1/server/certificates" % service_url
 
   # Retry code is adapted from components/net.py. net.py can't be used directly
   # since it depends on components.auth (and dependency cycles between
@@ -282,31 +290,35 @@ def _fetch_service_certs(service_url):
   result = None
   while attempt < 4:
     if attempt:
-      logging.info('Retrying...')
+      logging.info("Retrying...")
     attempt += 1
-    logging.info('GET %s', url)
+    logging.info("GET %s", url)
     try:
       result = urlfetch.fetch(
-          url=url,
-          method='GET',
-          headers={'X-URLFetch-Service-Id': utils.get_urlfetch_service_id()},
-          follow_redirects=False,
-          deadline=5,
-          validate_certificate=True)
+        url=url,
+        method="GET",
+        headers={"X-URLFetch-Service-Id": utils.get_urlfetch_service_id()},
+        follow_redirects=False,
+        deadline=5,
+        validate_certificate=True,
+      )
     except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
       # Transient network error or URL fetch service RPC deadline.
-      logging.warning('GET %s failed: %s', url, e)
+      logging.warning("GET %s failed: %s", url, e)
       continue
     # It MUST return 200 on success, it can't return 403, 404 or >=500.
     if result.status_code != 200:
       logging.warning(
-          'GET %s failed, HTTP %d: %r', url, result.status_code, result.content)
+        "GET %s failed, HTTP %d: %r", url, result.status_code, result.content
+      )
       continue
     return json.loads(result.content)
 
   # All attempts failed, give up.
-  msg = 'Failed to grab public certs from %s (HTTP code %s)' % (
-      service_url, result.status_code if result else '???')
+  msg = "Failed to grab public certs from %s (HTTP code %s)" % (
+    service_url,
+    result.status_code if result else "???",
+  )
   raise CertificateError(msg, transient=True)
 
 
@@ -319,41 +331,45 @@ def _fetch_certs_from_json(url, service_account_name=None):
   result = None
   while attempt < 4:
     if attempt:
-      logging.info('Retrying...')
+      logging.info("Retrying...")
     attempt += 1
-    logging.info('GET %s', url)
+    logging.info("GET %s", url)
     try:
       result = urlfetch.fetch(
-          url=url,
-          method='GET',
-          follow_redirects=False,
-          deadline=5,
-          validate_certificate=True)
+        url=url,
+        method="GET",
+        follow_redirects=False,
+        deadline=5,
+        validate_certificate=True,
+      )
     except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
       # Transient network error or URL fetch service RPC deadline.
-      logging.warning('GET %s failed: %s', url, e)
+      logging.warning("GET %s failed: %s", url, e)
       continue
     # It MUST return 200 on success, it can't return 403, 404 or >=500.
     if result.status_code != 200:
       logging.warning(
-          'GET %s failed, HTTP %d: %r', url, result.status_code, result.content)
+        "GET %s failed, HTTP %d: %r", url, result.status_code, result.content
+      )
       continue
     response = json.loads(result.content)
     return {
-      'service_account_name': service_account_name,
-      'certificates': [
+      "service_account_name": service_account_name,
+      "certificates": [
         {
-          'key_name': key_name,
-          'x509_certificate_pem': pem,
+          "key_name": key_name,
+          "x509_certificate_pem": pem,
         }
         for key_name, pem in sorted(response.items())
       ],
-      'timestamp': utils.datetime_to_timestamp(utils.utcnow()),
+      "timestamp": utils.datetime_to_timestamp(utils.utcnow()),
     }
 
   # All attempts failed, give up.
-  msg = 'Failed to grab service account certs for %s (HTTP code %s)' % (
-      service_account_name, result.status_code if result else '???')
+  msg = "Failed to grab service account certs for %s (HTTP code %s)" % (
+    service_account_name,
+    result.status_code if result else "???",
+  )
   raise CertificateError(msg, transient=True)
 
 

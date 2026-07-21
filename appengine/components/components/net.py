@@ -17,7 +17,7 @@ from components import utils
 from components.auth import delegation
 from components.auth import tokens
 
-EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
+EMAIL_SCOPE = "https://www.googleapis.com/auth/userinfo.email"
 
 # A sentinel value for `params` argument in request(...). See its doc.
 PARAMS_IN_URL = object()
@@ -47,6 +47,7 @@ class AuthError(Error):
 class MethodNotAllowed(Error):
   """Raised if endpoint returns 405."""
 
+
 # Do not log Error exception raised from a tasklet, it is expected to happen.
 ndb.add_flow_exception(Error)
 
@@ -63,9 +64,10 @@ def _is_transient_error(response, url):
   # Retry 404 iff it is a Cloud Endpoints API call *and* the
   # result is not JSON. This assumes that we only use JSON encoding.
   if response.status_code == 404:
-    content_type = response.headers.get('Content-Type', '')
-    return (urllib.parse.urlparse(url).path.startswith('/_ah/api/') and
-            not content_type.startswith('application/json'))
+    content_type = response.headers.get("Content-Type", "")
+    return urllib.parse.urlparse(url).path.startswith(
+      "/_ah/api/"
+    ) and not content_type.startswith("application/json")
   return False
 
 
@@ -88,21 +90,21 @@ def _error_class_for_status(status_code):
 
 @ndb.tasklet
 def request_async(
-    url,
-    method='GET',
-    payload=None,
-    params=None,
-    headers=None,
-    scopes=None,
-    service_account_key=None,
-    delegation_token=None,
-    project_id=None,
-    use_jwt_auth=None,
-    audience=None,
-    deadline=None,
-    max_attempts=None,
-    response_headers=None,
-    expected_codes=None,
+  url,
+  method="GET",
+  payload=None,
+  params=None,
+  headers=None,
+  scopes=None,
+  service_account_key=None,
+  delegation_token=None,
+  project_id=None,
+  use_jwt_auth=None,
+  audience=None,
+  deadline=None,
+  max_attempts=None,
+  response_headers=None,
+  expected_codes=None,
 ):
   """Sends a REST API request, returns raw unparsed response.
 
@@ -142,22 +144,23 @@ def request_async(
 
   # Reject incompatible combinations of options.
   if (project_id or scopes) and use_jwt_auth:
-    raise ValueError('Cannot use either `scopes` or `project_id` '
-                     'and `use_jwt_auth` together.')
+    raise ValueError(
+      "Cannot use either `scopes` or `project_id` and `use_jwt_auth` together."
+    )
   if audience and not use_jwt_auth:
-    raise ValueError('Cannot use `audience` when `use_jwt_auth` is not set.')
+    raise ValueError("Cannot use `audience` when `use_jwt_auth` is not set.")
   if service_account_key and project_id:
-    raise ValueError('Cannot use `service_account_key` and `project_id`.')
+    raise ValueError("Cannot use `service_account_key` and `project_id`.")
 
   if utils.is_local_dev_server():
-    protocols = ('http://', 'https://')
+    protocols = ("http://", "https://")
   else:
-    protocols = ('https://',)
+    protocols = ("https://",)
   assert url.startswith(protocols), url
   if params is not PARAMS_IN_URL:
-    assert '?' not in url, url
+    assert "?" not in url, url
   if params and params is not PARAMS_IN_URL:
-    url += '?' + urllib.parse.urlencode(params)
+    url += "?" + urllib.parse.urlencode(params)
 
   headers = (headers or {}).copy()
 
@@ -165,7 +168,7 @@ def request_async(
   if project_id:
     if auth.is_internal_domain(urllib.parse.urlparse(url).netloc):
       # When hitting other LUCI services, use X-Luci-Project header.
-      headers['X-Luci-Project'] = project_id
+      headers["X-Luci-Project"] = project_id
       tok, _ = yield auth.get_access_token_async([EMAIL_SCOPE])
     else:
       # When hitting external services, use a project-scoped account. Fall back
@@ -177,16 +180,16 @@ def request_async(
       try:
         tok, _ = yield auth.get_project_access_token_async(project_id, scopes)
       except auth.NotFoundError:
-        logging.warning('No project-scoped account for %s', project_id)
+        logging.warning("No project-scoped account for %s", project_id)
         tok, _ = yield auth.get_access_token_async(scopes)
   elif scopes:
     tok, _ = yield auth.get_access_token_async(scopes, service_account_key)
   elif use_jwt_auth:
     # TODO(vadimsh): Cache the token for its validity duration.
-    tok = tokens.sign_jwt(aud=audience or '')
+    tok = tokens.sign_jwt(aud=audience or "")
 
   if tok:
-    headers['Authorization'] = 'Bearer ' + tok
+    headers["Authorization"] = "Bearer " + tok
 
   if delegation_token:
     if isinstance(delegation_token, auth.DelegationToken):
@@ -196,7 +199,7 @@ def request_async(
 
   if payload is not None:
     assert isinstance(payload, str), type(payload)
-    assert method in ('CREATE', 'POST', 'PUT'), method
+    assert method in ("CREATE", "POST", "PUT"), method
 
   attempt = 0
   response = None
@@ -204,21 +207,22 @@ def request_async(
   last_status_code = 901
   while attempt < max_attempts:
     if attempt:
-      logging.info('Retrying...')
+      logging.info("Retrying...")
     attempt += 1
-    logging.info('%s %s', method, url)
+    logging.info("%s %s", method, url)
     try:
       response = yield urlfetch_async(
-          url=url,
-          payload=payload,
-          method=method,
-          headers=headers,
-          follow_redirects=False,
-          deadline=deadline,
-          validate_certificate=True)
+        url=url,
+        payload=payload,
+        method=method,
+        headers=headers,
+        follow_redirects=False,
+        deadline=deadline,
+        validate_certificate=True,
+      )
     except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
       # Transient network error or URL fetch service RPC deadline.
-      logging.warning('%s %s failed: %s', method, url, e)
+      logging.warning("%s %s failed: %s", method, url, e)
       # 902 CLIENT STATUS_TIMEOUT. See gae_ts_mon/common/http_metrics.py
       last_status_code = 902
       continue
@@ -227,34 +231,46 @@ def request_async(
 
     # Transient error on the other side.
     if _is_transient_error(response, url):
-      logging.warning('%s %s failed with HTTP %d\nHeaders: %r\nBody: %r',
-                      method, url, response.status_code, response.headers,
-                      response.content)
+      logging.warning(
+        "%s %s failed with HTTP %d\nHeaders: %r\nBody: %r",
+        method,
+        url,
+        response.status_code,
+        response.headers,
+        response.content,
+      )
       continue
 
     # Non-transient error.
     if _is_fatal_error(response, expected_codes):
-      logging.warning('%s %s failed with HTTP %d\nHeaders: %r\nBody: %r',
-                      method, url, response.status_code, response.headers,
-                      response.content)
+      logging.warning(
+        "%s %s failed with HTTP %d\nHeaders: %r\nBody: %r",
+        method,
+        url,
+        response.status_code,
+        response.headers,
+        response.content,
+      )
       raise _error_class_for_status(response.status_code)(
-          'Failed to call %s: HTTP %d' % (url, response.status_code),
-          response.status_code,
-          response.content,
-          headers=response.headers)
+        "Failed to call %s: HTTP %d" % (url, response.status_code),
+        response.status_code,
+        response.content,
+        headers=response.headers,
+      )
 
     # Success. Beware of large responses.
     if response_headers is not None:
       response_headers.update(response.headers)
     if len(response.content) > 1024 * 1024:
-      logging.warning('Response size: %.1f KiB', len(response.content) / 1024.0)
+      logging.warning("Response size: %.1f KiB", len(response.content) / 1024.0)
     raise ndb.Return(response.content)
 
   raise _error_class_for_status(last_status_code)(
-      'Failed to call %s after %d attempts' % (url, max_attempts),
-      response.status_code if response else last_status_code,
-      response.content if response else None,
-      headers=response.headers if response else None)
+    "Failed to call %s after %d attempts" % (url, max_attempts),
+    response.status_code if response else last_status_code,
+    response.content if response else None,
+    headers=response.headers if response else None,
+  )
 
 
 def request(*args, **kwargs):
@@ -263,20 +279,22 @@ def request(*args, **kwargs):
 
 
 @ndb.tasklet
-def json_request_async(url,
-                       method='GET',
-                       payload=None,
-                       params=None,
-                       headers=None,
-                       scopes=None,
-                       service_account_key=None,
-                       delegation_token=None,
-                       project_id=None,
-                       use_jwt_auth=None,
-                       audience=None,
-                       deadline=None,
-                       max_attempts=None,
-                       response_headers=None):
+def json_request_async(
+  url,
+  method="GET",
+  payload=None,
+  params=None,
+  headers=None,
+  scopes=None,
+  service_account_key=None,
+  delegation_token=None,
+  project_id=None,
+  use_jwt_auth=None,
+  audience=None,
+  deadline=None,
+  max_attempts=None,
+  response_headers=None,
+):
   """Sends a JSON REST API request, returns deserialized response.
 
   Automatically strips prefixes formed from characters in the set ")]}'\n"
@@ -313,29 +331,30 @@ def json_request_async(url,
   """
   if payload is not None:
     headers = (headers or {}).copy()
-    headers['Accept'] = 'application/json; charset=utf-8'
-    headers['Content-Type'] = 'application/json; charset=utf-8'
+    headers["Accept"] = "application/json; charset=utf-8"
+    headers["Content-Type"] = "application/json; charset=utf-8"
     payload = utils.encode_to_json(payload)
   response = yield request_async(
-      url=url,
-      method=method,
-      payload=payload,
-      params=params,
-      headers=headers,
-      scopes=scopes,
-      service_account_key=service_account_key,
-      delegation_token=delegation_token,
-      project_id=project_id,
-      deadline=deadline,
-      max_attempts=max_attempts,
-      use_jwt_auth=use_jwt_auth,
-      audience=audience,
-      response_headers=response_headers)
+    url=url,
+    method=method,
+    payload=payload,
+    params=params,
+    headers=headers,
+    scopes=scopes,
+    service_account_key=service_account_key,
+    delegation_token=delegation_token,
+    project_id=project_id,
+    deadline=deadline,
+    max_attempts=max_attempts,
+    use_jwt_auth=use_jwt_auth,
+    audience=audience,
+    response_headers=response_headers,
+  )
   try:
     response = json.loads(response.lstrip(")]}'\n"))
   except ValueError as e:
     # 901 CLIENT STATUS_ERROR. See gae_ts_mon/common/http_metrics.py
-    raise Error('Bad JSON response: %s' % e, 901, response)
+    raise Error("Bad JSON response: %s" % e, 901, response)
   raise ndb.Return(response)
 
 

@@ -8,6 +8,7 @@ import sys
 import unittest
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
@@ -30,6 +31,7 @@ class TransactionTest(test_case.TestCase):
     def run():
       EntityX(a=1).put()
       return 2
+
     self.assertEqual(2, txn.transaction(run))
     self.assertEqual(1, EntityX.query().count())
 
@@ -37,6 +39,7 @@ class TransactionTest(test_case.TestCase):
     def run():
       EntityX(a=1).put()
       return 2
+
     future = txn.transaction_async(run)
     self.assertEqual(2, future.get_result())
     self.assertEqual(1, EntityX.query().count())
@@ -45,6 +48,7 @@ class TransactionTest(test_case.TestCase):
     def run():
       EntityX(a=1).put()
       raise Failure()
+
     with self.assertRaises(Failure):
       txn.transaction(run)
     self.assertEqual(0, EntityX.query().count())
@@ -53,6 +57,7 @@ class TransactionTest(test_case.TestCase):
     def run():
       EntityX(a=1).put()
       raise Failure()
+
     future = txn.transaction_async(run)
     with self.assertRaises(Failure):
       future.get_result()
@@ -62,6 +67,7 @@ class TransactionTest(test_case.TestCase):
     def run():
       EntityX(a=1).put()
       raise Failure()
+
     with self.assertRaises(Failure):
       txn.transaction(run)
     self.assertEqual(0, EntityX.query().count())
@@ -70,6 +76,7 @@ class TransactionTest(test_case.TestCase):
     def run():
       EntityX(a=1).put()
       raise Failure()
+
     future = txn.transaction_async(run)
     with self.assertRaises(Failure):
       future.get_result()
@@ -80,6 +87,7 @@ class TransactionTest(test_case.TestCase):
     def run():
       EntityX(a=1).put()
       return 2
+
     self.assertEqual(2, run())
     self.assertEqual(1, EntityX.query().count())
 
@@ -88,6 +96,7 @@ class TransactionTest(test_case.TestCase):
     def run():
       EntityX(a=1).put()
       return 2
+
     future = run()
     self.assertEqual(2, future.get_result())
     self.assertEqual(1, EntityX.query().count())
@@ -97,14 +106,16 @@ class TransactionTest(test_case.TestCase):
     def run():
       yield EntityX(a=1).put_async()
       raise ndb.Return(2)
+
     future = run()
     self.assertEqual(2, future.get_result())
     self.assertEqual(1, EntityX.query().count())
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
+    level=logging.DEBUG if "-v" in sys.argv else logging.ERROR
+  )
   unittest.main()

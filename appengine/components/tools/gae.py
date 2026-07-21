@@ -13,7 +13,7 @@
 # >
 # [VPYTHON:END]
 
-__version__ = '3.0'
+__version__ = "3.0"
 
 import atexit
 import optparse
@@ -31,7 +31,8 @@ IS_SYMLINKED = False
 while True:
   try:
     SCRIPT_PATH = os.path.abspath(
-        os.path.join(os.path.dirname(SCRIPT_PATH), os.readlink(SCRIPT_PATH)))
+      os.path.join(os.path.dirname(SCRIPT_PATH), os.readlink(SCRIPT_PATH))
+    )
     IS_SYMLINKED = True
   except OSError:
     break
@@ -42,8 +43,8 @@ COMPONENTS_DIR = os.path.dirname(os.path.dirname(SCRIPT_PATH))
 if COMPONENTS_DIR not in sys.path:
   sys.path.insert(0, COMPONENTS_DIR)
 
-THIRD_PARTY = os.path.join(COMPONENTS_DIR, '..', '..', 'client', 'third_party')
-DEPOT_TOOLS = os.path.join(THIRD_PARTY, 'depot_tools')
+THIRD_PARTY = os.path.join(COMPONENTS_DIR, "..", "..", "client", "third_party")
+DEPOT_TOOLS = os.path.join(THIRD_PARTY, "depot_tools")
 
 sys.path.insert(0, THIRD_PARTY)
 sys.path.insert(0, DEPOT_TOOLS)
@@ -73,20 +74,23 @@ def _print_version_log(app, to_version):
     return
 
   try:
-    start = int(from_version.split('-', 1)[0])
-    end = int(to_version.split('-', 1)[0])
+    start = int(from_version.split("-", 1)[0])
+    end = int(to_version.split("-", 1)[0])
   except ValueError:
-    print("Can't get version number. from: %s, to: %s" %
-          (from_version, to_version))
+    print(
+      "Can't get version number. from: %s, to: %s" % (from_version, to_version)
+    )
     return
 
   if start < end:
     pseudo_revision, mergebase = calculate_version.get_remote_pseudo_revision(
-        app.app_dir, 'origin/main')
-    logs, _ = log_since.get_logs(app.app_dir, pseudo_revision, mergebase, start,
-                                 end)
-    print('\nLogs between %s and %s:' % (from_version, to_version))
-    print('%s\n' % logs)
+      app.app_dir, "origin/main"
+    )
+    logs, _ = log_since.get_logs(
+      app.app_dir, pseudo_revision, mergebase, start, end
+    )
+    print("\nLogs between %s and %s:" % (from_version, to_version))
+    print("%s\n" % logs)
 
 
 ##
@@ -98,21 +102,27 @@ def CMDactive(parser, args):
   This is an approximation of querying which version is the default.
   """
   parser.add_option(
-      '-b', '--bare', action='store_true',
-      help='Only print the version(s), nothing else')
+    "-b",
+    "--bare",
+    action="store_true",
+    help="Only print the version(s), nothing else",
+  )
   app, options, _services = parser.parse_args(args)
   data = app.get_actives()
   if options.bare:
-    print('\n'.join(sorted(set(i['id'] for i in data))))
+    print("\n".join(sorted(set(i["id"] for i in data))))
     return 0
-  print('%s:' % app.app_id)
+  print("%s:" % app.app_id)
 
   for service in data:
-    msg = (
-        '  %s: %s by %s at %s' % (service['service'], service['id'],
-                                  service['deployer'], service['creationTime']))
-    if service['traffic_split'] < 1:
-      msg += ' (traffic: %.1f%%)' % (service['traffic_split'] * 100)
+    msg = "  %s: %s by %s at %s" % (
+      service["service"],
+      service["id"],
+      service["deployer"],
+      service["creationTime"],
+    )
+    if service["traffic_split"] < 1:
+      msg += " (traffic: %.1f%%)" % (service["traffic_split"] * 100)
     print(msg)
   return 0
 
@@ -123,7 +133,7 @@ def CMDapp_dir(parser, args):
   # the command even before invoking CLI parser, or it will ask to pass
   # --app_dir to 'app-dir' subcommand, which is ridiculous.
   if not parser.default_app_dir:
-    print('Can\'t discover an application root directory.', file=sys.stderr)
+    print("Can't discover an application root directory.", file=sys.stderr)
     return 1
   # Validate the command line doesn't have unrecognized junk.
   _ = parser.parse_args(args, parse_only=True)
@@ -131,7 +141,7 @@ def CMDapp_dir(parser, args):
   return 0
 
 
-@subcommand.usage('[version_id version_id ...]')
+@subcommand.usage("[version_id version_id ...]")
 def CMDcleanup(parser, args):
   """Removes old versions of GAE application services.
 
@@ -150,29 +160,31 @@ def CMDcleanup(parser, args):
     versions = app.get_uploaded_versions()
     fd, path = tempfile.mkstemp()
     atexit.register(lambda: os.remove(path))
-    with os.fdopen(fd, 'w') as f:
+    with os.fdopen(fd, "w") as f:
       header = (
-        '# Remove lines that correspond to versions\n'
-        '# you\'d like to delete from \'%s\'.\n')
-      f.write(header % app.app_id + '\n'.join(versions) + '\n')
+        "# Remove lines that correspond to versions\n"
+        "# you'd like to delete from '%s'.\n"
+      )
+      f.write(header % app.app_id + "\n".join(versions) + "\n")
 
     # Let user remove versions that are no longer needed.
     editor = os.environ.get(
-        'EDITOR', 'notepad.exe' if sys.platform == 'win32' else 'vi')
-    exit_code = os.system('%s %s' % (editor, path))
+      "EDITOR", "notepad.exe" if sys.platform == "win32" else "vi"
+    )
+    exit_code = os.system("%s %s" % (editor, path))
     if exit_code:
-      print('Aborted.')
+      print("Aborted.")
       return exit_code
 
     # Read back the file that now contains only versions to keep.
     keep = []
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
       for line in f:
         line = line.strip()
-        if not line or line.startswith('#'):
+        if not line or line.startswith("#"):
           continue
         if line not in versions:
-          print('Unknown version: %s' % line, file=sys.stderr)
+          print("Unknown version: %s" % line, file=sys.stderr)
           return 1
         if line not in keep:
           keep.append(line)
@@ -180,39 +192,43 @@ def CMDcleanup(parser, args):
     # Calculate a list of versions to remove.
     versions_to_remove = [v for v in versions if v not in keep]
     if not versions_to_remove:
-      print('Nothing to do.')
+      print("Nothing to do.")
       return 0
 
   # Deleting a version is a destructive operation, confirm.
   if not options.force:
     ok = gae_sdk_utils.confirm(
-        'Delete the following versions?', app, versions_to_remove)
+      "Delete the following versions?", app, versions_to_remove
+    )
     if not ok:
-      print('Aborted.')
+      print("Aborted.")
       return 1
 
   for version in versions_to_remove:
-    print('Deleting %s...' % version)
+    print("Deleting %s..." % version)
     app.delete_version(version)
 
   return 0
 
 
-@subcommand.usage('[extra arguments for dev_appserver.py]')
+@subcommand.usage("[extra arguments for dev_appserver.py]")
 def CMDdevserver(parser, args):
   """Runs the app locally via dev_appserver.py."""
   parser.allow_positional_args = True
   parser.disable_interspersed_args()
   parser.add_option(
-      '-o', '--open', action='store_true',
-      help='Listen to all interfaces (less secure)')
+    "-o",
+    "--open",
+    action="store_true",
+    help="Listen to all interfaces (less secure)",
+  )
   app, options, args = parser.parse_args(args)
   # Let dev_appserver.py handle Ctrl+C interrupts.
   signal.signal(signal.SIGINT, signal.SIG_IGN)
   return app.run_dev_appserver(args, options.open)
 
 
-@subcommand.usage('[version_id]')
+@subcommand.usage("[version_id]")
 def CMDswitch(parser, args):
   """Switches default version of all app services.
 
@@ -224,31 +240,32 @@ def CMDswitch(parser, args):
   parser.allow_positional_args = True
   app, options, version = parser.parse_args(args)
   if len(version) > 1:
-    parser.error('Unknown args: %s' % version[1:])
+    parser.error("Unknown args: %s" % version[1:])
   version = None if not version else version[0]
 
   # Interactively pick a version if not passed via command line.
   if not version:
     versions = app.get_uploaded_versions()
     if not versions:
-      print('Upload a version first.')
+      print("Upload a version first.")
       return 1
 
-    print('Specify a version to switch to:')
+    print("Specify a version to switch to:")
     for version in versions:
-      print('  %s' % version)
+      print("  %s" % version)
 
-    prompt = 'Switch to version [%s]: ' % versions[-1]
+    prompt = "Switch to version [%s]: " % versions[-1]
     version = input(prompt) or versions[-1]
     if version not in versions:
-      print('No such version.')
+      print("No such version.")
       return 1
 
   _print_version_log(app, version)
   # Switching a default version is disruptive operation. Require confirmation.
-  if (not options.force and
-      not gae_sdk_utils.confirm('Switch default version?', app, version)):
-    print('Aborted.')
+  if not options.force and not gae_sdk_utils.confirm(
+    "Switch default version?", app, version
+  ):
+    print("Aborted.")
     return 1
 
   print()
@@ -256,7 +273,7 @@ def CMDswitch(parser, args):
   return 0
 
 
-@subcommand.usage('[service_id service_id ...]')
+@subcommand.usage("[service_id service_id ...]")
 def CMDupload(parser, args):
   """Uploads a new version of specific (or all) services of an app.
 
@@ -273,19 +290,25 @@ def CMDupload(parser, args):
   """
   parser.add_tag_option()
   parser.add_option(
-      '-x', '--switch', action='store_true',
-      help='Switch version after uploading new code')
+    "-x",
+    "--switch",
+    action="store_true",
+    help="Switch version after uploading new code",
+  )
   parser.add_option(
-      '--target-version', action='store',
-      help='Overrides the version that is uploaded. '
-           'If this is set, the --tag option is ignored.')
+    "--target-version",
+    action="store",
+    help="Overrides the version that is uploaded. "
+    "If this is set, the --tag option is ignored.",
+  )
   parser.add_option(
-      '--host-scheme',
-      action='store',
-      help='Specify the hostname scheme to use for links to the uploaded app. '
-      'For apps using custom domains. Any occurance of the uppercase text '
-      'VERSION in the scheme is substituted for the uploaded version. '
-      'E.g. "VERSION.staging.myapp.api.luci.app"')
+    "--host-scheme",
+    action="store",
+    help="Specify the hostname scheme to use for links to the uploaded app. "
+    "For apps using custom domains. Any occurance of the uppercase text "
+    "VERSION in the scheme is substituted for the uploaded version. "
+    'E.g. "VERSION.staging.myapp.api.luci.app"',
+  )
   parser.add_switch_option()
   parser.add_force_option()
   parser.allow_positional_args = True
@@ -293,54 +316,61 @@ def CMDupload(parser, args):
 
   for service in services:
     if service not in app.services:
-      parser.error('No such service: %s' % service)
+      parser.error("No such service: %s" % service)
 
   if options.target_version:
     version = options.target_version
   else:
     # Additional chars is for the app_id as well as 5 chars for '-dot-'.
     version = calculate_version.calculate_version(
-      app.app_dir, options.tag, len(app.app_id)+5)
+      app.app_dir, options.tag, len(app.app_id) + 5
+    )
 
   # Updating indexes, queues, etc is a disruptive operation. Confirm.
   if not options.force:
     approved = gae_sdk_utils.confirm(
-        'Upload new version, update indexes, queues and cron jobs?',
-        app, version, services, default_yes=True)
+      "Upload new version, update indexes, queues and cron jobs?",
+      app,
+      version,
+      services,
+      default_yes=True,
+    )
     if not approved:
-      print('Aborted.')
+      print("Aborted.")
       return 1
 
   if options.host_scheme:
     # Use the custom hostname scheme.
-    url = 'https://%s' % options.host_scheme.replace('VERSION', version)
+    url = "https://%s" % options.host_scheme.replace("VERSION", version)
   else:
-    url = 'https://%s-dot-%s.appspot.com' % (version, app.app_id)
+    url = "https://%s-dot-%s.appspot.com" % (version, app.app_id)
 
   app.update(version, services)
 
-  print('-' * 80)
-  print('New version:')
-  print('  %s' % version)
-  print('Uploaded as:')
-  print('  %s' % url)
-  print('Manage at:')
-  print('  https://console.cloud.google.com/appengine/versions?project=' +
-        app.app_id)
-  print('-' * 80)
+  print("-" * 80)
+  print("New version:")
+  print("  %s" % version)
+  print("Uploaded as:")
+  print("  %s" % url)
+  print("Manage at:")
+  print(
+    "  https://console.cloud.google.com/appengine/versions?project="
+    + app.app_id
+  )
+  print("-" * 80)
 
   if not (options.switch or options.roll_duration):
     return 0
-  if 'tainted-' in version:
-    print('')
-    print('Can\'t use --switch with a tainted version!', file=sys.stderr)
+  if "tainted-" in version:
+    print("")
+    print("Can't use --switch with a tainted version!", file=sys.stderr)
     return 1
   _print_version_log(app, version)
-  print('Switching as default version')
+  print("Switching as default version")
   print()
-  app.set_default_version(version,
-                          services,
-                          roll_duration=options.roll_duration)
+  app.set_default_version(
+    version, services, roll_duration=options.roll_duration
+  )
   return 0
 
 
@@ -358,8 +388,11 @@ def CMDversion(parser, args):
   parser.add_tag_option()
   app, options, _ = parser.parse_args(args)
   # Additional chars is for the app_id as well as 5 chars for '-dot-'.
-  print(calculate_version.calculate_version(
-    app.app_dir, options.tag, len(app.app_id)+5))
+  print(
+    calculate_version.calculate_version(
+      app.app_dir, options.tag, len(app.app_id) + 5
+    )
+  )
   return 0
 
 
@@ -368,34 +401,38 @@ class OptionParser(optparse.OptionParser):
 
   def __init__(self, app_dir, **kwargs):
     optparse.OptionParser.__init__(
-        self,
-        version=__version__,
-        description=sys.modules['__main__'].__doc__,
-        **kwargs)
+      self,
+      version=__version__,
+      description=sys.modules["__main__"].__doc__,
+      **kwargs,
+    )
     self.default_app_dir = app_dir
     self.allow_positional_args = False
 
   def add_tag_option(self):
-    self.add_option('-t', '--tag', help='Tag to attach to a tainted version')
+    self.add_option("-t", "--tag", help="Tag to attach to a tainted version")
 
   def add_switch_option(self):
     self.add_option(
-        '-n', '--no-log', action='store_true',
-        help='Do not print logs from the current server active version to the '
-             'one being switched to')
+      "-n",
+      "--no-log",
+      action="store_true",
+      help="Do not print logs from the current server active version to the "
+      "one being switched to",
+    )
     gae_sdk_utils.add_roll_duration_option(self)
 
   def add_force_option(self):
     self.add_option(
-        '-f', '--force', action='store_true',
-        help='Do not ask for confirmation')
+      "-f", "--force", action="store_true", help="Do not ask for confirmation"
+    )
 
   def parse_args(self, *args, **kwargs):
-    parse_only = kwargs.pop('parse_only', False)
+    parse_only = kwargs.pop("parse_only", False)
     gae_sdk_utils.add_sdk_options(self, self.default_app_dir)
     options, args = optparse.OptionParser.parse_args(self, *args, **kwargs)
     if not self.allow_positional_args and args:
-      self.error('Unknown arguments: %s' % args)
+      self.error("Unknown arguments: %s" % args)
     app = None
     if not parse_only:
       app = gae_sdk_utils.process_sdk_options(self, options)
@@ -426,13 +463,16 @@ def _find_app_dir(search_dir):
   A root directory is denoted either by presence of '.git' subdir, or 'ROOT'
   file.
   """
+
   def is_root(p):
     return (
-        os.path.isdir(os.path.join(p, '.git')) or
-        os.path.isfile(os.path.join(p, 'ROOT')) or
-        os.path.dirname(p) == p)
+      os.path.isdir(os.path.join(p, ".git"))
+      or os.path.isfile(os.path.join(p, "ROOT"))
+      or os.path.dirname(p) == p
+    )
 
   cached_check = {}
+
   def is_app_dir(p):
     if p not in cached_check:
       cached_check[p] = not is_root(p) and gae_sdk_utils.is_app_dir(p)
@@ -469,9 +509,9 @@ def main(args):
     return 1
   except KeyboardInterrupt:
     # Don't dump stack traces on Ctrl+C, it's expected flow in some commands.
-    print('\nInterrupted', file=sys.stderr)
+    print("\nInterrupted", file=sys.stderr)
     return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   sys.exit(main(sys.argv[1:]))

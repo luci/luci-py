@@ -21,7 +21,8 @@ from .. import model
 MembershipRequest = endpoints.ResourceContainer(
   message_types.VoidMessage,
   group=messages.StringField(1, required=True),
-  identity=messages.StringField(2, required=True))
+  identity=messages.StringField(2, required=True),
+)
 
 
 class MembershipResponse(messages.Message):
@@ -31,22 +32,21 @@ class MembershipResponse(messages.Message):
 ### API
 
 
-@endpoints_support.endpoints_api(name='auth', version='v1')
+@endpoints_support.endpoints_api(name="auth", version="v1")
 class AuthService(remote.Service):
   """Verifies if a given identity is a member of a particular group."""
 
   @endpoints_support.endpoints_method(
-      MembershipRequest, MembershipResponse,
-      http_method='GET',
-      path='/membership')
+    MembershipRequest, MembershipResponse, http_method="GET", path="/membership"
+  )
   @api.require(acl.has_access)
   def membership(self, request):
     identity = request.identity
-    if ':' not in identity:
-      identity = 'user:%s' % identity
+    if ":" not in identity:
+      identity = "user:%s" % identity
     try:
       identity = model.Identity.from_bytes(identity)
     except ValueError as e:
-      raise endpoints.BadRequestException('Invalid identity: %s.' % e)
+      raise endpoints.BadRequestException("Invalid identity: %s." % e)
     is_member = api.is_group_member(request.group, identity)
     return MembershipResponse(is_member=is_member)

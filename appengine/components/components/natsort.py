@@ -10,18 +10,20 @@ import re
 def natcmp(a, b):
   """Natural string comparison, case sensitive."""
   try_int = lambda s: int(s) if s.isdigit() else s
+
   def natsort_key(s):
     if not isinstance(s, basestring):
       # Since re.findall() generates a list out of a string, returns a list here
       # to balance the comparison done in cmp().
       return [s]
-    return map(try_int, re.findall(r'(\d+|\D+)', s))
+    return map(try_int, re.findall(r"(\d+|\D+)", s))
+
   return cmp(natsort_key(a), natsort_key(b))
 
 
 def try_lower(x):
   """Opportunistically lower() a string if it is a string."""
-  return x.lower() if hasattr(x, 'lower') else x
+  return x.lower() if hasattr(x, "lower") else x
 
 
 def naticasecmp(a, b):

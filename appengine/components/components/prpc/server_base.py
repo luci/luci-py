@@ -27,21 +27,22 @@ from components.prpc import discovery
 from components.prpc.codes import StatusCode
 
 __all__ = [
-    'HandlerCallDetails',
-    'ServerBase',
-    'StatusCode',
+  "HandlerCallDetails",
+  "ServerBase",
+  "StatusCode",
 ]
 
-_Service = collections.namedtuple('_Service', ['servicer', 'methods'])
+_Service = collections.namedtuple("_Service", ["servicer", "methods"])
 
 # Details about the RPC call passed to the interceptors.
 HandlerCallDetails = collections.namedtuple(
-    'HandlerCallDetails',
-    [
-        'method',  # full method name <service>.<method>
-        # (k, v) pairs list with metadata sent by the client
-        'invocation_metadata',
-    ])
+  "HandlerCallDetails",
+  [
+    "method",  # full method name <service>.<method>
+    # (k, v) pairs list with metadata sent by the client
+    "invocation_metadata",
+  ],
+)
 
 
 class ServerBase(object):
@@ -89,7 +90,7 @@ class ServerBase(object):
     Args:
       interceptor: an interceptor callback to add to the chain.
     """
-    self._interceptors = self._interceptors + (interceptor, )
+    self._interceptors = self._interceptors + (interceptor,)
 
   def add_service(self, servicer):
     """Registers a servicer for a service with the server.
@@ -103,34 +104,36 @@ class ServerBase(object):
       ValueError: when trying to add another handler for the same service name.
     """
     sym_db = symbol_database.Default()
-    pkg = servicer.DESCRIPTION['file_descriptor'].package
-    desc = servicer.DESCRIPTION['service_descriptor']
+    pkg = servicer.DESCRIPTION["file_descriptor"].package
+    desc = servicer.DESCRIPTION["service_descriptor"]
 
     # Construct handler.
     methods = {
-        method.name: (
-            # Fully-qualified proto type names will always begin with a '.'
-            # which GetSymbol doesn't strip out.
-            sym_db.GetSymbol(method.input_type[1:]),
-            sym_db.GetSymbol(method.output_type[1:]),
-            getattr(servicer, method.name),
-        )
-        for method in desc.method if hasattr(servicer, method.name)
+      method.name: (
+        # Fully-qualified proto type names will always begin with a '.'
+        # which GetSymbol doesn't strip out.
+        sym_db.GetSymbol(method.input_type[1:]),
+        sym_db.GetSymbol(method.output_type[1:]),
+        getattr(servicer, method.name),
+      )
+      for method in desc.method
+      if hasattr(servicer, method.name)
     }
 
     full_name = desc.name
     if pkg:
-      full_name = '%s.%s' % (pkg, desc.name)
+      full_name = "%s.%s" % (pkg, desc.name)
 
     # Register handler with internal server state.
     if desc.name in self._services:
-      raise ValueError('Tried to double-register handlers for service %s' %
-                       desc.name)
+      raise ValueError(
+        "Tried to double-register handlers for service %s" % desc.name
+      )
     self._services[full_name] = _Service(servicer, methods)
 
     self._discovery_service.add_service(servicer.DESCRIPTION)
 
-  def get_routes(self, prefix=''):
+  def get_routes(self, prefix=""):
     """Returns a list of routes the API handles."""
     raise NotImplementedError("Get_routes must be implemented")
 
@@ -150,8 +153,9 @@ class ServerBase(object):
       return handler(request, context)
 
     def continuation(request, context, call_details):
-      return self._run_interceptors(request, context, call_details, handler,
-                                    idx + 1)
+      return self._run_interceptors(
+        request, context, call_details, handler, idx + 1
+      )
 
     interceptor = self._interceptors[idx]
     return interceptor(request, context, call_details, continuation)
@@ -176,25 +180,25 @@ class ServerBase(object):
       context._request_encoding = parsed_headers.content_type
       context._response_encoding = parsed_headers.accept
     except ValueError as e:
-      logging.warning('Error parsing headers: %s', e)
+      logging.warning("Error parsing headers: %s", e)
       self._write_exc(context, StatusCode.INVALID_ARGUMENT, str(e))
       return None
 
     if service not in self._services:
       context.set_code(StatusCode.UNIMPLEMENTED)
-      context.set_details('Service %s does not exist' % service)
+      context.set_details("Service %s does not exist" % service)
       return None
     rpc_handler = self._services[service].methods.get(method)
     if rpc_handler is None:
       context.set_code(StatusCode.UNIMPLEMENTED)
-      context.set_details('Method %s does not exist' % method)
+      context.set_details("Method %s does not exist" % method)
       return None
     request_message, response_message, handler = rpc_handler
 
     request = request_message()
     try:
       decoder = encoding.get_decoder(parsed_headers.content_type)
-      if hasattr(router_request, 'body'):
+      if hasattr(router_request, "body"):
         # handle webapp2 request
         decoder(router_request.body, request)
       else:
@@ -202,54 +206,63 @@ class ServerBase(object):
         decoder(router_request.get_data(), request)
 
     except Exception as e:
-      logging.warning('Failed to decode request: %s', e, exc_info=True)
-      self._write_exc(context, StatusCode.INVALID_ARGUMENT,
-                      'Error parsing request: %s' % str(e))
+      logging.warning("Failed to decode request: %s", e, exc_info=True)
+      self._write_exc(
+        context,
+        StatusCode.INVALID_ARGUMENT,
+        "Error parsing request: %s" % str(e),
+      )
       return None
 
     context._timeout = parsed_headers.timeout
     context._invocation_metadata = parsed_headers.invocation_metadata
 
     # Only ipv6 addresses have ':' in them. Assume everything else is ipv4.
-    if ':' in router_request.remote_addr:
-      context._peer = 'ipv6:[%s]' % router_request.remote_addr
+    if ":" in router_request.remote_addr:
+      context._peer = "ipv6:[%s]" % router_request.remote_addr
     else:
-      context._peer = 'ipv4:%s' % router_request.remote_addr
+      context._peer = "ipv4:%s" % router_request.remote_addr
 
     call_details = HandlerCallDetails(
-        method='%s.%s' % (service, method),
-        invocation_metadata=context.invocation_metadata())
+      method="%s.%s" % (service, method),
+      invocation_metadata=context.invocation_metadata(),
+    )
 
     try:
       # TODO(nodir,mknyszek): Poll for context to hit timeout or be
       # canceled.
-      response = self._run_interceptors(request, context, call_details, handler,
-                                        0)
+      response = self._run_interceptors(
+        request, context, call_details, handler, 0
+      )
     except Exception:
-      logging.exception('Service implementation threw an exception')
-      self._write_exc(context, StatusCode.INTERNAL,
-                      'Service implementation threw an exception')
+      logging.exception("Service implementation threw an exception")
+      self._write_exc(
+        context,
+        StatusCode.INTERNAL,
+        "Service implementation threw an exception",
+      )
       return None
 
     if response is None:
       if context._code == StatusCode.OK:
         context.set_code(StatusCode.INTERNAL)
-        context.set_details('Service implementation didn\'t return a response')
+        context.set_details("Service implementation didn't return a response")
       return None
 
     if not isinstance(response, response_message):
-      logging.error('Service implementation response has incorrect type')
+      logging.error("Service implementation response has incorrect type")
       context.set_code(StatusCode.INTERNAL)
-      context.set_details('Service implementation returned invalid value')
+      context.set_details("Service implementation returned invalid value")
       return None
 
     try:
       encoder = encoding.get_encoder(parsed_headers.accept)
       content = encoder(response)
     except Exception:
-      logging.exception('Failed to encode response')
-      self._write_exc(context, StatusCode.INTERNAL,
-                      'Error serializing response')
+      logging.exception("Failed to encode response")
+      self._write_exc(
+        context, StatusCode.INTERNAL, "Error serializing response"
+      )
       return None
 
     return content
@@ -258,24 +271,27 @@ class ServerBase(object):
     """Populates `context` with error info and, potentially, traceback."""
     context.set_code(code)
     if self.debug:
-      context.set_details(message + '\n' + traceback.format_exc())
+      context.set_details(message + "\n" + traceback.format_exc())
     else:
       context.set_details(message)
 
   def _options_handler(self, request, response):
     """Sends an empty response with CORS headers for origins, if allowed."""
-    origin = request.headers.get('Origin')
+    origin = request.headers.get("Origin")
 
-    if origin and self.allow_cors and (not self.allowed_origins
-                                       or origin in self.allowed_origins):
-      response.headers['Access-Control-Allow-Origin'] = origin
-      response.headers['Vary'] = 'Origin'
-      response.headers['Access-Control-Allow-Credentials'] = 'true'
-      response.headers['Access-Control-Allow-Headers'] = \
-              'Origin, Content-Type, Accept, Authorization'
-      response.headers['Access-Control-Allow-Methods'] = \
-              'OPTIONS, POST'
-      response.headers['Access-Control-Max-Age'] = '600'
+    if (
+      origin
+      and self.allow_cors
+      and (not self.allowed_origins or origin in self.allowed_origins)
+    ):
+      response.headers["Access-Control-Allow-Origin"] = origin
+      response.headers["Vary"] = "Origin"
+      response.headers["Access-Control-Allow-Credentials"] = "true"
+      response.headers["Access-Control-Allow-Headers"] = (
+        "Origin, Content-Type, Accept, Authorization"
+      )
+      response.headers["Access-Control-Allow-Methods"] = "OPTIONS, POST"
+      response.headers["Access-Control-Max-Age"] = "600"
 
     return response
 
@@ -290,33 +306,34 @@ class ServerBase(object):
       response: response to be set to actual flask/webapp2 response
     """
     context = ServicerContext()
-    content = self._routes_handle(context,
-                                  service,
-                                  method,
-                                  router_request=request)
-    origin = request.headers.get('Origin')
+    content = self._routes_handle(
+      context, service, method, router_request=request
+    )
+    origin = request.headers.get("Origin")
     if origin:
-      response.headers['Access-Control-Allow-Origin'] = origin
-      response.headers['Vary'] = 'Origin'
-      response.headers['Access-Control-Allow-Credentials'] = 'true'
-    self._response_body_and_status_writer(response,
-                                          status=StatusCode.to_http_code(
-                                              context._code))
-    response.headers['X-Prpc-Grpc-Code'] = str(context._code.value)
-    response.headers['Access-Control-Expose-Headers'] = ('X-Prpc-Grpc-Code')
-    response.headers['X-Content-Type-Options'] = 'nosniff'
+      response.headers["Access-Control-Allow-Origin"] = origin
+      response.headers["Vary"] = "Origin"
+      response.headers["Access-Control-Allow-Credentials"] = "true"
+    self._response_body_and_status_writer(
+      response, status=StatusCode.to_http_code(context._code)
+    )
+    response.headers["X-Prpc-Grpc-Code"] = str(context._code.value)
+    response.headers["Access-Control-Expose-Headers"] = "X-Prpc-Grpc-Code"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     if content is not None:
-      response.headers['Content-Type'] = encoding.Encoding.media_type(
-          context._response_encoding)
+      response.headers["Content-Type"] = encoding.Encoding.media_type(
+        context._response_encoding
+      )
       self._response_body_and_status_writer(response, body=content)
     elif context._details is not None:
       # webapp2 will automatically encode strings as utf-8.
       # http://webapp2.readthedocs.io/en/latest/guide/response.html
       #
       # TODO(nodir,mknyszek): Come up with an actual test for this.
-      response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+      response.headers["Content-Type"] = "text/plain; charset=utf-8"
       self._response_body_and_status_writer(response, body=context._details)
 
   def _response_body_and_status_writer(self, response, body=None, status=None):
     raise NotImplementedError(
-        "response body and status writer must be implemented")
+      "response body and status writer must be implemented"
+    )

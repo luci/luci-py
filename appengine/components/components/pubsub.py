@@ -23,11 +23,12 @@ from components import net
 # The last check is done in _validate_name to simplify the regexp.
 #
 # Same rules apply to topic names too.
-_NAME_RE = re.compile(r'^[A-Za-z][A-Za-z0-9\-_\.~\+%]{2,254}$')
+_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9\-_\.~\+%]{2,254}$")
 
 
 class Error(Exception):
   """Raised on fatal errors."""
+
   def __init__(self, inner):
     super(Error, self).__init__(str(inner))
     self.inner = inner
@@ -39,6 +40,7 @@ class TransientError(Exception):
   Specifically not a subclass of Error, so that "except Error" block passes
   transient errors through.
   """
+
   def __init__(self, inner):
     super(TransientError, self).__init__(str(inner))
     self.inner = inner
@@ -50,7 +52,7 @@ def validate_project(project):
   # here, but the API will reject anything that doesn't match. We only check /
   # in case the user is trying to manipulate the topic into posting somewhere
   # else (e.g. by setting the project as ../../<some other project>.
-  return project and '/' not in project
+  return project and "/" not in project
 
 
 def validate_topic(topic):
@@ -67,32 +69,31 @@ def full_topic_name(project, topic):
   """Returns full topic name in given project."""
   assert validate_project(project), project
   assert validate_topic(topic), topic
-  return 'projects/%s/topics/%s' % (project, topic)
+  return "projects/%s/topics/%s" % (project, topic)
 
 
 def full_subscription_name(project, subscription):
   """Returns full subscription name in given project."""
   assert validate_project(project), project
   assert validate_subscription(subscription), subscription
-  return 'projects/%s/subscriptions/%s' % (project, subscription)
+  return "projects/%s/subscriptions/%s" % (project, subscription)
 
 
 def validate_full_name(name, kind):
   """Returns True if name has form "projects/<project-id>/<kind>/<id>."""
-  chunks = name.split('/')
+  chunks = name.split("/")
   return (
-      len(chunks) == 4 and
-      chunks[0] == 'projects' and
-      validate_project(chunks[1]) and
-      chunks[2] == kind and
-      _validate_name(chunks[3]))
+    len(chunks) == 4
+    and chunks[0] == "projects"
+    and validate_project(chunks[1])
+    and chunks[2] == kind
+    and _validate_name(chunks[3])
+  )
 
 
 def _validate_name(name):
   """Returns True if the name matches rules for topic and subcription names."""
-  return (
-      not name.startswith('goog') and
-      bool(_NAME_RE.match(name)))
+  return not name.startswith("goog") and bool(_NAME_RE.match(name))
 
 
 def _call_async(method, endpoint, payload=None):
@@ -104,10 +105,11 @@ def _call_async(method, endpoint, payload=None):
     payload: Body of the request to send as JSON.
   """
   return net.json_request_async(
-      url='https://pubsub.googleapis.com/v1/' + endpoint,
-      method=method,
-      payload=payload,
-      scopes=['https://www.googleapis.com/auth/pubsub'])
+    url="https://pubsub.googleapis.com/v1/" + endpoint,
+    method=method,
+    payload=payload,
+    scopes=["https://www.googleapis.com/auth/pubsub"],
+  )
 
 
 def _call(method, endpoint, payload=None, accepted_http_statuses=None):
@@ -141,9 +143,9 @@ def ensure_topic_exists(topic):
   Raises:
     Error or TransientError.
   """
-  assert validate_full_name(topic, 'topics'), topic
+  assert validate_full_name(topic, "topics"), topic
   # 409 is the status code when the topic already exists.
-  _call('PUT', topic, accepted_http_statuses=[409])
+  _call("PUT", topic, accepted_http_statuses=[409])
 
 
 def _with_existing_topic(topic, callback):
@@ -175,14 +177,14 @@ def publish_multi(topic, messages):
   Raises:
     Error or TransientError.
   """
-  assert validate_full_name(topic, 'topics'), topic
-  messages = [{
-      'attributes': attributes or {},
-      'data': base64.b64encode(message)
-  } for message, attributes in messages]
+  assert validate_full_name(topic, "topics"), topic
+  messages = [
+    {"attributes": attributes or {}, "data": base64.b64encode(message)}
+    for message, attributes in messages
+  ]
 
   def call_publish():
-    _call('POST', '%s:publish' % topic, payload={'messages': messages})
+    _call("POST", "%s:publish" % topic, payload={"messages": messages})
 
   _with_existing_topic(topic, call_publish)
 
@@ -198,7 +200,7 @@ def publish(topic, message, attributes):
   Raises:
     Error or TransientError.
   """
-  publish_multi(topic, ((message, attributes), ))
+  publish_multi(topic, ((message, attributes),))
 
 
 def modify_ack_deadline_async(subscription, deadline, *ack_ids):
@@ -210,12 +212,12 @@ def modify_ack_deadline_async(subscription, deadline, *ack_ids):
     *ack_ids: List of IDs of messages to extend the ack deadline of.
   """
   return _call_async(
-      'POST',
-      '%s:modifyAckDeadline' % subscription,
-      payload={
-          'ackDeadlineSeconds': deadline,
-          'ackIds': ack_ids,
-      },
+    "POST",
+    "%s:modifyAckDeadline" % subscription,
+    payload={
+      "ackDeadlineSeconds": deadline,
+      "ackIds": ack_ids,
+    },
   )
 
 
@@ -227,7 +229,8 @@ def ack_async(subscription, *ack_ids):
     *ack_ids: List of IDs of messages to ack.
   """
   return _call_async(
-      'POST', '%s:acknowledge' % subscription, payload={'ackIds': ack_ids})
+    "POST", "%s:acknowledge" % subscription, payload={"ackIds": ack_ids}
+  )
 
 
 def ack(*args, **kwargs):
@@ -242,12 +245,12 @@ def pull(subscription, max_messages=100):
     max_messages: Maximum number of messages to return.
   """
   return _call(
-      'POST',
-      '%s:pull' % subscription,
-      payload={
-          'maxMessages': max_messages,
-          'returnImmediately': True,
-      },
+    "POST",
+    "%s:pull" % subscription,
+    payload={
+      "maxMessages": max_messages,
+      "returnImmediately": True,
+    },
   )
 
 
@@ -262,11 +265,12 @@ def get_subscription(subscription):
   Raises:
     Error or TransientError.
   """
-  return _call('GET', subscription, accepted_http_statuses=[404])
+  return _call("GET", subscription, accepted_http_statuses=[404])
 
 
 def ensure_subscription_exists(
-    subscription, topic, push_config=None, ack_deadline_seconds=None):
+  subscription, topic, push_config=None, ack_deadline_seconds=None
+):
   """Ensures given subscription exists.
 
   Will register new subscription or chage push config of an existing one
@@ -284,32 +288,37 @@ def ensure_subscription_exists(
   Raises:
     Error or TransientError.
   """
-  assert validate_full_name(subscription, 'subscriptions'), subscription
-  assert validate_full_name(topic, 'topics'), topic
+  assert validate_full_name(subscription, "subscriptions"), subscription
+  assert validate_full_name(topic, "topics"), topic
 
   # Need to use GET to ensure the subscription is actually subscripted to
   # the given topic and not to something else.
-  existing = _call('GET', subscription, accepted_http_statuses=[404])
+  existing = _call("GET", subscription, accepted_http_statuses=[404])
   if existing:
-    if existing['topic'] != topic:
-      raise Error('Can\'t change topic of an existing subscription')
-    if (ack_deadline_seconds is not None and
-        ack_deadline_seconds != existing['ackDeadlineSeconds']):
-      raise Error('Can\'t change ack deadline of an existing subscription')
-    if push_config is not None and push_config != existing['pushConfig']:
+    if existing["topic"] != topic:
+      raise Error("Can't change topic of an existing subscription")
+    if (
+      ack_deadline_seconds is not None
+      and ack_deadline_seconds != existing["ackDeadlineSeconds"]
+    ):
+      raise Error("Can't change ack deadline of an existing subscription")
+    if push_config is not None and push_config != existing["pushConfig"]:
       _call(
-          'POST', '%s:modifyPushConfig' % subscription,
-          payload={'pushConfig': push_config})
+        "POST",
+        "%s:modifyPushConfig" % subscription,
+        payload={"pushConfig": push_config},
+      )
     return
 
   def create_subscription():
     _call(
-        'PUT', subscription,
-        payload={
-            'topic': topic,
-            'pushConfig': push_config or {},
-            'ackDeadlineSeconds': ack_deadline_seconds or 60,
-        },
+      "PUT",
+      subscription,
+      payload={
+        "topic": topic,
+        "pushConfig": push_config or {},
+        "ackDeadlineSeconds": ack_deadline_seconds or 60,
+      },
     )
 
   _with_existing_topic(topic, create_subscription)
@@ -324,8 +333,8 @@ def ensure_topic_deleted(topic):
   Raises:
     Error or TransientError.
   """
-  assert validate_full_name(topic, 'topics'), topic
-  _call('DELETE', topic, accepted_http_statuses=[404])
+  assert validate_full_name(topic, "topics"), topic
+  _call("DELETE", topic, accepted_http_statuses=[404])
 
 
 def ensure_subscription_deleted(subscription):
@@ -337,8 +346,8 @@ def ensure_subscription_deleted(subscription):
   Raises:
     Error or TransientError.
   """
-  assert validate_full_name(subscription, 'subscriptions'), subscription
-  _call('DELETE', subscription, accepted_http_statuses=[404])
+  assert validate_full_name(subscription, "subscriptions"), subscription
+  _call("DELETE", subscription, accepted_http_statuses=[404])
 
 
 @contextlib.contextmanager
@@ -360,12 +369,12 @@ def iam_policy(object_name):
   Raises:
     Error or TransientError.
   """
-  is_sub = validate_full_name(object_name, 'subscriptions')
-  is_topic = validate_full_name(object_name, 'topics')
+  is_sub = validate_full_name(object_name, "subscriptions")
+  is_topic = validate_full_name(object_name, "topics")
   assert is_sub or is_topic, object_name
 
   def get_policy():
-    return _call('GET', '%s:getIamPolicy' % object_name)
+    return _call("GET", "%s:getIamPolicy" % object_name)
 
   # We can create topics on the fly (but not subscriptions).
   if is_topic:
@@ -378,8 +387,8 @@ def iam_policy(object_name):
 
   if copied.policy != policy:
     _call(
-        'POST', '%s:setIamPolicy' % object_name,
-        payload={'policy': copied.policy})
+      "POST", "%s:setIamPolicy" % object_name, payload={"policy": copied.policy}
+    )
 
 
 class IAMPolicy(object):
@@ -398,9 +407,9 @@ class IAMPolicy(object):
     Args:
       role: Role name, such as 'roles/viewer'.
     """
-    for b in self.policy.get('bindings', []):
-      if b.get('role') == role:
-        return list(b.get('members', []))
+    for b in self.policy.get("bindings", []):
+      if b.get("role") == role:
+        return list(b.get("members", []))
     return []
 
   def add_member(self, role, member):
@@ -414,22 +423,24 @@ class IAMPolicy(object):
       True if added, False if was already there.
     """
     role_dict = None
-    for b in self.policy.get('bindings', []):
-      if b.get('role') == role:
+    for b in self.policy.get("bindings", []):
+      if b.get("role") == role:
         role_dict = b
         break
 
     if role_dict is None:
-      self.policy.setdefault('bindings', []).append({
-          'role': role,
-          'members': [member],
-      })
+      self.policy.setdefault("bindings", []).append(
+        {
+          "role": role,
+          "members": [member],
+        }
+      )
       return True
 
-    if member in role_dict.get('members', []):
+    if member in role_dict.get("members", []):
       return False
 
-    role_dict.setdefault('members', []).append(member)
+    role_dict.setdefault("members", []).append(member)
     return True
 
   def remove_member(self, role, member):
@@ -442,9 +453,9 @@ class IAMPolicy(object):
     Returns:
       True if removed, False if wasn't there.
     """
-    for b in self.policy.get('bindings', []):
-      if b.get('role') == role:
-        members = b.get('members')
+    for b in self.policy.get("bindings", []):
+      if b.get("role") == role:
+        members = b.get("members")
         if not members or member not in members:
           return False
         members.remove(member)
@@ -454,6 +465,7 @@ class IAMPolicy(object):
 
 class SubscriptionHandler(webapp2.RequestHandler):
   """Base class for defining Pub/Sub subscription handlers."""
+
   # TODO(smut): Keep in datastore. See components/datastore_utils.
   ENDPOINT = None
   MAX_MESSAGES = None
@@ -487,9 +499,10 @@ class SubscriptionHandler(webapp2.RequestHandler):
       push: Whether or not to create a push subscription. Defaults to pull.
     """
     ensure_subscription_exists(
-        subscription=cls.get_subscription_name(),
-        topic=cls.get_topic_name(),
-        push_config={'pushEndpoint': cls.ENDPOINT} if push else {})
+      subscription=cls.get_subscription_name(),
+      topic=cls.get_topic_name(),
+      push_config={"pushEndpoint": cls.ENDPOINT} if push else {},
+    )
 
   @classmethod
   def is_subscribed(cls):
@@ -503,25 +516,29 @@ class SubscriptionHandler(webapp2.RequestHandler):
   def get(self):
     """Queries for Pub/Sub messages."""
     response = _call(
-        'POST', '%s:pull' % self.get_subscription_name(),
-        payload={
-            'maxMessages': self.MAX_MESSAGES,
-            'returnImmediately': True,
-        },
+      "POST",
+      "%s:pull" % self.get_subscription_name(),
+      payload={
+        "maxMessages": self.MAX_MESSAGES,
+        "returnImmediately": True,
+      },
     )
     message_ids = []
-    for received_message in response.get('receivedMessages', []):
-      attributes = received_message.get('message', {}).get('attributes', {})
-      message = received_message.get('message', {}).get('data', '')
+    for received_message in response.get("receivedMessages", []):
+      attributes = received_message.get("message", {}).get("attributes", {})
+      message = received_message.get("message", {}).get("data", "")
       logging.info(
-          'Received Pub/Sub message:\n%s\nAttributes:\n%s', message, attributes)
+        "Received Pub/Sub message:\n%s\nAttributes:\n%s", message, attributes
+      )
       # TODO(smut): Process messages in parallel.
       self.process_message(message, attributes)
-      message_ids.append(received_message['ackId'])
+      message_ids.append(received_message["ackId"])
     if message_ids:
       _call(
-          'POST', '%s:acknowledge' % self.get_subscription_name(),
-          payload={'ackIds': message_ids})
+        "POST",
+        "%s:acknowledge" % self.get_subscription_name(),
+        payload={"ackIds": message_ids},
+      )
 
   def post(self):
     """Handles a Pub/Sub push message."""
@@ -529,18 +546,19 @@ class SubscriptionHandler(webapp2.RequestHandler):
     # Since anyone can post to this endpoint, we need to ensure the message
     # actually came from Cloud Pub/Sub. Unfortunately, there aren't any
     # useful headers set that can guarantee this.
-    attributes = self.request.json.get('message', {}).get('attributes', {})
-    message = self.request.json.get('message', {}).get('data', '')
-    subscription = self.request.json.get('subscription')
+    attributes = self.request.json.get("message", {}).get("attributes", {})
+    message = self.request.json.get("message", {}).get("data", "")
+    subscription = self.request.json.get("subscription")
 
     if subscription != self.get_subscription_name():
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-      logging.error('Ignoring unexpected subscription: %s', subscription)
-      self.abort(403, 'Unexpected subscription: %s' % subscription)
+      self.response.headers["Content-Type"] = "text/plain; charset=utf-8"
+      logging.error("Ignoring unexpected subscription: %s", subscription)
+      self.abort(403, "Unexpected subscription: %s" % subscription)
       return
 
     logging.info(
-        'Received Pub/Sub message:\n%s\nAttributes:\n%s', message, attributes)
+      "Received Pub/Sub message:\n%s\nAttributes:\n%s", message, attributes
+    )
     return self.process_message(message, attributes)
 
   def process_message(self, message, attributes):

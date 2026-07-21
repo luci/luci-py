@@ -22,22 +22,24 @@ from components.prpc.server_base import ServerBase
 
 class Webapp2Server(ServerBase):
   """
-    Implement a webapp2.RequestHandler, and get_routes() method for the host
-    application to call.
+  Implement a webapp2.RequestHandler, and get_routes() method for the host
+  application to call.
   """
 
-  def get_routes(self, prefix=''):
+  def get_routes(self, prefix=""):
     """Returns a list of webapp2.Route for all the routes the API handles."""
     return [
-        webapp2.Route('%s/prpc/<service>/<method>' % prefix,
-                      handler=self._handler(),
-                      methods=['POST', 'OPTIONS'])
+      webapp2.Route(
+        "%s/prpc/<service>/<method>" % prefix,
+        handler=self._handler(),
+        methods=["POST", "OPTIONS"],
+      )
     ]
 
   def _response_body_and_status_writer(self, response, body=None, status=None):
     """Implementation will apply `cgi.escape` to any text based inputs."""
     if body is not None:
-      if response.content_type == 'text/plain':
+      if response.content_type == "text/plain":
         body = cgi.escape(body, quote=True)
       response.out.write(body)
     if status is not None:

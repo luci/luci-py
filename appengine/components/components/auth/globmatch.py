@@ -15,18 +15,18 @@ def match(s, pat):
   Case sensitive. Doesn't support multi-line strings or patterns. There's no way
   to match '*' itself.
   """
-  if '\n' in s or '\n' in pat:
-    raise ValueError('Multiline strings are not supported')
+  if "\n" in s or "\n" in pat:
+    raise ValueError("Multiline strings are not supported")
   return bool(re.match(_translate(pat), s))
 
 
 def _translate(pat):
   """Given a pattern, returns a regexp string for it."""
-  out = '^'
+  out = "^"
   for c in pat:
-    if c == '*':
-      out += '.*'
+    if c == "*":
+      out += ".*"
     else:
       out += re.escape(c)
-  out += '$'
+  out += "$"
   return out

@@ -11,7 +11,7 @@ from . import ui
 from .. import change_log
 
 # Part of public API of 'auth' component, exposed by this module.
-__all__ = ['create_wsgi_application']
+__all__ = ["create_wsgi_application"]
 
 
 def create_wsgi_application(debug=False):

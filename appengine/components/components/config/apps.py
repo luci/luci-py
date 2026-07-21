@@ -11,6 +11,7 @@ a backend module, it must be included there.
 import webapp2
 
 from components import utils
+
 utils.import_third_party()
 
 from . import handlers
@@ -18,8 +19,8 @@ from . import handlers
 
 def create_backend_application():
   app = webapp2.WSGIApplication(
-      handlers.get_backend_routes(),
-      debug=utils.is_local_dev_server())
+    handlers.get_backend_routes(), debug=utils.is_local_dev_server()
+  )
   utils.report_memory(app)
   return app
 

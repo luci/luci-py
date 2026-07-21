@@ -7,6 +7,7 @@ import sys
 import unittest
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 from test_support import test_case
@@ -22,7 +23,7 @@ class PRPCCodeTestCase(test_case.TestCase):
         self.assertNotEqual(httpCode, None)
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()

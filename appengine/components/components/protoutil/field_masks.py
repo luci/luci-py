@@ -42,11 +42,11 @@ from google import protobuf
 from google.protobuf import descriptor
 
 __all__ = [
-    'EXCLUDE',
-    'INCLUDE_ENTIRELY',
-    'INCLUDE_PARTIALLY',
-    'Mask',
-    'STAR',
+  "EXCLUDE",
+  "INCLUDE_ENTIRELY",
+  "INCLUDE_PARTIALLY",
+  "Mask",
+  "STAR",
 ]
 
 
@@ -157,7 +157,7 @@ class Mask(object):
     """
     assert path
     return self._includes(
-        _parse_path(path, self.desc, repeated=self.repeated)[0]
+      _parse_path(path, self.desc, repeated=self.repeated)[0]
     )
 
   def _includes(self, path, start_at=0):
@@ -243,7 +243,7 @@ class Mask(object):
     """
     assert path
     parsed_path, desc, repeated = _parse_path(
-        path, self.desc, repeated=self.repeated
+      path, self.desc, repeated=self.repeated
     )
     if self._includes(parsed_path) == INCLUDE_ENTIRELY:
       # Return a mask that includes everything.
@@ -260,7 +260,8 @@ class Mask(object):
 
   @classmethod
   def from_field_mask(
-      cls, field_mask, desc, json_names=False, update_mask=False):
+    cls, field_mask, desc, json_names=False, update_mask=False
+  ):
     """Parses a field mask to a Mask.
 
     Removes trailing stars, e.g. parses ['a.*'] as ['a'].
@@ -291,16 +292,19 @@ class Mask(object):
     root = cls(desc)
     for i, p in enumerate(parsed_paths):
       node = root
-      node_name = ''
+      node_name = ""
       for seg in p:
         if node.repeated and update_mask:
           raise ValueError(
-              ('update mask allows a repeated field only at the last '
-               'position; field "%s" in "%s" is not last')
-              % (node_name, field_mask.paths[i]))
+            (
+              "update mask allows a repeated field only at the last "
+              'position; field "%s" in "%s" is not last'
+            )
+            % (node_name, field_mask.paths[i])
+          )
         if seg not in node.children:
           if node.desc.GetOptions().map_entry:
-            child = cls(node.desc.fields_by_name['value'].message_type)
+            child = cls(node.desc.fields_by_name["value"].message_type)
           elif node.repeated:
             child = cls(node.desc)
           else:
@@ -315,9 +319,10 @@ class Mask(object):
   def __eq__(self, other):
     """Returns True if other is equivalent to self."""
     return (
-        self.desc == other.desc and
-        self.repeated == other.repeated and
-        self.children == other.children)
+      self.desc == other.desc
+      and self.repeated == other.repeated
+      and self.children == other.children
+    )
 
   def __ne__(self, other):
     """Returns False if other is equivalent to self."""
@@ -325,7 +330,7 @@ class Mask(object):
 
   def __repr__(self):
     """Returns a string representation of the Mask."""
-    return 'Mask(%r, %r, %r)' % (self.desc, self.repeated, self.children)
+    return "Mask(%r, %r, %r)" % (self.desc, self.repeated, self.children)
 
 
 def _normalize_paths(paths):
@@ -357,18 +362,18 @@ _STAR, _PERIOD, _LITERAL, _STRING, _INTEGER, _UNKNOWN, _EOF = range(7)
 
 
 _INTEGER_FIELD_TYPES = {
-    descriptor.FieldDescriptor.TYPE_INT64,
-    descriptor.FieldDescriptor.TYPE_INT32,
-    descriptor.FieldDescriptor.TYPE_UINT32,
-    descriptor.FieldDescriptor.TYPE_UINT64,
-    descriptor.FieldDescriptor.TYPE_FIXED64,
-    descriptor.FieldDescriptor.TYPE_FIXED32,
-    descriptor.FieldDescriptor.TYPE_SFIXED64,
-    descriptor.FieldDescriptor.TYPE_SFIXED32,
+  descriptor.FieldDescriptor.TYPE_INT64,
+  descriptor.FieldDescriptor.TYPE_INT32,
+  descriptor.FieldDescriptor.TYPE_UINT32,
+  descriptor.FieldDescriptor.TYPE_UINT64,
+  descriptor.FieldDescriptor.TYPE_FIXED64,
+  descriptor.FieldDescriptor.TYPE_FIXED32,
+  descriptor.FieldDescriptor.TYPE_SFIXED64,
+  descriptor.FieldDescriptor.TYPE_SFIXED32,
 }
 _SUPPORTED_MAP_KEY_TYPES = _INTEGER_FIELD_TYPES | {
-    descriptor.FieldDescriptor.TYPE_STRING,
-    descriptor.FieldDescriptor.TYPE_BOOL,
+  descriptor.FieldDescriptor.TYPE_STRING,
+  descriptor.FieldDescriptor.TYPE_BOOL,
 }
 
 
@@ -423,9 +428,9 @@ def _parse_path(path, desc, repeated=False, json_names=False):
     tok_type, tok = peek()
     assert tok
     if tok_type == _PERIOD:
-      raise ValueError('a segment cannot start with a period')
+      raise ValueError("a segment cannot start with a period")
     if tok_type == _EOF:
-      raise ValueError('unexpected end')
+      raise ValueError("unexpected end")
 
     is_map_key = ctx.desc and ctx.desc.GetOptions().map_entry
     if ctx.repeated and not is_map_key:
@@ -437,11 +442,11 @@ def _parse_path(path, desc, repeated=False, json_names=False):
 
     if ctx.desc is None:
       raise ValueError(
-          'scalar field "%s" cannot have subfields' % ctx.field_path
+        'scalar field "%s" cannot have subfields' % ctx.field_path
       )
 
     if is_map_key:
-      key_type = ctx.desc.fields_by_name['key'].type
+      key_type = ctx.desc.fields_by_name["key"].type
       if key_type not in _SUPPORTED_MAP_KEY_TYPES:
         raise ValueError('unsupported key type of field "%s"' % ctx.field_path)
       if tok_type == _STAR:
@@ -455,7 +460,7 @@ def _parse_path(path, desc, repeated=False, json_names=False):
         assert key_type == descriptor.FieldDescriptor.TYPE_STRING
         seg = read_string()
 
-      ctx.advance_to_field(ctx.desc.fields_by_name['value'])
+      ctx.advance_to_field(ctx.desc.fields_by_name["value"])
       return seg, False
 
     if tok_type == _STAR:
@@ -471,16 +476,16 @@ def _parse_path(path, desc, repeated=False, json_names=False):
     field = _find_field(ctx.desc, tok, json_names)
     if field is None:
       raise ValueError(
-          'field "%s" does not exist in message %s' % (tok, ctx.desc.full_name)
+        'field "%s" does not exist in message %s' % (tok, ctx.desc.full_name)
       )
     ctx.advance_to_field(field)
     return field.name, False
 
   def read_bool():
     tok_type, tok = read()
-    if tok_type != _LITERAL or tok not in ('true', 'false'):
+    if tok_type != _LITERAL or tok not in ("true", "false"):
       raise ValueError('unexpected token "%s", expected true or false' % tok)
-    return tok == 'true'
+    return tok == "true"
 
   def read_integer():
     tok_type, tok = read()
@@ -527,7 +532,7 @@ class _ParseContext(object):
 
   @property
   def field_path(self):
-    return '.'.join(self._field_path)
+    return ".".join(self._field_path)
 
 
 def _tokenize(path):
@@ -544,35 +549,35 @@ def _tokenize(path):
     start = i
     c = path[i]
     i += 1
-    if c == '`':
+    if c == "`":
       quoted_string = []  # Parsed quoted string as list of string parts.
       while True:
-        next_backtick = path.find('`', i)
+        next_backtick = path.find("`", i)
         if next_backtick == -1:
-          raise ValueError('a quoted string is not closed')
+          raise ValueError("a quoted string is not closed")
 
         quoted_string.append(path[i:next_backtick])
         i = next_backtick + 1  # Swallow the discovered backtick.
 
-        escaped_backtick = i < len(path) and path[i] == '`'
+        escaped_backtick = i < len(path) and path[i] == "`"
         if not escaped_backtick:
           break
-        quoted_string.append('`')
+        quoted_string.append("`")
         i += 1  # Swallow second backtick.
 
-      yield (_STRING, ''.join(quoted_string))
-    elif c == '*':
+      yield (_STRING, "".join(quoted_string))
+    elif c == "*":
       yield (_STAR, c)
-    elif c == '.':
+    elif c == ".":
       yield (_PERIOD, c)
-    elif c == '-' or c.isdigit():
+    elif c == "-" or c.isdigit():
       while i < len(path) and path[i].isdigit():
         i += 1
       yield (_INTEGER, path[start:i])
-    elif c == '_' or c.isalpha():
-      while i < len(path) and (path[i].isalnum() or path[i] == '_'):
+    elif c == "_" or c.isalpha():
+      while i < len(path) and (path[i].isalnum() or path[i] == "_"):
         i += 1
       yield (_LITERAL, path[start:i])
     else:
       yield (_UNKNOWN, c)
-  yield (_EOF, '<eof>')
+  yield (_EOF, "<eof>")

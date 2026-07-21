@@ -23,9 +23,9 @@ def _normalize_name(n):
     A normalized version of the given string.
   """
   words = []
-  for word in re.split(r'[^0-9a-zA-Z]', n):
-    words.append('%s%s' % (word[:1].upper(), word[1:]))
-  return ''.join(words)
+  for word in re.split(r"[^0-9a-zA-Z]", n):
+    words.append("%s%s" % (word[:1].upper(), word[1:]))
+  return "".join(words)
 
 
 def _normalize_whitespace(s):
@@ -37,7 +37,7 @@ def _normalize_whitespace(s):
   Returns:
     A normalized version of the given string.
   """
-  return ' '.join((s or '').split())
+  return " ".join((s or "").split())
 
 
 def _get_type_format(field):
@@ -50,43 +50,43 @@ def _get_type_format(field):
     (type, format) for use in the "schemas" section of a discovery document.
   """
   if isinstance(field, messages.BooleanField):
-    return ('boolean', None)
+    return ("boolean", None)
 
   if isinstance(field, messages.BytesField):
-    return ('string', 'byte')
+    return ("string", "byte")
 
   if isinstance(field, message_types.DateTimeField):
-    return ('string', 'date-time')
+    return ("string", "date-time")
 
   if isinstance(field, messages.EnumField):
-    return ('string', None)
+    return ("string", None)
 
   if isinstance(field, messages.FloatField):
     if field.variant == messages.Variant.DOUBLE:
-      return ('number', 'double')
-    return ('number', 'float')
+      return ("number", "double")
+    return ("number", "float")
 
   if isinstance(field, messages.IntegerField):
     if field.variant in (messages.Variant.INT32, messages.Variant.SINT32):
-      return ('integer', 'int32')
+      return ("integer", "int32")
 
     if field.variant in (messages.Variant.INT64, messages.Variant.SINT64):
       # If the type requires int64 or uint64, specify string or JavaScript will
       # convert them to 32-bit.
-      return ('string', 'int64')
+      return ("string", "int64")
 
     if field.variant == messages.Variant.UINT32:
-      return ('integer', 'uint32')
+      return ("integer", "uint32")
 
     if field.variant == messages.Variant.UINT64:
-      return ('string', 'uint64')
+      return ("string", "uint64")
 
     # Despite the warning about JavaScript, Endpoints v2's discovery document
     # generator uses integer, int64 as the default here. Follow their choice.
-    return ('integer', 'int64')
+    return ("integer", "int64")
 
   if isinstance(field, messages.StringField):
-    return ('string', None)
+    return ("string", None)
 
   return (None, None)
 
@@ -115,13 +115,13 @@ def _get_schemas(types):
     name = _normalize_name(message_type.definition_name())
 
     schemas[name] = {
-        'id': name,
-        'type': 'object',
+      "id": name,
+      "type": "object",
     }
 
     desc = _normalize_whitespace(message_type.__doc__)
     if desc:
-      schemas[name]['description'] = desc
+      schemas[name]["description"] = desc
 
     properties = {}
     for field in message_type.all_fields():
@@ -133,40 +133,41 @@ def _get_schemas(types):
       # directly. For message fields, add a $ref to elsewhere in the schema
       # and ensure the type is queued to have its schema added. DateTimeField
       # is a message field but is treated as a non-message field.
-      if (isinstance(field, messages.MessageField)
-          and not isinstance(field, message_types.DateTimeField)):
+      if isinstance(field, messages.MessageField) and not isinstance(
+        field, message_types.DateTimeField
+      ):
         field_type = field.type().__class__
         desc = _normalize_whitespace(field_type.__doc__)
         if desc:
-          field_properties['description'] = desc
+          field_properties["description"] = desc
         # Queue new types to have their schema added in a future iteration.
         if field_type not in seen:
           types.append(field_type)
           # Maintain loop invariant.
           seen.add(field_type)
-        items['$ref'] = _normalize_name(field_type.definition_name())
+        items["$ref"] = _normalize_name(field_type.definition_name())
       else:
         schema_type, schema_format = _get_type_format(field)
-        items['type'] = schema_type
+        items["type"] = schema_type
         if schema_format:
-          items['format'] = schema_format
+          items["format"] = schema_format
 
       if isinstance(field, messages.EnumField):
         # Endpoints v1 sorts these alphabetically while v2 does not.
-        items['enum'] = sorted([enum.name for enum in field.type])
+        items["enum"] = sorted([enum.name for enum in field.type])
         # Endpoints v1 includes empty descriptions for each enum.
-        items['enumDescriptions'] = ['' for _ in field.type]
+        items["enumDescriptions"] = ["" for _ in field.type]
 
       if field.default:
-        field_properties['default'] = field.default
+        field_properties["default"] = field.default
         # Defaults for types that aren't strings in the code but are strings
         # in the schema must be converted here. For example, EnumField
         # would otherwise have a default that isn't even valid JSON.
-        if schema_type == 'string':
-          field_properties['default'] = str(field.default)
+        if schema_type == "string":
+          field_properties["default"] = str(field.default)
 
       if field.required:
-        field_properties['required'] = True
+        field_properties["required"] = True
 
       # For repeated fields, most of the field information gets added to items.
       # For non-repeated fields, the field information is added directly to the
@@ -174,15 +175,15 @@ def _get_schemas(types):
       # their field information added directly to the field properties. See
       # _get_parameters below.
       if field.repeated:
-        field_properties['items'] = items
-        field_properties['type'] = 'array'
+        field_properties["items"] = items
+        field_properties["type"] = "array"
       else:
         field_properties.update(items)
 
       properties[field.name] = field_properties
 
     if properties:
-      schemas[name]['properties'] = properties
+      schemas[name]["properties"] = properties
 
   return schemas
 
@@ -197,36 +198,38 @@ def _get_parameters(message, path):
   Returns:
     A dict which can be written as JSON describing the path parameters.
   """
-  PARAMETER_REGEX = r'{([a-zA-Z_][a-zA-Z0-9_]*)}'
+  PARAMETER_REGEX = r"{([a-zA-Z_][a-zA-Z0-9_]*)}"
   # The order is the names of path parameters in the order in which they
   # appear in the path followed by the names of required query strings.
   order = re.findall(PARAMETER_REGEX, path)
-  parameters = _get_schemas([message
-                             ]).get(_normalize_name(message.definition_name()),
-                                    {}).get('properties', {})
+  parameters = (
+    _get_schemas([message])
+    .get(_normalize_name(message.definition_name()), {})
+    .get("properties", {})
+  )
   for parameter, schema in parameters.items():
     # As above, repeated fields for parameters do not have items.
-    if schema['type'] == 'array':
-      schema.update(schema.pop('items'))
-      schema['repeated'] = True
+    if schema["type"] == "array":
+      schema.update(schema.pop("items"))
+      schema["repeated"] = True
     if parameter in order:
-      schema['location'] = 'path'
+      schema["location"] = "path"
     else:
-      schema['location'] = 'query'
-      if schema.get('required'):
+      schema["location"] = "query"
+      if schema.get("required"):
         order.append(parameter)
     # Parameters have string defaults because they're part of a URL.
-    if schema.get('default'):
-      schema['default'] = str(schema['default'])
+    if schema.get("default"):
+      schema["default"] = str(schema["default"])
       # JSON bools are lowercase.
-      if schema['type'] == 'boolean':
-        schema['default'] = schema['default'].lower()
+      if schema["type"] == "boolean":
+        schema["default"] = schema["default"].lower()
 
   document = {}
   if order:
-    document['parameterOrder'] = order
+    document["parameterOrder"] = order
   if parameters:
-    document['parameters'] = parameters
+    document["parameters"] = parameters
   return document
 
 
@@ -241,46 +244,46 @@ def _get_methods(service):
     resources, and types.
   """
   document = {
-      'methods': {},
-      'resources': {},
+    "methods": {},
+    "resources": {},
   }
   types = set()
 
   for _, method in service.all_remote_methods().items():
     # Only describe methods decorated with @method.
-    info = getattr(method, 'method_info', None)
+    info = getattr(method, "method_info", None)
     if info is None:
       continue
     # info.method_id returns <service name>.[<resource name>.]*<method name>.
     # There may be 0 or more resource names.
     method_id = info.method_id(service.api_info)
-    parts = method_id.split('.')
+    parts = method_id.split(".")
     assert len(parts) > 1, method_id
     name = parts[-1]
     resource_parts = parts[1:-1]
 
     item = {
-        'httpMethod': info.http_method,
-        'id': method_id,
-        'path': info.get_path(service.api_info),
-        'scopes': [
-            'https://www.googleapis.com/auth/userinfo.email',
-        ],
+      "httpMethod": info.http_method,
+      "id": method_id,
+      "path": info.get_path(service.api_info),
+      "scopes": [
+        "https://www.googleapis.com/auth/userinfo.email",
+      ],
     }
 
     desc = _normalize_whitespace(method.remote.method.__doc__)
     if desc:
-      item['description'] = desc
+      item["description"] = desc
 
     request = method.remote.request_type()
     rc = endpoints.ResourceContainer.get_request_message(method.remote)
     if not isinstance(rc, endpoints.ResourceContainer):
       if not isinstance(request, message_types.VoidMessage):
-        if info.http_method not in ('GET', 'DELETE'):
-          item['request'] = {
-              # $refs refer to the "schemas" section of the discovery doc.
-              '$ref': _normalize_name(request.__class__.definition_name()),
-              'parameterName': 'resource',
+        if info.http_method not in ("GET", "DELETE"):
+          item["request"] = {
+            # $refs refer to the "schemas" section of the discovery doc.
+            "$ref": _normalize_name(request.__class__.definition_name()),
+            "parameterName": "resource",
           }
           types.add(request.__class__)
     else:
@@ -288,29 +291,31 @@ def _get_methods(service):
       # reference to the body if necessary. Path parameters are handled
       # differently.
       if rc.body_message_class != message_types.VoidMessage:
-        if info.http_method not in ('GET', 'DELETE'):
-          item['request'] = {
-              '$ref': _normalize_name(rc.body_message_class.definition_name()),
-              'parameterName': 'resource',
+        if info.http_method not in ("GET", "DELETE"):
+          item["request"] = {
+            "$ref": _normalize_name(rc.body_message_class.definition_name()),
+            "parameterName": "resource",
           }
           types.add(rc.body_message_class)
       item.update(
-          _get_parameters(rc.parameters_message_class,
-                          info.get_path(service.api_info)))
+        _get_parameters(
+          rc.parameters_message_class, info.get_path(service.api_info)
+        )
+      )
 
     response = method.remote.response_type()
     if not isinstance(response, message_types.VoidMessage):
-      item['response'] = {
-          '$ref': _normalize_name(response.__class__.definition_name()),
+      item["response"] = {
+        "$ref": _normalize_name(response.__class__.definition_name()),
       }
       types.add(response.__class__)
 
     pointer = document
     for part in resource_parts:
-      pointer = pointer.setdefault('resources', {}).setdefault(part, {})
-    pointer.setdefault('methods', {})[name] = item
+      pointer = pointer.setdefault("resources", {}).setdefault(part, {})
+    pointer.setdefault("methods", {})[name] = item
 
-  return document['methods'], document['resources'], _get_schemas(types)
+  return document["methods"], document["resources"], _get_schemas(types)
 
 
 def generate(classes, host, base_path):
@@ -326,121 +331,101 @@ def generate(classes, host, base_path):
     A dict which can be written as JSON describing the service.
   """
   assert classes, classes
-  scheme = 'http:' if utils.is_local_dev_server() else 'https:'
-  path_version = (classes[0].api_info.path_version if hasattr(
-      classes[0].api_info, 'path_version') else classes[0].api_info.version)
+  scheme = "http:" if utils.is_local_dev_server() else "https:"
+  path_version = (
+    classes[0].api_info.path_version
+    if hasattr(classes[0].api_info, "path_version")
+    else classes[0].api_info.version
+  )
   document = {
-      'discoveryVersion':
-      'v1',
-      'auth': {
-          'oauth2': {
-              'scopes':
-              {s: {
-                  'description': s
-              }
-               for s in classes[0].api_info.scopes},
-          },
+    "discoveryVersion": "v1",
+    "auth": {
+      "oauth2": {
+        "scopes": {s: {"description": s} for s in classes[0].api_info.scopes},
       },
-      'basePath':
-      '%s/%s/%s' % (base_path, classes[0].api_info.name, path_version),
-      'baseUrl':
-      '%s//%s%s/%s/%s' %
-      (scheme, host, base_path, classes[0].api_info.name, path_version),
-      'batchPath':
-      'batch',
-      'icons': {
-          'x16': 'https://www.google.com/images/icons/product/search-16.gif',
-          'x32': 'https://www.google.com/images/icons/product/search-32.gif',
+    },
+    "basePath": "%s/%s/%s"
+    % (base_path, classes[0].api_info.name, path_version),
+    "baseUrl": "%s//%s%s/%s/%s"
+    % (scheme, host, base_path, classes[0].api_info.name, path_version),
+    "batchPath": "batch",
+    "icons": {
+      "x16": "https://www.google.com/images/icons/product/search-16.gif",
+      "x32": "https://www.google.com/images/icons/product/search-32.gif",
+    },
+    "id": "%s:%s" % (classes[0].api_info.name, path_version),
+    "kind": "discovery#restDescription",
+    "name": classes[0].api_info.name,
+    "parameters": {
+      "alt": {
+        "default": "json",
+        "description": "Data format for the response.",
+        "enum": ["json"],
+        "enumDescriptions": [
+          "Responses with Content-Type of application/json",
+        ],
+        "location": "query",
+        "type": "string",
       },
-      'id':
-      '%s:%s' % (classes[0].api_info.name, path_version),
-      'kind':
-      'discovery#restDescription',
-      'name':
-      classes[0].api_info.name,
-      'parameters': {
-          'alt': {
-              'default':
-              'json',
-              'description':
-              'Data format for the response.',
-              'enum': ['json'],
-              'enumDescriptions': [
-                  'Responses with Content-Type of application/json',
-              ],
-              'location':
-              'query',
-              'type':
-              'string',
-          },
-          'fields': {
-              'description':
-              ('Selector specifying which fields to include in a partial'
-               ' response.'),
-              'location':
-              'query',
-              'type':
-              'string',
-          },
-          'key': {
-              'description':
-              ('API key. Your API key identifies your project and provides you'
-               ' with API access, quota, and reports. Required unless you'
-               ' provide an OAuth 2.0 token.'),
-              'location':
-              'query',
-              'type':
-              'string',
-          },
-          'oauth_token': {
-              'description': 'OAuth 2.0 token for the current user.',
-              'location': 'query',
-              'type': 'string',
-          },
-          'prettyPrint': {
-              'default': 'true',
-              'description':
-              'Returns response with indentations and line breaks.',
-              'location': 'query',
-              'type': 'boolean',
-          },
-          'quotaUser': {
-              'description':
-              ('Available to use for quota purposes for server-side apps.'
-               ' Can be any arbitrary string assigned to a user, but should not'
-               ' exceed 40 characters. Overrides userIp if both are provided.'),
-              'location':
-              'query',
-              'type':
-              'string',
-          },
-          'userIp': {
-              'description':
-              ('IP address of the site where the request originates. Use if'
-               ' you want to enforce per-user limits.'),
-              'location':
-              'query',
-              'type':
-              'string',
-          },
+      "fields": {
+        "description": (
+          "Selector specifying which fields to include in a partial response."
+        ),
+        "location": "query",
+        "type": "string",
       },
-      'protocol':
-      'rest',
-      'rootUrl':
-      '%s//%s%s/' % (scheme, host, base_path),
-      'servicePath':
-      '%s/%s/' % (classes[0].api_info.name, path_version),
-      'version':
-      path_version,
+      "key": {
+        "description": (
+          "API key. Your API key identifies your project and provides you"
+          " with API access, quota, and reports. Required unless you"
+          " provide an OAuth 2.0 token."
+        ),
+        "location": "query",
+        "type": "string",
+      },
+      "oauth_token": {
+        "description": "OAuth 2.0 token for the current user.",
+        "location": "query",
+        "type": "string",
+      },
+      "prettyPrint": {
+        "default": "true",
+        "description": "Returns response with indentations and line breaks.",
+        "location": "query",
+        "type": "boolean",
+      },
+      "quotaUser": {
+        "description": (
+          "Available to use for quota purposes for server-side apps."
+          " Can be any arbitrary string assigned to a user, but should not"
+          " exceed 40 characters. Overrides userIp if both are provided."
+        ),
+        "location": "query",
+        "type": "string",
+      },
+      "userIp": {
+        "description": (
+          "IP address of the site where the request originates. Use if"
+          " you want to enforce per-user limits."
+        ),
+        "location": "query",
+        "type": "string",
+      },
+    },
+    "protocol": "rest",
+    "rootUrl": "%s//%s%s/" % (scheme, host, base_path),
+    "servicePath": "%s/%s/" % (classes[0].api_info.name, path_version),
+    "version": path_version,
   }
   if classes[0].api_info.title:
-    document['title'] = classes[0].api_info.title
-  desc = _normalize_whitespace(classes[0].api_info.description
-                               or classes[0].__doc__)
+    document["title"] = classes[0].api_info.title
+  desc = _normalize_whitespace(
+    classes[0].api_info.description or classes[0].__doc__
+  )
   if desc:
-    document['description'] = desc
+    document["description"] = desc
   if classes[0].api_info.documentation:
-    document['documentationLink'] = classes[0].api_info.documentation
+    document["documentationLink"] = classes[0].api_info.documentation
   methods = {}
   resources = {}
   schemas = {}
@@ -450,11 +435,11 @@ def generate(classes, host, base_path):
     resources.update(r)
     schemas.update(s)
   if methods:
-    document['methods'] = methods
+    document["methods"] = methods
   if resources:
-    document['resources'] = resources
+    document["resources"] = resources
   if schemas:
-    document['schemas'] = schemas
+    document["schemas"] = schemas
   return document
 
 
@@ -469,45 +454,43 @@ def directory(classes, host, base_path):
   Returns:
     A dict which can be written as JSON describing the services.
   """
-  scheme = 'http:' if utils.is_local_dev_server() else 'https:'
+  scheme = "http:" if utils.is_local_dev_server() else "https:"
   document = {
-      'discoveryVersion': 'v1',
-      'kind': 'discovery#directoryList',
+    "discoveryVersion": "v1",
+    "kind": "discovery#directoryList",
   }
 
   items = {}
   for service in classes:
-    path_version = (service.api_info.path_version if hasattr(
-        service.api_info, 'path_version') else service.api_info.version)
+    path_version = (
+      service.api_info.path_version
+      if hasattr(service.api_info, "path_version")
+      else service.api_info.version
+    )
     item = {
-        'discoveryLink':
-        './apis/%s/%s/rest' % (service.api_info.name, path_version),
-        'discoveryRestUrl':
-        '%s//%s%s/discovery/v1/apis/%s/%s/rest' %
-        (scheme, host, base_path, service.api_info.name, path_version),
-        'id':
-        '%s:%s' % (service.api_info.name, path_version),
-        'icons': {
-            'x16': 'https://www.google.com/images/icons/product/search-16.gif',
-            'x32': 'https://www.google.com/images/icons/product/search-32.gif',
-        },
-        'kind':
-        'discovery#directoryItem',
-        'name':
-        service.api_info.name,
-        'preferred':
-        True,
-        'version':
-        path_version,
+      "discoveryLink": "./apis/%s/%s/rest"
+      % (service.api_info.name, path_version),
+      "discoveryRestUrl": "%s//%s%s/discovery/v1/apis/%s/%s/rest"
+      % (scheme, host, base_path, service.api_info.name, path_version),
+      "id": "%s:%s" % (service.api_info.name, path_version),
+      "icons": {
+        "x16": "https://www.google.com/images/icons/product/search-16.gif",
+        "x32": "https://www.google.com/images/icons/product/search-32.gif",
+      },
+      "kind": "discovery#directoryItem",
+      "name": service.api_info.name,
+      "preferred": True,
+      "version": path_version,
     }
-    desc = _normalize_whitespace(service.api_info.description
-                                 or service.__doc__)
+    desc = _normalize_whitespace(
+      service.api_info.description or service.__doc__
+    )
     if desc:
-      item['description'] = desc
+      item["description"] = desc
     if service.api_info.documentation:
-      item['documentationLink'] = service.api_info.documentation
-    items[item['id']] = item
+      item["documentationLink"] = service.api_info.documentation
+    items[item["id"]] = item
 
   if items:
-    document['items'] = sorted(items.values(), key=lambda i: i['id'])
+    document["items"] = sorted(items.values(), key=lambda i: i["id"])
   return document

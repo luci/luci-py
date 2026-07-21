@@ -9,6 +9,7 @@ import threading
 import unittest
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 import mock
@@ -22,6 +23,7 @@ from test_support import test_case
 
 class Rambling(ndb.Model):
   """Fake statistics."""
+
   a = ndb.IntegerProperty()
   b = ndb.FloatProperty()
   c = ndb.DateTimeProperty()
@@ -29,28 +31,29 @@ class Rambling(ndb.Model):
 
   def to_dict(self):
     out = super(Rambling, self).to_dict()
-    out['e'] = datetime.timedelta(seconds=1.1)
-    out['f'] = '\xc4\xa9'
+    out["e"] = datetime.timedelta(seconds=1.1)
+    out["f"] = "\xc4\xa9"
     return out
 
 
 class UtilsTest(test_case.TestCase):
   def test_json(self):
     r = Rambling(
-        a=2,
-        b=0.2,
-        c=datetime.datetime(2012, 1, 2, 3, 4, 5, 6),
-        d=datetime.date(2012, 1, 2))
+      a=2,
+      b=0.2,
+      c=datetime.datetime(2012, 1, 2, 3, 4, 5, 6),
+      d=datetime.date(2012, 1, 2),
+    )
     actual = utils.to_json_encodable([r])
     # Confirm that default is tight encoding and sorted keys.
     expected = [
       {
-        'a': 2,
-        'b': 0.2,
-        'c': u'2012-01-02 03:04:05',
-        'd': u'2012-01-02',
-        'e': 1,
-        'f': u'\u0129',
+        "a": 2,
+        "b": 0.2,
+        "c": "2012-01-02 03:04:05",
+        "d": "2012-01-02",
+        "e": 1,
+        "f": "\u0129",
       },
     ]
     self.assertEqual(expected, actual)
@@ -61,41 +64,41 @@ class UtilsTest(test_case.TestCase):
       self.assertEqual([0, 1], utils.to_json_encodable(xrange(2)))
 
   def test_validate_root_service_url_dev_server(self):
-    self.mock(utils, 'is_local_dev_server', lambda: True)
-    utils.validate_root_service_url('https://blah')
-    utils.validate_root_service_url('http://localhost:8080')
+    self.mock(utils, "is_local_dev_server", lambda: True)
+    utils.validate_root_service_url("https://blah")
+    utils.validate_root_service_url("http://localhost:8080")
 
   def test_validate_root_service_url_gae(self):
-    self.mock(utils, 'is_local_dev_server', lambda: False)
-    utils.validate_root_service_url('https://blah')
+    self.mock(utils, "is_local_dev_server", lambda: False)
+    utils.validate_root_service_url("https://blah")
     with self.assertRaises(ValueError):
-      utils.validate_root_service_url('http://localhost:8080')
+      utils.validate_root_service_url("http://localhost:8080")
 
   def test_validate_root_service_bad(self):
     with self.assertRaises(ValueError):
-      utils.validate_root_service_url('')
+      utils.validate_root_service_url("")
     with self.assertRaises(ValueError):
-      utils.validate_root_service_url('blah://blah')
+      utils.validate_root_service_url("blah://blah")
     with self.assertRaises(ValueError):
-      utils.validate_root_service_url('https://')
+      utils.validate_root_service_url("https://")
     with self.assertRaises(ValueError):
-      utils.validate_root_service_url('https://blah/')
+      utils.validate_root_service_url("https://blah/")
     with self.assertRaises(ValueError):
-      utils.validate_root_service_url('https://blah?asdad')
+      utils.validate_root_service_url("https://blah?asdad")
 
   def test_parse_rfc3339_datetime(self):
     # Sanity round-trip test with current time.
     now = utils.utcnow()
-    parsed = utils.parse_rfc3339_datetime(now.isoformat() + 'Z')
+    parsed = utils.parse_rfc3339_datetime(now.isoformat() + "Z")
     self.assertEqual(now, parsed)
 
     ok_cases = [
-      ('2017-08-17T04:21:32.722952943Z', (2017, 8, 17, 4, 21, 32, 722953)),
-      ('2017-08-17T04:21:32Z',           (2017, 8, 17, 4, 21, 32, 0)),
-      ('1972-01-01T10:00:20.021-05:00',  (1972, 1, 1, 15, 0, 20, 21000)),
-      ('1972-01-01T10:00:20.021+05:00',  (1972, 1, 1, 5, 0, 20, 21000)),
-      ('1985-04-12T23:20:50.52Z',        (1985, 4,  12, 23, 20, 50, 520000)),
-      ('1996-12-19T16:39:57-08:00',      (1996, 12, 20,  0, 39, 57,  0)),
+      ("2017-08-17T04:21:32.722952943Z", (2017, 8, 17, 4, 21, 32, 722953)),
+      ("2017-08-17T04:21:32Z", (2017, 8, 17, 4, 21, 32, 0)),
+      ("1972-01-01T10:00:20.021-05:00", (1972, 1, 1, 15, 0, 20, 21000)),
+      ("1972-01-01T10:00:20.021+05:00", (1972, 1, 1, 5, 0, 20, 21000)),
+      ("1985-04-12T23:20:50.52Z", (1985, 4, 12, 23, 20, 50, 520000)),
+      ("1996-12-19T16:39:57-08:00", (1996, 12, 20, 0, 39, 57, 0)),
     ]
     for val, expected in ok_cases:
       parsed = utils.parse_rfc3339_datetime(val)
@@ -103,12 +106,12 @@ class UtilsTest(test_case.TestCase):
       self.assertEqual(datetime.datetime(*expected), parsed)
 
     bad_cases = [
-      '',
-      '1985-04-12T23:20:50.52',            # no timezone
-      '2017:08:17T04:21:32Z',              # bad base format
-      '2017-08-17T04:21:32.7229529431Z' ,  # more than nano second precision
-      '2017-08-17T04:21:32Zblah',          # trailing data
-      '1972-01-01T10:00:20.021-0500',      # bad timezone format
+      "",
+      "1985-04-12T23:20:50.52",  # no timezone
+      "2017:08:17T04:21:32Z",  # bad base format
+      "2017-08-17T04:21:32.7229529431Z",  # more than nano second precision
+      "2017-08-17T04:21:32Zblah",  # trailing data
+      "1972-01-01T10:00:20.021-0500",  # bad timezone format
     ]
     for val in bad_cases:
       with self.assertRaises(ValueError):
@@ -116,8 +119,9 @@ class UtilsTest(test_case.TestCase):
 
   def test_datetime_to_rfc2822(self):
     self.assertEqual(
-      'Mon, 02 Jan 2012 03:04:05 -0000',
-      utils.datetime_to_rfc2822(datetime.datetime(2012, 1, 2, 3, 4, 5)))
+      "Mon, 02 Jan 2012 03:04:05 -0000",
+      utils.datetime_to_rfc2822(datetime.datetime(2012, 1, 2, 3, 4, 5)),
+    )
 
   def test_milliseconds_since_epoch(self):
     self.mock_now(datetime.datetime(1970, 1, 2, 3, 4, 5, 6789))
@@ -155,11 +159,11 @@ class UtilsTest(test_case.TestCase):
     t.start()
     t.join(1)
     if t.is_alive():
-      self.fail('deadlock')
+      self.fail("deadlock")
 
   def test_cache_with_expiration(self):
     ran = []
-    self.mock(utils, 'time_time', lambda: 1000)
+    self.mock(utils, "time_time", lambda: 1000)
 
     @utils.cache_with_expiration(30)
     def do_work():
@@ -179,12 +183,12 @@ class UtilsTest(test_case.TestCase):
     self.assertEqual(2, len(ran))
     self.assertEqual(1030, do_work.__parent_cache__.expires)
 
-    self.mock(utils, 'time_time', lambda: 1029)
+    self.mock(utils, "time_time", lambda: 1029)
     self.assertEqual(2, do_work())
     self.assertEqual(2, do_work())
     self.assertEqual(2, len(ran))
 
-    self.mock(utils, 'time_time', lambda: 1030)
+    self.mock(utils, "time_time", lambda: 1030)
     self.assertEqual(3, do_work())
     self.assertEqual(3, do_work())
     self.assertEqual(3, len(ran))
@@ -222,21 +226,20 @@ class FakeNdbContext(object):
 
 
 class MemcacheTest(test_case.TestCase):
-
   def setUp(self):
     super(MemcacheTest, self).setUp()
 
     self.f_calls = []
-    self.f_value = 'value'
+    self.f_value = "value"
     self.ctx = FakeNdbContext()
-    self.mock(ndb, 'get_context', lambda: self.ctx)
+    self.mock(ndb, "get_context", lambda: self.ctx)
 
-  @utils.memcache('f', ['a', 'b', 'c', 'd'], time=54)
+  @utils.memcache("f", ["a", "b", "c", "d"], time=54)
   def f(self, a, b, c=3, d=4, e=5):
     self.f_calls.append((a, b, c, d, e))
     return self.f_value
 
-  @utils.memcache_async('f', ['a', 'b', 'c', 'd'], time=54)
+  @utils.memcache_async("f", ["a", "b", "c", "d"], time=54)
   @ndb.tasklet
   def f_async(self, a, b, c=3, d=4, e=5):
     self.f_calls.append((a, b, c, d, e))
@@ -244,108 +247,112 @@ class MemcacheTest(test_case.TestCase):
 
   def test_async(self):
     self.f_async(1, 2, 3, 4, 5).get_result()
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 3, 4]"])
     self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
+      self.ctx.set_calls, [("utils.memcache/v1a/f[1, 2, 3, 4]", ("value",), 54)]
+    )
 
   def test_call(self):
     self.f(1, 2, 3, 4, 5)
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 3, 4]"])
     self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
+      self.ctx.set_calls, [("utils.memcache/v1a/f[1, 2, 3, 4]", ("value",), 54)]
+    )
 
     self.ctx.get_calls = []
     self.f_calls = []
     self.ctx.set_calls = []
     self.f(1, 2, 3, 4)
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 3, 4]"])
     self.assertEqual(self.f_calls, [])
     self.assertEqual(self.ctx.set_calls, [])
 
   def test_none(self):
     self.f_value = None
     self.assertEqual(self.f(1, 2, 3, 4), None)
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 3, 4]"])
     self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[1, 2, 3, 4]', (None,), 54)])
+      self.ctx.set_calls, [("utils.memcache/v1a/f[1, 2, 3, 4]", (None,), 54)]
+    )
 
     self.ctx.get_calls = []
     self.f_calls = []
     self.ctx.set_calls = []
     self.assertEqual(self.f(1, 2, 3, 4), None)
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 3, 4]"])
     self.assertEqual(self.f_calls, [])
     self.assertEqual(self.ctx.set_calls, [])
 
-
   def test_call_without_optional_arg(self):
     self.f(1, 2)
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 3, 4]"])
     self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
+      self.ctx.set_calls, [("utils.memcache/v1a/f[1, 2, 3, 4]", ("value",), 54)]
+    )
 
   def test_call_kwargs(self):
     self.f(1, 2, c=30, d=40)
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 30, 40]"])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
+      self.ctx.set_calls,
+      [("utils.memcache/v1a/f[1, 2, 30, 40]", ("value",), 54)],
+    )
 
   def test_call_all_kwargs(self):
     self.f(a=1, b=2, c=30, d=40)
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 30, 40]"])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
+      self.ctx.set_calls,
+      [("utils.memcache/v1a/f[1, 2, 30, 40]", ("value",), 54)],
+    )
 
   def test_call_packed_args(self):
     self.f(*[1, 2])
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 3, 4]"])
     self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
+      self.ctx.set_calls, [("utils.memcache/v1a/f[1, 2, 3, 4]", ("value",), 54)]
+    )
 
   def test_call_packed_kwargs(self):
-    self.f(1, 2, **{'c': 30, 'd': 40})
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
+    self.f(1, 2, **{"c": 30, "d": 40})
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 30, 40]"])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
+      self.ctx.set_calls,
+      [("utils.memcache/v1a/f[1, 2, 30, 40]", ("value",), 54)],
+    )
 
   def test_call_packed_both(self):
-    self.f(*[1, 2], **{'c': 30, 'd': 40})
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
+    self.f(*[1, 2], **{"c": 30, "d": 40})
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[1, 2, 30, 40]"])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
+      self.ctx.set_calls,
+      [("utils.memcache/v1a/f[1, 2, 30, 40]", ("value",), 54)],
+    )
 
   def test_empty_key_arg(self):
-    @utils.memcache('f')
+    @utils.memcache("f")
     def f(a):
       return 1
 
     f(1)
-    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[]'])
+    self.assertEqual(self.ctx.get_calls, ["utils.memcache/v1a/f[]"])
     self.assertEqual(
-        self.ctx.set_calls,
-        [('utils.memcache/v1a/f[]', (1,), None)])
+      self.ctx.set_calls, [("utils.memcache/v1a/f[]", (1,), None)]
+    )
 
   def test_nonexisting_arg(self):
     with self.assertRaises(KeyError):
-      @utils.memcache('f', ['b'])
+
+      @utils.memcache("f", ["b"])
       def _f(a):
         pass
 
@@ -364,13 +371,15 @@ class MemcacheTest(test_case.TestCase):
 
   def test_args_prohibited(self):
     with self.assertRaises(NotImplementedError):
-      @utils.memcache('f', [])
+
+      @utils.memcache("f", [])
       def _f(a, *args):
         pass
 
   def test_kwargs_prohibited(self):
     with self.assertRaises(NotImplementedError):
-      @utils.memcache('f', [])
+
+      @utils.memcache("f", [])
       def _f(**kwargs):
         pass
 
@@ -378,8 +387,8 @@ class MemcacheTest(test_case.TestCase):
 class FingerprintTest(test_case.TestCase):
   def test_get_token_fingerprint(self):
     self.assertEqual(
-        '8b7df143d91c716ecfa5fc1730022f6b',
-        utils.get_token_fingerprint(u'blah'))
+      "8b7df143d91c716ecfa5fc1730022f6b", utils.get_token_fingerprint("blah")
+    )
 
 
 class AsyncApplyTest(test_case.TestCase):
@@ -406,25 +415,28 @@ class AsyncApplyTest(test_case.TestCase):
 
     @ndb.tasklet
     def fn_async(x):
-      log.append('%d started' % x)
+      log.append("%d started" % x)
       yield ndb.sleep(0.01)
-      log.append('%d finishing' % x)
+      log.append("%d finishing" % x)
       raise ndb.Return(x + 10)
 
     expected = [(i, i + 10) for i in items]
     actual = utils.async_apply(items, fn_async, concurrent_jobs=2)
     self.assertFalse(isinstance(actual, list))
     self.assertEqual(expected, list(actual))
-    self.assertEqual(log, [
-        '0 started',
-        '1 started',
-        '0 finishing',
-        '2 started',
-        '1 finishing',
-        '3 started',
-        '2 finishing',
-        '3 finishing',
-    ])
+    self.assertEqual(
+      log,
+      [
+        "0 started",
+        "1 started",
+        "0 finishing",
+        "2 started",
+        "1 finishing",
+        "3 started",
+        "2 finishing",
+        "3 finishing",
+      ],
+    )
 
   def test_unordered(self):
     items = [10, 5, 0]
@@ -446,57 +458,78 @@ class AsyncApplyTest(test_case.TestCase):
 
     @ndb.tasklet
     def fn_async(x):
-      log.append('%d started' % x)
+      log.append("%d started" % x)
       yield ndb.sleep(float(x) / 1000)
-      log.append('%d finishing' % x)
+      log.append("%d finishing" % x)
       raise ndb.Return(x)
 
     expected = [(5, 5), (0, 0), (10, 10)]
     actual = utils.async_apply(
-        items, fn_async, concurrent_jobs=2, unordered=True)
+      items, fn_async, concurrent_jobs=2, unordered=True
+    )
     self.assertFalse(isinstance(actual, list))
     self.assertEqual(expected, list(actual))
-    self.assertEqual(log, [
-        '10 started',
-        '5 started',
-        '5 finishing',
-        '0 started',
-        '0 finishing',
-        '10 finishing',
-    ])
+    self.assertEqual(
+      log,
+      [
+        "10 started",
+        "5 started",
+        "5 finishing",
+        "0 started",
+        "0 finishing",
+        "10 finishing",
+      ],
+    )
 
 
 class TaskQueueTest(test_case.TestCase):
-
   def setUp(self):
     super(TaskQueueTest, self).setUp()
 
-    self.mock(utils, 'get_task_queue_host', lambda: 'appengine.host')
-    self.mock(app_identity, 'get_default_version_hostname',
-              lambda: 'default-appengine.host')
+    self.mock(utils, "get_task_queue_host", lambda: "appengine.host")
+    self.mock(
+      app_identity,
+      "get_default_version_hostname",
+      lambda: "default-appengine.host",
+    )
 
-  @mock.patch('google.appengine.api.taskqueue.Task')
+  @mock.patch("google.appengine.api.taskqueue.Task")
   def test_enqueue_task_async(self, mock_task):
     # Task.add_async is not allowed to return plain value.
     mock_task.return_value.add_async.return_value = []
 
-    self.assertTrue(utils.enqueue_task_async(
-      '/internal/test', 'test').get_result())
+    self.assertTrue(
+      utils.enqueue_task_async("/internal/test", "test").get_result()
+    )
     mock_task.assert_called_once_with(
-      name=None, url='/internal/test', countdown=None,
-      headers={'Host': 'appengine.host'}, params=None, payload=None)
+      name=None,
+      url="/internal/test",
+      countdown=None,
+      headers={"Host": "appengine.host"},
+      params=None,
+      payload=None,
+    )
 
     mock_task.reset_mock()
-    self.assertTrue(utils.enqueue_task_async(
-      '/internal/test', 'test', use_dedicated_module=False,
-      version='4420-5e77b02').get_result())
+    self.assertTrue(
+      utils.enqueue_task_async(
+        "/internal/test",
+        "test",
+        use_dedicated_module=False,
+        version="4420-5e77b02",
+      ).get_result()
+    )
     mock_task.assert_called_once_with(
-      name=None, url='/internal/test', countdown=None,
-      headers={'Host': '4420-5e77b02-dot-backend-dot-default-appengine.host'},
-      params=None, payload=None)
+      name=None,
+      url="/internal/test",
+      countdown=None,
+      headers={"Host": "4420-5e77b02-dot-backend-dot-default-appengine.host"},
+      params=None,
+      payload=None,
+    )
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()

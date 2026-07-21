@@ -84,7 +84,7 @@ class ServicerContext(object):
       code: One of StatusCode.* tuples that contains a status code of the RPC to
         be transmitted to the invocation side of the RPC.
     """
-    assert code in codes.ALL_CODES, '%r is not StatusCode.*' % (code,)
+    assert code in codes.ALL_CODES, "%r is not StatusCode.*" % (code,)
     self._code = code
 
   @property
@@ -102,8 +102,9 @@ class ServicerContext(object):
       details: The details string of the RPC to be transmitted to
         the invocation side of the RPC.
     """
-    assert isinstance(details,
-                      six.string_types), ('%r is not string' % (details, ))
+    assert isinstance(details, six.string_types), "%r is not string" % (
+      details,
+    )
     self._details = details
 
   @property

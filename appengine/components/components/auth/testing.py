@@ -15,9 +15,9 @@ from test_support import test_case
 
 
 # Mocked subset of config tuple returned by config.ensure_configured().
-_MockedConfig = collections.namedtuple('_MockedConfig', [
-    'USE_PROJECT_IDENTITIES'
-])
+_MockedConfig = collections.namedtuple(
+  "_MockedConfig", ["USE_PROJECT_IDENTITIES"]
+)
 
 
 class TestCase(test_case.TestCase):
@@ -29,15 +29,19 @@ class TestCase(test_case.TestCase):
 
     self.logged_errors = []
     self.mock(
-        logging, 'error',
-        lambda *args, **kwargs: self.logged_errors.append((args, kwargs)))
+      logging,
+      "error",
+      lambda *args, **kwargs: self.logged_errors.append((args, kwargs)),
+    )
     self.logged_warnings = []
     self.mock(
-        logging, 'warning',
-        lambda *args, **kwargs: self.logged_warnings.append((args, kwargs)))
+      logging,
+      "warning",
+      lambda *args, **kwargs: self.logged_warnings.append((args, kwargs)),
+    )
 
-    self.trusted_signers = {'user:token-server@example.com': self}
-    self.mock(delegation, 'get_trusted_signers', lambda: self.trusted_signers)
+    self.trusted_signers = {"user:token-server@example.com": self}
+    self.mock(delegation, "get_trusted_signers", lambda: self.trusted_signers)
 
   # Implements CertificateBundle interface, as used by get_trusted_signers.
   def check_signature(self, blob, key_name, signature):
@@ -46,13 +50,13 @@ class TestCase(test_case.TestCase):
   def mock_config(self, **kwargs):
     """Mocks result of config.ensure_configured() call."""
     cfg = _MockedConfig(**kwargs)
-    self.mock(config, 'ensure_configured', lambda: cfg)
+    self.mock(config, "ensure_configured", lambda: cfg)
 
   @staticmethod
   def mock_group(group, members):
     """Creates new group entity in the datastore."""
     members = [
-        model.Identity.from_bytes(m) if isinstance(m, basestring) else m
-        for m in members
+      model.Identity.from_bytes(m) if isinstance(m, basestring) else m
+      for m in members
     ]
     model.AuthGroup(key=model.group_key(group), members=members).put()

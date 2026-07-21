@@ -40,7 +40,7 @@ class ParsingError(Exception):
   """
 
   def __init__(self, index, message):
-    super(ParsingError, self).__init__('%d: %s' % (index, message))
+    super(ParsingError, self).__init__("%d: %s" % (index, message))
     self.index = index
     self.message = message
 
@@ -99,13 +99,13 @@ class _ParsingContext(object):
     # Reset the index to the start of the accumulated string.
     i -= len(self.accumulator)
 
-    path = ''.join(self.accumulator).strip()
+    path = "".join(self.accumulator).strip()
     if not path:
-      raise ParsingError(i, 'expected name')
+      raise ParsingError(i, "expected name")
 
     # Advance i to the first non-space char.
     for char in self.accumulator:
-      if char != ' ':
+      if char != " ":
         break
       i += 1
 
@@ -113,9 +113,9 @@ class _ParsingContext(object):
     # recursively. E.g. if the fields dict is empty then parsing a/b/c is like
     # setting fields["a"] = {"b": {"c": {}} and pointing last to c's value.
     pointer = self.fields
-    for part in path.split('/'):
+    for part in path.split("/"):
       if not part:
-        raise ParsingError(i, 'empty name in path')
+        raise ParsingError(i, "empty name in path")
       pointer = pointer.setdefault(part, {})
       # Increment the index by the length of this part as well as the /.
       i += len(part) + 1
@@ -160,13 +160,13 @@ def _parse(fields):
     # Accumulator invariant: Non-empty accumulator implies expecting a name.
     assert not stack[-1].accumulator or stack[-1].expecting_name, fields
 
-    if fields[i] == ',':
+    if fields[i] == ",":
       # If we just returned from a lower context, no name is expected.
       if stack[-1].expecting_name:
         stack[-1].add_field(i)
       stack[-1].expecting_name = True
 
-    elif fields[i] == '(':
+    elif fields[i] == "(":
       # Maintain accumulator invariant.
       # A name must occur before any (.
       stack[-1].add_field(i)
@@ -177,7 +177,7 @@ def _parse(fields):
       # (or the end of the string altogether).
       stack.append(_ParsingContext())
 
-    elif fields[i] == ')':
+    elif fields[i] == ")":
       # If we just returned from a lower context, no name is expected.
       if stack[-1].expecting_name:
         stack[-1].add_field(i)
@@ -186,26 +186,26 @@ def _parse(fields):
       subfields = stack.pop().fields
       if not stack:
         # Mismatched ().
-        raise ParsingError(i, 'unexpected )')
+        raise ParsingError(i, "unexpected )")
 
       # See accumulator invariant maintenance above.
       assert not stack[-1].expecting_name, fields
 
       if not stack[-1].add_subfields(subfields):
         # ) before any field.
-        raise ParsingError(i, 'unexpected (')
+        raise ParsingError(i, "unexpected (")
 
     else:
       # If we just returned from a lower context, no name is expected.
       if not stack[-1].expecting_name:
-        raise ParsingError(i, 'unexpected name')
+        raise ParsingError(i, "unexpected name")
       stack[-1].accumulate(fields[i])
 
     i += 1
 
   if len(stack) != 1:
     # Mismatched ().
-    raise ParsingError(i, 'expected )')
+    raise ParsingError(i, "expected )")
 
   # If we just returned from a lower context, no name is expected.
   if stack[-1].expecting_name:
@@ -230,10 +230,10 @@ def _apply(response, partial):
     if key in partial:
       if partial[key]:
         # If the subfield dict is non-empty, include all of *'s subfields.
-        _merge(partial.get('*', {}), partial[key])
+        _merge(partial.get("*", {}), partial[key])
       pointer = partial[key]
-    elif '*' in partial:
-      pointer = partial['*']
+    elif "*" in partial:
+      pointer = partial["*"]
 
     if pointer is None:
       response.pop(key)

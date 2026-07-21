@@ -14,16 +14,16 @@ import base64
 def encode(data):
   """Bytes str -> URL safe base64 with stripped '='."""
   if not isinstance(data, str):
-    raise TypeError('Expecting str with binary data')
+    raise TypeError("Expecting str with binary data")
   urlsafe = base64.b64encode(data)
-  return urlsafe.rstrip('=').replace('+', '-').replace('/', '_')
+  return urlsafe.rstrip("=").replace("+", "-").replace("/", "_")
 
 
 def decode(data):
   """URL safe base64 with stripped '=' -> bytes str."""
   if not isinstance(data, str):
-    raise TypeError('Expecting str with base64 data')
+    raise TypeError("Expecting str with base64 data")
   mod = len(data) % 4
   if mod:
-    data += '=' * (4 - mod)
-  return base64.b64decode(data.replace('-', '+').replace('_', '/'))
+    data += "=" * (4 - mod)
+  return base64.b64decode(data.replace("-", "+").replace("_", "/"))

@@ -21,13 +21,14 @@ class Secret(object):
   """
 
   _FetchOutcome = collections.namedtuple(
-      '_FetchOutcome',
-      [
-          'value',  # bytes with the actual secret value
-          'exception',  # an Exception if the fetch failed
-          'expiry',  # time.time() when to refetch
-          'errors',  # incremented on fetch errors
-      ])
+    "_FetchOutcome",
+    [
+      "value",  # bytes with the actual secret value
+      "exception",  # an Exception if the fetch failed
+      "expiry",  # time.time() when to refetch
+      "errors",  # incremented on fetch errors
+    ],
+  )
 
   def __init__(self, project, secret, version):
     self._project = project
@@ -66,8 +67,11 @@ class Secret(object):
         # Log error if it got stuck. This should not be happening normally.
         if self._time() - self._fetching_time > 120:
           logging.error(
-              'Secret %s staleness is %.1f sec, it is updated by thread %s',
-              self._secret_id, staleness, self._fetching_thread)
+            "Secret %s staleness is %.1f sec, it is updated by thread %s",
+            self._secret_id,
+            staleness,
+            self._fetching_thread,
+          )
         return self._latest_or_raise
 
       # If no one is fetching, we'll have to do it (outside the lock to allow
@@ -98,10 +102,12 @@ class Secret(object):
             # its expiry to request a refetch per the retry policy. This is
             # a throttling mechanism to avoid busy retry loops in case of
             # persistent fetch errors.
-            self._latest = self._FetchOutcome(value=self._latest.value,
-                                              exception=self._latest.exception,
-                                              expiry=fetched.expiry,
-                                              errors=fetched.errors)
+            self._latest = self._FetchOutcome(
+              value=self._latest.value,
+              exception=self._latest.exception,
+              expiry=fetched.expiry,
+              errors=fetched.errors,
+            )
           # If we are here, there's no active exception and it is OK to return,
           # but pylint is still confused, so disable the check.
           # pylint: disable=lost-exception
@@ -109,7 +115,7 @@ class Secret(object):
 
   @property
   def _secret_id(self):
-    return '%s/%s/%s' % (self._project, self._secret, self._version)
+    return "%s/%s/%s" % (self._project, self._secret, self._version)
 
   @property
   def _latest_or_raise(self):
@@ -118,27 +124,41 @@ class Secret(object):
     return self._latest.value
 
   def _fetch(self, prev_errors):
-    logging.info('Fetching secret %s...', self._secret_id)
+    logging.info("Fetching secret %s...", self._secret_id)
     try:
       resp = self._json_request(
-          url=('https://secretmanager.googleapis.com/v1/'
-               'projects/%s/secrets/%s/versions/%s:access' %
-               (self._project, self._secret, self._version)),
-          method='GET',
-          scopes=['https://www.googleapis.com/auth/cloud-platform'])
+        url=(
+          "https://secretmanager.googleapis.com/v1/"
+          "projects/%s/secrets/%s/versions/%s:access"
+          % (self._project, self._secret, self._version)
+        ),
+        method="GET",
+        scopes=["https://www.googleapis.com/auth/cloud-platform"],
+      )
       exp_sec = 2 * 3600.0 + self._random() * 3600.0
-      logging.info('Fetched secret %s (refetch in %.1f sec): %s',
-                   self._secret_id, exp_sec, resp['name'])
-      return self._FetchOutcome(value=base64.b64decode(resp['payload']['data']),
-                                exception=None,
-                                expiry=self._time() + exp_sec,
-                                errors=0)
+      logging.info(
+        "Fetched secret %s (refetch in %.1f sec): %s",
+        self._secret_id,
+        exp_sec,
+        resp["name"],
+      )
+      return self._FetchOutcome(
+        value=base64.b64decode(resp["payload"]["data"]),
+        exception=None,
+        expiry=self._time() + exp_sec,
+        errors=0,
+      )
     except net.Error as exception:
-      exp_sec = 2**min(9, prev_errors) + self._random() * 15.0
+      exp_sec = 2 ** min(9, prev_errors) + self._random() * 15.0
       logging.exception(
-          'Failed to fetch secret %s on attempt %d, refetch in %.1f sec',
-          self._secret_id, prev_errors + 1, exp_sec)
-      return self._FetchOutcome(value=None,
-                                exception=exception,
-                                expiry=self._time() + exp_sec,
-                                errors=prev_errors + 1)
+        "Failed to fetch secret %s on attempt %d, refetch in %.1f sec",
+        self._secret_id,
+        prev_errors + 1,
+        exp_sec,
+      )
+      return self._FetchOutcome(
+        value=None,
+        exception=exception,
+        expiry=self._time() + exp_sec,
+        errors=prev_errors + 1,
+      )

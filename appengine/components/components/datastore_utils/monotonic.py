@@ -13,17 +13,17 @@ from . import txn
 
 
 __all__ = [
-  'HIGH_KEY_ID',
-  'Root',
-  'get_versioned_most_recent',
-  'get_versioned_most_recent_async',
-  'get_versioned_most_recent_with_root',
-  'get_versioned_most_recent_with_root_async',
-  'get_versioned_root_model',
-  'insert',
-  'insert_async',
-  'store_new_version',
-  'store_new_version_async',
+  "HIGH_KEY_ID",
+  "Root",
+  "get_versioned_most_recent",
+  "get_versioned_most_recent_async",
+  "get_versioned_most_recent_with_root",
+  "get_versioned_most_recent_with_root_async",
+  "get_versioned_root_model",
+  "insert",
+  "insert_async",
+  "store_new_version",
+  "store_new_version_async",
 ]
 
 
@@ -43,6 +43,7 @@ class Root(ndb.Model):
 
   Either inherit from this class or use get_versioned_root_model().
   """
+
   # Key id of the most recent child entity in the DB. It is monotonically
   # decreasing starting at HIGH_KEY_ID. It is None if no child is present.
   current = ndb.IntegerProperty(indexed=False)
@@ -135,6 +136,7 @@ def get_versioned_root_model(model_name):
   entity with cls.current as an ndb.IntegerProperty will do.
   """
   assert isinstance(model_name, str), model_name
+
   class _Root(Root):
     @classmethod
     def _get_kind(cls):
@@ -151,6 +153,7 @@ def get_versioned_most_recent_async(cls, root_key):
 
 
 get_versioned_most_recent = utils.sync_of(get_versioned_most_recent_async)
+
 
 @ndb.tasklet
 def get_versioned_most_recent_with_root_async(cls, root_key):
@@ -200,10 +203,11 @@ def store_new_version_async(entity, root_cls, extra=None):
   """
   assert not ndb.in_transaction()
   assert isinstance(entity, ndb.Model), entity
-  assert entity.key and entity.key.parent(), 'entity.key.parent() must be set.'
-  assert root_cls._properties.keys() == ['current'], (
-      'This function is unsafe for root entity, use store_new_version_safe '
-      'which is not yet implemented')
+  assert entity.key and entity.key.parent(), "entity.key.parent() must be set."
+  assert root_cls._properties.keys() == ["current"], (
+    "This function is unsafe for root entity, use store_new_version_safe "
+    "which is not yet implemented"
+  )
   root_key = entity.key.parent()
   root = (yield root_key.get_async()) or root_cls(key=root_key)
   root.current = root.current or HIGH_KEY_ID

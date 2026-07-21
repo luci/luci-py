@@ -12,7 +12,8 @@ from google.appengine.ext import ndb
 
 class ErrorReportingInfo(ndb.Model):
   """Notes the last timestamp to be used to resume collecting errors."""
-  KEY_ID = 'root'
+
+  KEY_ID = "root"
 
   timestamp = ndb.FloatProperty()
 
@@ -26,6 +27,7 @@ class ErrorReportingMonitoring(ndb.Model):
 
   Key name is the hash of the error name.
   """
+
   created_ts = ndb.DateTimeProperty(auto_now_add=True)
 
   # The error string. It can be either the exception type or a single line.
@@ -46,7 +48,7 @@ class ErrorReportingMonitoring(ndb.Model):
   def error_to_key_id(error):
     """Returns the key id for an error signature."""
     assert isinstance(error, unicode), repr(error)
-    return hashlib.sha1(error.encode('utf-8')).hexdigest()
+    return hashlib.sha1(error.encode("utf-8")).hexdigest()
 
   @classmethod
   def error_to_key(cls, error):
@@ -60,10 +62,11 @@ class Error(ndb.Model):
 
   The entity is immutable once created.
   """
+
   created_ts = ndb.DateTimeProperty(auto_now_add=True)
 
   # Examples includes 'bot', 'client', 'run_isolated', 'server'.
-  source = ndb.StringProperty(default='unknown')
+  source = ndb.StringProperty(default="unknown")
 
   # Examples includes 'auth', 'exception', 'task_failure'.
   category = ndb.StringProperty()

@@ -8,6 +8,7 @@ import sys
 import unittest
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 from google.appengine.ext import ndb
@@ -22,17 +23,17 @@ class EntityX(ndb.Model):
 
 class ShardingTest(test_case.TestCase):
   def test_shard_key(self):
-    actual = sharding.shard_key('1234', 2, 'Root')
+    actual = sharding.shard_key("1234", 2, "Root")
     expected = "Key('Root', '12')"
     self.assertEqual(expected, str(actual))
 
   def test_hashed_shard_key(self):
-    actual = sharding.hashed_shard_key('1234', 2, 'Root')
-    expected = "Key('Root', '%s')" % hashlib.md5('1234').hexdigest()[:2]
+    actual = sharding.hashed_shard_key("1234", 2, "Root")
+    expected = "Key('Root', '%s')" % hashlib.md5("1234").hexdigest()[:2]
     self.assertEqual(expected, str(actual))
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()

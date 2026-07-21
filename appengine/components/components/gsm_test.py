@@ -14,6 +14,7 @@ except ImportError:
   import queue
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 from components import gsm
@@ -31,18 +32,21 @@ class SecretTest(test_case.TestCase):
     self.threads = []
 
   def secret(self, fetch_queue=None, blocked=None):
-    s = gsm.Secret('some-project', 'some-secret', 'some-version')
+    s = gsm.Secret("some-project", "some-secret", "some-version")
     s._time = lambda: self.now
     s._random = lambda: 0.0
 
     def mock_json_request(url, method, scopes):
       self.assertEqual(
-          url, 'https://secretmanager.googleapis.com/v1/'
-          'projects/some-project/secrets/some-secret/versions/some-version'
-          ':access')
-      self.assertEqual(method, 'GET')
-      self.assertEqual(scopes,
-                       ['https://www.googleapis.com/auth/cloud-platform'])
+        url,
+        "https://secretmanager.googleapis.com/v1/"
+        "projects/some-project/secrets/some-secret/versions/some-version"
+        ":access",
+      )
+      self.assertEqual(method, "GET")
+      self.assertEqual(
+        scopes, ["https://www.googleapis.com/auth/cloud-platform"]
+      )
 
       # Multi-threaded tests use a queue.
       if fetch_queue:
@@ -54,10 +58,8 @@ class SecretTest(test_case.TestCase):
         if isinstance(item, Exception):
           raise item
         return {
-            'name': 'doesnt-really-matter',
-            'payload': {
-                'data': base64.b64encode(item)
-            },
+          "name": "doesnt-really-matter",
+          "payload": {"data": base64.b64encode(item)},
         }
 
       # Single-threaded tests just use generated values.
@@ -66,10 +68,10 @@ class SecretTest(test_case.TestCase):
         if self.error:
           raise net.Error(self.error, 500, None)
         return {
-            'name': 'doesnt-really-matter',
-            'payload': {
-                'data': base64.b64encode('secret-value-%d' % self.fetches)
-            },
+          "name": "doesnt-really-matter",
+          "payload": {
+            "data": base64.b64encode("secret-value-%d" % self.fetches)
+          },
         }
 
     s._json_request = mock_json_request
@@ -87,18 +89,18 @@ class SecretTest(test_case.TestCase):
 
   def test_happy_path_single_thread(self):
     s = self.secret()
-    self.assertEqual(s.access(), 'secret-value-1')
+    self.assertEqual(s.access(), "secret-value-1")
 
     # Still using the cached value a bit later.
     self.now += 600.0
-    self.assertEqual(s.access(), 'secret-value-1')
+    self.assertEqual(s.access(), "secret-value-1")
 
     # Refetched when accessed much later.
     self.now += 3 * 3600.0
-    self.assertEqual(s.access(), 'secret-value-2')
+    self.assertEqual(s.access(), "secret-value-2")
 
   def test_completely_broken(self):
-    self.error = 'Broken'
+    self.error = "Broken"
 
     s = self.secret()
 
@@ -137,14 +139,14 @@ class SecretTest(test_case.TestCase):
       self.launch(access_thread)
 
     # Unblocks all fetching threads.
-    fetch_q.put('val')
+    fetch_q.put("val")
     # Waits for them to be done.
     self.join()
 
     # Only one fetch actually happened.
     self.assertEqual(self.fetches, 1)
     # All threads saw the same value.
-    self.assertEqual(results, ['val'] * 4)
+    self.assertEqual(results, ["val"] * 4)
     del results[:]
 
     # Advance time to trigger expiry.
@@ -157,21 +159,21 @@ class SecretTest(test_case.TestCase):
 
     # Meanwhile try to access the value from the main thread. It should
     # immediately return the cached value.
-    self.assertEqual(secret.access(), 'val')
+    self.assertEqual(secret.access(), "val")
 
     # Let the blocked thread finish and store the new value.
-    fetch_q.put('new-val')
+    fetch_q.put("new-val")
     self.join()
 
     # Verify it saw the new value.
     self.assertEqual(self.fetches, 2)
-    self.assertEqual(results, ['new-val'])
+    self.assertEqual(results, ["new-val"])
 
     # It is now used by all threads.
-    self.assertEqual(secret.access(), 'new-val')
+    self.assertEqual(secret.access(), "new-val")
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()

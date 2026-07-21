@@ -19,13 +19,13 @@ class Discovery(object):
     return self._response
 
   def add_service(self, service_description):
-    file_desc = service_description['file_descriptor']
-    full_name = service_description['service_descriptor'].name
+    file_desc = service_description["file_descriptor"]
+    full_name = service_description["service_descriptor"].name
     if file_desc.package:
-      full_name = '%s.%s' % (file_desc.package, full_name)
+      full_name = "%s.%s" % (file_desc.package, full_name)
     self._response.services.append(full_name)
 
-    for f in service_description['file_descriptor_set'].file:
+    for f in service_description["file_descriptor_set"].file:
       if f.name not in self._files:
         self._response.description.file.add().CopyFrom(f)
         self._files.add(f.name)

@@ -36,9 +36,9 @@ import re
 import textwrap
 
 
-_START_RE = re.compile(r'^(.*)<<\s*([_a-zA-Z]+)\s*$')
-_SPACE_RE = re.compile('^(\s*)')
-_END_RE_FMT = r'^\s*%s\s*$'
+_START_RE = re.compile(r"^(.*)<<\s*([_a-zA-Z]+)\s*$")
+_SPACE_RE = re.compile("^(\s*)")
+_END_RE_FMT = r"^\s*%s\s*$"
 
 
 class MultilineParseError(Exception):
@@ -56,16 +56,16 @@ def parse_multiline(content):
   Returns:
     equivalent single-line text proto string.
   """
-  terminator = ''
+  terminator = ""
   terminator_re = None
   lines = []
-  prefix = ''
+  prefix = ""
   multiline_parts = []
 
   if isinstance(content, unicode):
-    content = content.encode('utf-8')
+    content = content.encode("utf-8")
 
-  for line in content.split('\n'):
+  for line in content.split("\n"):
     if not terminator:
       m = _START_RE.match(line)
       if not m:
@@ -77,9 +77,9 @@ def parse_multiline(content):
       continue
 
     if terminator_re.match(line):
-      single_line = _escape_line(textwrap.dedent('\n'.join(multiline_parts)))
+      single_line = _escape_line(textwrap.dedent("\n".join(multiline_parts)))
       lines.append(prefix + '"' + single_line + '"')
-      terminator = ''
+      terminator = ""
       terminator_re = None
       multiline_parts = []
       continue
@@ -88,27 +88,28 @@ def parse_multiline(content):
 
   if terminator:
     raise MultilineParseError(
-        'Unterminated multiline sequence; terminator = %r' % terminator)
+      "Unterminated multiline sequence; terminator = %r" % terminator
+    )
 
-  return '\n'.join(lines)
+  return "\n".join(lines)
 
 
 def _escape_char(c):
   subst = {
-      '\n': r'\n',
-      '\r': r'\r',
-      '\t': r'\t',
-      '"':  r'\"',
-      '\\': r'\\',
+    "\n": r"\n",
+    "\r": r"\r",
+    "\t": r"\t",
+    '"': r"\"",
+    "\\": r"\\",
   }
   res = subst.get(c)
   if res:
     return res
   # Check if c is directly printable.
-  if 0x20 <= ord(c) and ord(c) <= 0x7f:
+  if 0x20 <= ord(c) and ord(c) <= 0x7F:
     return c
-  return r'\%03o' % ord(c)
+  return r"\%03o" % ord(c)
 
 
 def _escape_line(s):
-  return str(''.join(_escape_char(c) for c in s))
+  return str("".join(_escape_char(c) for c in s))

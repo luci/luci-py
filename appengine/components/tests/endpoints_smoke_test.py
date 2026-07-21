@@ -16,7 +16,7 @@ import tempfile
 import unittest
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-TEST_APP_DIR = os.path.join(THIS_DIR, 'test_endpoints_app')
+TEST_APP_DIR = os.path.join(THIS_DIR, "test_endpoints_app")
 
 from tool_support import gae_sdk_utils
 from tool_support import local_app
@@ -25,7 +25,7 @@ from tool_support import local_app
 class CloudEndpointsSmokeTest(unittest.TestCase):
   def setUp(self):
     super(CloudEndpointsSmokeTest, self).setUp()
-    self.root = tempfile.mkdtemp(prefix='endpoints_smoke_test')
+    self.root = tempfile.mkdtemp(prefix="endpoints_smoke_test")
     self.app = local_app.LocalApplication(TEST_APP_DIR, 9700, False, self.root)
     self.app.start()
     self.app.ensure_serving()
@@ -49,10 +49,10 @@ class CloudEndpointsSmokeTest(unittest.TestCase):
     self.check_forbidden()
 
   def check_who_anonymous(self):
-    response = self.app.client.json_request('/_ah/api/testing_service/v1/who')
+    response = self.app.client.json_request("/_ah/api/testing_service/v1/who")
     self.assertEqual(200, response.http_code)
-    self.assertEqual('anonymous:anonymous', response.body.get('identity'))
-    self.assertIn(response.body.get('ip'), ('127.0.0.1', '0:0:0:0:0:0:0:1'))
+    self.assertEqual("anonymous:anonymous", response.body.get("identity"))
+    self.assertIn(response.body.get("ip"), ("127.0.0.1", "0:0:0:0:0:0:0:1"))
 
   def check_who_authenticated(self):
     # TODO(vadimsh): Testing this requires interacting with real OAuth2 service
@@ -62,10 +62,11 @@ class CloudEndpointsSmokeTest(unittest.TestCase):
 
   def check_forbidden(self):
     response = self.app.client.json_request(
-        '/_ah/api/testing_service/v1/forbidden')
+      "/_ah/api/testing_service/v1/forbidden"
+    )
     self.assertEqual(403, response.http_code)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   gae_sdk_utils.setup_gae_env()
   unittest.main()

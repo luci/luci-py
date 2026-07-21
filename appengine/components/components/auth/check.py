@@ -24,21 +24,22 @@ from . import model
 # This group should contain only **fully trusted** services, deployed and
 # managed by the LUCI deployment administrators. Adding "random" services here
 # is a security risk, since they will be able to impersonate any LUCI project.
-LUCI_SERVICES_GROUP = 'auth-luci-services'
+LUCI_SERVICES_GROUP = "auth-luci-services"
 
 # A header with a value of 'project_header' for check_request.
-X_LUCI_PROJECT = 'X-Luci-Project'
+X_LUCI_PROJECT = "X-Luci-Project"
 
 
 def check_request(
-    ctx,
-    peer_identity,
-    peer_ip,
-    auth_details,
-    delegation_token,
-    project_header,
-    use_project_identites,
-    use_bots_ip_whitelist):
+  ctx,
+  peer_identity,
+  peer_ip,
+  auth_details,
+  delegation_token,
+  project_header,
+  use_project_identites,
+  use_bots_ip_whitelist,
+):
   """Prepares the request context, checking IP whitelist and delegation token.
 
   This is intended to be called by request processing middlewares right after
@@ -74,15 +75,19 @@ def check_request(
   # identity or don't do any of that at all. But never both, it is ambiguous.
   if delegation_token and project_header:
     raise api.AuthenticationError(
-        'Delegation tokens and %s cannot be used together' % X_LUCI_PROJECT)
+      "Delegation tokens and %s cannot be used together" % X_LUCI_PROJECT
+    )
 
   # Hack to allow pure IP-whitelist based authentication for bots, until they
   # are switched to use something better.
   #
   # TODO(vadimsh): Get rid of this. Blocked on killing IP whitelisted access
   # from Chrome Buildbot machines.
-  if (use_bots_ip_whitelist and peer_identity.is_anonymous and
-      auth_db.is_in_ip_whitelist(model.bots_ip_whitelist(), peer_ip, False)):
+  if (
+    use_bots_ip_whitelist
+    and peer_identity.is_anonymous
+    and auth_db.is_in_ip_whitelist(model.bots_ip_whitelist(), peer_ip, False)
+  ):
     peer_identity = model.IP_WHITELISTED_BOT_ID
 
   # Note: populating fields early is useful, since exception handlers may use
@@ -100,19 +105,21 @@ def check_request(
     # the delegated identity.
     try:
       ident, unwrapped_tok = delegation.check_bearer_delegation_token(
-          delegation_token, peer_identity, auth_db)
+        delegation_token, peer_identity, auth_db
+      )
       ctx.current_identity = ident
       ctx.delegation_token = unwrapped_tok
     except exceptions.BadTokenError as exc:
-      raise api.AuthorizationError('Bad delegation token: %s' % exc)
+      raise api.AuthorizationError("Bad delegation token: %s" % exc)
   elif use_project_identites and project_header:
     # X-Luci-Project header can be used only by LUCI services (which we
     # completely trust). Other callers must not provide it (most likely this
     # indicates a misconfiguration).
     if not auth_db.is_group_member(LUCI_SERVICES_GROUP, peer_identity):
       raise api.AuthenticationError(
-          'Usage of %s is not allowed for %s: not a member of %s group' %
-          (X_LUCI_PROJECT, peer_identity.to_bytes(), LUCI_SERVICES_GROUP))
+        "Usage of %s is not allowed for %s: not a member of %s group"
+        % (X_LUCI_PROJECT, peer_identity.to_bytes(), LUCI_SERVICES_GROUP)
+      )
     ctx.current_identity = _project_identity(project_header)
   else:
     ctx.current_identity = ctx.peer_identity
@@ -128,4 +135,4 @@ def _project_identity(proj):
   try:
     return model.Identity(model.IDENTITY_PROJECT, proj)
   except ValueError as exc:
-    raise api.AuthenticationError('Bad %s: %s' % (X_LUCI_PROJECT, exc))
+    raise api.AuthenticationError("Bad %s: %s" % (X_LUCI_PROJECT, exc))

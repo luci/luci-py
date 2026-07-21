@@ -7,14 +7,14 @@ import os
 
 from nose2.events import Plugin
 
-log = logging.getLogger('nose2.plugins.nofollowlink')
+log = logging.getLogger("nose2.plugins.nofollowlink")
 
 
 class NoFollowLink(Plugin):
   alwaysOn = True
 
   def handleDir(self, event):
-    log.info('handleDir path=%s', event.path)
+    log.info("handleDir path=%s", event.path)
     if os.path.islink(event.path):
-      log.info('ignoring link')
+      log.info("ignoring link")
       event.handled = True

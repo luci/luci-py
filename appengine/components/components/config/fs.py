@@ -13,7 +13,7 @@ from components.config import common
 
 # SEPARATOR separates config set name and config file path.
 # A config set name cannot contain 'CONFIGS' because of the capilization.
-SEPARATOR = 'CONFIGS'
+SEPARATOR = "CONFIGS"
 
 
 class Provider(object):
@@ -37,25 +37,27 @@ class Provider(object):
     assert path
     if kwargs:
       logging.warning(
-          'config: parameters %r are ignored in the filesystem mode',
-          kwargs.keys())
+        "config: parameters %r are ignored in the filesystem mode",
+        kwargs.keys(),
+      )
     filename = os.path.join(
-        self.root,
-        config_set.replace('/', os.path.sep),
-        SEPARATOR,
-        path.replace('/', os.path.sep))
+      self.root,
+      config_set.replace("/", os.path.sep),
+      SEPARATOR,
+      path.replace("/", os.path.sep),
+    )
     filename = os.path.abspath(filename)
     assert filename.startswith(os.path.abspath(self.root)), filename
     content = None
     if os.path.exists(filename):
-      with open(filename, 'rb') as f:
+      with open(filename, "rb") as f:
         content = f.read()
     config = common._convert_config(content, dest_type)
     raise ndb.Return(None, config)
 
   def get_project_ids(self):
     # A project_id cannot contain a slash, so recursion is not needed.
-    projects_dir = os.path.join(self.root, 'projects')
+    projects_dir = os.path.join(self.root, "projects")
     if not os.path.isdir(projects_dir):
       return
     for pid in os.listdir(projects_dir):
@@ -64,22 +66,22 @@ class Provider(object):
 
   @ndb.tasklet
   def get_projects_async(self):
-    projects = [{'id': pid} for pid in sorted(self.get_project_ids())]
+    projects = [{"id": pid} for pid in sorted(self.get_project_ids())]
     # TODO(nodir): read project names from projects/<pid>:project.cfg
     raise ndb.Return(projects)
 
   def get_project_refs(self, project_id):
     assert project_id
     assert os.path.sep not in project_id, project_id
-    project_path = os.path.join(self.root, 'projects', project_id) + os.path.sep
-    refs_dir = project_path + 'refs'
+    project_path = os.path.join(self.root, "projects", project_id) + os.path.sep
+    refs_dir = project_path + "refs"
     if not os.path.isdir(refs_dir):
       return
     for dirpath, dirs, _ in os.walk(refs_dir):
       if SEPARATOR in dirs:
         # This is a leaf of the ref tree.
         dirs.remove(SEPARATOR)  # Do not go deeper.
-        yield dirpath[len(project_path):]
+        yield dirpath[len(project_path) :]
 
   @ndb.tasklet
   def get_project_configs_async(self, path):
@@ -89,7 +91,7 @@ class Provider(object):
       {config_set -> (revision, content)} map, where revision is always None.
     """
     assert path
-    config_sets = ['projects/%s' % pid for pid in self.get_project_ids()]
+    config_sets = ["projects/%s" % pid for pid in self.get_project_ids()]
     result = {}
     for config_set in config_sets:
       rev, content = yield self.get_async(config_set, path)

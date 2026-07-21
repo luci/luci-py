@@ -7,6 +7,7 @@ import sys
 import unittest
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 from google.protobuf import descriptor_pb2
@@ -21,7 +22,7 @@ class TestService(object):
   DESCRIPTION = test_prpc_pb2.TestServiceServiceDescription
 
 
-EXPECTED_DESCRIPTION = '''
+EXPECTED_DESCRIPTION = """
 file {
   name: "test.proto"
   package: "discovery_test"
@@ -84,7 +85,7 @@ file {
   }
   syntax: "proto3"
 }
-'''
+"""
 
 
 class DiscoveryServiceTests(unittest.TestCase):
@@ -92,18 +93,18 @@ class DiscoveryServiceTests(unittest.TestCase):
     serv = service.Discovery()
     serv.add_service(TestService.DESCRIPTION)
     res = serv.Describe(None, None)
-    self.assertEquals(res.services, ['discovery_test.TestService'])
+    self.assertEquals(res.services, ["discovery_test.TestService"])
 
     for f in res.description.file:
-      self.assertTrue(f.HasField('source_code_info'))
-      f.ClearField('source_code_info')
+      self.assertTrue(f.HasField("source_code_info"))
+      f.ClearField("source_code_info")
 
     expected_description = descriptor_pb2.FileDescriptorSet()
     text_format.Merge(EXPECTED_DESCRIPTION, expected_description)
     self.assertEqual(expected_description, res.description)
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()

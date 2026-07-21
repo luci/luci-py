@@ -35,13 +35,13 @@ from google.appengine.api import app_identity
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
-  'gce_vm_authentication',
-  'optional_gce_vm_authentication',
+  "gce_vm_authentication",
+  "optional_gce_vm_authentication",
 ]
 
 
 # HTTP header that carries the GCE VM token.
-GCE_VM_TOKEN_HEADER = 'X-Luci-Gce-Vm-Token'
+GCE_VM_TOKEN_HEADER = "X-Luci-Gce-Vm-Token"
 
 
 class BadTokenError(api.AuthenticationError):
@@ -78,7 +78,7 @@ def gce_vm_authentication(request):
   try:
     _, payload = tokens.verify_jwt(token, certs)
   except (signature.CertificateError, tokens.InvalidTokenError) as exc:
-    raise BadTokenError('Invalid GCE VM token: %s' % exc)
+    raise BadTokenError("Invalid GCE VM token: %s" % exc)
 
   # The valid payload looks like this:
   # {
@@ -102,41 +102,44 @@ def gce_vm_authentication(request):
 
   # Verify the token was intended for us.
   allowed = _allowed_audience_re()
-  aud = str(payload.get('aud', ''))
+  aud = str(payload.get("aud", ""))
   if not allowed.match(aud):
     raise BadTokenError(
-        'Bad audience in GCE VM token: got %r, expecting %r' %
-        (aud, allowed.pattern))
+      "Bad audience in GCE VM token: got %r, expecting %r"
+      % (aud, allowed.pattern)
+    )
 
   # The token should have 'google.compute_engine' field, which happens only if
   # it was generated with format=full.
-  gce = payload.get('google', {}).get('compute_engine')
+  gce = payload.get("google", {}).get("compute_engine")
   if not gce:
     raise BadTokenError(
-        'No google.compute_engine in the GCE VM token, use "full" format')
+      'No google.compute_engine in the GCE VM token, use "full" format'
+    )
   if not isinstance(gce, dict):
-    raise BadTokenError('Wrong type for compute_engine: %r' % (gce,))
+    raise BadTokenError("Wrong type for compute_engine: %r" % (gce,))
 
-  instance_name = gce.get('instance_name')
+  instance_name = gce.get("instance_name")
   if not isinstance(instance_name, basestring):
-    raise BadTokenError('Wrong type for instance_name: %r' % (instance_name,))
-  project_id = gce.get('project_id')
+    raise BadTokenError("Wrong type for instance_name: %r" % (instance_name,))
+  project_id = gce.get("project_id")
   if not isinstance(project_id, basestring):
-    raise BadTokenError('Wrong type for project_id: %r' % (project_id,))
+    raise BadTokenError("Wrong type for project_id: %r" % (project_id,))
   details = api.new_auth_details(
-      gce_instance=str(instance_name),
-      gce_project=str(project_id))
+    gce_instance=str(instance_name), gce_project=str(project_id)
+  )
 
   # Convert '<realm>:<project>' to '<project>.<realm>' for bot:... string.
   domain = details.gce_project
-  if ':' in domain:
-    realm, proj = domain.split(':', 1)
-    domain = '%s.%s' % (proj, realm)
+  if ":" in domain:
+    realm, proj = domain.split(":", 1)
+    domain = "%s.%s" % (proj, realm)
 
   # The token is valid. Construct and validate bot identity.
   try:
     ident = model.Identity(
-        model.IDENTITY_BOT, '%s@gce.%s' % (details.gce_instance, domain))
+      model.IDENTITY_BOT, "%s@gce.%s" % (details.gce_instance, domain)
+    )
   except ValueError as exc:
     raise BadTokenError(str(exc))
   return ident, details
@@ -151,7 +154,7 @@ def optional_gce_vm_authentication(request):
   try:
     return gce_vm_authentication(request)
   except BadTokenError as exc:
-    logging.error('Skipping GCE VM auth, it returned an error: %s', exc)
+    logging.error("Skipping GCE VM auth, it returned an error: %s", exc)
     return None, None
 
 
@@ -163,4 +166,6 @@ def _allowed_audience_re():
 
 # Extracted into a separate function for simpler testing.
 def _audience_re(hostname):
-  return re.compile(r'^https\://([a-z0-9\-_]+-dot-)?'+re.escape(hostname)+'$')
+  return re.compile(
+    r"^https\://([a-z0-9\-_]+-dot-)?" + re.escape(hostname) + "$"
+  )

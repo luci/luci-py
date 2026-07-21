@@ -82,74 +82,74 @@ from .proto import realms_pb2
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
-  'ADMIN_GROUP',
-  'Anonymous',
-  'bootstrap_group',
-  'bootstrap_ip_whitelist',
-  'bootstrap_loopback_ips',
-  'bots_ip_whitelist',
-  'configure_as_primary',
-  'find_group_dependency_cycle',
-  'find_referencing_groups',
-  'get_auth_db_revision',
-  'get_missing_groups',
-  'get_service_self_identity',
-  'group_key',
-  'Identity',
-  'IDENTITY_ANONYMOUS',
-  'IDENTITY_BOT',
-  'IDENTITY_PROJECT',
-  'IDENTITY_SERVICE',
-  'IDENTITY_USER',
-  'IdentityGlob',
-  'IdentityProperty',
-  'ip_whitelist_key',
-  'IP_WHITELISTED_BOT_ID',
-  'is_empty_group',
-  'is_external_group_name',
-  'is_primary',
-  'is_replica',
-  'is_standalone',
-  'is_valid_group_name',
-  'is_valid_ip_whitelist_name',
-  'replicate_auth_db',
+  "ADMIN_GROUP",
+  "Anonymous",
+  "bootstrap_group",
+  "bootstrap_ip_whitelist",
+  "bootstrap_loopback_ips",
+  "bots_ip_whitelist",
+  "configure_as_primary",
+  "find_group_dependency_cycle",
+  "find_referencing_groups",
+  "get_auth_db_revision",
+  "get_missing_groups",
+  "get_service_self_identity",
+  "group_key",
+  "Identity",
+  "IDENTITY_ANONYMOUS",
+  "IDENTITY_BOT",
+  "IDENTITY_PROJECT",
+  "IDENTITY_SERVICE",
+  "IDENTITY_USER",
+  "IdentityGlob",
+  "IdentityProperty",
+  "ip_whitelist_key",
+  "IP_WHITELISTED_BOT_ID",
+  "is_empty_group",
+  "is_external_group_name",
+  "is_primary",
+  "is_replica",
+  "is_standalone",
+  "is_valid_group_name",
+  "is_valid_ip_whitelist_name",
+  "replicate_auth_db",
 ]
 
 
 # Name of a group whose members have access to Group management UI. It's the
 # only group needed to bootstrap everything else.
-ADMIN_GROUP = 'administrators'
+ADMIN_GROUP = "administrators"
 
 # No identity information is provided. Identity name is always 'anonymous'.
-IDENTITY_ANONYMOUS = 'anonymous'
+IDENTITY_ANONYMOUS = "anonymous"
 # Using bot credentials. Used primary by Swarming. Identity encodes bot's id.
-IDENTITY_BOT = 'bot'
+IDENTITY_BOT = "bot"
 # Using X-Luci-Project header in an internal RPC. Identity name is project name.
-IDENTITY_PROJECT = 'project'
+IDENTITY_PROJECT = "project"
 # Using App Engine X-Appengine-Inbound-Appid header. Identity name is app name.
-IDENTITY_SERVICE = 'service'
+IDENTITY_SERVICE = "service"
 # Using user credentials (cookies or access tokens). Identity name is email.
-IDENTITY_USER = 'user'
+IDENTITY_USER = "user"
 
 
 # All allowed identity kinds + regexps to validate identity name.
 ALLOWED_IDENTITY_KINDS = {
-  IDENTITY_ANONYMOUS: re.compile(r'^anonymous$'),
-  IDENTITY_BOT: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
+  IDENTITY_ANONYMOUS: re.compile(r"^anonymous$"),
+  IDENTITY_BOT: re.compile(r"^[0-9a-zA-Z_\-\.@]+$"),
   # See also PROJECT_ID_RGX in components/config/common.py.
-  IDENTITY_PROJECT: re.compile(r'^[a-z0-9\-_]+$'),
-  IDENTITY_SERVICE: re.compile(r'^[0-9a-zA-Z_\-\:\.]+$'),
-  IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.\+\%]+@[0-9a-zA-Z_\-\.]+$'),
+  IDENTITY_PROJECT: re.compile(r"^[a-z0-9\-_]+$"),
+  IDENTITY_SERVICE: re.compile(r"^[0-9a-zA-Z_\-\:\.]+$"),
+  IDENTITY_USER: re.compile(r"^[0-9a-zA-Z_\-\.\+\%]+@[0-9a-zA-Z_\-\.]+$"),
 }
 
 # Regular expression that matches group names. Lowercase ASCII only plus some
 # special symbols to allow imported google groups.
-GROUP_NAME_RE = re.compile(r'^([a-z\-]+/)?[0-9a-z_\-\.@]{1,100}$')
+GROUP_NAME_RE = re.compile(r"^([a-z\-]+/)?[0-9a-z_\-\.@]{1,100}$")
 # Special group name that means 'All possible users' (including anonymous!).
-GROUP_ALL = '*'
+GROUP_ALL = "*"
 
 # Regular expression for IP whitelist name.
-IP_WHITELIST_NAME_RE = re.compile(r'^[0-9a-zA-Z_\-\+\.\ ]{2,200}$')
+IP_WHITELIST_NAME_RE = re.compile(r"^[0-9a-zA-Z_\-\+\.\ ]{2,200}$")
 
 
 # Configuration of Primary service, set by 'configure_as_primary'.
@@ -165,22 +165,22 @@ _replication_callback = None
 
 def root_key():
   """Global root key of auth models entity group."""
-  return ndb.Key('AuthGlobalConfig', 'root')
+  return ndb.Key("AuthGlobalConfig", "root")
 
 
 def replication_state_key():
   """Key of AuthReplicationState entity."""
-  return ndb.Key('AuthReplicationState', 'self', parent=root_key())
+  return ndb.Key("AuthReplicationState", "self", parent=root_key())
 
 
 def ip_whitelist_assignments_key():
   """Key of AuthIPWhitelistAssignments entity."""
-  return ndb.Key('AuthIPWhitelistAssignments', 'default', parent=root_key())
+  return ndb.Key("AuthIPWhitelistAssignments", "default", parent=root_key())
 
 
 def historical_revision_key(auth_db_rev):
   """Key for entity subgroup that holds changes done in a concrete revision."""
-  return ndb.Key('Rev', auth_db_rev, parent=root_key())
+  return ndb.Key("Rev", auth_db_rev, parent=root_key())
 
 
 ################################################################################
@@ -188,8 +188,9 @@ def historical_revision_key(auth_db_rev):
 
 
 class Identity(
-    datastore_utils.BytesSerializable,
-    collections.namedtuple('Identity', 'kind, name')):
+  datastore_utils.BytesSerializable,
+  collections.namedtuple("Identity", "kind, name"),
+):
   """Represents a caller that makes requests. Immutable.
 
   A tuple of (kind, name) where 'kind' is one of IDENTITY_* constants and
@@ -209,17 +210,18 @@ class Identity(
   def __new__(cls, kind, name):
     if isinstance(name, unicode):
       try:
-        name = name.encode('ascii')
+        name = name.encode("ascii")
       except UnicodeEncodeError:
-        raise ValueError('Identity has invalid format: only ASCII is allowed')
-    if (kind not in ALLOWED_IDENTITY_KINDS or
-        not ALLOWED_IDENTITY_KINDS[kind].match(name)):
-      raise ValueError('Identity has invalid format: %s' % name)
+        raise ValueError("Identity has invalid format: only ASCII is allowed")
+    if kind not in ALLOWED_IDENTITY_KINDS or not ALLOWED_IDENTITY_KINDS[
+      kind
+    ].match(name):
+      raise ValueError("Identity has invalid format: %s" % name)
     return super(Identity, cls).__new__(cls, str(kind), name)
 
   def to_bytes(self):
     """Serializes this identity to byte buffer."""
-    return '%s:%s' % (self.kind, self.name)
+    return "%s:%s" % (self.kind, self.name)
 
   def to_normalized_bytes(self):
     """Normalizes the serialized identity byte buffer."""
@@ -228,9 +230,9 @@ class Identity(
   @classmethod
   def from_bytes(cls, byte_buf):
     """Given a byte buffer returns corresponding Identity object."""
-    kind, sep, name = byte_buf.partition(':')
+    kind, sep, name = byte_buf.partition(":")
     if not sep:
-      raise ValueError('Missing \':\' separator in Identity string')
+      raise ValueError("Missing ':' separator in Identity string")
     return cls(kind, name)
 
   @property
@@ -261,13 +263,13 @@ class Identity(
   @staticmethod
   def normalize(identity):
     """Returns the normalized version of the given identity value."""
-    if identity.startswith('user:'):
+    if identity.startswith("user:"):
       return identity.lower()
     return identity
 
 
 # Predefined Anonymous identity.
-Anonymous = Identity(IDENTITY_ANONYMOUS, 'anonymous')
+Anonymous = Identity(IDENTITY_ANONYMOUS, "anonymous")
 
 
 # Identity assigned to callers that make unauthenticated calls from IPs
@@ -278,7 +280,7 @@ Anonymous = Identity(IDENTITY_ANONYMOUS, 'anonymous')
 #
 # TODO(vadimsh): Get rid of this. Blocked on Swarming and Isolate switching
 # to service accounts.
-IP_WHITELISTED_BOT_ID = Identity(IDENTITY_BOT, 'whitelisted-ip')
+IP_WHITELISTED_BOT_ID = Identity(IDENTITY_BOT, "whitelisted-ip")
 
 
 class IdentityProperty(datastore_utils.BytesSerializableProperty):
@@ -286,13 +288,15 @@ class IdentityProperty(datastore_utils.BytesSerializableProperty):
 
   Identities are stored as indexed short blobs internally.
   """
+
   _value_type = Identity
   _indexed = True
 
 
 class IdentityGlob(
-    datastore_utils.BytesSerializable,
-    collections.namedtuple('IdentityGlob', 'kind, pattern')):
+  datastore_utils.BytesSerializable,
+  collections.namedtuple("IdentityGlob", "kind, pattern"),
+):
   """Glob-like pattern that matches subset of identities. Immutable.
 
   Tuple (kind, glob) where 'kind' is is one of IDENTITY_* constants and 'glob'
@@ -307,27 +311,27 @@ class IdentityGlob(
   def __new__(cls, kind, pattern):
     if isinstance(pattern, unicode):
       try:
-        pattern = pattern.encode('ascii')
+        pattern = pattern.encode("ascii")
       except UnicodeEncodeError:
-        raise ValueError('Invalid IdentityGlob pattern: only ASCII is allowed')
+        raise ValueError("Invalid IdentityGlob pattern: only ASCII is allowed")
     if not pattern:
-      raise ValueError('No pattern is given')
-    if '\n' in pattern:
-      raise ValueError('Multi-line patterns are not allowed')
+      raise ValueError("No pattern is given")
+    if "\n" in pattern:
+      raise ValueError("Multi-line patterns are not allowed")
     if kind not in ALLOWED_IDENTITY_KINDS:
-      raise ValueError('Invalid Identity kind: %s' % kind)
+      raise ValueError("Invalid Identity kind: %s" % kind)
     return super(IdentityGlob, cls).__new__(cls, str(kind), pattern)
 
   def to_bytes(self):
     """Serializes this identity glob to byte buffer."""
-    return '%s:%s' % (self.kind, self.pattern)
+    return "%s:%s" % (self.kind, self.pattern)
 
   @classmethod
   def from_bytes(cls, byte_buf):
     """Given a byte buffer returns corresponding IdentityGlob object."""
-    kind, sep, pattern = byte_buf.partition(':')
+    kind, sep, pattern = byte_buf.partition(":")
     if not sep:
-      raise ValueError('Missing \':\' separator in IdentityGlob string')
+      raise ValueError("Missing ':' separator in IdentityGlob string")
     return cls(kind, pattern)
 
   def match(self, identity):
@@ -342,6 +346,7 @@ class IdentityGlobProperty(datastore_utils.BytesSerializableProperty):
 
   IdentityGlobs are stored as short indexed blobs internally.
   """
+
   _value_type = IdentityGlob
   _indexed = True
 
@@ -409,6 +414,7 @@ class AuthVersionedEntityMixin(object):
   a linked list of versions of this entity (e.g. one can take most recent entity
   version and go back in time by following auth_db_prev_rev links).
   """
+
   # When the entity was modified last time. Do not use 'auto_now' property since
   # such property overrides any explicitly set value with now() during put. It's
   # undesired when storing a copy of entity received from Primary (Replica
@@ -437,11 +443,12 @@ class AuthVersionedEntityMixin(object):
       comment: optional comment to put in the revision log.
     """
     _get_pending_auth_db_transaction().record_change(
-        entity=self,
-        deletion=False,
-        modified_by=modified_by,
-        modified_ts=modified_ts or utils.utcnow(),
-        comment=comment)
+      entity=self,
+      deletion=False,
+      modified_by=modified_by,
+      modified_ts=modified_ts or utils.utcnow(),
+      comment=comment,
+    )
 
   def record_deletion(self, modified_by, modified_ts=None, comment=None):
     """Marks entity as being deleted in the current transaction.
@@ -459,11 +466,12 @@ class AuthVersionedEntityMixin(object):
       comment: optional comment to put in the revision log.
     """
     _get_pending_auth_db_transaction().record_change(
-        entity=self,
-        deletion=True,
-        modified_by=modified_by,
-        modified_ts=modified_ts or utils.utcnow(),
-        comment=comment)
+      entity=self,
+      deletion=True,
+      modified_by=modified_by,
+      modified_ts=modified_ts or utils.utcnow(),
+      comment=comment,
+    )
 
   ## Internal interface. Do not use directly unless you know what you are doing.
 
@@ -477,7 +485,7 @@ class AuthVersionedEntityMixin(object):
     The name of the new entity class is "<original name>History" (to make sure
     it doesn't show up in indexes for original entity class).
     """
-    existing = getattr(cls, '_auth_db_historical_copy_cls', None)
+    existing = getattr(cls, "_auth_db_historical_copy_cls", None)
     if existing:
       return existing
     props = {}
@@ -499,21 +507,24 @@ class AuthVersionedEntityMixin(object):
         ndb.TextProperty,
       ), prop.__class__
       kwargs = {
-        'name': prop._name,
-        'indexed': False,
-        'required': False,
-        'repeated': prop._repeated,
+        "name": prop._name,
+        "indexed": False,
+        "required": False,
+        "repeated": prop._repeated,
       }
       if prop.__class__ == datastore_utils.ProtobufProperty:
-        kwargs.update({
-          'message_class': prop._message_class,
-          'compressed': prop._compressed,
-        })
+        kwargs.update(
+          {
+            "message_class": prop._message_class,
+            "compressed": prop._compressed,
+          }
+        )
       elif prop.__class__ == ndb.LocalStructuredProperty:
-        kwargs['modelclass'] = prop._modelclass
+        kwargs["modelclass"] = prop._modelclass
       props[name] = prop.__class__(**kwargs)
     new_cls = type(
-        '%sHistory' % cls.__name__, (_AuthDBHistoricalEntity,), props)
+      "%sHistory" % cls.__name__, (_AuthDBHistoricalEntity,), props
+    )
     cls._auth_db_historical_copy_cls = new_cls
     return new_cls
 
@@ -533,8 +544,8 @@ class AuthVersionedEntityMixin(object):
     assert self.key.parent() == root_key() or self.key == root_key(), self.key
     cls = self.get_historical_copy_class()
     entity = cls(
-        id=self.key.id(),
-        parent=historical_revision_key(self.auth_db_rev))
+      id=self.key.id(), parent=historical_revision_key(self.auth_db_rev)
+    )
     for prop in self._properties:
       setattr(entity, prop, getattr(self, prop))
     entity.auth_db_deleted = deleted
@@ -563,20 +574,21 @@ class AuthGlobalConfig(ndb.Model, AuthVersionedEntityMixin):
    * AuthReplicationState
    * AuthSecret
   """
+
   # Disable memcache and always fetch from Datastore. This means we can see
   # changes from the Go version of the app.
   _use_cache = False
   _use_memcache = False
 
   # OAuth2 client_id to use to mint new OAuth2 tokens.
-  oauth_client_id = ndb.StringProperty(indexed=False, default='')
+  oauth_client_id = ndb.StringProperty(indexed=False, default="")
   # OAuth2 client secret. Not so secret really, since it's passed to clients.
-  oauth_client_secret = ndb.StringProperty(indexed=False, default='')
+  oauth_client_secret = ndb.StringProperty(indexed=False, default="")
   # Additional OAuth2 client_ids allowed to access the services.
   oauth_additional_client_ids = ndb.StringProperty(repeated=True, indexed=False)
 
   # URL of a token server to use to generate delegation tokens.
-  token_server_url = ndb.StringProperty(indexed=False, default='')
+  token_server_url = ndb.StringProperty(indexed=False, default="")
   # Serialized security_config_pb2.SecurityConfig, see security_config.proto.
   security_config = ndb.BlobProperty()
 
@@ -592,6 +604,7 @@ class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
   changes to AuthDB are made, Replica updates it whenever it receives a push
   from Primary.
   """
+
   # Disable memcache and always fetch from Datastore. This means we can see
   # changes from the Go version of the app.
   _use_cache = False
@@ -599,10 +612,10 @@ class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
 
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
-    'primary_id': datastore_utils.READABLE,
-    'primary_url': datastore_utils.READABLE,
-    'auth_db_rev': datastore_utils.READABLE,
-    'modified_ts': datastore_utils.READABLE,
+    "primary_id": datastore_utils.READABLE,
+    "primary_url": datastore_utils.READABLE,
+    "auth_db_rev": datastore_utils.READABLE,
+    "modified_ts": datastore_utils.READABLE,
   }
 
   # For services in Standalone mode it is None.
@@ -648,6 +661,7 @@ class AuthDBSnapshotShard(ndb.Model):
 
   Immutable.
   """
+
   # Disable useless in-process per-request cache.
   _use_cache = False
 
@@ -662,8 +676,11 @@ class AuthDBSnapshotShard(ndb.Model):
 def snapshot_shard_key(primary_url, auth_db_rev, shard_id):
   """Returns ndb.Key of some AuthDBSnapshotShard entity."""
   return ndb.Key(
-      'AuthDBShapshotRoot', '%s,%d' % (primary_url, auth_db_rev),
-      AuthDBSnapshotShard, shard_id)
+    "AuthDBShapshotRoot",
+    "%s,%d" % (primary_url, auth_db_rev),
+    AuthDBSnapshotShard,
+    shard_id,
+  )
 
 
 def replicate_auth_db():
@@ -732,7 +749,7 @@ def _get_pending_auth_db_transaction():
   # see ndb/context.py, 'transaction' tasklet, around line 982 (for SDK 1.9.6).
   assert ndb.in_transaction()
   ctx = ndb.get_context()
-  txn = getattr(ctx, '_auth_db_transaction', None)
+  txn = getattr(ctx, "_auth_db_transaction", None)
   if txn:
     return txn
 
@@ -741,12 +758,11 @@ def _get_pending_auth_db_transaction():
   if not state:
     primary_id = app_identity.get_application_id() if is_primary() else None
     state = AuthReplicationState(
-        key=replication_state_key(),
-        primary_id=primary_id,
-        auth_db_rev=0)
+      key=replication_state_key(), primary_id=primary_id, auth_db_rev=0
+    )
   # Assert Primary or Standalone. Replicas can't increment auth db revision.
   if not is_primary() and state.primary_id:
-    raise ValueError('Can\'t modify Auth DB on Replica')
+    raise ValueError("Can't modify Auth DB on Replica")
   state.auth_db_rev += 1
   state.modified_ts = utils.utcnow()
 
@@ -760,11 +776,11 @@ def _get_pending_auth_db_transaction():
 class _AuthDBTransaction(object):
   """Keeps track of entities updated or removed in current transaction."""
 
-  _Change = collections.namedtuple('_Change', 'entity deletion comment')
+  _Change = collections.namedtuple("_Change", "entity deletion comment")
 
   def __init__(self, replication_state):
     self.replication_state = replication_state
-    self.changes = [] # list of _Change tuples
+    self.changes = []  # list of _Change tuples
     self.committed = False
 
   def record_change(self, entity, deletion, modified_by, modified_ts, comment):
@@ -775,7 +791,7 @@ class _AuthDBTransaction(object):
     # Mutate the main entity (the one used to serve online requests).
     entity.modified_by = modified_by
     entity.modified_ts = modified_ts
-    entity.auth_db_prev_rev = entity.auth_db_rev # can be None for new entities
+    entity.auth_db_prev_rev = entity.auth_db_rev  # can be None for new entities
     entity.auth_db_rev = self.replication_state.auth_db_rev
 
     # Keep a historical copy. Delay make_historical_copy call until the commit.
@@ -785,8 +801,7 @@ class _AuthDBTransaction(object):
   def commit(self):
     assert not self.committed
     puts = [
-      c.entity.make_historical_copy(c.deletion, c.comment)
-      for c in self.changes
+      c.entity.make_historical_copy(c.deletion, c.comment) for c in self.changes
     ]
     ndb.put_multi(puts + [self.replication_state])
     for cb in _commit_callbacks:
@@ -803,6 +818,7 @@ class _AuthDBHistoricalEntity(ndb.Model):
 
   See get_historical_copy_class().
   """
+
   # Historical entities are not intended to be read often, and updating the
   # cache will make AuthDB transactions only slower.
   _use_cache = False
@@ -820,8 +836,10 @@ class _AuthDBHistoricalEntity(ndb.Model):
     if self.auth_db_prev_rev is None:
       return None
     return ndb.Key(
-        self.__class__, self.key.id(),
-        parent=historical_revision_key(self.auth_db_prev_rev))
+      self.__class__,
+      self.key.id(),
+      parent=historical_revision_key(self.auth_db_prev_rev),
+    )
 
 
 ################################################################################
@@ -829,9 +847,8 @@ class _AuthDBHistoricalEntity(ndb.Model):
 
 
 class AuthGroup(
-    ndb.Model,
-    AuthVersionedEntityMixin,
-    datastore_utils.SerializableModelMixin):
+  ndb.Model, AuthVersionedEntityMixin, datastore_utils.SerializableModelMixin
+):
   """A group of identities, entity id is a group name.
 
   Parent is AuthGlobalConfig entity keyed at root_key().
@@ -839,6 +856,7 @@ class AuthGroup(
   Primary service holds authoritative list of Groups, that gets replicated to
   all Replicas.
   """
+
   # Disable memcache and always fetch from Datastore. This means we can see
   # changes from the Go version of the app.
   _use_cache = False
@@ -846,15 +864,15 @@ class AuthGroup(
 
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
-    'members': datastore_utils.READABLE | datastore_utils.WRITABLE,
-    'globs': datastore_utils.READABLE | datastore_utils.WRITABLE,
-    'nested': datastore_utils.READABLE | datastore_utils.WRITABLE,
-    'description': datastore_utils.READABLE | datastore_utils.WRITABLE,
-    'owners': datastore_utils.READABLE | datastore_utils.WRITABLE,
-    'created_ts': datastore_utils.READABLE,
-    'created_by': datastore_utils.READABLE,
-    'modified_ts': datastore_utils.READABLE,
-    'modified_by': datastore_utils.READABLE,
+    "members": datastore_utils.READABLE | datastore_utils.WRITABLE,
+    "globs": datastore_utils.READABLE | datastore_utils.WRITABLE,
+    "nested": datastore_utils.READABLE | datastore_utils.WRITABLE,
+    "description": datastore_utils.READABLE | datastore_utils.WRITABLE,
+    "owners": datastore_utils.READABLE | datastore_utils.WRITABLE,
+    "created_ts": datastore_utils.READABLE,
+    "created_by": datastore_utils.READABLE,
+    "modified_ts": datastore_utils.READABLE,
+    "modified_by": datastore_utils.READABLE,
   }
 
   # List of members that are explicitly in this group. Indexed.
@@ -865,7 +883,7 @@ class AuthGroup(
   nested = ndb.StringProperty(repeated=True)
 
   # Human readable description.
-  description = ndb.TextProperty(default='')
+  description = ndb.TextProperty(default="")
   # A name of the group that can modify or delete this group.
   owners = ndb.StringProperty(default=ADMIN_GROUP)
 
@@ -883,7 +901,7 @@ def group_key(group):
 def is_empty_group(group):
   """Returns True if group is missing or completely empty."""
   group = group_key(group).get()
-  return not group or not(group.members or group.globs or group.nested)
+  return not group or not (group.members or group.globs or group.nested)
 
 
 def is_valid_group_name(name):
@@ -893,11 +911,11 @@ def is_valid_group_name(name):
 
 def is_external_group_name(name):
   """True if group is imported from outside and is not writable."""
-  return '/' in name and is_valid_group_name(name)
+  return "/" in name and is_valid_group_name(name)
 
 
 @ndb.transactional
-def bootstrap_group(group, identities, description=''):
+def bootstrap_group(group, identities, description=""):
   """Makes a group (if not yet exists) and adds |identities| to it as members.
 
   Returns True if modified the group, False if identities are already there.
@@ -909,17 +927,19 @@ def bootstrap_group(group, identities, description=''):
   now = utils.utcnow()
   if not entity:
     entity = AuthGroup(
-        key=key,
-        description=description,
-        created_ts=now,
-        created_by=get_service_self_identity())
+      key=key,
+      description=description,
+      created_ts=now,
+      created_by=get_service_self_identity(),
+    )
   for i in identities:
     if i not in entity.members:
       entity.members.append(i)
   entity.record_revision(
-      modified_by=get_service_self_identity(),
-      modified_ts=now,
-      comment='Bootstrap')
+    modified_by=get_service_self_identity(),
+    modified_ts=now,
+    comment="Bootstrap",
+  )
   entity.put()
   replicate_auth_db()
   return True
@@ -935,11 +955,11 @@ def find_referencing_groups(group):
     Set of names of referencing groups.
   """
   nesting_groups = AuthGroup.query(
-      AuthGroup.nested == group,
-      ancestor=root_key()).fetch_async(keys_only=True)
+    AuthGroup.nested == group, ancestor=root_key()
+  ).fetch_async(keys_only=True)
   owned_groups = AuthGroup.query(
-      AuthGroup.owners == group,
-      ancestor=root_key()).fetch_async(keys_only=True)
+    AuthGroup.owners == group, ancestor=root_key()
+  ).fetch_async(keys_only=True)
   refs = set()
   refs.update(key.id() for key in nesting_groups.get_result())
   refs.update(key.id() for key in owned_groups.get_result())
@@ -988,7 +1008,8 @@ def find_group_dependency_cycle(group):
 
     # Load bodies of nested groups not seen so far into |groups|.
     entities = ndb.get_multi(
-        group_key(name) for name in group.nested if name not in groups)
+      group_key(name) for name in group.nested if name not in groups
+    )
     groups.update({entity.key.id(): entity for entity in entities if entity})
 
     visiting.append(group)
@@ -1046,6 +1067,7 @@ class AuthSecret(ndb.Model):
   validate existing tokens. That way secret can be rotated without invalidating
   any existing outstanding tokens.
   """
+
   # Disable memcache and always fetch from Datastore. This means we can see
   # changes from the Go version of the app.
   _use_cache = False
@@ -1074,23 +1096,26 @@ class AuthSecret(ndb.Model):
     # have to call os.urandom every time we want to get a key. It's a waste of
     # time and entropy.
     key = ndb.Key(
-        cls, name,
-        parent=ndb.Key(AuthSecretScope, 'local', parent=root_key()))
+      cls, name, parent=ndb.Key(AuthSecretScope, "local", parent=root_key())
+    )
     entity = key.get()
     if entity is not None:
       return entity
+
     @ndb.transactional
     def create():
       entity = key.get()
       if entity is not None:
         return entity
-      logging.info('Creating new secret key %s', name)
+      logging.info("Creating new secret key %s", name)
       entity = cls(
-          key=key,
-          values=[os.urandom(length)],
-          modified_by=get_service_self_identity())
+        key=key,
+        values=[os.urandom(length)],
+        modified_by=get_service_self_identity(),
+      )
       entity.put()
       return entity
+
     return create()
 
 
@@ -1105,6 +1130,7 @@ class AuthIPWhitelistAssignments(ndb.Model, AuthVersionedEntityMixin):
 
   See AuthIPWhitelist for more info about IP whitelists.
   """
+
   # Disable memcache and always fetch from Datastore. This means we can see
   # changes from the Go version of the app.
   _use_cache = False
@@ -1127,9 +1153,8 @@ class AuthIPWhitelistAssignments(ndb.Model, AuthVersionedEntityMixin):
 
 
 class AuthIPWhitelist(
-    ndb.Model,
-    AuthVersionedEntityMixin,
-    datastore_utils.SerializableModelMixin):
+  ndb.Model, AuthVersionedEntityMixin, datastore_utils.SerializableModelMixin
+):
   """A named set of whitelisted IPv4 and IPv6 subnets.
 
   Can be assigned to individual user accounts to forcibly limit them only to
@@ -1139,6 +1164,7 @@ class AuthIPWhitelist(
 
   Entity id is a name of the whitelist. Parent entity is root_key().
   """
+
   # Disable memcache and always fetch from Datastore. This means we can see
   # changes from the Go version of the app.
   _use_cache = False
@@ -1146,21 +1172,22 @@ class AuthIPWhitelist(
 
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
-    'subnets': datastore_utils.READABLE | datastore_utils.WRITABLE,
-    'description': datastore_utils.READABLE | datastore_utils.WRITABLE,
-    'created_ts': datastore_utils.READABLE,
-    'created_by': datastore_utils.READABLE,
-    'modified_ts': datastore_utils.READABLE,
-    'modified_by': datastore_utils.READABLE,
+    "subnets": datastore_utils.READABLE | datastore_utils.WRITABLE,
+    "description": datastore_utils.READABLE | datastore_utils.WRITABLE,
+    "created_ts": datastore_utils.READABLE,
+    "created_by": datastore_utils.READABLE,
+    "modified_ts": datastore_utils.READABLE,
+    "modified_by": datastore_utils.READABLE,
   }
 
   # The list of subnets. The validator is used only as a last measure. JSON API
   # handler should do validation too.
   subnets = ndb.StringProperty(
-      repeated=True, validator=lambda _, val: ipaddr.normalize_subnet(val))
+    repeated=True, validator=lambda _, val: ipaddr.normalize_subnet(val)
+  )
 
   # Human readable description.
-  description = ndb.TextProperty(default='')
+  description = ndb.TextProperty(default="")
 
   # When the list was created.
   created_ts = ndb.DateTimeProperty()
@@ -1186,11 +1213,11 @@ def bots_ip_whitelist():
 
   DEPRECATED.
   """
-  return '%s-bots' % app_identity.get_application_id()
+  return "%s-bots" % app_identity.get_application_id()
 
 
 @ndb.transactional
-def bootstrap_ip_whitelist(name, subnets, description=''):
+def bootstrap_ip_whitelist(name, subnets, description=""):
   """Adds subnets to an IP whitelist if not there yet.
 
   Can be used on local dev appserver to add 127.0.0.1 to IP whitelist during
@@ -1216,17 +1243,19 @@ def bootstrap_ip_whitelist(name, subnets, description=''):
   now = utils.utcnow()
   if not entity:
     entity = AuthIPWhitelist(
-        key=key,
-        description=description,
-        created_ts=now,
-        created_by=get_service_self_identity())
+      key=key,
+      description=description,
+      created_ts=now,
+      created_by=get_service_self_identity(),
+    )
   for s in subnets:
     if s not in entity.subnets:
       entity.subnets.append(s)
   entity.record_revision(
-      modified_by=get_service_self_identity(),
-      modified_ts=now,
-      comment='Bootstrap')
+    modified_by=get_service_self_identity(),
+    modified_ts=now,
+    comment="Bootstrap",
+  )
   entity.put()
   replicate_auth_db()
   return True
@@ -1242,12 +1271,13 @@ def bootstrap_loopback_ips():
   # See api.py, AuthDB.verify_ip_whitelisted for IP -> Identity conversion.
   assert utils.is_local_dev_server()
   bootstrap_ip_whitelist(
-      bots_ip_whitelist(), ['127.0.0.1', '::1'], 'Local bots')
+    bots_ip_whitelist(), ["127.0.0.1", "::1"], "Local bots"
+  )
   return [IP_WHITELISTED_BOT_ID]
 
 
 @ndb.transactional
-def bootstrap_ip_whitelist_assignment(identity, ip_whitelist, comment=''):
+def bootstrap_ip_whitelist_assignment(identity, ip_whitelist, comment=""):
   """Sets a mapping "identity -> IP whitelist to use" for some account.
 
   Replaces existing assignment. Can be used on local dev appserver to configure
@@ -1262,9 +1292,9 @@ def bootstrap_ip_whitelist_assignment(identity, ip_whitelist, comment=''):
   Returns:
     True if IP whitelist assignment was modified, False if it was already set.
   """
-  entity = (
-      ip_whitelist_assignments_key().get() or
-      AuthIPWhitelistAssignments(key=ip_whitelist_assignments_key()))
+  entity = ip_whitelist_assignments_key().get() or AuthIPWhitelistAssignments(
+    key=ip_whitelist_assignments_key()
+  )
 
   found = False
   for assignment in entity.assignments:
@@ -1279,17 +1309,20 @@ def bootstrap_ip_whitelist_assignment(identity, ip_whitelist, comment=''):
   now = utils.utcnow()
   if not found:
     entity.assignments.append(
-        AuthIPWhitelistAssignments.Assignment(
-            identity=identity,
-            ip_whitelist=ip_whitelist,
-            comment=comment,
-            created_ts=now,
-            created_by=get_service_self_identity()))
+      AuthIPWhitelistAssignments.Assignment(
+        identity=identity,
+        ip_whitelist=ip_whitelist,
+        comment=comment,
+        created_ts=now,
+        created_by=get_service_self_identity(),
+      )
+    )
 
   entity.record_revision(
-      modified_by=get_service_self_identity(),
-      modified_ts=now,
-      comment='Bootstrap')
+    modified_by=get_service_self_identity(),
+    modified_ts=now,
+    comment="Bootstrap",
+  )
   entity.put()
   replicate_auth_db()
   return True
@@ -1304,9 +1337,9 @@ def fetch_ip_whitelists():
   assign_fut = ip_whitelist_assignments_key().get_async()
   whitelists_fut = AuthIPWhitelist.query(ancestor=root_key()).fetch_async()
 
-  assignments = (
-      assign_fut.get_result() or
-      AuthIPWhitelistAssignments(key=ip_whitelist_assignments_key()))
+  assignments = assign_fut.get_result() or AuthIPWhitelistAssignments(
+    key=ip_whitelist_assignments_key()
+  )
 
   whitelists = sorted(whitelists_fut.get_result(), key=lambda x: x.key.id())
   return assignments, whitelists
@@ -1324,6 +1357,7 @@ class AuthRealmsGlobals(ndb.Model, AuthVersionedEntityMixin):
 
   Entity key is realms_globals_key(). Parent entity is root_key().
   """
+
   # Disable memcache and always fetch from Datastore. This means we can see
   # changes from the Go version of the app.
   _use_cache = False
@@ -1332,7 +1366,8 @@ class AuthRealmsGlobals(ndb.Model, AuthVersionedEntityMixin):
   # All globally defined permissions, in alphabetical order, populated
   # by Auth Service v1 (Python).
   permissions = datastore_utils.ProtobufProperty(
-      realms_pb2.Permission, repeated=True)
+    realms_pb2.Permission, repeated=True
+  )
 
   # All globally defined permissions, in alphabetical order, populated
   # by Auth Service v2 (Go).
@@ -1350,6 +1385,7 @@ class AuthProjectRealms(ndb.Model, AuthVersionedEntityMixin):
 
   Entity key is project_realms_key(...). Parent entity is root_key().
   """
+
   # Disable memcache and always fetch from Datastore. This means we can see
   # changes from the Go version of the app.
   _use_cache = False
@@ -1365,7 +1401,7 @@ class AuthProjectRealms(ndb.Model, AuthVersionedEntityMixin):
 
 def realms_globals_key():
   """The key of AuthRealmsGlobals singleton entity."""
-  return ndb.Key(AuthRealmsGlobals, 'globals', parent=root_key())
+  return ndb.Key(AuthRealmsGlobals, "globals", parent=root_key())
 
 
 def project_realms_key(project_id):
@@ -1392,7 +1428,7 @@ class AuthDevConfig(ndb.Model):
   # A custom endpoint to validate OAuth tokens to use as a fallback.
   #
   # E.g. "https://www.googleapis.com/oauth2/v1/tokeninfo".
-  token_info_endpoint = ndb.StringProperty(indexed=False, default='')
+  token_info_endpoint = ndb.StringProperty(indexed=False, default="")
 
 
 @utils.cache_with_expiration(60)
@@ -1402,10 +1438,10 @@ def get_dev_config():
   Asserts that it is used only on dev instance.
   """
   assert utils.is_local_dev_server() or utils.is_dev()
-  k = ndb.Key('AuthDevConfig', 'dev_config')
+  k = ndb.Key("AuthDevConfig", "dev_config")
   e = k.get()
   if not e:
-    logging.warning('Initializing AuthDevConfig entity')
+    logging.warning("Initializing AuthDevConfig entity")
     e = AuthDevConfig(key=k)
     e.put()  # there's a race condition here, but we don't care
   return e

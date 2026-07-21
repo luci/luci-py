@@ -16,13 +16,14 @@ import sys
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-THIRD_PARTY = os.path.join(ROOT_DIR, '..', '..', 'client', 'third_party')
-DEPOT_TOOLS = os.path.join(THIRD_PARTY, 'depot_tools')
+THIRD_PARTY = os.path.join(ROOT_DIR, "..", "..", "client", "third_party")
+DEPOT_TOOLS = os.path.join(THIRD_PARTY, "depot_tools")
 
 sys.path.insert(0, THIRD_PARTY)
 sys.path.insert(0, DEPOT_TOOLS)
 from depot_tools import git_number
 from depot_tools import git_common
+
 assert sys.path.pop(0) == DEPOT_TOOLS
 assert sys.path.pop(0) == THIRD_PARTY
 
@@ -33,7 +34,7 @@ class VersionError(Exception):
 
 
 def git(cmd, cwd):
-  return subprocess.check_output(['git'] + cmd, cwd=cwd, text=True)
+  return subprocess.check_output(["git"] + cmd, cwd=cwd, text=True)
 
 
 @contextlib.contextmanager
@@ -66,7 +67,7 @@ def get_head_pseudo_revision(root, remote):
     - pseudo revision number as a int
     - upstream commit hash this branch is based of.
   """
-  mergebase = git(['merge-base', 'HEAD', remote], cwd=root).rstrip()
+  mergebase = git(["merge-base", "HEAD", remote], cwd=root).rstrip()
   with chdir(root):
     targets = git_common.parse_commitrefs(mergebase)
     git_number.load_generation_numbers(targets)
@@ -88,7 +89,7 @@ def get_remote_pseudo_revision(root, remote):
     - pseudo revision number as a int
     - upstream commit hash this branch is based of.
   """
-  mergebase = git(['rev-parse', remote], cwd=root).rstrip()
+  mergebase = git(["rev-parse", remote], cwd=root).rstrip()
   with chdir(root):
     targets = git_common.parse_commitrefs(mergebase)
     git_number.load_generation_numbers(targets)
@@ -98,17 +99,18 @@ def get_remote_pseudo_revision(root, remote):
 
 def is_pristine(root, mergebase):
   """Returns True if the tree is pristine relating to mergebase."""
-  head = git(['rev-parse', 'HEAD'], cwd=root).rstrip()
-  logging.info('head: %s, mergebase: %s', head, mergebase)
+  head = git(["rev-parse", "HEAD"], cwd=root).rstrip()
+  logging.info("head: %s, mergebase: %s", head, mergebase)
 
   if head != mergebase:
     return False
 
   # Look for local uncommitted diff.
   return not (
-      git(['diff', '--ignore-submodules=none', mergebase], cwd=root) or
-      git(['diff', '--ignore-submodules', '--cached', mergebase], cwd=root) or
-      git(['status', '-s', '--porcelain=v2'], cwd=root))
+    git(["diff", "--ignore-submodules=none", mergebase], cwd=root)
+    or git(["diff", "--ignore-submodules", "--cached", mergebase], cwd=root)
+    or git(["status", "-s", "--porcelain=v2"], cwd=root)
+  )
 
 
 def calculate_version(root, tag, additional_chars=0):
@@ -121,7 +123,7 @@ def calculate_version(root, tag, additional_chars=0):
   additional characters will be added, and thus that the limit for version
   should actually be 63 - additional_chars.
   """
-  pseudo_revision, mergebase = get_head_pseudo_revision(root, 'origin/main')
+  pseudo_revision, mergebase = get_head_pseudo_revision(root, "origin/main")
   pristine = is_pristine(root, mergebase)
   user = getpass.getuser()
   if not pristine and not tag:
@@ -131,27 +133,29 @@ def calculate_version(root, tag, additional_chars=0):
   # Per https://tools.ietf.org/html/rfc1035#section-2.3.1 and
   # https://tools.ietf.org/html/rfc2181#section-11, labels in domains can't be
   # more than 63 chars - additional_chars.
-  return _get_limited_version(pseudo_revision, mergebase, pristine, user, tag,
-                             63 - additional_chars)
+  return _get_limited_version(
+    pseudo_revision, mergebase, pristine, user, tag, 63 - additional_chars
+  )
 
 
 def _get_cleaned_git_branch_name(root):
   """Returns the current git branch name if appropriate to use as an AppEngine
   version tag.
   """
-  branch = git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd=root).strip()
-  if branch == 'HEAD':
-    return ''
+  branch = git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=root).strip()
+  if branch == "HEAD":
+    return ""
   # The official regexp is '^(?:^(?!-)[a-z\d\-]{0,62}[a-z\d]$)$'.
-  valid = string.ascii_lowercase + string.digits + '-'
+  valid = string.ascii_lowercase + string.digits + "-"
   # Strip unexpected characters. At worst it'll be an empty string, which will
   # result in no tag.
-  clean = branch.lower().replace('_', '-').strip('-').lower()
-  return ''.join(b for b in clean if b in valid)
+  clean = branch.lower().replace("_", "-").strip("-").lower()
+  return "".join(b for b in clean if b in valid)
 
 
 def _get_limited_version(
-    pseudo_revision, mergebase, pristine, user, tag, limit):
+  pseudo_revision, mergebase, pristine, user, tag, limit
+):
   """Return version, limited to the given 'limit' number of chars.
 
   Arguments:
@@ -169,7 +173,7 @@ def _get_limited_version(
   - trim username while keeping a minimum of 6 characters.
   - cut the tag off.
   """
-  tainted_text = '-tainted-%s' % user if not pristine else ''
+  tainted_text = "-tainted-%s" % user if not pristine else ""
   version = _get_version(pseudo_revision, mergebase, tainted_text, tag)
 
   # If already under the limit, return what we have.
@@ -185,7 +189,7 @@ def _get_limited_version(
   min_user_chars = 6
 
   # Try with full username (just removing '-tainted').
-  version = _get_version(pseudo_revision, mergebase, '-%s' % user, tag)
+  version = _get_version(pseudo_revision, mergebase, "-%s" % user, tag)
   if len(version) <= limit:
     return version
 
@@ -193,14 +197,15 @@ def _get_limited_version(
   # 8 chars of tainted), bailing if we try to go lower than min_user_chars.
   current_chars_without_user = orig_version_len - len(user) - 8
   chars_for_user = limit - current_chars_without_user
-  tainted_text = '-%s' % user[:max(min_user_chars, chars_for_user)]
-  version = _get_version(
-      pseudo_revision, mergebase, tainted_text, tag).strip('-')
+  tainted_text = "-%s" % user[: max(min_user_chars, chars_for_user)]
+  version = _get_version(pseudo_revision, mergebase, tainted_text, tag).strip(
+    "-"
+  )
   if len(version) <= limit:
     return version
 
   # Regenerate an even smaller version by cutting off the tag.
-  return version[:limit].rstrip('-')
+  return version[:limit].rstrip("-")
 
 
 def _get_version(pseudo_revision, mergebase, tainted_text, tag):
@@ -208,31 +213,30 @@ def _get_version(pseudo_revision, mergebase, tainted_text, tag):
 
   # Build version, trimming mergebase to 7 characters like 'git describe' does
   # (since 40 chars is overwhelming)!
-  version = '%s-%s' % (pseudo_revision, mergebase[:7])
+  version = "%s-%s" % (pseudo_revision, mergebase[:7])
   version += tainted_text
   if tag:
-    version += '-' + tag
+    version += "-" + tag
   return version
 
 
 def checkout_root(cwd):
   """Returns the root of the checkout."""
-  return git(['rev-parse', '--show-toplevel'], cwd).rstrip()
+  return git(["rev-parse", "--show-toplevel"], cwd).rstrip()
 
 
 def main():
   parser = optparse.OptionParser(description=sys.modules[__name__].__doc__)
-  parser.add_option('-v', '--verbose', action='store_true')
-  parser.add_option(
-      '-t', '--tag', help='Tag to attach to a tainted version')
+  parser.add_option("-v", "--verbose", action="store_true")
+  parser.add_option("-t", "--tag", help="Tag to attach to a tainted version")
   options, args = parser.parse_args()
   logging.basicConfig(level=logging.DEBUG if options.verbose else logging.ERROR)
 
   if args:
-    parser.error('Unknown arguments, %s' % args)
+    parser.error("Unknown arguments, %s" % args)
 
   root = checkout_root(os.getcwd())
-  logging.info('Checkout root is %s', root)
+  logging.info("Checkout root is %s", root)
   try:
     print(calculate_version(root, options.tag))
   except VersionError as e:
@@ -242,5 +246,5 @@ def main():
   return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   sys.exit(main())

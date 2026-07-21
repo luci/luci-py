@@ -59,30 +59,32 @@ def merge(permissions, realms, out=None):
       bindings = []
       for b in old_realm.bindings:
         perms = sorted(
-            old_to_new[idx]
-            for idx in b.permissions
-            if old_to_new[idx] is not None
+          old_to_new[idx]
+          for idx in b.permissions
+          if old_to_new[idx] is not None
         )
         if perms:
-          bindings.append((
+          bindings.append(
+            (
               perms,
               conds.relabel(proj_realms.conditions, b.conditions),
               b.principals,
-          ))
+            )
+          )
 
       # Add the relabeled realm to the output.
-      assert old_realm.name.startswith(proj_id+':'), old_realm.name
+      assert old_realm.name.startswith(proj_id + ":"), old_realm.name
       new_realm = out.realms.add()
       new_realm.name = old_realm.name
       new_realm.bindings.extend(
-          realms_pb2.Binding(
-              permissions=perms,
-              principals=principals,
-              conditions=conds,
-          )
-          for perms, conds, principals in sorted(bindings)
+        realms_pb2.Binding(
+          permissions=perms,
+          principals=principals,
+          conditions=conds,
+        )
+        for perms, conds, principals in sorted(bindings)
       )
-      if old_realm.HasField('data'):
+      if old_realm.HasField("data"):
         new_realm.data.CopyFrom(old_realm.data)
 
   return out

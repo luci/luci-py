@@ -10,6 +10,7 @@ import logging
 import time
 
 import six
+
 if six.PY2:
   import webtest  # only for endpoints
 
@@ -29,9 +30,9 @@ def mock_now(test, now, seconds):
   In particular handles when auto_now and auto_now_add are used.
   """
   now = now + datetime.timedelta(seconds=seconds)
-  test.mock(utils, 'utcnow', lambda: now)
-  test.mock(ndb.DateTimeProperty, '_now', lambda _: now)
-  test.mock(ndb.DateProperty, '_now', lambda _: now.date())
+  test.mock(utils, "utcnow", lambda: now)
+  test.mock(ndb.DateTimeProperty, "_now", lambda _: now)
+  test.mock(ndb.DateProperty, "_now", lambda _: now.date())
   return now
 
 
@@ -69,6 +70,7 @@ class TestCase(auto_stub.TestCase):
     - google.appengine.api.mail.send_mail_to_admins().
     - Running task queues.
   """
+
   # See APP_DIR to the root directory containing index.yaml and queue.yaml. It
   # will be used to assert the indexes and task queues are properly defined. It
   # can be left to None if no index or task queue is used for the test case.
@@ -109,10 +111,12 @@ class TestCase(auto_stub.TestCase):
 
     self.testbed.init_app_identity_stub()
     self.testbed.init_datastore_v3_stub(
-        require_indexes=not train_index_yaml and not self.SKIP_INDEX_YAML_CHECK,
-        root_path=self.APP_DIR,
-        consistency_policy=datastore_stub_util.PseudoRandomHRConsistencyPolicy(
-            probability=1))
+      require_indexes=not train_index_yaml and not self.SKIP_INDEX_YAML_CHECK,
+      root_path=self.APP_DIR,
+      consistency_policy=datastore_stub_util.PseudoRandomHRConsistencyPolicy(
+        probability=1
+      ),
+    )
     if six.PY2:
       self.testbed.init_logservice_stub()  # Not in the py3 SDK
     self.testbed.init_memcache_stub()
@@ -126,7 +130,8 @@ class TestCase(auto_stub.TestCase):
     self.testbed.init_mail_stub()
     self.mail_stub = self.testbed.get_stub(testbed.MAIL_SERVICE_NAME)
     self.old_send_to_admins = self.mock(
-        self.mail_stub, '_Dynamic_SendToAdmins', self._SendToAdmins)
+      self.mail_stub, "_Dynamic_SendToAdmins", self._SendToAdmins
+    )
 
     self.testbed.init_taskqueue_stub()
     self._taskqueue_stub = self.testbed.get_stub(testbed.TASKQUEUE_SERVICE_NAME)
@@ -138,9 +143,12 @@ class TestCase(auto_stub.TestCase):
     try:
       if not self.has_failed():
         remaining = self.execute_tasks()
-        self.assertEqual(0, remaining,
-            'Passing tests must leave behind no pending tasks, found %d.'
-            % remaining)
+        self.assertEqual(
+          0,
+          remaining,
+          "Passing tests must leave behind no pending tasks, found %d."
+          % remaining,
+        )
       self.testbed.deactivate()
     finally:
       super(TestCase, self).tearDown()
@@ -174,18 +182,18 @@ class TestCase(auto_stub.TestCase):
       # Do multiple loops until no task was run.
       ran = 0
       for queue in self._taskqueue_stub.GetQueues():
-        if queue['mode'] == 'pull':
+        if queue["mode"] == "pull":
           continue
-        for task in self._taskqueue_stub.GetTasks(queue['name']):
+        for task in self._taskqueue_stub.GetTasks(queue["name"]):
           # Remove 2 seconds for jitter.
-          eta = task['eta_usec'] / 1e6 - 2
+          eta = task["eta_usec"] / 1e6 - 2
           if eta >= time.time():
             continue
-          self.assertEqual('POST', task['method'])
-          logging.info('Task: %s', task['url'])
+          self.assertEqual("POST", task["method"])
+          logging.info("Task: %s", task["url"])
 
           self._post_task(task, **kwargs)
-          self._taskqueue_stub.DeleteTask(queue['name'], task['name'])
+          self._taskqueue_stub.DeleteTask(queue["name"], task["name"])
           ran += 1
       if not ran:
         return ran_total
@@ -196,7 +204,7 @@ class TestCase(auto_stub.TestCase):
     Raise error if the task isn't in the queue.
     """
     task = self._find_task(url, queue_name, payload)
-    expected = {'url': url, 'queue_name': queue_name, 'payload': payload}
+    expected = {"url": url, "queue_name": queue_name, "payload": payload}
     if not task:
       raise AssertionError("Task is not enqueued. expected: %r" % expected)
     self._post_task(task)
@@ -204,22 +212,22 @@ class TestCase(auto_stub.TestCase):
   def _post_task(self, task, **kwargs):
     # Not 100% sure why the Content-Length hack is needed, nor why the
     # stub returns unicode values that break webtest's assertions.
-    body = base64.b64decode(task['body'])
-    headers = {k: str(v) for k, v in task['headers']}
-    headers['Content-Length'] = str(len(body))
+    body = base64.b64decode(task["body"])
+    headers = {k: str(v) for k, v in task["headers"]}
+    headers["Content-Length"] = str(len(body))
     try:
-      self.app.post(task['url'], body, headers=headers, **kwargs)
+      self.app.post(task["url"], body, headers=headers, **kwargs)
     except:
       logging.error(task)
       raise
 
   def _find_task(self, url, queue_name, payload):
     for t in self._taskqueue_stub.GetTasks(queue_name):
-      if t['url'] != url:
+      if t["url"] != url:
         continue
-      if t['queue_name'] != queue_name:
+      if t["queue_name"] != queue_name:
         continue
-      if base64.b64decode(t['body']) != payload:
+      if base64.b64decode(t["body"]) != payload:
         continue
       return t
     return None
@@ -230,15 +238,16 @@ if six.PY2:
   class Endpoints(object):
     """Handles endpoints API calls."""
 
-    def __init__(self, api_service_cls, regex=None, source_ip='127.0.0.1'):
+    def __init__(self, api_service_cls, regex=None, source_ip="127.0.0.1"):
       super(Endpoints, self).__init__()
       self._api_service_cls = api_service_cls
-      kwargs = {'debug': True}
+      kwargs = {"debug": True}
       if regex:
-        kwargs['regex'] = regex
-      self._api_app = webtest.TestApp(endpoints_webapp2.api_server(
-          [self._api_service_cls], **kwargs),
-                                      extra_environ={'REMOTE_ADDR': source_ip})
+        kwargs["regex"] = regex
+      self._api_app = webtest.TestApp(
+        endpoints_webapp2.api_server([self._api_service_cls], **kwargs),
+        extra_environ={"REMOTE_ADDR": source_ip},
+      )
 
     def call_api(self, method, body=None, status=(200, 204)):
       """Calls endpoints API method identified by its name."""
@@ -258,28 +267,30 @@ if six.PY2:
       body = body or {}
       query_strings = []
       for key, value in sorted(body.items()):
-        if '{%s}' % key in path:
-          path = path.replace('{%s}' % key, value)
+        if "{%s}" % key in path:
+          path = path.replace("{%s}" % key, value)
         else:
           # We cannot tell if the parameter is a repeated field from a dict.
           # Allow all query strings to be multi-valued.
           if not isinstance(value, list):
             value = [value]
           for val in value:
-            query_strings.append('%s=%s' % (key, val))
+            query_strings.append("%s=%s" % (key, val))
       if query_strings:
-        path = '%s?%s' % (path, '&'.join(query_strings))
+        path = "%s?%s" % (path, "&".join(query_strings))
 
-      path = '/_ah/api/%s/%s/%s' % (self._api_service_cls.api_info.name,
-                                    self._api_service_cls.api_info.version,
-                                    path)
+      path = "/_ah/api/%s/%s/%s" % (
+        self._api_service_cls.api_info.name,
+        self._api_service_cls.api_info.version,
+        path,
+      )
       try:
-        if info.http_method in ('GET', 'DELETE'):
+        if info.http_method in ("GET", "DELETE"):
           return self._api_app.get(path, status=status)
         return self._api_app.post_json(path, body, status=status)
       except Exception as e:
         # Useful for diagnosing issues in test cases.
-        logging.info('%s failed: %s', path, e)
+        logging.info("%s failed: %s", path, e)
         raise
 
   class EndpointsTestCase(TestCase):
@@ -297,6 +308,7 @@ if six.PY2:
           with self.call_should_fail(403):
             self.call_api('protected_method')
     """
+
     # Should be set in subclasses to a subclass of remote.Service.
     api_service_cls = None
     # Should be set in subclasses to a regular expression to match against path
@@ -310,8 +322,9 @@ if six.PY2:
 
     def setUp(self):
       super(EndpointsTestCase, self).setUp()
-      self._endpoints = Endpoints(self.api_service_cls,
-                                  regex=self.api_service_regex)
+      self._endpoints = Endpoints(
+        self.api_service_cls, regex=self.api_service_regex
+      )
 
     def call_api(self, method, body=None, status=(200, 204)):
       if self.expected_fail_status:
@@ -325,7 +338,7 @@ if six.PY2:
       # call_api(..., status=...). It existed as a workaround for bug that has
       # been fixed:
       # https://code.google.com/p/googleappengine/issues/detail?id=10544
-      assert self.expected_fail_status is None, 'nested call_should_fail'
+      assert self.expected_fail_status is None, "nested call_should_fail"
       assert status is not None
       self.expected_fail_status = int(status)
       try:

@@ -8,6 +8,7 @@ import sys
 import unittest
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 from google.appengine.ext import ndb
@@ -31,10 +32,12 @@ class MakeInitialSnapshotTest(test_case.TestCase):
     def make_auth_db():
       model.AuthGlobalConfig(key=model.root_key()).put()
       model.AuthIPWhitelistAssignments(
-          key=model.ip_whitelist_assignments_key()).put()
-      model.AuthGroup(key=model.group_key('A group')).put()
-      model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist')).put()
+        key=model.ip_whitelist_assignments_key()
+      ).put()
+      model.AuthGroup(key=model.group_key("A group")).put()
+      model.AuthIPWhitelist(key=model.ip_whitelist_key("A whitelist")).put()
       model.replicate_auth_db()
+
     make_auth_db()
 
     # Bump auth_db once more to avoid hitting trivial case of "processing first
@@ -51,38 +54,42 @@ class MakeInitialSnapshotTest(test_case.TestCase):
     # Check all *History entities exist now.
     p = model.historical_revision_key(3)
     self.assertIsNotNone(
-        ndb.Key('AuthGlobalConfigHistory', 'root', parent=p).get())
+      ndb.Key("AuthGlobalConfigHistory", "root", parent=p).get()
+    )
     self.assertIsNotNone(
-        ndb.Key(
-            'AuthIPWhitelistAssignmentsHistory', 'default', parent=p).get())
-    self.assertIsNotNone(ndb.Key('AuthGroupHistory', 'A group', parent=p).get())
+      ndb.Key("AuthIPWhitelistAssignmentsHistory", "default", parent=p).get()
+    )
+    self.assertIsNotNone(ndb.Key("AuthGroupHistory", "A group", parent=p).get())
     self.assertIsNotNone(
-        ndb.Key('AuthIPWhitelistHistory', 'A whitelist', parent=p).get())
+      ndb.Key("AuthIPWhitelistHistory", "A whitelist", parent=p).get()
+    )
 
     # Call again, should be noop (marker is set).
     change_log.ensure_initial_snapshot(3)
     self.assertEqual(3, model.get_auth_db_revision())
 
 
-ident = lambda x: model.Identity.from_bytes('user:' + x)
-glob = lambda x: model.IdentityGlob.from_bytes('user:' + x)
+ident = lambda x: model.Identity.from_bytes("user:" + x)
+glob = lambda x: model.IdentityGlob.from_bytes("user:" + x)
 
 
 def make_group(name, comment, **kwargs):
   group = model.AuthGroup(key=model.group_key(name), **kwargs)
   group.record_revision(
-      modified_by=ident('me@example.com'),
-      modified_ts=utils.utcnow(),
-      comment=comment)
+    modified_by=ident("me@example.com"),
+    modified_ts=utils.utcnow(),
+    comment=comment,
+  )
   group.put()
 
 
 def make_ip_whitelist(name, comment, **kwargs):
   wl = model.AuthIPWhitelist(key=model.ip_whitelist_key(name), **kwargs)
   wl.record_revision(
-      modified_by=ident('me@example.com'),
-      modified_ts=utils.utcnow(),
-      comment=comment)
+    modified_by=ident("me@example.com"),
+    modified_ts=utils.utcnow(),
+    comment=comment,
+  )
   wl.put()
 
 
@@ -96,7 +103,7 @@ class GenerateChangesTest(test_case.TestCase):
 
   def setUp(self):
     super(GenerateChangesTest, self).setUp()
-    self.mock(change_log, 'enqueue_process_change_task', lambda _: None)
+    self.mock(change_log, "enqueue_process_change_task", lambda _: None)
     self.mock_now(datetime.datetime(2015, 1, 2, 3, 4, 5))
 
   def auth_db_transaction(self, callback):
@@ -104,10 +111,12 @@ class GenerateChangesTest(test_case.TestCase):
 
     Returns parent entity of entity subgroup with all generated changes.
     """
+
     @ndb.transactional
     def run():
       callback()
       return model.replicate_auth_db()
+
     auth_db_rev = run()
     change_log.process_change(auth_db_rev)
     return change_log.change_log_revision_key(auth_db_rev)
@@ -115,6 +124,7 @@ class GenerateChangesTest(test_case.TestCase):
   def grab_all(self, ancestor):
     """Returns dicts with all entities under given ancestor."""
     entities = {}
+
     def cb(key):
       # Skip AuthDBLogRev itself, it's not interesting.
       if key == ancestor:
@@ -122,11 +132,12 @@ class GenerateChangesTest(test_case.TestCase):
       as_str = []
       k = key
       while k and k != ancestor:
-        as_str.append('%s:%s' % (k.kind(), k.id()))
+        as_str.append("%s:%s" % (k.kind(), k.id()))
         k = k.parent()
-      entities['/'.join(as_str)] = {
+      entities["/".join(as_str)] = {
         prop: val for prop, val in key.get().to_dict().items() if val
       }
+
     ndb.Query(ancestor=ancestor).map(cb, keys_only=True)
     return entities
 
@@ -135,631 +146,688 @@ class GenerateChangesTest(test_case.TestCase):
     # changes are below.
     def touch_all():
       make_group(
-          name='A group',
-          members=[ident('a@example.com'), ident('b@example.com')],
-          description='Blah',
-          comment='New group')
+        name="A group",
+        members=[ident("a@example.com"), ident("b@example.com")],
+        description="Blah",
+        comment="New group",
+      )
       make_ip_whitelist(
-          name='An IP whitelist',
-          subnets=['127.0.0.1/32'],
-          description='Bluh',
-          comment='New IP whitelist')
+        name="An IP whitelist",
+        subnets=["127.0.0.1/32"],
+        description="Bluh",
+        comment="New IP whitelist",
+      )
       c = model.AuthGlobalConfig(
-          key=model.root_key(),
-          oauth_client_id='client_id',
-          oauth_client_secret='client_secret',
-          oauth_additional_client_ids=['1', '2'])
+        key=model.root_key(),
+        oauth_client_id="client_id",
+        oauth_client_secret="client_secret",
+        oauth_additional_client_ids=["1", "2"],
+      )
       c.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Config change')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Config change",
+      )
       c.put()
       r = model.AuthRealmsGlobals(
-          key=model.realms_globals_key(),
-          permissions=[realms_pb2.Permission(name='luci.dev.p1')])
+        key=model.realms_globals_key(),
+        permissions=[realms_pb2.Permission(name="luci.dev.p1")],
+      )
       r.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='New permission')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="New permission",
+      )
       r.put()
       p = model.AuthProjectRealms(
-          key=model.project_realms_key('proj1'),
-          realms=realms_pb2.Realms(api_version=1234),
-          config_rev='config_rev',
-          perms_rev='prems_rev')
+        key=model.project_realms_key("proj1"),
+        realms=realms_pb2.Realms(api_version=1234),
+        config_rev="config_rev",
+        perms_rev="prems_rev",
+      )
       p.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='New project')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="New project",
+      )
       p.put()
 
     changes = self.grab_all(self.auth_db_transaction(touch_all))
-    self.assertEqual({
-      'AuthDBChange:AuthGlobalConfig$root!7000': {
-      'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_CONF_OAUTH_CLIENT_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
-        'comment': u'Config change',
-        'oauth_client_id': u'client_id',
-        'oauth_client_secret': u'client_secret',
-        'target': u'AuthGlobalConfig$root',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthGlobalConfig$root!7000": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_CONF_OAUTH_CLIENT_CHANGED,
+          "class_": ["AuthDBChange", "AuthDBConfigChange"],
+          "comment": "Config change",
+          "oauth_client_id": "client_id",
+          "oauth_client_secret": "client_secret",
+          "target": "AuthGlobalConfig$root",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGlobalConfig$root!7100": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_CONF_CLIENT_IDS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBConfigChange"],
+          "comment": "Config change",
+          "oauth_additional_client_ids": ["1", "2"],
+          "target": "AuthGlobalConfig$root",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1000": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_CREATED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "New group",
+          "description": "Blah",
+          "owners": "administrators",
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1200": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "New group",
+          "members": [
+            model.Identity(kind="user", name="a@example.com"),
+            model.Identity(kind="user", name="b@example.com"),
+          ],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthIPWhitelist$An IP whitelist!3000": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_IPWL_CREATED,
+          "class_": ["AuthDBChange", "AuthDBIPWhitelistChange"],
+          "comment": "New IP whitelist",
+          "description": "Bluh",
+          "target": "AuthIPWhitelist$An IP whitelist",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthIPWhitelist$An IP whitelist!3200": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBIPWhitelistChange"],
+          "comment": "New IP whitelist",
+          "subnets": ["127.0.0.1/32"],
+          "target": "AuthIPWhitelist$An IP whitelist",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthProjectRealms$proj1!10000": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CREATED,
+          "class_": ["AuthDBChange", "AuthProjectRealmsChange"],
+          "comment": "New project",
+          "config_rev_new": "config_rev",
+          "perms_rev_new": "prems_rev",
+          "target": "AuthProjectRealms$proj1",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthRealmsGlobals$globals!9000": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_REALMS_GLOBALS_CHANGED,
+          "class_": ["AuthDBChange", "AuthRealmsGlobalsChange"],
+          "comment": "New permission",
+          "permissions_added": ["luci.dev.p1"],
+          "target": "AuthRealmsGlobals$globals",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthGlobalConfig$root!7100': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_CONF_CLIENT_IDS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
-        'comment': u'Config change',
-        'oauth_additional_client_ids': [u'1', u'2'],
-        'target': u'AuthGlobalConfig$root',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1000': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_CREATED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'New group',
-        'description': u'Blah',
-        'owners': u'administrators',
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1200': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'New group',
-        'members': [
-          model.Identity(kind='user', name='a@example.com'),
-          model.Identity(kind='user', name='b@example.com'),
-        ],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthIPWhitelist$An IP whitelist!3000': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_IPWL_CREATED,
-        'class_': [u'AuthDBChange', u'AuthDBIPWhitelistChange'],
-        'comment': u'New IP whitelist',
-        'description': u'Bluh',
-        'target': u'AuthIPWhitelist$An IP whitelist',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthIPWhitelist$An IP whitelist!3200': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBIPWhitelistChange'],
-        'comment': u'New IP whitelist',
-        'subnets': [u'127.0.0.1/32'],
-        'target': u'AuthIPWhitelist$An IP whitelist',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthProjectRealms$proj1!10000': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CREATED,
-        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
-        'comment': u'New project',
-        'config_rev_new': u'config_rev',
-        'perms_rev_new': u'prems_rev',
-        'target': u'AuthProjectRealms$proj1',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com')
-      },
-      'AuthDBChange:AuthRealmsGlobals$globals!9000': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_REALMS_GLOBALS_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthRealmsGlobalsChange'],
-        'comment': u'New permission',
-        'permissions_added': [u'luci.dev.p1'],
-        'target': u'AuthRealmsGlobals$globals',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com')
-      },
-    }, changes)
+      changes,
+    )
 
   def test_groups_diff(self):
     def create():
       make_group(
-          name='A group',
-          members=[ident('a@example.com'), ident('b@example.com')],
-          globs=[glob('*@example.com'), glob('*@other.com')],
-          nested=['A', 'B'],
-          description='Blah',
-          comment='New group')
+        name="A group",
+        members=[ident("a@example.com"), ident("b@example.com")],
+        globs=[glob("*@example.com"), glob("*@other.com")],
+        nested=["A", "B"],
+        description="Blah",
+        comment="New group",
+      )
+
     changes = self.grab_all(self.auth_db_transaction(create))
-    self.assertEqual({
-      'AuthDBChange:AuthGroup$A group!1000': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_CREATED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'New group',
-        'description': u'Blah',
-        'owners': u'administrators',
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthGroup$A group!1000": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_CREATED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "New group",
+          "description": "Blah",
+          "owners": "administrators",
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1200": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "New group",
+          "members": [
+            model.Identity(kind="user", name="a@example.com"),
+            model.Identity(kind="user", name="b@example.com"),
+          ],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1400": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_GLOBS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "New group",
+          "globs": [
+            model.IdentityGlob(kind="user", pattern="*@example.com"),
+            model.IdentityGlob(kind="user", pattern="*@other.com"),
+          ],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1600": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_NESTED_ADDED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "New group",
+          "nested": ["A", "B"],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthGroup$A group!1200': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'New group',
-        'members': [
-          model.Identity(kind='user', name='a@example.com'),
-          model.Identity(kind='user', name='b@example.com'),
-        ],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1400': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_GLOBS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'New group',
-        'globs': [
-          model.IdentityGlob(kind='user', pattern='*@example.com'),
-          model.IdentityGlob(kind='user', pattern='*@other.com'),
-        ],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1600': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_NESTED_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'New group',
-        'nested': [u'A', u'B'],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-    }, changes)
+      changes,
+    )
 
     def modify():
-      g = model.group_key('A group').get()
-      g.members = [ident('a@example.com'), ident('c@example.com')]
-      g.globs = [glob('*@example.com'), glob('*@blah.com')]
-      g.nested = ['A', 'C']
-      g.description = 'Another blah'
-      g.owners = 'another-owners'
+      g = model.group_key("A group").get()
+      g.members = [ident("a@example.com"), ident("c@example.com")]
+      g.globs = [glob("*@example.com"), glob("*@blah.com")]
+      g.nested = ["A", "C"]
+      g.description = "Another blah"
+      g.owners = "another-owners"
       g.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Changed')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Changed",
+      )
       g.put()
+
     changes = self.grab_all(self.auth_db_transaction(modify))
-    self.assertEqual({
-      'AuthDBChange:AuthGroup$A group!1100': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_DESCRIPTION_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Changed',
-        'description': u'Another blah',
-        'old_description': u'Blah',
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthGroup$A group!1100": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_DESCRIPTION_CHANGED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Changed",
+          "description": "Another blah",
+          "old_description": "Blah",
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1150": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_OWNERS_CHANGED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Changed",
+          "old_owners": "administrators",
+          "owners": "another-owners",
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1200": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Changed",
+          "members": [model.Identity(kind="user", name="c@example.com")],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1300": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_REMOVED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Changed",
+          "members": [model.Identity(kind="user", name="b@example.com")],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1400": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_GLOBS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Changed",
+          "globs": [model.IdentityGlob(kind="user", pattern="*@blah.com")],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1500": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_GLOBS_REMOVED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Changed",
+          "globs": [model.IdentityGlob(kind="user", pattern="*@other.com")],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1600": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_NESTED_ADDED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Changed",
+          "nested": ["C"],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1700": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_NESTED_REMOVED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Changed",
+          "nested": ["B"],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthGroup$A group!1150': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_OWNERS_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Changed',
-        'old_owners': u'administrators',
-        'owners': u'another-owners',
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1200': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Changed',
-        'members': [model.Identity(kind='user', name='c@example.com')],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1300': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Changed',
-        'members': [model.Identity(kind='user', name='b@example.com')],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1400': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_GLOBS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Changed',
-        'globs': [model.IdentityGlob(kind='user', pattern='*@blah.com')],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1500': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_GLOBS_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Changed',
-        'globs': [model.IdentityGlob(kind='user', pattern='*@other.com')],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1600': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_NESTED_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Changed',
-        'nested': [u'C'],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1700': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_NESTED_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Changed',
-        'nested': [u'B'],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-    }, changes)
+      changes,
+    )
 
     def delete():
-      g = model.group_key('A group').get()
+      g = model.group_key("A group").get()
       g.record_deletion(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Deleted')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Deleted",
+      )
       g.key.delete()
+
     changes = self.grab_all(self.auth_db_transaction(delete))
-    self.assertEqual({
-      'AuthDBChange:AuthGroup$A group!1300': {
-        'app_version': u'v1a',
-        'auth_db_rev': 3,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Deleted',
-        'members': [
-          model.Identity(kind='user', name='a@example.com'),
-          model.Identity(kind='user', name='c@example.com'),
-        ],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthGroup$A group!1300": {
+          "app_version": "v1a",
+          "auth_db_rev": 3,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_REMOVED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Deleted",
+          "members": [
+            model.Identity(kind="user", name="a@example.com"),
+            model.Identity(kind="user", name="c@example.com"),
+          ],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1500": {
+          "app_version": "v1a",
+          "auth_db_rev": 3,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_GLOBS_REMOVED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Deleted",
+          "globs": [
+            model.IdentityGlob(kind="user", pattern="*@example.com"),
+            model.IdentityGlob(kind="user", pattern="*@blah.com"),
+          ],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1700": {
+          "app_version": "v1a",
+          "auth_db_rev": 3,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_NESTED_REMOVED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Deleted",
+          "nested": ["A", "C"],
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGroup$A group!1800": {
+          "app_version": "v1a",
+          "auth_db_rev": 3,
+          "change_type": change_log.AuthDBChange.CHANGE_GROUP_DELETED,
+          "class_": ["AuthDBChange", "AuthDBGroupChange"],
+          "comment": "Deleted",
+          "old_description": "Another blah",
+          "old_owners": "another-owners",
+          "target": "AuthGroup$A group",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthGroup$A group!1500': {
-        'app_version': u'v1a',
-        'auth_db_rev': 3,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_GLOBS_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Deleted',
-        'globs': [
-          model.IdentityGlob(kind='user', pattern='*@example.com'),
-          model.IdentityGlob(kind='user', pattern='*@blah.com'),
-        ],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1700': {
-        'app_version': u'v1a',
-        'auth_db_rev': 3,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_NESTED_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Deleted',
-        'nested': [u'A', u'C'],
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGroup$A group!1800': {
-        'app_version': u'v1a',
-        'auth_db_rev': 3,
-        'change_type': change_log.AuthDBChange.CHANGE_GROUP_DELETED,
-        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
-        'comment': u'Deleted',
-        'old_description': u'Another blah',
-        'old_owners': u'another-owners',
-        'target': u'AuthGroup$A group',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-    }, changes)
+      changes,
+    )
 
   def test_ip_whitelists_diff(self):
     def create():
       make_ip_whitelist(
-          name='A list',
-          subnets=['127.0.0.1/32', '127.0.0.2/32'],
-          description='Blah',
-          comment='New list')
+        name="A list",
+        subnets=["127.0.0.1/32", "127.0.0.2/32"],
+        description="Blah",
+        comment="New list",
+      )
+
     changes = self.grab_all(self.auth_db_transaction(create))
-    self.assertEqual({
-      'AuthDBChange:AuthIPWhitelist$A list!3000': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_IPWL_CREATED,
-        'class_': [u'AuthDBChange', u'AuthDBIPWhitelistChange'],
-        'comment': u'New list',
-        'description': u'Blah',
-        'target': u'AuthIPWhitelist$A list',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthIPWhitelist$A list!3000": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_IPWL_CREATED,
+          "class_": ["AuthDBChange", "AuthDBIPWhitelistChange"],
+          "comment": "New list",
+          "description": "Blah",
+          "target": "AuthIPWhitelist$A list",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthIPWhitelist$A list!3200": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBIPWhitelistChange"],
+          "comment": "New list",
+          "subnets": ["127.0.0.1/32", "127.0.0.2/32"],
+          "target": "AuthIPWhitelist$A list",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthIPWhitelist$A list!3200': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBIPWhitelistChange'],
-        'comment': u'New list',
-        'subnets': [u'127.0.0.1/32', u'127.0.0.2/32'],
-        'target': u'AuthIPWhitelist$A list',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-    }, changes)
+      changes,
+    )
 
     def modify():
-      l = model.ip_whitelist_key('A list').get()
-      l.subnets = ['127.0.0.1/32', '127.0.0.3/32']
-      l.description = 'Another blah'
+      l = model.ip_whitelist_key("A list").get()
+      l.subnets = ["127.0.0.1/32", "127.0.0.3/32"]
+      l.description = "Another blah"
       l.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Changed')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Changed",
+      )
       l.put()
+
     changes = self.grab_all(self.auth_db_transaction(modify))
-    self.assertEqual({
-      'AuthDBChange:AuthIPWhitelist$A list!3100': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_IPWL_DESCRIPTION_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthDBIPWhitelistChange'],
-        'comment': u'Changed',
-        'description': u'Another blah',
-        'old_description': u'Blah',
-        'target': u'AuthIPWhitelist$A list',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthIPWhitelist$A list!3100": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_IPWL_DESCRIPTION_CHANGED,
+          "class_": ["AuthDBChange", "AuthDBIPWhitelistChange"],
+          "comment": "Changed",
+          "description": "Another blah",
+          "old_description": "Blah",
+          "target": "AuthIPWhitelist$A list",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthIPWhitelist$A list!3200": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBIPWhitelistChange"],
+          "comment": "Changed",
+          "subnets": ["127.0.0.3/32"],
+          "target": "AuthIPWhitelist$A list",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthIPWhitelist$A list!3300": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_REMOVED,
+          "class_": ["AuthDBChange", "AuthDBIPWhitelistChange"],
+          "comment": "Changed",
+          "subnets": ["127.0.0.2/32"],
+          "target": "AuthIPWhitelist$A list",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthIPWhitelist$A list!3200': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBIPWhitelistChange'],
-        'comment': u'Changed',
-        'subnets': [u'127.0.0.3/32'],
-        'target': u'AuthIPWhitelist$A list',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthIPWhitelist$A list!3300': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthDBIPWhitelistChange'],
-        'comment': u'Changed',
-        'subnets': [u'127.0.0.2/32'],
-        'target': u'AuthIPWhitelist$A list',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-    }, changes)
+      changes,
+    )
 
     def delete():
-      l = model.ip_whitelist_key('A list').get()
+      l = model.ip_whitelist_key("A list").get()
       l.record_deletion(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Deleted')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Deleted",
+      )
       l.key.delete()
+
     changes = self.grab_all(self.auth_db_transaction(delete))
-    self.assertEqual({
-      'AuthDBChange:AuthIPWhitelist$A list!3300': {
-        'app_version': u'v1a',
-        'auth_db_rev': 3,
-        'change_type': change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthDBIPWhitelistChange'],
-        'comment': u'Deleted',
-        'subnets': [u'127.0.0.1/32', u'127.0.0.3/32'],
-        'target': u'AuthIPWhitelist$A list',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthIPWhitelist$A list!3300": {
+          "app_version": "v1a",
+          "auth_db_rev": 3,
+          "change_type": change_log.AuthDBChange.CHANGE_IPWL_SUBNETS_REMOVED,
+          "class_": ["AuthDBChange", "AuthDBIPWhitelistChange"],
+          "comment": "Deleted",
+          "subnets": ["127.0.0.1/32", "127.0.0.3/32"],
+          "target": "AuthIPWhitelist$A list",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthIPWhitelist$A list!3400": {
+          "app_version": "v1a",
+          "auth_db_rev": 3,
+          "change_type": change_log.AuthDBChange.CHANGE_IPWL_DELETED,
+          "class_": ["AuthDBChange", "AuthDBIPWhitelistChange"],
+          "comment": "Deleted",
+          "old_description": "Another blah",
+          "target": "AuthIPWhitelist$A list",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthIPWhitelist$A list!3400': {
-        'app_version': u'v1a',
-        'auth_db_rev': 3,
-        'change_type': change_log.AuthDBChange.CHANGE_IPWL_DELETED,
-        'class_': [u'AuthDBChange', u'AuthDBIPWhitelistChange'],
-        'comment': u'Deleted',
-        'old_description': u'Another blah',
-        'target': u'AuthIPWhitelist$A list',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-    }, changes)
+      changes,
+    )
 
   def test_global_config_diff(self):
     def create():
       c = model.AuthGlobalConfig(
-          key=model.root_key(),
-          oauth_client_id='client_id',
-          oauth_client_secret='client_secret',
-          oauth_additional_client_ids=['1', '2'])
+        key=model.root_key(),
+        oauth_client_id="client_id",
+        oauth_client_secret="client_secret",
+        oauth_additional_client_ids=["1", "2"],
+      )
       c.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Config change')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Config change",
+      )
       c.put()
+
     changes = self.grab_all(self.auth_db_transaction(create))
-    self.assertEqual({
-      'AuthDBChange:AuthGlobalConfig$root!7000': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_CONF_OAUTH_CLIENT_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
-        'comment': u'Config change',
-        'oauth_client_id': u'client_id',
-        'oauth_client_secret': u'client_secret',
-        'target': u'AuthGlobalConfig$root',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthGlobalConfig$root!7000": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_CONF_OAUTH_CLIENT_CHANGED,
+          "class_": ["AuthDBChange", "AuthDBConfigChange"],
+          "comment": "Config change",
+          "oauth_client_id": "client_id",
+          "oauth_client_secret": "client_secret",
+          "target": "AuthGlobalConfig$root",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGlobalConfig$root!7100": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_CONF_CLIENT_IDS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBConfigChange"],
+          "comment": "Config change",
+          "oauth_additional_client_ids": ["1", "2"],
+          "target": "AuthGlobalConfig$root",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthGlobalConfig$root!7100': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_CONF_CLIENT_IDS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
-        'comment': u'Config change',
-        'oauth_additional_client_ids': [u'1', u'2'],
-        'target': u'AuthGlobalConfig$root',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-    }, changes)
+      changes,
+    )
 
     def modify():
       c = model.root_key().get()
-      c.oauth_additional_client_ids = ['1', '3']
-      c.token_server_url = 'https://token-server'
-      c.security_config = security_config(['hi'])
+      c.oauth_additional_client_ids = ["1", "3"]
+      c.token_server_url = "https://token-server"
+      c.security_config = security_config(["hi"])
       c.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Config change')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Config change",
+      )
       c.put()
+
     changes = self.grab_all(self.auth_db_transaction(modify))
-    self.assertEqual({
-      'AuthDBChange:AuthGlobalConfig$root!7100': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_CONF_CLIENT_IDS_ADDED,
-        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
-        'comment': u'Config change',
-        'oauth_additional_client_ids': [u'3'],
-        'target': u'AuthGlobalConfig$root',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthGlobalConfig$root!7100": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_CONF_CLIENT_IDS_ADDED,
+          "class_": ["AuthDBChange", "AuthDBConfigChange"],
+          "comment": "Config change",
+          "oauth_additional_client_ids": ["3"],
+          "target": "AuthGlobalConfig$root",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGlobalConfig$root!7200": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_CONF_CLIENT_IDS_REMOVED,
+          "class_": ["AuthDBChange", "AuthDBConfigChange"],
+          "comment": "Config change",
+          "oauth_additional_client_ids": ["2"],
+          "target": "AuthGlobalConfig$root",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGlobalConfig$root!7300": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_CONF_TOKEN_SERVER_URL_CHANGED,
+          "class_": ["AuthDBChange", "AuthDBConfigChange"],
+          "comment": "Config change",
+          "target": "AuthGlobalConfig$root",
+          "token_server_url_new": "https://token-server",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthGlobalConfig$root!7400": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_CONF_SECURITY_CONFIG_CHANGED,
+          "class_": ["AuthDBChange", "AuthDBConfigChange"],
+          "comment": "Config change",
+          "security_config_new": security_config(["hi"]),
+          "target": "AuthGlobalConfig$root",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthGlobalConfig$root!7200': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_CONF_CLIENT_IDS_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
-        'comment': u'Config change',
-        'oauth_additional_client_ids': [u'2'],
-        'target': u'AuthGlobalConfig$root',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGlobalConfig$root!7300': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type':
-            change_log.AuthDBChange.CHANGE_CONF_TOKEN_SERVER_URL_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
-        'comment': u'Config change',
-        'target': u'AuthGlobalConfig$root',
-        'token_server_url_new': u'https://token-server',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-      'AuthDBChange:AuthGlobalConfig$root!7400': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type':
-            change_log.AuthDBChange.CHANGE_CONF_SECURITY_CONFIG_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
-        'comment': u'Config change',
-        'security_config_new': security_config(['hi']),
-        'target': u'AuthGlobalConfig$root',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-    }, changes)
+      changes,
+    )
 
   def test_realms_globals_diff(self):
     def create():
       c = model.AuthRealmsGlobals(
-          key=model.realms_globals_key(),
-          permissions=[
-            realms_pb2.Permission(name='luci.dev.p1'),
-            realms_pb2.Permission(name='luci.dev.p2'),
-            realms_pb2.Permission(name='luci.dev.p3'),
-          ])
+        key=model.realms_globals_key(),
+        permissions=[
+          realms_pb2.Permission(name="luci.dev.p1"),
+          realms_pb2.Permission(name="luci.dev.p2"),
+          realms_pb2.Permission(name="luci.dev.p3"),
+        ],
+      )
       c.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='New realms config')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="New realms config",
+      )
       c.put()
+
     self.auth_db_transaction(create)
 
     def modify():
       ent = model.realms_globals_key().get()
       ent.permissions = [
-        realms_pb2.Permission(name='luci.dev.p1'),
-        realms_pb2.Permission(name='luci.dev.p3'),
-        realms_pb2.Permission(name='luci.dev.p4'),
+        realms_pb2.Permission(name="luci.dev.p1"),
+        realms_pb2.Permission(name="luci.dev.p3"),
+        realms_pb2.Permission(name="luci.dev.p4"),
       ]
       ent.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Realms config change')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Realms config change",
+      )
       ent.put()
+
     changes = self.grab_all(self.auth_db_transaction(modify))
 
-    self.assertEqual({
-      'AuthDBChange:AuthRealmsGlobals$globals!9000': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type':
-            change_log.AuthDBChange.CHANGE_REALMS_GLOBALS_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthRealmsGlobalsChange'],
-        'comment': u'Realms config change',
-        'permissions_added': [u'luci.dev.p4'],
-        'permissions_removed': [u'luci.dev.p2'],
-        'target': u'AuthRealmsGlobals$globals',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthRealmsGlobals$globals!9000": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_REALMS_GLOBALS_CHANGED,
+          "class_": ["AuthDBChange", "AuthRealmsGlobalsChange"],
+          "comment": "Realms config change",
+          "permissions_added": ["luci.dev.p4"],
+          "permissions_removed": ["luci.dev.p2"],
+          "target": "AuthRealmsGlobals$globals",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-    }, changes)
+      changes,
+    )
 
   def test_project_realms_diff(self):
     # Note: in reality Realms.api_version is fixed. We change it in this test
@@ -767,120 +835,144 @@ class GenerateChangesTest(test_case.TestCase):
 
     def create():
       p = model.AuthProjectRealms(
-          key=model.project_realms_key('proj1'),
-          realms=realms_pb2.Realms(api_version=123),
-          config_rev='config_rev1',
-          perms_rev='perms_rev1')
+        key=model.project_realms_key("proj1"),
+        realms=realms_pb2.Realms(api_version=123),
+        config_rev="config_rev1",
+        perms_rev="perms_rev1",
+      )
       p.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Created')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Created",
+      )
       p.put()
 
     changes = self.grab_all(self.auth_db_transaction(create))
-    self.assertEqual({
-      'AuthDBChange:AuthProjectRealms$proj1!10000': {
-        'app_version': u'v1a',
-        'auth_db_rev': 1,
-        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CREATED,
-        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
-        'comment': u'Created',
-        'config_rev_new': u'config_rev1',
-        'perms_rev_new': u'perms_rev1',
-        'target': u'AuthProjectRealms$proj1',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthProjectRealms$proj1!10000": {
+          "app_version": "v1a",
+          "auth_db_rev": 1,
+          "change_type": change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CREATED,
+          "class_": ["AuthDBChange", "AuthProjectRealmsChange"],
+          "comment": "Created",
+          "config_rev_new": "config_rev1",
+          "perms_rev_new": "perms_rev1",
+          "target": "AuthProjectRealms$proj1",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-    }, changes)
+      changes,
+    )
 
     def update(api_version, config_rev, perms_rev):
-      p = model.project_realms_key('proj1').get()
+      p = model.project_realms_key("proj1").get()
       p.realms = realms_pb2.Realms(api_version=api_version)
       p.config_rev = config_rev
       p.perms_rev = perms_rev
       p.record_revision(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Updated')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Updated",
+      )
       p.put()
 
     # Update everything.
-    changes = self.grab_all(self.auth_db_transaction(
-        lambda: update(1234, 'config_rev2', 'perms_rev2')))
-    self.assertEqual({
-      'AuthDBChange:AuthProjectRealms$proj1!10100': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
-        'comment': u'Updated',
-        'config_rev_new': u'config_rev2',
-        'config_rev_old': u'config_rev1',
-        'target': u'AuthProjectRealms$proj1',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    changes = self.grab_all(
+      self.auth_db_transaction(
+        lambda: update(1234, "config_rev2", "perms_rev2")
+      )
+    )
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthProjectRealms$proj1!10100": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CHANGED,
+          "class_": ["AuthDBChange", "AuthProjectRealmsChange"],
+          "comment": "Updated",
+          "config_rev_new": "config_rev2",
+          "config_rev_old": "config_rev1",
+          "target": "AuthProjectRealms$proj1",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
+        "AuthDBChange:AuthProjectRealms$proj1!10200": {
+          "app_version": "v1a",
+          "auth_db_rev": 2,
+          "change_type": change_log.AuthDBChange.CHANGE_PROJECT_REALMS_REEVALUATED,
+          "class_": ["AuthDBChange", "AuthProjectRealmsChange"],
+          "comment": "Updated",
+          "perms_rev_new": "perms_rev2",
+          "perms_rev_old": "perms_rev1",
+          "target": "AuthProjectRealms$proj1",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-      'AuthDBChange:AuthProjectRealms$proj1!10200': {
-        'app_version': u'v1a',
-        'auth_db_rev': 2,
-        'change_type':
-            change_log.AuthDBChange.CHANGE_PROJECT_REALMS_REEVALUATED,
-        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
-        'comment': u'Updated',
-        'perms_rev_new': u'perms_rev2',
-        'perms_rev_old': u'perms_rev1',
-        'target': u'AuthProjectRealms$proj1',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
-      },
-    }, changes)
+      changes,
+    )
 
     # Update realms_pb2.Realms, but do not change revisions.
-    changes = self.grab_all(self.auth_db_transaction(
-        lambda: update(12345, 'config_rev2', 'perms_rev2')))
-    self.assertEqual({
-      'AuthDBChange:AuthProjectRealms$proj1!10100': {
-        'app_version': u'v1a',
-        'auth_db_rev': 3,
-        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CHANGED,
-        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
-        'comment': u'Updated',
-        'config_rev_new': u'config_rev2',
-        'config_rev_old': u'config_rev2',
-        'target': u'AuthProjectRealms$proj1',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    changes = self.grab_all(
+      self.auth_db_transaction(
+        lambda: update(12345, "config_rev2", "perms_rev2")
+      )
+    )
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthProjectRealms$proj1!10100": {
+          "app_version": "v1a",
+          "auth_db_rev": 3,
+          "change_type": change_log.AuthDBChange.CHANGE_PROJECT_REALMS_CHANGED,
+          "class_": ["AuthDBChange", "AuthProjectRealmsChange"],
+          "comment": "Updated",
+          "config_rev_new": "config_rev2",
+          "config_rev_old": "config_rev2",
+          "target": "AuthProjectRealms$proj1",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-    }, changes)
+      changes,
+    )
 
     # Update revisions, but don't actually touch realms.
-    changes = self.grab_all(self.auth_db_transaction(
-        lambda: update(12345, 'config_rev3', 'perms_rev3')))
+    changes = self.grab_all(
+      self.auth_db_transaction(
+        lambda: update(12345, "config_rev3", "perms_rev3")
+      )
+    )
     self.assertEqual({}, changes)
 
     def delete():
-      p = model.project_realms_key('proj1').get()
+      p = model.project_realms_key("proj1").get()
       p.record_deletion(
-          modified_by=ident('me@example.com'),
-          modified_ts=utils.utcnow(),
-          comment='Deleted')
+        modified_by=ident("me@example.com"),
+        modified_ts=utils.utcnow(),
+        comment="Deleted",
+      )
       p.key.delete()
 
     changes = self.grab_all(self.auth_db_transaction(delete))
-    self.assertEqual({
-      'AuthDBChange:AuthProjectRealms$proj1!10300': {
-        'app_version': u'v1a',
-        'auth_db_rev': 5,
-        'change_type': change_log.AuthDBChange.CHANGE_PROJECT_REALMS_REMOVED,
-        'class_': [u'AuthDBChange', u'AuthProjectRealmsChange'],
-        'comment': u'Deleted',
-        'config_rev_old': u'config_rev3',
-        'perms_rev_old': u'perms_rev3',
-        'target': u'AuthProjectRealms$proj1',
-        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
-        'who': model.Identity(kind='user', name='me@example.com'),
+    self.assertEqual(
+      {
+        "AuthDBChange:AuthProjectRealms$proj1!10300": {
+          "app_version": "v1a",
+          "auth_db_rev": 5,
+          "change_type": change_log.AuthDBChange.CHANGE_PROJECT_REALMS_REMOVED,
+          "class_": ["AuthDBChange", "AuthProjectRealmsChange"],
+          "comment": "Deleted",
+          "config_rev_old": "config_rev3",
+          "perms_rev_old": "perms_rev3",
+          "target": "AuthProjectRealms$proj1",
+          "when": datetime.datetime(2015, 1, 2, 3, 4, 5),
+          "who": model.Identity(kind="user", name="me@example.com"),
+        },
       },
-    }, changes)
+      changes,
+    )
 
 
 class AuthDBChangeTest(test_case.TestCase):
@@ -889,86 +981,98 @@ class AuthDBChangeTest(test_case.TestCase):
 
   def test_group_change_to_jsonish(self):
     c = change_log.AuthDBGroupChange(
-        change_type=change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
-        target='AuthGroup$abc',
-        auth_db_rev=123,
-        who=ident('a@example.com'),
-        when=datetime.datetime(2015, 1, 2, 3, 4, 5),
-        comment='A comment',
-        app_version='v123',
-        description='abc',
-        members=[ident('a@a.com')],
-        globs=[glob('*@a.com')],
-        nested=['A'],
-        owners='abc',
-        old_owners='def')
-    self.assertEqual({
-      'app_version': 'v123',
-      'auth_db_rev': 123,
-      'change_type': 'GROUP_MEMBERS_ADDED',
-      'comment': 'A comment',
-      'description': 'abc',
-      'globs': ['user:*@a.com'],
-      'members': ['user:a@a.com'],
-      'nested': ['A'],
-      'old_description': None,
-      'old_owners': 'def',
-      'owners': 'abc',
-      'target': 'AuthGroup$abc',
-      'when': 1420167845000000,
-      'who': 'user:a@example.com',
-    }, c.to_jsonish())
+      change_type=change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
+      target="AuthGroup$abc",
+      auth_db_rev=123,
+      who=ident("a@example.com"),
+      when=datetime.datetime(2015, 1, 2, 3, 4, 5),
+      comment="A comment",
+      app_version="v123",
+      description="abc",
+      members=[ident("a@a.com")],
+      globs=[glob("*@a.com")],
+      nested=["A"],
+      owners="abc",
+      old_owners="def",
+    )
+    self.assertEqual(
+      {
+        "app_version": "v123",
+        "auth_db_rev": 123,
+        "change_type": "GROUP_MEMBERS_ADDED",
+        "comment": "A comment",
+        "description": "abc",
+        "globs": ["user:*@a.com"],
+        "members": ["user:a@a.com"],
+        "nested": ["A"],
+        "old_description": None,
+        "old_owners": "def",
+        "owners": "abc",
+        "target": "AuthGroup$abc",
+        "when": 1420167845000000,
+        "who": "user:a@example.com",
+      },
+      c.to_jsonish(),
+    )
 
   def test_wl_assignment_to_jsonish(self):
     c = change_log.AuthDBIPWhitelistAssignmentChange(
-        change_type=change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
-        target='AuthIPWhitelistAssignments$default',
-        auth_db_rev=123,
-        who=ident('a@example.com'),
-        when=datetime.datetime(2015, 1, 2, 3, 4, 5),
-        comment='A comment',
-        app_version='v123',
-        identity=ident('b@example.com'),
-        ip_whitelist='whitelist')
-    self.assertEqual({
-      'app_version': 'v123',
-      'auth_db_rev': 123,
-      'change_type': 'GROUP_MEMBERS_ADDED',
-      'comment': 'A comment',
-      'identity': 'user:b@example.com',
-      'ip_whitelist': 'whitelist',
-      'target': 'AuthIPWhitelistAssignments$default',
-      'when': 1420167845000000,
-      'who': 'user:a@example.com',
-    }, c.to_jsonish())
+      change_type=change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
+      target="AuthIPWhitelistAssignments$default",
+      auth_db_rev=123,
+      who=ident("a@example.com"),
+      when=datetime.datetime(2015, 1, 2, 3, 4, 5),
+      comment="A comment",
+      app_version="v123",
+      identity=ident("b@example.com"),
+      ip_whitelist="whitelist",
+    )
+    self.assertEqual(
+      {
+        "app_version": "v123",
+        "auth_db_rev": 123,
+        "change_type": "GROUP_MEMBERS_ADDED",
+        "comment": "A comment",
+        "identity": "user:b@example.com",
+        "ip_whitelist": "whitelist",
+        "target": "AuthIPWhitelistAssignments$default",
+        "when": 1420167845000000,
+        "who": "user:a@example.com",
+      },
+      c.to_jsonish(),
+    )
 
   def test_security_config_change_to_jsonish(self):
     c = change_log.AuthDBConfigChange(
-        change_type=change_log.AuthDBChange.CHANGE_CONF_SECURITY_CONFIG_CHANGED,
-        target='AuthGlobalConfig$default',
-        auth_db_rev=123,
-        who=ident('a@example.com'),
-        when=datetime.datetime(2015, 1, 2, 3, 4, 5),
-        comment='A comment',
-        app_version='v123',
-        security_config_old=None,
-        security_config_new=security_config(['hi']))
-    self.assertEqual({
-      'app_version': 'v123',
-      'auth_db_rev': 123,
-      'change_type': 'CONF_SECURITY_CONFIG_CHANGED',
-      'comment': 'A comment',
-      'oauth_additional_client_ids': [],
-      'oauth_client_id': None,
-      'oauth_client_secret': None,
-      'security_config_new': {'internal_service_regexp': [u'hi']},
-      'security_config_old': None,
-      'target': 'AuthGlobalConfig$default',
-      'token_server_url_new': None,
-      'token_server_url_old': None,
-      'when': 1420167845000000,
-      'who': 'user:a@example.com',
-    }, c.to_jsonish())
+      change_type=change_log.AuthDBChange.CHANGE_CONF_SECURITY_CONFIG_CHANGED,
+      target="AuthGlobalConfig$default",
+      auth_db_rev=123,
+      who=ident("a@example.com"),
+      when=datetime.datetime(2015, 1, 2, 3, 4, 5),
+      comment="A comment",
+      app_version="v123",
+      security_config_old=None,
+      security_config_new=security_config(["hi"]),
+    )
+    self.assertEqual(
+      {
+        "app_version": "v123",
+        "auth_db_rev": 123,
+        "change_type": "CONF_SECURITY_CONFIG_CHANGED",
+        "comment": "A comment",
+        "oauth_additional_client_ids": [],
+        "oauth_client_id": None,
+        "oauth_client_secret": None,
+        "security_config_new": {"internal_service_regexp": ["hi"]},
+        "security_config_old": None,
+        "target": "AuthGlobalConfig$default",
+        "token_server_url_new": None,
+        "token_server_url_old": None,
+        "when": 1420167845000000,
+        "who": "user:a@example.com",
+      },
+      c.to_jsonish(),
+    )
 
 
 class ChangeLogQueryTest(test_case.TestCase):
@@ -982,53 +1086,64 @@ class ChangeLogQueryTest(test_case.TestCase):
   def test_make_change_log_query(self):
     def mk_ch(tp, rev, target):
       ch = change_log.AuthDBChange(
-          change_type=getattr(change_log.AuthDBChange, 'CHANGE_%s' % tp),
-          auth_db_rev=rev,
-          target=target)
+        change_type=getattr(change_log.AuthDBChange, "CHANGE_%s" % tp),
+        auth_db_rev=rev,
+        target=target,
+      )
       ch.key = change_log.make_change_key(ch)
       ch.put()
 
     def key(c):
-      return '%s/%s' % (c.key.parent().id(), c.key.id())
+      return "%s/%s" % (c.key.parent().id(), c.key.id())
 
-    mk_ch('GROUP_CREATED', 1, 'AuthGroup$abc')
-    mk_ch('GROUP_MEMBERS_ADDED', 1, 'AuthGroup$abc')
-    mk_ch('GROUP_CREATED', 1, 'AuthGroup$another')
-    mk_ch('GROUP_DELETED', 2, 'AuthGroup$abc')
-    mk_ch('GROUP_MEMBERS_ADDED', 2, 'AuthGroup$another')
+    mk_ch("GROUP_CREATED", 1, "AuthGroup$abc")
+    mk_ch("GROUP_MEMBERS_ADDED", 1, "AuthGroup$abc")
+    mk_ch("GROUP_CREATED", 1, "AuthGroup$another")
+    mk_ch("GROUP_DELETED", 2, "AuthGroup$abc")
+    mk_ch("GROUP_MEMBERS_ADDED", 2, "AuthGroup$another")
 
     # All. Most recent first. Largest even types first.
     q = change_log.make_change_log_query()
-    self.assertEqual([
-      '2/AuthGroup$another!1200',
-      '2/AuthGroup$abc!1800',
-      '1/AuthGroup$another!1000',
-      '1/AuthGroup$abc!1200',
-      '1/AuthGroup$abc!1000',
-    ], map(key, q.fetch()))
+    self.assertEqual(
+      [
+        "2/AuthGroup$another!1200",
+        "2/AuthGroup$abc!1800",
+        "1/AuthGroup$another!1000",
+        "1/AuthGroup$abc!1200",
+        "1/AuthGroup$abc!1000",
+      ],
+      map(key, q.fetch()),
+    )
 
     # Single revision only.
     q = change_log.make_change_log_query(auth_db_rev=1)
-    self.assertEqual([
-      '1/AuthGroup$another!1000',
-      '1/AuthGroup$abc!1200',
-      '1/AuthGroup$abc!1000',
-    ], map(key, q.fetch()))
+    self.assertEqual(
+      [
+        "1/AuthGroup$another!1000",
+        "1/AuthGroup$abc!1200",
+        "1/AuthGroup$abc!1000",
+      ],
+      map(key, q.fetch()),
+    )
 
     # Single target only.
-    q = change_log.make_change_log_query(target='AuthGroup$another')
-    self.assertEqual([
-      '2/AuthGroup$another!1200',
-      '1/AuthGroup$another!1000',
-    ], map(key, q.fetch()))
+    q = change_log.make_change_log_query(target="AuthGroup$another")
+    self.assertEqual(
+      [
+        "2/AuthGroup$another!1200",
+        "1/AuthGroup$another!1000",
+      ],
+      map(key, q.fetch()),
+    )
 
     # Single revision and single target.
     q = change_log.make_change_log_query(
-        auth_db_rev=1, target='AuthGroup$another')
-    self.assertEqual(['1/AuthGroup$another!1000'], map(key, q.fetch()))
+      auth_db_rev=1, target="AuthGroup$another"
+    )
+    self.assertEqual(["1/AuthGroup$another!1000"], map(key, q.fetch()))
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()

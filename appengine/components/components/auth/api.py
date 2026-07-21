@@ -42,42 +42,42 @@ from .proto import security_config_pb2
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
-    'AuthDetails',
-    'AuthenticationError',
-    'AuthorizationError',
-    'Error',
-    'GroupListing',
-    'Permission',
-    'SecretKey',
-    'autologin',
-    'disable_process_cache',
-    'get_auth_details',
-    'get_current_identity',
-    'get_delegation_token',
-    'get_peer_identity',
-    'get_peer_ip',
-    'get_process_cache_expiration_sec',
-    'get_realm_data',
-    'get_request_auth_db',
-    'get_secret',
-    'get_web_client_id',
-    'has_permission',
-    'has_permission_dryrun',
-    'is_admin',
-    'is_group_member',
-    'is_in_ip_whitelist',
-    'is_internal_domain',
-    'is_superuser',
-    'legacy_realm',
-    'list_group',
-    'new_auth_details',
-    'public',
-    'require',
-    'root_realm',
-    'should_enforce_realm_acl',
-    'validate_realm_name',
-    'verify_ip_whitelisted',
-    'warmup',
+  "AuthDetails",
+  "AuthenticationError",
+  "AuthorizationError",
+  "Error",
+  "GroupListing",
+  "Permission",
+  "SecretKey",
+  "autologin",
+  "disable_process_cache",
+  "get_auth_details",
+  "get_current_identity",
+  "get_delegation_token",
+  "get_peer_identity",
+  "get_peer_ip",
+  "get_process_cache_expiration_sec",
+  "get_realm_data",
+  "get_request_auth_db",
+  "get_secret",
+  "get_web_client_id",
+  "has_permission",
+  "has_permission_dryrun",
+  "is_admin",
+  "is_group_member",
+  "is_in_ip_whitelist",
+  "is_internal_domain",
+  "is_superuser",
+  "legacy_realm",
+  "list_group",
+  "new_auth_details",
+  "public",
+  "require",
+  "root_realm",
+  "should_enforce_realm_acl",
+  "validate_realm_name",
+  "verify_ip_whitelisted",
+  "warmup",
 ]
 
 
@@ -113,10 +113,10 @@ _thread_local = threading.local()
 
 
 # The endpoint used to validate an access token on dev server.
-TOKEN_INFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v1/tokeninfo'
+TOKEN_INFO_ENDPOINT = "https://www.googleapis.com/oauth2/v1/tokeninfo"
 
 # OAuth2 client_id of the "API Explorer" web app.
-API_EXPLORER_CLIENT_ID = '292824132082.apps.googleusercontent.com'
+API_EXPLORER_CLIENT_ID = "292824132082.apps.googleusercontent.com"
 
 
 ################################################################################
@@ -125,6 +125,7 @@ API_EXPLORER_CLIENT_ID = '292824132082.apps.googleusercontent.com'
 
 class Error(Exception):
   """Base class for exceptions raised by auth component."""
+
   def __init__(self, message=None):
     super(Error, self).__init__(message or self.__doc__)
 
@@ -146,57 +147,70 @@ class RealmsError(Error):
 
 
 # Name of a secret. Used by 'get_secret' function.
-SecretKey = collections.namedtuple('SecretKey', ['name'])
+SecretKey = collections.namedtuple("SecretKey", ["name"])
 
 
 # The representation of AuthGroup used by AuthDB, preprocessed for faster
 # membership checks. We keep it in AuthDB in place of AuthGroup to reduce RAM
 # usage.
 CachedGroup = collections.namedtuple(
-    'CachedGroup',
-    [
-        'members',  # frozenset(m.to_normalized_bytes() for m in group.members)
-        'globs',
-        'nested',
-        'description',
-        'owners',
-        'created_ts',
-        'created_by',
-        'modified_ts',
-        'modified_by',
-    ])
+  "CachedGroup",
+  [
+    "members",  # frozenset(m.to_normalized_bytes() for m in group.members)
+    "globs",
+    "nested",
+    "description",
+    "owners",
+    "created_ts",
+    "created_by",
+    "modified_ts",
+    "modified_by",
+  ],
+)
 
 
 # GroupListing is returned by list_group.
-GroupListing = collections.namedtuple('GroupListing', [
-  'members',  # list of Identity in no particular order
-  'globs',    # list of IdentityGlob in no particular order
-  'nested',   # list of strings with nested group names in no particular order
-])
+GroupListing = collections.namedtuple(
+  "GroupListing",
+  [
+    "members",  # list of Identity in no particular order
+    "globs",  # list of IdentityGlob in no particular order
+    "nested",  # list of strings with nested group names in no particular order
+  ],
+)
 
 
 # OAuthConfig is extracted from the AuthDB proto or from AuthGlobalConfig.
-OAuthConfig = collections.namedtuple('OAuthConfig', [
-  'oauth_client_id',              # str
-  'oauth_client_secret',          # str
-  'oauth_additional_client_ids',  # list of str
-])
+OAuthConfig = collections.namedtuple(
+  "OAuthConfig",
+  [
+    "oauth_client_id",  # str
+    "oauth_client_secret",  # str
+    "oauth_additional_client_ids",  # list of str
+  ],
+)
 
 
 # The representation of realms_pb2.Realm used by AuthDB, preprocessed for faster
 # checks.
-CachedRealm = collections.namedtuple('CachedRealm', [
-  'per_permission_sets',  # permission index -> [ConditionalPrincipalsSet]
-  'data',                 # realms_pb2.RealmData (perhaps empty)
-])
+CachedRealm = collections.namedtuple(
+  "CachedRealm",
+  [
+    "per_permission_sets",  # permission index -> [ConditionalPrincipalsSet]
+    "data",  # realms_pb2.RealmData (perhaps empty)
+  ],
+)
 
 
 # Represents a set of groups and identities + a condition, used by CachedRealm.
-ConditionalPrincipalsSet = collections.namedtuple('ConditionalPrincipalsSet', [
-  'groups',      # tuple(['group1', 'group2', ...])
-  'idents',      # frozenset(['user:abc@example.com', ...])
-  'conditions',  # tuple([func, func, func]) AND'ed together
-])
+ConditionalPrincipalsSet = collections.namedtuple(
+  "ConditionalPrincipalsSet",
+  [
+    "groups",  # tuple(['group1', 'group2', ...])
+    "idents",  # frozenset(['user:abc@example.com', ...])
+    "conditions",  # tuple([func, func, func]) AND'ed together
+  ],
+)
 
 
 class AuthDB(object):
@@ -212,26 +226,27 @@ class AuthDB(object):
   def empty():
     """Returns empty AuthDB suitable for tests."""
     return AuthDB(
-        from_what='empty',
-        replication_state=model.AuthReplicationState(),
-        oauth_config=OAuthConfig('', '', []),
-        token_server_url='',
-        groups={},
-        ip_whitelist_assignments={},
-        ip_whitelists={},
-        realms_pb=realms_pb2.Realms(api_version=realms.API_VERSION),
-        security_config_blob=None,
-        additional_client_ids=[])
+      from_what="empty",
+      replication_state=model.AuthReplicationState(),
+      oauth_config=OAuthConfig("", "", []),
+      token_server_url="",
+      groups={},
+      ip_whitelist_assignments={},
+      ip_whitelists={},
+      realms_pb=realms_pb2.Realms(api_version=realms.API_VERSION),
+      security_config_blob=None,
+      additional_client_ids=[],
+    )
 
   @staticmethod
   def from_entities(
-        replication_state,
-        global_config,
-        groups,
-        ip_whitelist_assignments,
-        ip_whitelists,
-        additional_client_ids
-    ):
+    replication_state,
+    global_config,
+    groups,
+    ip_whitelist_assignments,
+    ip_whitelists,
+    additional_client_ids,
+  ):
     """Constructs AuthDB from various (already loaded) datastore entities.
 
     Args:
@@ -246,35 +261,37 @@ class AuthDB(object):
       New AuthDB instance.
     """
     cached_groups = {}
-    for entity in (groups or []):
+    for entity in groups or []:
       cached_groups[entity.key.string_id()] = CachedGroup(
-          members=frozenset(m.to_normalized_bytes() for m in entity.members),
-          globs=tuple(entity.globs or ()),
-          nested=tuple(entity.nested or ()),
-          description=entity.description,
-          owners=entity.owners,
-          created_ts=entity.created_ts,
-          created_by=entity.created_by,
-          modified_ts=entity.modified_ts,
-          modified_by=entity.modified_by)
+        members=frozenset(m.to_normalized_bytes() for m in entity.members),
+        globs=tuple(entity.globs or ()),
+        nested=tuple(entity.nested or ()),
+        description=entity.description,
+        owners=entity.owners,
+        created_ts=entity.created_ts,
+        created_by=entity.created_by,
+        modified_ts=entity.modified_ts,
+        modified_by=entity.modified_by,
+      )
 
     return AuthDB(
-        from_what='from_entities',
-        replication_state=replication_state,
-        oauth_config=OAuthConfig(
-            global_config.oauth_client_id,
-            global_config.oauth_client_secret,
-            global_config.oauth_additional_client_ids),
-        token_server_url=global_config.token_server_url,
-        groups=cached_groups,
-        ip_whitelist_assignments={
-            e.identity: e.ip_whitelist
-            for e in ip_whitelist_assignments.assignments
-        },
-        ip_whitelists={e.key.id(): list(e.subnets) for e in ip_whitelists},
-        realms_pb=None,  # not available when not using replication_pb2.AuthDB
-        security_config_blob=global_config.security_config,
-        additional_client_ids=additional_client_ids)
+      from_what="from_entities",
+      replication_state=replication_state,
+      oauth_config=OAuthConfig(
+        global_config.oauth_client_id,
+        global_config.oauth_client_secret,
+        global_config.oauth_additional_client_ids,
+      ),
+      token_server_url=global_config.token_server_url,
+      groups=cached_groups,
+      ip_whitelist_assignments={
+        e.identity: e.ip_whitelist for e in ip_whitelist_assignments.assignments
+      },
+      ip_whitelists={e.key.id(): list(e.subnets) for e in ip_whitelists},
+      realms_pb=None,  # not available when not using replication_pb2.AuthDB
+      security_config_blob=global_config.security_config,
+      additional_client_ids=additional_client_ids,
+    )
 
   @staticmethod
   def from_proto(replication_state, auth_db, additional_client_ids):
@@ -291,52 +308,52 @@ class AuthDB(object):
     cached_groups = {}
     for gr in auth_db.groups:
       cached_groups[gr.name] = CachedGroup(
-          members=frozenset(model.Identity.normalize(m) for m in gr.members),
-          globs=tuple(model.IdentityGlob.from_bytes(x) for x in gr.globs),
-          nested=tuple(gr.nested),
-          description=gr.description,
-          owners=gr.owners or model.ADMIN_GROUP,
-          created_ts=utils.timestamp_to_datetime(gr.created_ts),
-          created_by=model.Identity.from_bytes(gr.created_by),
-          modified_ts=utils.timestamp_to_datetime(gr.modified_ts),
-          modified_by=model.Identity.from_bytes(gr.modified_by))
+        members=frozenset(model.Identity.normalize(m) for m in gr.members),
+        globs=tuple(model.IdentityGlob.from_bytes(x) for x in gr.globs),
+        nested=tuple(gr.nested),
+        description=gr.description,
+        owners=gr.owners or model.ADMIN_GROUP,
+        created_ts=utils.timestamp_to_datetime(gr.created_ts),
+        created_by=model.Identity.from_bytes(gr.created_by),
+        modified_ts=utils.timestamp_to_datetime(gr.modified_ts),
+        modified_by=model.Identity.from_bytes(gr.modified_by),
+      )
 
     return AuthDB(
-        from_what='from_proto',
-        replication_state=replication_state,
-        oauth_config=OAuthConfig(
-            oauth_client_id=auth_db.oauth_client_id,
-            oauth_client_secret=auth_db.oauth_client_secret,
-            oauth_additional_client_ids=list(
-                auth_db.oauth_additional_client_ids)),
-        token_server_url=auth_db.token_server_url,
-        groups=cached_groups,
-        ip_whitelist_assignments={
-            model.Identity.from_bytes(e.identity): e.ip_whitelist
-            for e in auth_db.ip_whitelist_assignments
-        },
-        ip_whitelists={
-            e.name: list(e.subnets) for e in auth_db.ip_whitelists
-        },
-        realms_pb=auth_db.realms if auth_db.HasField('realms') else None,
-        security_config_blob=auth_db.security_config,
-        additional_client_ids=additional_client_ids)
+      from_what="from_proto",
+      replication_state=replication_state,
+      oauth_config=OAuthConfig(
+        oauth_client_id=auth_db.oauth_client_id,
+        oauth_client_secret=auth_db.oauth_client_secret,
+        oauth_additional_client_ids=list(auth_db.oauth_additional_client_ids),
+      ),
+      token_server_url=auth_db.token_server_url,
+      groups=cached_groups,
+      ip_whitelist_assignments={
+        model.Identity.from_bytes(e.identity): e.ip_whitelist
+        for e in auth_db.ip_whitelist_assignments
+      },
+      ip_whitelists={e.name: list(e.subnets) for e in auth_db.ip_whitelists},
+      realms_pb=auth_db.realms if auth_db.HasField("realms") else None,
+      security_config_blob=auth_db.security_config,
+      additional_client_ids=additional_client_ids,
+    )
 
   # Note: do not use __init__ directly, use one of AuthDB.empty(),
   # AuthDB.from_entities() or AuthDB.from_proto() instead.
   def __init__(
-        self,
-        from_what,                 # str
-        replication_state,         # AuthReplicationState
-        oauth_config,              # OAuthConfig
-        token_server_url,          # str
-        groups,                    # {str -> CachedGroup}
-        ip_whitelist_assignments,  # {Identity -> str}
-        ip_whitelists,             # {str -> [str]}
-        realms_pb,                 # realms_pb2.Realms or None
-        security_config_blob,      # str
-        additional_client_ids      # [str]
-    ):
+    self,
+    from_what,  # str
+    replication_state,  # AuthReplicationState
+    oauth_config,  # OAuthConfig
+    token_server_url,  # str
+    groups,  # {str -> CachedGroup}
+    ip_whitelist_assignments,  # {Identity -> str}
+    ip_whitelists,  # {str -> [str]}
+    realms_pb,  # realms_pb2.Realms or None
+    security_config_blob,  # str
+    additional_client_ids,  # [str]
+  ):
     self._from_what = from_what  # for tests only
     self._replication_state = replication_state
     self._oauth_config = oauth_config
@@ -363,7 +380,7 @@ class AuthDB(object):
     # These are populated from realms_pb2.Realms.
     self._use_realms = realms_pb is not None
     self._permissions = {}  # {str name -> int index}
-    self._realms = {}       # {str name -> CachedRealm}
+    self._realms = {}  # {str name -> CachedRealm}
     if realms_pb:
       with _all_perms_lock:
         registered_perms = list(_all_perms)
@@ -372,7 +389,7 @@ class AuthDB(object):
     # Interpret the SecurityConfig proto if given, used by is_internal_domain.
     # See replication.py for explanation of 'empty' string.
     self._internal_domains_re = None
-    if security_config_blob and security_config_blob != 'empty':
+    if security_config_blob and security_config_blob != "empty":
       self._init_security_config(security_config_blob)
 
     # Lazy-initialized indexes structures. See _indexes().
@@ -398,7 +415,7 @@ class AuthDB(object):
     assert not self._permissions
     assert not self._realms
 
-    logging.info('Loading realms...')
+    logging.info("Loading realms...")
 
     # Do not use realm_pb2.Realms we don't understand. Better to go offline
     # completely than mistakenly allow access to something private by
@@ -412,8 +429,9 @@ class AuthDB(object):
     #   3. Update Auth Service to generate realms_pb2.Realms using the new API.
     if realms_pb.api_version != realms.API_VERSION:
       raise RealmsError(
-          'Realms proto has api_version %d not compatible with this service '
-          '(it expects %d)' % (realms_pb.api_version, realms.API_VERSION))
+        "Realms proto has api_version %d not compatible with this service "
+        "(it expects %d)" % (realms_pb.api_version, realms.API_VERSION)
+      )
 
     # Build map: permission name -> its index (since Binding messages operate
     # with indexes). Using ints as keys is also slightly faster than strings.
@@ -427,10 +445,12 @@ class AuthDB(object):
     for p in registered_perms:
       if p not in self._permissions:
         logging.warning(
-            'Permission %r is not in the AuthDB rev %d', p, self.auth_db_rev)
+          "Permission %r is not in the AuthDB rev %d", p, self.auth_db_rev
+        )
 
     # Lazily convert conditions into predicate lambdas.
     conds = {}
+
     def condition(idx):
       func = conds.get(idx)
       if not func:
@@ -452,25 +472,27 @@ class AuthDB(object):
       for b in realm.bindings:
         groups, idents = [], []
         for p in b.principals:
-          if p.startswith('group:'):
+          if p.startswith("group:"):
             groups.append(p[6:])  # 6 == len('group:')
           else:
             idents.append(model.Identity.normalize(p))
         principals_set = ConditionalPrincipalsSet(
-            tuple(groups), frozenset(idents),
-            tuple(condition(idx) for idx in b.conditions))
+          tuple(groups),
+          frozenset(idents),
+          tuple(condition(idx) for idx in b.conditions),
+        )
         for perm_idx in b.permissions:
           per_permission_sets.setdefault(perm_idx, []).append(principals_set)
       self._realms[realm.name] = CachedRealm(per_permission_sets, realm.data)
 
-    logging.info('Loaded %d realms', len(self._realms))
+    logging.info("Loaded %d realms", len(self._realms))
 
   def _init_security_config(self, blob):
     """Parses and interprets security_config_pb2.SecurityConfig."""
     msg = security_config_pb2.SecurityConfig.FromString(blob)
     if msg.internal_service_regexp:
-      merged = '|'.join('(%s)' % r for r in msg.internal_service_regexp)
-      self._internal_domains_re = re.compile('^(%s)$' % merged)
+      merged = "|".join("(%s)" % r for r in msg.internal_service_regexp)
+      self._internal_domains_re = re.compile("^(%s)$" % merged)
 
   def _indexes(self):
     """Lazily builds and returns various indexes used by get_relevant_subgraph.
@@ -504,10 +526,13 @@ class AuthDB(object):
         assert self._nested_idx is not None
         assert self._owned_idx is not None
         return (
-            self._members_idx, self._globs_idx,
-            self._nested_idx, self._owned_idx)
+          self._members_idx,
+          self._globs_idx,
+          self._nested_idx,
+          self._owned_idx,
+        )
 
-      logging.info('Building in-memory indexes...')
+      logging.info("Building in-memory indexes...")
 
       members_idx = collections.defaultdict(list)
       globs_idx = collections.defaultdict(list)
@@ -522,7 +547,7 @@ class AuthDB(object):
           nested_idx[nested].append(name)
         owned_idx[group.owners].append(name)
 
-      logging.info('Finished building in-memory indexes')
+      logging.info("Finished building in-memory indexes")
 
       self._members_idx = members_idx
       self._globs_idx = collections.OrderedDict(sorted(globs_idx.items()))
@@ -581,14 +606,16 @@ class AuthDB(object):
       group_obj = self._groups.get(group_name)
       if not group_obj:
         logging.warning(
-            'Querying unknown group: %s via %s', group_name, current)
+          "Querying unknown group: %s via %s", group_name, current
+        )
         return False
 
       # In a group DAG a group can not reference any of its ancestors, since it
       # creates a cycle.
       if group_name in current:
         logging.warning(
-            'Cycle in a group graph: %s via %s', group_name, current)
+          "Cycle in a group graph: %s via %s", group_name, current
+        )
         return False
 
       # Explored this group already (and didn't find |identity| there) while
@@ -629,16 +656,17 @@ class AuthDB(object):
     if not g:
       return None
     return model.AuthGroup(
-        key=model.group_key(group_name),
-        members=[model.Identity.from_bytes(m) for m in sorted(g.members)],
-        globs=list(g.globs),
-        nested=list(g.nested),
-        description=g.description,
-        owners=g.owners,
-        created_ts=g.created_ts,
-        created_by=g.created_by,
-        modified_ts=g.modified_ts,
-        modified_by=g.modified_by)
+      key=model.group_key(group_name),
+      members=[model.Identity.from_bytes(m) for m in sorted(g.members)],
+      globs=list(g.globs),
+      nested=list(g.nested),
+      description=g.description,
+      owners=g.owners,
+      created_ts=g.created_ts,
+      created_by=g.created_by,
+      modified_ts=g.modified_ts,
+      modified_by=g.modified_by,
+    )
 
   def list_group(self, group_name, recursive=True):
     """Returns all members, all globs and all nested groups in a group.
@@ -653,8 +681,8 @@ class AuthDB(object):
       GroupListing object.
     """
     members = set()  # set of strings (not Identity!), see CachedGroup
-    globs = set()    # set of IdentityGlob
-    nested = set()   # set of strings
+    globs = set()  # set of IdentityGlob
+    nested = set()  # set of strings
 
     def accumulate(group_obj):
       members.update(group_obj.members)
@@ -663,9 +691,10 @@ class AuthDB(object):
 
     def finalize_listing():
       return GroupListing(
-          members=[model.Identity.from_bytes(m) for m in members],
-          globs=list(globs),
-          nested=list(nested))
+        members=[model.Identity.from_bytes(m) for m in members],
+        globs=list(globs),
+        nested=list(nested),
+      )
 
     if not recursive:
       group_obj = self._groups.get(group_name)
@@ -808,13 +837,13 @@ class AuthDB(object):
     subnets = self._ip_whitelists.get(whitelist_name)
     if not subnets:
       if warn_if_missing:
-        logging.error('Unknown IP whitelist: %s', whitelist_name)
+        logging.error("Unknown IP whitelist: %s", whitelist_name)
       return False
     # TODO(vadimsh): If number of subnets to check grows it makes sense to add
     # an internal cache to 'subnet_from_string' (sort of like in re.compile).
     return any(
-        ipaddr.is_in_subnet(ip, ipaddr.subnet_from_string(net))
-        for net in subnets)
+      ipaddr.is_in_subnet(ip, ipaddr.subnet_from_string(net)) for net in subnets
+    )
 
   def verify_ip_whitelisted(self, identity, ip):
     """Verifies IP is in a whitelist assigned to the Identity.
@@ -835,9 +864,12 @@ class AuthDB(object):
     if whitelist_name and not self.is_in_ip_whitelist(whitelist_name, ip):
       ip_as_str = ipaddr.ip_to_string(ip)
       logging.error(
-          'IP is not whitelisted.\nIdentity: %s\nIP: %s\nWhitelist: %s',
-          identity.to_bytes(), ip_as_str, whitelist_name)
-      raise AuthorizationError('IP %s is not whitelisted' % ip_as_str)
+        "IP is not whitelisted.\nIdentity: %s\nIP: %s\nWhitelist: %s",
+        identity.to_bytes(),
+        ip_as_str,
+        whitelist_name,
+      )
+      raise AuthorizationError("IP %s is not whitelisted" % ip_as_str)
 
   def is_allowed_oauth_client_id(self, client_id):
     """True if given OAuth2 client_id can be used to authenticate the user."""
@@ -853,8 +885,8 @@ class AuthDB(object):
   def is_internal_domain(self, domain):
     """True for domain names of services within the current LUCI deployment."""
     return bool(
-        self._internal_domains_re and
-        self._internal_domains_re.match(domain))
+      self._internal_domains_re and self._internal_domains_re.match(domain)
+    )
 
   # pylint: disable=redefined-outer-name
   def has_permission(self, permission, realms, identity, attributes=None):
@@ -868,23 +900,26 @@ class AuthDB(object):
       attributes = {}
     else:
       if not isinstance(attributes, dict):
-        raise TypeError('Attributes must be a dict')
+        raise TypeError("Attributes must be a dict")
       for k, v in attributes.items():
         if not isinstance(k, basestring):
-          raise TypeError('Attribute name must be a string, got %r' % (k,))
+          raise TypeError("Attribute name must be a string, got %r" % (k,))
         if not isinstance(v, basestring):
           raise TypeError(
-              'Attribute value for key %r must be a string, got %r' % (k, v))
+            "Attribute value for key %r must be a string, got %r" % (k, v)
+          )
 
     if not isinstance(permission, Permission):
       raise TypeError(
-          'Bad permission type: got %s, want auth.Permission' %
-          (type(permission),))
+        "Bad permission type: got %s, want auth.Permission"
+        % (type(permission),)
+      )
 
     perm_idx = self._permissions.get(permission.name)
     if perm_idx is None:
       logging.warning(
-          'Checking permission %r not present in the AuthDB' % (permission,))
+        "Checking permission %r not present in the AuthDB" % (permission,)
+      )
       return False
 
     # Memoization of negative is_group_member() checks to avoid doing them
@@ -904,7 +939,8 @@ class AuthDB(object):
       # dumb and can be optimized more if necessary.
       for ps in realm.per_permission_sets.get(perm_idx, []):
         if self._is_identity_in_conditional_principals_set(
-            identity, ps, attributes, checked_groups):
+          identity, ps, attributes, checked_groups
+        ):
           return True
 
     return False
@@ -931,7 +967,7 @@ class AuthDB(object):
     test setup without connecting them to an Auth Service.
     """
     if not self._use_realms:
-      raise RealmsError('Realms API is not available')
+      raise RealmsError("Realms API is not available")
 
   def _get_realm_or_its_root(self, name, perm=None):
     """Returns either the realm `name` or its @root if `name` doesn't exist.
@@ -951,7 +987,7 @@ class AuthDB(object):
       ValueError if `name` doesn't look valid.
     """
     if not isinstance(name, basestring):
-      raise TypeError('Bad realm: got %s, want a string' % (type(name),))
+      raise TypeError("Bad realm: got %s, want a string" % (type(name),))
     realm = self._realms.get(name)
     if realm:
       return realm
@@ -963,13 +999,14 @@ class AuthDB(object):
     validate_realm_name(name)
 
     # Same as root_realm(...) except skipping the validation, we already did it.
-    root_name = str('%s:%s' % (name.split(':')[0], _ROOT_REALM))
+    root_name = str("%s:%s" % (name.split(":")[0], _ROOT_REALM))
 
     # Can't fallback to the root if already checking it.
     if name == root_name:
       if perm:
         logging.warning(
-            'Checking %r in a non-existing root realm %r: denying', perm, name)
+          "Checking %r in a non-existing root realm %r: denying", perm, name
+        )
       return None
 
     # Fallback to the root and log the outcome.
@@ -977,23 +1014,26 @@ class AuthDB(object):
     if root:
       if perm:
         logging.warning(
-            'Checking %r in a non-existing realm %r: falling back to the root '
-            'realm %r', perm, name, root_name)
+          "Checking %r in a non-existing realm %r: falling back to the root "
+          "realm %r",
+          perm,
+          name,
+          root_name,
+        )
       return root
 
     if perm:
       logging.warning(
-          'Checking %r in a non-existing realm %r that doesn\'t have a root '
-          'realm (no such project?): denying', perm, name)
+        "Checking %r in a non-existing realm %r that doesn't have a root "
+        "realm (no such project?): denying",
+        perm,
+        name,
+      )
     return None
 
   def _is_identity_in_conditional_principals_set(
-        self,
-        ident,
-        principals,
-        attributes,
-        checked_groups
-    ):
+    self, ident, principals, attributes, checked_groups
+  ):
     """Returns True if `ident` is in a ConditionalPrincipalsSet.
 
     Checks attributes pass the condition on the ConditionalPrincipalsSet.
@@ -1032,7 +1072,8 @@ class AuthWebUIConfig(ds_config.GlobalConfig):
 
   See BootstrapOAuthHandler in ui/ui.py for where this config is updated.
   """
-  web_client_id = ndb.StringProperty(indexed=False, default='')
+
+  web_client_id = ndb.StringProperty(indexed=False, default="")
 
 
 @utils.cache_with_expiration(300)
@@ -1047,15 +1088,15 @@ def get_web_client_id():
 def get_web_client_id_uncached():
   """Fetches web client ID from the datastore (slow, use get_web_client_id)."""
   cfg = AuthWebUIConfig.fetch()
-  return cfg.web_client_id if cfg else ''
+  return cfg.web_client_id if cfg else ""
 
 
 def set_web_client_id(web_client_id):
   """Changes the configured OAuth2 client ID for the web UI."""
   cfg = AuthWebUIConfig.fetch() or AuthWebUIConfig()
   cfg.modify(
-      updated_by=get_current_identity().to_bytes(),
-      web_client_id=web_client_id)
+    updated_by=get_current_identity().to_bytes(), web_client_id=web_client_id
+  )
 
 
 ################################################################################
@@ -1092,20 +1133,21 @@ def attempt_oauth_initialization(scope):
       oauth.get_client_id(scope)
       return
     except apiproxy_errors.DeadlineExceededError as e:
-      logging.warning('DeadlineExceededError: %s', e)
+      logging.warning("DeadlineExceededError: %s", e)
       continue
     except oauth.OAuthServiceFailureError as e:
       logging.warning(
-          'oauth.OAuthServiceFailureError (%s): %s', e.__class__.__name__, e)
+        "oauth.OAuthServiceFailureError (%s): %s", e.__class__.__name__, e
+      )
       # oauth library "caches" the error code in os.environ and retrying
       # oauth.get_client_id doesn't do anything. Clear this cache first, see
       # oauth_api.py, _maybe_call_get_oauth_user in GAE SDK.
-      os.environ.pop('OAUTH_ERROR_CODE', None)
+      os.environ.pop("OAUTH_ERROR_CODE", None)
       continue
     except oauth.Error as e:
       # Next call to oauth.get_client_id() will trigger same error and it will
       # be handled for real.
-      logging.warning('oauth.Error (%s): %s', e.__class__.__name__, e)
+      logging.warning("oauth.Error (%s): %s", e.__class__.__name__, e)
       return
 
 
@@ -1127,7 +1169,7 @@ def extract_oauth_caller_identity():
     AuthorizationError in case client_id is forbidden.
   """
   # OAuth2 scope a token should have.
-  oauth_scope = 'https://www.googleapis.com/auth/userinfo.email'
+  oauth_scope = "https://www.googleapis.com/auth/userinfo.email"
 
   # Fetch OAuth request state with retries. oauth.* calls use it internally.
   attempt_oauth_initialization(oauth_scope)
@@ -1137,7 +1179,7 @@ def extract_oauth_caller_identity():
   try:
     client_id = oauth.get_client_id(oauth_scope)
   except oauth.OAuthRequestError:
-    raise AuthenticationError('Invalid OAuth token')
+    raise AuthenticationError("Invalid OAuth token")
 
   # This call just reads data cached by oauth.get_client_id, and thus should
   # never fail.
@@ -1146,21 +1188,23 @@ def extract_oauth_caller_identity():
   # Is client_id in the explicit whitelist? Used with three legged OAuth. Detect
   # Google service accounts. No need to whitelist client_ids for each of them,
   # since email address uniquely identifies credentials used.
-  good = (
-      email.endswith('.gserviceaccount.com') or
-      get_request_auth_db().is_allowed_oauth_client_id(client_id))
+  good = email.endswith(
+    ".gserviceaccount.com"
+  ) or get_request_auth_db().is_allowed_oauth_client_id(client_id)
 
   if not good:
     raise AuthorizationError(
-        'Unrecognized combination of email (%s) and client_id (%s). '
-        'Is client_id whitelisted? Is it unrecognized service account?' %
-        (email, client_id))
+      "Unrecognized combination of email (%s) and client_id (%s). "
+      "Is client_id whitelisted? Is it unrecognized service account?"
+      % (email, client_id)
+    )
   try:
     ident = model.Identity(model.IDENTITY_USER, email)
   except ValueError:
-    raise AuthenticationError('Unsupported user email: %s' % email)
+    raise AuthenticationError("Unsupported user email: %s" % email)
   return ident, new_auth_details(
-      is_superuser=oauth.is_current_user_admin(oauth_scope))
+    is_superuser=oauth.is_current_user_admin(oauth_scope)
+  )
 
 
 def check_oauth_access_token(header):
@@ -1208,7 +1252,9 @@ def check_oauth_access_token(header):
     # auth_call returns tuple (Identity, AuthDetails). There are no additional
     # details if not using native GAE OAuth API.
     auth_call = lambda: (
-        dev_oauth_authentication(header, TOKEN_INFO_ENDPOINT), None)
+      dev_oauth_authentication(header, TOKEN_INFO_ENDPOINT),
+      None,
+    )
   else:
     auth_call = extract_oauth_caller_identity
 
@@ -1223,12 +1269,12 @@ def check_oauth_access_token(header):
   try:
     return auth_call()
   except AuthenticationError:
-    ident = dev_oauth_authentication(header, cfg.token_info_endpoint, '.dev')
-    logging.warning('Authenticated as dev account: %s', ident.to_bytes())
+    ident = dev_oauth_authentication(header, cfg.token_info_endpoint, ".dev")
+    logging.warning("Authenticated as dev account: %s", ident.to_bytes())
     return ident, None
 
 
-def dev_oauth_authentication(header, token_info_endpoint, suffix=''):
+def dev_oauth_authentication(header, token_info_endpoint, suffix=""):
   """OAuth2 based authentication via URL Fetch to the token info endpoint.
 
   This is slow and ignores client_id whitelist. Must be used only in
@@ -1243,37 +1289,39 @@ def dev_oauth_authentication(header, token_info_endpoint, suffix=''):
   """
   assert utils.is_local_dev_server() or utils.is_dev()
 
-  header = header.split(' ', 1)
-  if len(header) != 2 or header[0] not in ('OAuth', 'Bearer'):
-    raise AuthenticationError('Invalid authorization header')
+  header = header.split(" ", 1)
+  if len(header) != 2 or header[0] not in ("OAuth", "Bearer"):
+    raise AuthenticationError("Invalid authorization header")
 
   # Adapted from endpoints/users_id_tokens.py, _set_bearer_user_vars_local.
-  logging.info('Using dev token info endpoint %s', token_info_endpoint)
+  logging.info("Using dev token info endpoint %s", token_info_endpoint)
   result = urlfetch.fetch(
-      url='%s?%s' % (token_info_endpoint,
-                     urllib.parse.urlencode({
-                         'access_token': header[1]
-                     })),
-      follow_redirects=False,
-      validate_certificate=True)
+    url="%s?%s"
+    % (
+      token_info_endpoint,
+      urllib.parse.urlencode({"access_token": header[1]}),
+    ),
+    follow_redirects=False,
+    validate_certificate=True,
+  )
   if result.status_code != 200:
     try:
-      error = json.loads(result.content)['error_description']
+      error = json.loads(result.content)["error_description"]
     except (KeyError, ValueError):
       error = repr(result.content)
-    raise AuthenticationError('Failed to validate the token: %s' % error)
+    raise AuthenticationError("Failed to validate the token: %s" % error)
 
   token_info = json.loads(result.content)
-  if 'email' not in token_info:
-    raise AuthorizationError('Token doesn\'t include an email address')
-  if not token_info.get('verified_email'):
-    raise AuthorizationError('Token email isn\'t verified')
+  if "email" not in token_info:
+    raise AuthorizationError("Token doesn't include an email address")
+  if not token_info.get("verified_email"):
+    raise AuthorizationError("Token email isn't verified")
 
-  email = token_info['email'] + suffix
+  email = token_info["email"] + suffix
   try:
     return model.Identity(model.IDENTITY_USER, email)
   except ValueError:
-    raise AuthorizationError('Unsupported user email: %s' % email)
+    raise AuthorizationError("Unsupported user email: %s" % email)
 
 
 ################################################################################
@@ -1284,22 +1332,25 @@ def dev_oauth_authentication(header, token_info_endpoint, suffix=''):
 #
 # Lives in the request authentication context (aka RequestCache). Cleared in
 # a presence of a delegation token.
-AuthDetails = collections.namedtuple('AuthDetails', [
-  'is_superuser',  # True if the caller is GAE-level administrator
-
-  # Populated when using 'gce_vm_authentication' method.
-  'gce_instance',  # name of a GCE VM that is making the call
-  'gce_project',   # name of a GCE project that owns a VM making the call
-])
+AuthDetails = collections.namedtuple(
+  "AuthDetails",
+  [
+    "is_superuser",  # True if the caller is GAE-level administrator
+    # Populated when using 'gce_vm_authentication' method.
+    "gce_instance",  # name of a GCE VM that is making the call
+    "gce_project",  # name of a GCE project that owns a VM making the call
+  ],
+)
 
 
 # pylint: disable=redefined-outer-name
 def new_auth_details(is_superuser=False, gce_instance=None, gce_project=None):
   """Constructs AuthDetails, filling in defaults."""
   return AuthDetails(
-      is_superuser=is_superuser,
-      gce_instance=gce_instance,
-      gce_project=gce_project)
+    is_superuser=is_superuser,
+    gce_instance=gce_instance,
+    gce_project=gce_project,
+  )
 
 
 class RequestCache(object):
@@ -1339,7 +1390,7 @@ class RequestCache(object):
 
   @auth_details.setter
   def auth_details(self, value):
-    assert self._auth_details is None # haven't been set yet
+    assert self._auth_details is None  # haven't been set yet
     assert value is None or isinstance(value, AuthDetails), value
     self._auth_details = value or new_auth_details()
 
@@ -1423,7 +1474,7 @@ def reinitialize_request_cache():
 
   RequestCached used by the thread before this call (if any) is forcibly closed.
   """
-  prev = getattr(_thread_local, 'request_cache', None)
+  prev = getattr(_thread_local, "request_cache", None)
   if prev:
     prev.close()
   request_cache = RequestCache()
@@ -1436,7 +1487,7 @@ def get_request_cache():
 
   Creates a new empty one if necessary.
   """
-  cache = getattr(_thread_local, 'request_cache', None)
+  cache = getattr(_thread_local, "request_cache", None)
   return cache or reinitialize_request_cache()
 
 
@@ -1483,9 +1534,10 @@ def fetch_auth_db(known_auth_db=None):
     state = model.get_replication_state()
     if known_auth_db is not None:
       return (
-          not state or
-          state.primary_id != known_auth_db.primary_id or
-          state.auth_db_rev != known_auth_db.auth_db_rev), state
+        not state
+        or state.primary_id != known_auth_db.primary_id
+        or state.auth_db_rev != known_auth_db.auth_db_rev
+      ), state
     return True, state
 
   @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
@@ -1502,18 +1554,18 @@ def fetch_auth_db(known_auth_db=None):
     # since it does some heavy computations. Instead just return all kwargs for
     # it, so AuthDB can be built outside.
     return {
-      'replication_state': (
-          replication_state_future.get_result() or
-          model.AuthReplicationState(key=model.replication_state_key())
+      "replication_state": (
+        replication_state_future.get_result()
+        or model.AuthReplicationState(key=model.replication_state_key())
       ),
-      'global_config': (
-          global_config_future.get_result() or
-          model.AuthGlobalConfig(key=root_key)
+      "global_config": (
+        global_config_future.get_result()
+        or model.AuthGlobalConfig(key=root_key)
       ),
-      'groups': groups_future.get_result(),
-      'ip_whitelist_assignments': ip_whitelist_assignments,
-      'ip_whitelists': ip_whitelists,
-      'additional_client_ids': additional_client_ids,
+      "groups": groups_future.get_result(),
+      "ip_whitelist_assignments": ip_whitelist_assignments,
+      "ip_whitelists": ip_whitelists,
+      "additional_client_ids": additional_client_ids,
     }
 
   need_refetch, replication_state = prepare()
@@ -1532,17 +1584,19 @@ def fetch_auth_db(known_auth_db=None):
   # It is put there by replication.push_auth_db(...) when the replica receives
   # AuthDB pushes from the primary.
   auth_db = replication.load_sharded_auth_db(
-      replication_state.primary_url,
-      replication_state.auth_db_rev,
-      replication_state.shard_ids)
+    replication_state.primary_url,
+    replication_state.auth_db_rev,
+    replication_state.shard_ids,
+  )
   if not auth_db:
     raise Error(
-        'Could not load sharded AuthDB of %s rev %d, shard_ids: %s' %
-        (
-            replication_state.primary_url,
-            replication_state.auth_db_rev,
-            ', '.join(replication_state.shard_ids),
-        ))
+      "Could not load sharded AuthDB of %s rev %d, shard_ids: %s"
+      % (
+        replication_state.primary_url,
+        replication_state.auth_db_rev,
+        ", ".join(replication_state.shard_ids),
+      )
+    )
   return AuthDB.from_proto(replication_state, auth_db, additional_client_ids)
 
 
@@ -1589,9 +1643,10 @@ def get_process_auth_db():
     # stale copy instead right away.
     if _auth_db_fetching_thread is not None:
       logging.info(
-          'Using stale copy of AuthDB while another thread is fetching '
-          'a fresh one. Cached copy expired %.1f sec ago.',
-          time.time() - _auth_db_expiration)
+        "Using stale copy of AuthDB while another thread is fetching "
+        "a fresh one. Cached copy expired %.1f sec ago.",
+        time.time() - _auth_db_expiration,
+      )
       return _auth_db
 
     # No one is fetching AuthDB yet. Start the operation, release the lock so
@@ -1599,7 +1654,7 @@ def get_process_auth_db():
     # on the lock.
     _auth_db_fetching_thread = threading.current_thread()
     known_auth_db = _auth_db
-    logging.debug('Refetching AuthDB (cur rev is %d)', _auth_db.auth_db_rev)
+    logging.debug("Refetching AuthDB (cur rev is %d)", _auth_db.auth_db_rev)
 
   # Do the actual fetch outside the lock. Be careful to handle any unexpected
   # exception by 'fixing' the global state before leaving this function.
@@ -1621,7 +1676,7 @@ def get_process_auth_db():
         return _roll_auth_db_cache(fetched)
       # The fetch has failed. An exception is already being raised and will be
       # propagated up the stack.
-  raise AssertionError('This line should be unreachable')
+  raise AssertionError("This line should be unreachable")
 
 
 def get_latest_auth_db():
@@ -1678,11 +1733,14 @@ def _initialize_auth_db_cache():
   global _auth_db_expiration
 
   assert _auth_db is None
-  logging.info('Initial fetch of AuthDB')
+  logging.info("Initial fetch of AuthDB")
   _auth_db = fetch_auth_db()
   _auth_db_expiration = time.time() + _process_cache_expiration_sec
-  logging.info('Fetched AuthDB at rev %d (%d groups)', _auth_db.auth_db_rev,
-               _auth_db.group_count)
+  logging.info(
+    "Fetched AuthDB at rev %d (%d groups)",
+    _auth_db.auth_db_rev,
+    _auth_db.group_count,
+  )
 
   return _auth_db
 
@@ -1697,7 +1755,7 @@ def _roll_auth_db_cache(candidate):
 
   # This may happen after 'reset_local_state' call.
   if _auth_db is None:
-    logging.info('Fetched AuthDB at rev %d', candidate.auth_db_rev)
+    logging.info("Fetched AuthDB at rev %d", candidate.auth_db_rev)
     _auth_db = candidate
     _auth_db_expiration = time.time() + _process_cache_expiration_sec
     return _auth_db
@@ -1707,9 +1765,12 @@ def _roll_auth_db_cache(candidate):
   # 'candidate' is newer.
   if _auth_db.primary_id != candidate.primary_id:
     logging.info(
-        'AuthDB primary changed %s (rev %d) -> %s (rev %d)',
-        _auth_db.primary_id, _auth_db.auth_db_rev,
-        candidate.primary_id, candidate.auth_db_rev)
+      "AuthDB primary changed %s (rev %d) -> %s (rev %d)",
+      _auth_db.primary_id,
+      _auth_db.auth_db_rev,
+      candidate.primary_id,
+      candidate.auth_db_rev,
+    )
     _auth_db = candidate
     _auth_db_expiration = time.time() + _process_cache_expiration_sec
     return _auth_db
@@ -1718,21 +1779,26 @@ def _roll_auth_db_cache(candidate):
   # already have.
   if candidate.auth_db_rev < _auth_db.auth_db_rev:
     logging.info(
-        'Someone else updated the cached AuthDB already '
-        '(cached rev %d > fetched rev %d)',
-        _auth_db.auth_db_rev, candidate.auth_db_rev)
+      "Someone else updated the cached AuthDB already "
+      "(cached rev %d > fetched rev %d)",
+      _auth_db.auth_db_rev,
+      candidate.auth_db_rev,
+    )
     return _auth_db
 
   # Prefer to reuse the known copy if it matches the fetched one, it may have
   # some internal caches we want to keep. So update _auth_db only if candidate
   # is strictly fresher.
   if candidate.auth_db_rev > _auth_db.auth_db_rev:
-    logging.info('Updated cached AuthDB: rev %d->%d (%d groups)',
-                 _auth_db.auth_db_rev, candidate.auth_db_rev,
-                 candidate.group_count)
+    logging.info(
+      "Updated cached AuthDB: rev %d->%d (%d groups)",
+      _auth_db.auth_db_rev,
+      candidate.auth_db_rev,
+      candidate.group_count,
+    )
     _auth_db = candidate
   else:
-    logging.info('Reusing cached AuthDB rev %d', _auth_db.auth_db_rev)
+    logging.info("Reusing cached AuthDB rev %d", _auth_db.auth_db_rev)
 
   # Bump the expiration time even if the candidate's version is same as the
   # current cached one. We've just confirmed it is still fresh, we can keep
@@ -1755,17 +1821,19 @@ class Graph(object):
   """
 
   # Note: exact values of labels end up in JSON API output, so change carefully.
-  IN   = 'IN'    # edge A->B labeled 'IN' means 'A is subset of B'
-  OWNS = 'OWNS'  # edge A->B labeled 'OWNS' means 'A owns B'
+  IN = "IN"  # edge A->B labeled 'IN' means 'A is subset of B'
+  OWNS = "OWNS"  # edge A->B labeled 'OWNS' means 'A owns B'
 
   def __init__(self):
-    self._nodes = []        # list of all added nodes
+    self._nodes = []  # list of all added nodes
     self._nodes_to_id = {}  # node object -> index of the node in _nodes
     self._root_id = None
-    self._edges = collections.defaultdict(lambda: {
-      self.IN: set(),
-      self.OWNS: set(),
-    })
+    self._edges = collections.defaultdict(
+      lambda: {
+        self.IN: set(),
+        self.OWNS: set(),
+      }
+    )
 
   @property
   def root_id(self):
@@ -1891,7 +1959,8 @@ def is_group_member(group_name, identity=None):
   Unknown groups are considered empty.
   """
   return get_request_cache().auth_db.is_group_member(
-      group_name, identity or get_current_identity())
+    group_name, identity or get_current_identity()
+  )
 
 
 def is_admin(identity=None):
@@ -1947,7 +2016,8 @@ def is_in_ip_whitelist(whitelist_name, ip, warn_if_missing=True):
     warn_if_missing: if True and IP whitelist is missing, logs a warning.
   """
   return get_request_cache().auth_db.is_in_ip_whitelist(
-      whitelist_name, ip, warn_if_missing)
+    whitelist_name, ip, warn_if_missing
+  )
 
 
 def verify_ip_whitelisted(identity, ip):
@@ -1995,8 +2065,8 @@ def public(func):
       ....
   """
   # @require decorator sets __auth_require attribute.
-  if hasattr(func, '__auth_require'):
-    raise TypeError('Can\'t use @public and @require on a same function')
+  if hasattr(func, "__auth_require"):
+    raise TypeError("Can't use @public and @require on a same function")
   func.__auth_public = True
   return func
 
@@ -2028,20 +2098,21 @@ def require(callback, error_msg=None, log_identity=False):
     def get(self):
       ....
   """
+
   def decorator(func):
     # @public decorator sets __auth_public attribute.
-    if hasattr(func, '__auth_public'):
-      raise TypeError('Can\'t use @public and @require on same function')
+    if hasattr(func, "__auth_public"):
+      raise TypeError("Can't use @public and @require on same function")
 
     # When nesting multiple decorators the information (argspec, name) about
     # original function gets lost. __wrapped__ is used by NDB decorators
     # to preserve reference to original function. Use it too.
-    original = getattr(func, '__wrapped__', func)
+    original = getattr(func, "__wrapped__", func)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
       if log_identity:
-        logging.info('Accessed from %s' % get_current_identity().to_bytes())
+        logging.info("Accessed from %s" % get_current_identity().to_bytes())
       if not callback():
         raise AuthorizationError(error_msg)
       return func(*args, **kwargs)
@@ -2072,14 +2143,14 @@ def autologin(func):
       ....
   """
   # @public decorator sets __auth_public attribute.
-  if hasattr(func, '__auth_public'):
-    raise TypeError('Can\'t use @public and @autolgin on same function')
+  if hasattr(func, "__auth_public"):
+    raise TypeError("Can't use @public and @autolgin on same function")
   # When nesting multiple decorators the information (argspec, name) about
   # original function gets lost. __wrapped__ is used by NDB decorators
   # to preserve reference to original function. Use it too.
-  original = getattr(func, '__wrapped__', func)
-  if original.__name__ != 'get':
-    raise TypeError('Only get() can be set as autologin')
+  original = getattr(func, "__wrapped__", func)
+  if original.__name__ != "get":
+    raise TypeError("Only get() can be set as autologin")
 
   @functools.wraps(func)
   def wrapper(self, *args, **kwargs):
@@ -2095,8 +2166,9 @@ def autologin(func):
       # (bootstrap works only on standalone or on primary).
       if not is_superuser() or is_admin() or model.is_replica():
         raise
-      self.redirect('/auth/bootstrap?r=%s' % urllib.parse.quote_plus(
-          self.request.path_qs))
+      self.redirect(
+        "/auth/bootstrap?r=%s" % urllib.parse.quote_plus(self.request.path_qs)
+      )
 
   # Propagate reference to original function, mark function as decorated.
   wrapper.__wrapped__ = original
@@ -2107,7 +2179,7 @@ def autologin(func):
 
 def is_decorated(func):
   """Return True if |func| is decorated by @public or @require decorators."""
-  return hasattr(func, '__auth_public') or hasattr(func, '__auth_require')
+  return hasattr(func, "__auth_public") or hasattr(func, "__auth_require")
 
 
 ################################################################################
@@ -2115,17 +2187,17 @@ def is_decorated(func):
 
 
 # Allowed non-special (not "@...") project names, see realms.proto.
-_PROJECT_NAME_RE = re.compile(r'^[a-z0-9\-_]{1,100}$')
+_PROJECT_NAME_RE = re.compile(r"^[a-z0-9\-_]{1,100}$")
 # Allowed non-special (not "@...") realm names in realms.cfg.
-_REALM_NAME_RE = re.compile(r'^[a-z0-9_\.\-/]{1,400}$')
+_REALM_NAME_RE = re.compile(r"^[a-z0-9_\.\-/]{1,400}$")
 
 # Used in place of a project in full names of internal realms.
-_INTERNAL_PROJECT = '@internal'
+_INTERNAL_PROJECT = "@internal"
 
 # Root realm is included in all other realms, see root_realm().
-_ROOT_REALM = '@root'
+_ROOT_REALM = "@root"
 # Legacy realm is used for older realm-less resources, see legacy_realm().
-_LEGACY_REALM = '@legacy'
+_LEGACY_REALM = "@legacy"
 
 # Set of special realms accepted when validating realm names.
 _SPECIAL_REALMS = (_ROOT_REALM, _LEGACY_REALM)
@@ -2136,7 +2208,7 @@ _all_perms = {}
 _all_perms_lock = threading.Lock()
 
 
-class Permission(collections.namedtuple('Permission', 'name')):
+class Permission(collections.namedtuple("Permission", "name")):
   """Represents a single permission.
 
   Permission is a symbol that has form "<service>.<subject>.<verb>", which
@@ -2157,12 +2229,12 @@ class Permission(collections.namedtuple('Permission', 'name')):
 
   def __new__(cls, name):
     if not isinstance(name, str):
-      raise TypeError('Permission name should be str, not %s' % (type(name),))
-    parts = name.split('.')
-    if len(parts) != 3 or any(p == '' for p in parts):
+      raise TypeError("Permission name should be str, not %s" % (type(name),))
+    parts = name.split(".")
+    if len(parts) != 3 or any(p == "" for p in parts):
       raise ValueError(
-          'Permissions should have form <service>.<subject>.<verb>, got %r'
-          % name)
+        "Permissions should have form <service>.<subject>.<verb>, got %r" % name
+      )
     with _all_perms_lock:
       perm = super(Permission, cls).__new__(cls, name)
       return _all_perms.setdefault(name, perm)
@@ -2198,7 +2270,7 @@ def root_realm(project):
     TypeError if `project` is not a string.
     ValueError if `project` doesn't pass the regexp check.
   """
-  return '%s:%s' % (_validated_realm_project(project), _ROOT_REALM)
+  return "%s:%s" % (_validated_realm_project(project), _ROOT_REALM)
 
 
 def legacy_realm(project):
@@ -2223,7 +2295,7 @@ def legacy_realm(project):
     TypeError if `project` is not a string.
     ValueError if `project` doesn't pass the regexp check.
   """
-  return '%s:%s' % (_validated_realm_project(project), _LEGACY_REALM)
+  return "%s:%s" % (_validated_realm_project(project), _LEGACY_REALM)
 
 
 def validate_realm_name(name):
@@ -2236,7 +2308,7 @@ def validate_realm_name(name):
   Raises:
     ValueError: if the realm name doesn't look valid.
   """
-  spl = name.split(':', 1)
+  spl = name.split(":", 1)
   if len(spl) != 2 or not spl[0] or not spl[1]:
     raise ValueError('Bad realm %r, want "<project>:<name>"' % (name,))
 
@@ -2245,14 +2317,16 @@ def validate_realm_name(name):
   # will just confuse users.
   if not _PROJECT_NAME_RE.match(spl[0]) and spl[0] != _INTERNAL_PROJECT:
     raise ValueError(
-        'Bad realm %r: should be "<project>:<name>" where <project> '
-        'matches %r' % (name, _PROJECT_NAME_RE.pattern))
+      'Bad realm %r: should be "<project>:<name>" where <project> '
+      "matches %r" % (name, _PROJECT_NAME_RE.pattern)
+    )
 
   if not _REALM_NAME_RE.match(spl[1]) and spl[1] not in _SPECIAL_REALMS:
     raise ValueError(
-        'Bad realm %r: should be "<project>:<name>" where <name> '
-        'matches %r or is %s' %
-        (name, _REALM_NAME_RE.pattern, ' or '.join(_SPECIAL_REALMS)))
+      'Bad realm %r: should be "<project>:<name>" where <name> '
+      "matches %r or is %s"
+      % (name, _REALM_NAME_RE.pattern, " or ".join(_SPECIAL_REALMS))
+    )
 
 
 # pylint: disable=redefined-outer-name
@@ -2284,19 +2358,20 @@ def has_permission(permission, realms, identity=None, attributes=None):
     RealmsError if Realms API is unavailable or misconfigured.
   """
   return get_request_cache().auth_db.has_permission(
-      permission, realms, identity or get_current_identity(), attributes)
+    permission, realms, identity or get_current_identity(), attributes
+  )
 
 
 # pylint: disable=redefined-outer-name
 def has_permission_dryrun(
-      permission,
-      realms,
-      expected_result,
-      identity=None,
-      attributes=None,
-      admin_group=None,
-      tracking_bug=None
-  ):
+  permission,
+  realms,
+  expected_result,
+  identity=None,
+  attributes=None,
+  admin_group=None,
+  tracking_bug=None,
+):
   """Compares result of has_permission(...) to `expected_result`.
 
   Also catches ValueError and RealmsError and logs them.
@@ -2330,34 +2405,42 @@ def has_permission_dryrun(
   realms = list(realms)
   identity = identity or get_current_identity()
 
-  log_pfx = 'has_permission_dryrun(%r, %r, %r), authdb=%d' % (
-      permission, realms, identity.to_bytes(), auth_db.auth_db_rev)
+  log_pfx = "has_permission_dryrun(%r, %r, %r), authdb=%d" % (
+    permission,
+    realms,
+    identity.to_bytes(),
+    auth_db.auth_db_rev,
+  )
   if tracking_bug:
-    log_pfx = '%s: %s' % (tracking_bug, log_pfx)
+    log_pfx = "%s: %s" % (tracking_bug, log_pfx)
 
   try:
     result = auth_db.has_permission(permission, realms, identity, attributes)
   except (ValueError, RealmsError) as exc:
     logging.exception(
-        '%s: exception %s, want %s',
-        log_pfx, type(exc).__name__, 'ALLOW' if expected_result else 'DENY')
+      "%s: exception %s, want %s",
+      log_pfx,
+      type(exc).__name__,
+      "ALLOW" if expected_result else "DENY",
+    )
     return
 
   if result == bool(expected_result):
-    logging.info('%s: match - %s', log_pfx, 'ALLOW' if result else 'DENY')
+    logging.info("%s: match - %s", log_pfx, "ALLOW" if result else "DENY")
   elif not admin_group or not expected_result:
     logging.warning(
-        '%s: mismatch - got %s, want %s',
-        log_pfx,
-        'ALLOW' if result else 'DENY',
-        'ALLOW' if expected_result else 'DENY')
+      "%s: mismatch - got %s, want %s",
+      log_pfx,
+      "ALLOW" if result else "DENY",
+      "ALLOW" if expected_result else "DENY",
+    )
   else:
     # We expected ALLOW, but got DENY. Maybe the legacy ACL check relied on
     # the admin group. Check this separately.
     if auth_db.is_group_member(admin_group, identity):
-      logging.info('%s: match - ADMIN_ALLOW', log_pfx)
+      logging.info("%s: match - ADMIN_ALLOW", log_pfx)
     else:
-      logging.warning('%s: mismatch - got DENY, want ALLOW', log_pfx)
+      logging.warning("%s: mismatch - got DENY, want ALLOW", log_pfx)
 
 
 def get_realm_data(realm):
@@ -2385,17 +2468,18 @@ def should_enforce_realm_acl(realm):
 def _validated_realm_project(project):
   """Checks type and value of `project` and returns it as str."""
   if not isinstance(project, basestring):
-    raise TypeError('Expecting a string, got %s' % (type(project),))
+    raise TypeError("Expecting a string, got %s" % (type(project),))
   if not _PROJECT_NAME_RE.match(project) and project != _INTERNAL_PROJECT:
     raise ValueError(
-        'Invalid project name %r: should match %r' %
-        (project, _PROJECT_NAME_RE.pattern))
+      "Invalid project name %r: should match %r"
+      % (project, _PROJECT_NAME_RE.pattern)
+    )
   return str(project)  # get rid of 'unicode'
 
 
 def _condition_pb_to_predicate(cond_pb):
   """Returns a predicate func(attributes) for the given realms_pb.Condition."""
-  if cond_pb.HasField('restrict'):
+  if cond_pb.HasField("restrict"):
     attr = cond_pb.restrict.attribute
     vals = frozenset(cond_pb.restrict.values)
     return lambda attrs: attrs.get(attr) in vals
@@ -2403,5 +2487,6 @@ def _condition_pb_to_predicate(cond_pb):
   # Allow parsing AuthDB with unrecognized condition kinds, but refuse to use
   # any bindings that refer to them.
   logging.warning(
-      'Unknown condition kind %r, always evaluating it to False', cond_pb)
+    "Unknown condition kind %r, always evaluating it to False", cond_pb
+  )
   return lambda _attrs: False

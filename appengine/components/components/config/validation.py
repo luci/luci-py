@@ -36,16 +36,16 @@ from . import validation_context
 
 
 __all__ = [
-  'Context',
-  'Message',
-  'RuleSet',
-  'is_defined_for',
-  'is_valid',
-  'project_config_rule',
-  'ref_config_rule',
-  'rule',
-  'self_rule',
-  'validate',
+  "Context",
+  "Message",
+  "RuleSet",
+  "is_defined_for",
+  "is_valid",
+  "project_config_rule",
+  "ref_config_rule",
+  "rule",
+  "self_rule",
+  "validate",
 ]
 
 
@@ -103,17 +103,18 @@ def is_valid_secure_url(url):
   parsed = urllib.parse.urlparse(url)
   if not parsed.netloc:
     return False
-  if parsed.hostname in ('localhost', '127.0.0.1', '::1'):
-    return parsed.scheme in ('http', 'https')
-  return parsed.scheme == 'https'
+  if parsed.hostname in ("localhost", "127.0.0.1", "::1"):
+    return parsed.scheme in ("http", "https")
+  return parsed.scheme == "https"
 
 
 ConfigPattern = collections.namedtuple(
-    'ConfigPattern',
-    [
-      'config_set',  # config_set pattern, see compile_pattern().
-      'path',  # path pattern, see compile_pattern().
-    ])
+  "ConfigPattern",
+  [
+    "config_set",  # config_set pattern, see compile_pattern().
+    "path",  # path pattern, see compile_pattern().
+  ],
+)
 
 
 def rule(config_set, path, dest_type=None, rule_set=None):
@@ -163,15 +164,13 @@ def rule(config_set, path, dest_type=None, rule_set=None):
 def project_config_rule(*args, **kwargs):
   """Shortcut for rule() for project configs."""
   return rule(
-      'regex:%s' % common.PROJECT_CONFIG_SET_RGX.pattern,
-      *args, **kwargs)
+    "regex:%s" % common.PROJECT_CONFIG_SET_RGX.pattern, *args, **kwargs
+  )
 
 
 def ref_config_rule(*args, **kwargs):
   """Shortcut for rule() for ref configs."""
-  return rule(
-      'regex:%s' % common.REF_CONFIG_SET_RGX.pattern,
-      *args, **kwargs)
+  return rule("regex:%s" % common.REF_CONFIG_SET_RGX.pattern, *args, **kwargs)
 
 
 def self_rule(*args, **kwargs):
@@ -226,7 +225,7 @@ class Rule(object):
     try:
       cfg = common._convert_config(content, self.dest_type)
     except common.ConfigFormatError as ex:
-      ctx.error('%s', ex)
+      ctx.error("%s", ex)
       return
     ctx.config_set = config_set
     ctx.path = path
@@ -236,7 +235,7 @@ class Rule(object):
   def __call__(self, func):
     """Adds |func| to the list of validation functions. Used as a decorator."""
     assert func
-    assert hasattr(func, '__call__')
+    assert hasattr(func, "__call__")
     self.validator_funcs.append(func)
     func.rule = self
     return func
@@ -278,8 +277,7 @@ class RuleSet(object):
       A set of ConfigPattern objects.
     """
     return set(
-      ConfigPattern(config_set=r.config_set, path=r.path)
-      for r in self.rules
+      ConfigPattern(config_set=r.config_set, path=r.path) for r in self.rules
     )
 
 
@@ -300,28 +298,28 @@ def compile_pattern(pattern):
     ValueError if |pattern| is malformed.
   """
   if not isinstance(pattern, basestring):
-    raise ValueError('Pattern must be a string')
-  if ':' in pattern:
-    kind, value = pattern.split(':', 2)
+    raise ValueError("Pattern must be a string")
+  if ":" in pattern:
+    kind, value = pattern.split(":", 2)
   else:
-    kind = 'text'
+    kind = "text"
     value = pattern
 
-  if kind in ('text', 'exact'):
+  if kind in ("text", "exact"):
     return lambda s: s == value
 
-  if kind == 'regex':
-    if not value.startswith('^'):
-      value = '^' + value
-    if not value.endswith('$'):
-      value = value + '$'
+  if kind == "regex":
+    if not value.startswith("^"):
+      value = "^" + value
+    if not value.endswith("$"):
+      value = value + "$"
     try:
       regex = re.compile(value)
     except re.error as ex:
       raise ValueError(ex.message)
     return regex.match
 
-  raise ValueError('Invalid pattern kind: %s' % kind)
+  raise ValueError("Invalid pattern kind: %s" % kind)
 
 
 DEFAULT_RULE_SET = RuleSet()

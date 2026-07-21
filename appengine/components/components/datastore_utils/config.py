@@ -47,7 +47,7 @@ class GlobalConfig(ndb.Model):
   # When this revision of configuration was created.
   updated_ts = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
   # Who created this revision of configuration (as identity string).
-  updated_by = ndb.StringProperty(indexed=False, default='')
+  updated_by = ndb.StringProperty(indexed=False, default="")
 
   @classmethod
   def cached_async(cls):
@@ -61,6 +61,7 @@ class GlobalConfig(ndb.Model):
     # environment, last one wins). Same can be achieved with metaclasses, but no
     # one likes metaclasses.
     if not cls._config_fetcher_async:
+
       @ndb.tasklet
       def fetcher():
         with fetcher.cache_lock:
@@ -77,7 +78,7 @@ class GlobalConfig(ndb.Model):
         if not conf:
           conf = cls()
           conf.set_defaults()
-          yield conf.store_async(updated_by='')
+          yield conf.store_async(updated_by="")
 
         with fetcher.cache_lock:
           fetcher.cache_expiry = utils.utcnow() + datetime.timedelta(minutes=1)
@@ -109,7 +110,8 @@ class GlobalConfig(ndb.Model):
     Always fetches it from datastore. May return None if missing.
     """
     return datastore_utils.get_versioned_most_recent_async(
-        cls, cls._get_root_key())
+      cls, cls._get_root_key()
+    )
 
   fetch = utils.sync_of(fetch_async)
 
@@ -145,7 +147,7 @@ class GlobalConfig(ndb.Model):
 
   @classmethod
   def _get_root_model(cls):
-    return datastore_utils.get_versioned_root_model('%sRoot' % cls.__name__)
+    return datastore_utils.get_versioned_root_model("%sRoot" % cls.__name__)
 
   @classmethod
   def _get_root_key(cls):

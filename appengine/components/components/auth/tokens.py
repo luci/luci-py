@@ -18,17 +18,17 @@ from . import b64
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
-  'InvalidTokenError',
-  'InvalidSignatureError',
-  'TokenKind',
-  'sign_jwt',
-  'verify_jwt',
+  "InvalidTokenError",
+  "InvalidSignatureError",
+  "TokenKind",
+  "sign_jwt",
+  "verify_jwt",
 ]
 
 
 # Name -> (hash algorithm to use, how many bytes of digest to use).
 MAC_ALGOS = {
-  'hmac-sha256': (hashlib.sha256, 32),
+  "hmac-sha256": (hashlib.sha256, 32),
 }
 
 
@@ -62,8 +62,9 @@ class TokenKind(object):
 
   Generated token expires after |expiration_sec| or when secret key expires.
   """
+
   # What algo to use for MAC tag, one of MAC_ALGOS.
-  algo = 'hmac-sha256'
+  algo = "hmac-sha256"
   # Defines how long token can live, in seconds. Should be set in subclasses.
   # May be overridden on per-token basis, see |expiration_sec| in 'generate'.
   expiration_sec = None
@@ -93,7 +94,7 @@ class TokenKind(object):
       URL safe base64 encoded token.
     """
     if not cls.is_configured():
-      raise ValueError('Token parameters are invalid ')
+      raise ValueError("Token parameters are invalid ")
 
     # Convert all 'unicode' strings to 'str' in appropriate encoding.
     message = normalize_message(message) if message is not None else []
@@ -104,10 +105,10 @@ class TokenKind(object):
     assert secret
 
     # Append 'issued' timestamp (in milliseconds) and expiration time.
-    embedded['_i'] = str(int(utils.time_time() * 1000))
+    embedded["_i"] = str(int(utils.time_time() * 1000))
     if expiration_sec is not None:
       assert expiration_sec > 0, expiration_sec
-      embedded['_x'] = str(int(expiration_sec * 1000))
+      embedded["_x"] = str(int(expiration_sec * 1000))
 
     # Encode token using most recent secret key value.
     return encode_token(cls.algo, cls.version, secret[0], message, embedded)
@@ -136,10 +137,10 @@ class TokenKind(object):
       InvalidTokenError if token is broken, tampered with or expired.
     """
     if not cls.is_configured():
-      raise ValueError('Token parameters are invalid ')
+      raise ValueError("Token parameters are invalid ")
 
     # Convert all 'unicode' strings to 'str' in appropriate encoding.
-    token = to_encoding(token, 'ascii')
+    token = to_encoding(token, "ascii")
     message = normalize_message(message) if message is not None else []
 
     # Fetch an array of last values of secret key.
@@ -152,22 +153,23 @@ class TokenKind(object):
     # Versions should match.
     if version != cls.version:
       raise InvalidTokenError(
-          'Bad token format version - expected %r, got %r' %
-          (cls.version, version))
+        "Bad token format version - expected %r, got %r"
+        % (cls.version, version)
+      )
 
     # Grab a timestamp (in milliseconds) when token was issued.
-    issued_ts = embedded.pop('_i', None)
+    issued_ts = embedded.pop("_i", None)
     if issued_ts is None:
-      raise InvalidTokenError('Bad token: missing issued timestamp')
+      raise InvalidTokenError("Bad token: missing issued timestamp")
     issued_ts = int(issued_ts)
 
     # Discard tokens from the future. Someone is messing with the clock.
     now = utils.time_time() * 1000
     if issued_ts > now + ALLOWED_CLOCK_DRIFT_SEC * 1000:
-      raise InvalidTokenError('Bad token: issued timestamp is in the future')
+      raise InvalidTokenError("Bad token: issued timestamp is in the future")
 
     # Grab expiration time embedded into the token, if any.
-    expiration_msec = embedded.pop('_x', None)
+    expiration_msec = embedded.pop("_x", None)
     if expiration_msec is None:
       expiration_msec = cls.expiration_sec * 1000
     else:
@@ -176,7 +178,7 @@ class TokenKind(object):
 
     # Check token expiration.
     if now > issued_ts + expiration_msec:
-      raise InvalidTokenError('Bad token: expired')
+      raise InvalidTokenError("Bad token: expired")
 
     return embedded
 
@@ -184,11 +186,12 @@ class TokenKind(object):
   def is_configured(cls):
     """Returns True if token class parameters are correct."""
     return (
-        cls.algo in MAC_ALGOS and
-        isinstance(cls.expiration_sec, (int, float)) and
-        cls.expiration_sec > 0 and
-        isinstance(cls.secret_key, api.SecretKey) and
-        0 <= cls.version <= 255)
+      cls.algo in MAC_ALGOS
+      and isinstance(cls.expiration_sec, (int, float))
+      and cls.expiration_sec > 0
+      and isinstance(cls.secret_key, api.SecretKey)
+      and 0 <= cls.version <= 255
+    )
 
 
 def to_encoding(string, encoding):
@@ -203,7 +206,7 @@ def to_encoding(string, encoding):
     return string
   if isinstance(string, unicode):
     return string.encode(encoding)
-  raise TypeError('Expecting str or unicode')
+  raise TypeError("Expecting str or unicode")
 
 
 def normalize_message(message):
@@ -213,19 +216,20 @@ def normalize_message(message):
   """
   if not isinstance(message, (list, tuple)):
     message = [message]
-  return [to_encoding(chunk, 'utf-8') for chunk in message]
+  return [to_encoding(chunk, "utf-8") for chunk in message]
 
 
 def normalize_embedded(embedded):
   """Dict of strings -> dict with ASCII keys and values."""
   if not all(
-      isinstance(k, basestring) and isinstance(v, basestring)
-      for k, v in embedded.items()):
-    raise TypeError('Only string keys and values are allowed')
-  if any(k.startswith('_') for k in embedded):
-    raise ValueError('Keys starting with \'_\' are reserved for internal use')
+    isinstance(k, basestring) and isinstance(v, basestring)
+    for k, v in embedded.items()
+  ):
+    raise TypeError("Only string keys and values are allowed")
+  if any(k.startswith("_") for k in embedded):
+    raise ValueError("Keys starting with '_' are reserved for internal use")
   return {
-    to_encoding(k, 'ascii'): to_encoding(v, 'ascii')
+    to_encoding(k, "ascii"): to_encoding(v, "ascii")
     for k, v in embedded.items()
   }
 
@@ -262,7 +266,7 @@ def compute_mac(algo, secret, chunks):
     # combined string as input and return original list of chunks. Which means
     # that a list of chunks reversibly (i.e. uniquely) maps to a combined
     # string.
-    mac.update('%d\n' % len(chunk))
+    mac.update("%d\n" % len(chunk))
     mac.update(chunk)
   return mac.digest()[:digest_size]
 
@@ -292,9 +296,10 @@ def encode_token(algo, version, secret, message, embedded):
   assert isinstance(message, list)
   assert isinstance(embedded, dict)
   public = json.dumps(
-      embedded, sort_keys=True, separators=(',', ':'), encoding='ascii')
+    embedded, sort_keys=True, separators=(",", ":"), encoding="ascii"
+  )
   mac = compute_mac(algo, secret, [chr(version), public] + message)
-  return b64.encode(''.join([chr(version), public, mac]))
+  return b64.encode("".join([chr(version), public, mac]))
 
 
 def decode_token(algo, token, possible_secrets, message):
@@ -328,7 +333,7 @@ def decode_token(algo, token, possible_secrets, message):
     public = binary[1:-digest_size]
     token_mac = binary[-digest_size:]
   except (ValueError, TypeError):
-    raise InvalidTokenError('Bad token format: %r' % token)
+    raise InvalidTokenError("Bad token format: %r" % token)
 
   # Validate MAC tag. Run in constant time to prevent timing attacks.
   for secret in possible_secrets:
@@ -344,21 +349,22 @@ def decode_token(algo, token, possible_secrets, message):
       # The public part is a JSON encoded dict with ASCII key-value pairs,
       # as generated by normalize_embedded. Convert the result to ASCII too.
       public = {
-        k.encode('ascii'): v.encode('ascii')
+        k.encode("ascii"): v.encode("ascii")
         for k, v in json.loads(public).items()
       }
       return version, public
 
   try:
     public = {
-      k.encode('ascii', 'replace'): v.encode('ascii', 'replace')
+      k.encode("ascii", "replace"): v.encode("ascii", "replace")
       for k, v in json.loads(public).items()
     }
   except (AttributeError, ValueError):
     pass
   # At least one secret key should match.
   raise InvalidTokenError(
-      'Bad token MAC; now=%d; data=%s' % (time.time(), public))
+    "Bad token MAC; now=%d; data=%s" % (time.time(), public)
+  )
 
 
 # We can produce only RS256 JWTs, since we're relying on Cloud APIs to do the
@@ -371,19 +377,19 @@ def sign_jwt(aud):
   now = int(utils.time_time())
   issuer = utils.get_service_account_name()
   claims = {
-      'email': issuer,
-      'exp': now + 3600,
-      'iat': now,
-      'iss': issuer,
-      'sub': issuer,
+    "email": issuer,
+    "exp": now + 3600,
+    "iat": now,
+    "iss": issuer,
+    "sub": issuer,
   }
   if aud:
-    claims['aud'] = aud
+    claims["aud"] = aud
   claims_b64 = b64.encode(utils.encode_to_json(claims))
-  payload = '.'.join((_jwt_header_b64, claims_b64))
+  payload = ".".join((_jwt_header_b64, claims_b64))
   # TODO(vadimsh): Use sign_jwt RPC to get JWT header with 'kid' populated.
   _, sig = app_identity.sign_blob(payload)
-  return '.'.join((payload, b64.encode(sig)))
+  return ".".join((payload, b64.encode(sig)))
 
 
 def verify_jwt(jwt, bundle):
@@ -415,62 +421,62 @@ def verify_jwt(jwt, bundle):
     InvalidSignatureError if JWT's signature is invalid.
     signature.CertificateError if the signing key is unknown or invalid.
   """
-  jwt = jwt.encode('ascii') if isinstance(jwt, unicode) else jwt
-  if jwt.count('.') != 2:
-    raise InvalidTokenError('Bad JWT, should have 3 segments')
-  segments = jwt.split('.')
+  jwt = jwt.encode("ascii") if isinstance(jwt, unicode) else jwt
+  if jwt.count(".") != 2:
+    raise InvalidTokenError("Bad JWT, should have 3 segments")
+  segments = jwt.split(".")
 
   try:
     hdr, payload, sig = (b64.decode(seg) for seg in segments)
   except (ValueError, TypeError) as exc:
-    raise InvalidTokenError('Malformed JWT, not valid base64: %s' % exc)
+    raise InvalidTokenError("Malformed JWT, not valid base64: %s" % exc)
 
   try:
     hdr_dict = json.loads(hdr)
     if not isinstance(hdr_dict, dict):
-      raise ValueError('not a dict')
-    typ = hdr_dict.get('typ', 'JWT')
-    alg = hdr_dict.get('alg')
-    kid = hdr_dict.get('kid')
+      raise ValueError("not a dict")
+    typ = hdr_dict.get("typ", "JWT")
+    alg = hdr_dict.get("alg")
+    kid = hdr_dict.get("kid")
   except ValueError as exc:
-    raise InvalidTokenError('Malformed JWT header %r: %s' % (hdr, exc))
+    raise InvalidTokenError("Malformed JWT header %r: %s" % (hdr, exc))
 
-  if typ != 'JWT':
-    raise InvalidTokenError('Only JWT tokens are supported, got %s' % (typ,))
-  if alg != 'RS256':
-    raise InvalidTokenError('Only RS256 tokens are supported, got %s' % (alg,))
+  if typ != "JWT":
+    raise InvalidTokenError("Only JWT tokens are supported, got %s" % (typ,))
+  if alg != "RS256":
+    raise InvalidTokenError("Only RS256 tokens are supported, got %s" % (alg,))
   if not kid:
-    raise InvalidTokenError('Key ID is not specified in the header')
-  if not bundle.check_signature('%s.%s' % (segments[0], segments[1]), kid, sig):
-    raise InvalidSignatureError('Bad JWT: invalid signature')
+    raise InvalidTokenError("Key ID is not specified in the header")
+  if not bundle.check_signature("%s.%s" % (segments[0], segments[1]), kid, sig):
+    raise InvalidSignatureError("Bad JWT: invalid signature")
 
   # Here token's signature is valid, but the token may have expired already.
   try:
     payload = json.loads(payload)
     if not isinstance(payload, dict):
-      raise ValueError('not a dict')
+      raise ValueError("not a dict")
   except ValueError as exc:
-    raise InvalidTokenError('Malformed JWT payload %r: %s' % (payload, exc))
+    raise InvalidTokenError("Malformed JWT payload %r: %s" % (payload, exc))
 
-  for key in ('iat', 'exp', 'nbf'):
+  for key in ("iat", "exp", "nbf"):
     ts = payload.get(key)
     if not ts:
-      if key == 'nbf':
+      if key == "nbf":
         continue  # 'nbf' is optional
-      raise InvalidTokenError('Bad JWT: has no %r field' % key)
+      raise InvalidTokenError("Bad JWT: has no %r field" % key)
     if not isinstance(ts, (int, long, float)):
-      raise InvalidTokenError('Bad JWT: %r (%r) is not a number' % (key, ts))
+      raise InvalidTokenError("Bad JWT: %r (%r) is not a number" % (key, ts))
 
   now = utils.time_time()
-  nbf = payload.get('nbf') or payload['iat']
-  exp = payload['exp']
+  nbf = payload.get("nbf") or payload["iat"]
+  exp = payload["exp"]
 
   # Make sure the token is not from the future or already expired. Give some
   # wiggle room to account for a possible clock skew between the machine that
   # produced the token and us.
   if now < nbf - ALLOWED_CLOCK_DRIFT_SEC:
-    raise InvalidTokenError('Bad JWT: too early (now %d < nbf %d)' % (now, nbf))
+    raise InvalidTokenError("Bad JWT: too early (now %d < nbf %d)" % (now, nbf))
   if now > exp + ALLOWED_CLOCK_DRIFT_SEC:
-    raise InvalidTokenError('Bad JWT: expired (now %d > exp %d)' % (now, exp))
+    raise InvalidTokenError("Bad JWT: expired (now %d > exp %d)" % (now, exp))
 
   return hdr_dict, payload

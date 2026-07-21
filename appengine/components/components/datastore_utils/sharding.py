@@ -14,8 +14,8 @@ import string
 from google.appengine.ext import ndb
 
 __all__ = [
-  'shard_key',
-  'hashed_shard_key',
+  "shard_key",
+  "hashed_shard_key",
 ]
 
 
@@ -50,7 +50,8 @@ def shard_key(key, number_of_letters, root_entity_type):
   # number_of_letters==10 means 1099511627776 shards, which is unreasonable.
   assert 1 <= number_of_letters < 10, number_of_letters
   assert isinstance(root_entity_type, (ndb.Model, str)) and root_entity_type, (
-      root_entity_type)
+    root_entity_type
+  )
   return ndb.Key(root_entity_type, key[:number_of_letters])
 
 
@@ -61,4 +62,5 @@ def hashed_shard_key(key, number_of_letters, root_entity_type):
   distributed so it first hashes the value via MD5 to make it more distributed.
   """
   return shard_key(
-      hashlib.md5(key).hexdigest(), number_of_letters, root_entity_type)
+    hashlib.md5(key).hexdigest(), number_of_letters, root_entity_type
+  )

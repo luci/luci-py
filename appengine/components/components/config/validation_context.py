@@ -30,13 +30,13 @@ import contextlib
 import logging
 
 __all__ = [
-  'Context',
-  'Message',
-  'Result',
+  "Context",
+  "Message",
+  "Result",
 ]
 
-Message = collections.namedtuple('Message', ['text', 'severity'])
-ResultBase = collections.namedtuple('ResultBase', ['messages'])
+Message = collections.namedtuple("Message", ["text", "severity"])
+ResultBase = collections.namedtuple("ResultBase", ["messages"])
 
 
 class Result(ResultBase):
@@ -62,10 +62,10 @@ class Context(object):
     Args:
       on_message: a function that is called whenever a message is emitted.
     """
-    assert on_message is None or hasattr(on_message, '__call__'), on_message
+    assert on_message is None or hasattr(on_message, "__call__"), on_message
     self.messages = []
     self.on_message = on_message
-    self.prefixes = ['']
+    self.prefixes = [""]
 
   @contextlib.contextmanager
   def prefix(self, prefix, *args):
@@ -81,7 +81,7 @@ class Context(object):
         if foo % 2 == 1:
           ctx.error('must be an even number')  # 'foo: must be an even number'
     """
-    new_prefix = '%s%s' % (self.prefixes[-1], prefix % args)
+    new_prefix = "%s%s" % (self.prefixes[-1], prefix % args)
     self.prefixes.append(new_prefix)
     try:
       yield
@@ -100,8 +100,8 @@ class Context(object):
     assert isinstance(text, basestring), text
     assert severity >= 0, severity
     msg = Message(
-        severity=severity,
-        text='%s%s' % (self.prefixes[-1], text % args),
+      severity=severity,
+      text="%s%s" % (self.prefixes[-1], text % args),
     )
     self.messages.append(msg)
     if self.on_message:
@@ -139,12 +139,14 @@ class Context(object):
       exc_type (type): exception type to raise. Defaults to ValueError.
     """
     exc_type = exc_type or ValueError
+
     def on_message(msg):
       if msg.severity >= logging.ERROR:
         text = msg.text
         if prefix:
-          text = '%s%s' % (prefix, text)
+          text = "%s%s" % (prefix, text)
         raise exc_type(text)
+
     return cls(on_message=on_message)
 
   @classmethod

@@ -7,18 +7,19 @@ import sys
 import unittest
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from components.datastore_utils import properties
-from components.protoutil  import test_proto_pb2
+from components.protoutil import test_proto_pb2
 from test_support import test_case
 
 
 class BP(ndb.Model):
-  prop = properties.BytesComputedProperty(lambda _: '\x00')
+  prop = properties.BytesComputedProperty(lambda _: "\x00")
 
 
 class DJP(ndb.Model):
@@ -32,18 +33,18 @@ class PP(ndb.Model):
 
 class PropertiesTest(test_case.TestCase):
   def test_DeterministicJsonProperty(self):
-    self.assertEqual({'a': 1}, DJP(prop={'a': 1}).prop)
+    self.assertEqual({"a": 1}, DJP(prop={"a": 1}).prop)
 
-    DJP(prop={'a': 1}).put()
-    self.assertEqual({'a': 1}, DJP.query().get().prop)
+    DJP(prop={"a": 1}).put()
+    self.assertEqual({"a": 1}, DJP.query().get().prop)
 
     with self.assertRaises(TypeError):
       DJP(prop=[])
 
   def test_BytesComputedProperty(self):
-    self.assertEqual('\x00', BP().prop)
+    self.assertEqual("\x00", BP().prop)
     BP().put()
-    self.assertEqual('\x00', BP.query().get().prop)
+    self.assertEqual("\x00", BP.query().get().prop)
 
   def test_ProtobufProperty(self):
     m = test_proto_pb2.Msg(num=1)
@@ -54,12 +55,12 @@ class PropertiesTest(test_case.TestCase):
     self.assertEqual(m, PP.query().get().prop)
 
     with self.assertRaises(TypeError):
-      PP(prop='not a protobuf message')
+      PP(prop="not a protobuf message")
     with self.assertRaises(datastore_errors.BadValueError):
-      PP(prop_limited=test_proto_pb2.Msg(str='a very long string'))
+      PP(prop_limited=test_proto_pb2.Msg(str="a very long string"))
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()

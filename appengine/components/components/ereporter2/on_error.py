@@ -31,7 +31,8 @@ ERROR_TIME_TO_LIVE = datetime.timedelta(days=30)
 
 # Keys that can be specified by the client.
 VALID_ERROR_KEYS = frozenset(models.Error._properties) - frozenset(
-    ['created_ts', 'identity'])
+  ["created_ts", "identity"]
+)
 
 
 def log(**kwargs):
@@ -47,16 +48,16 @@ def log(**kwargs):
     LIMIT = 4096
     for key, value in kwargs.items():
       if key not in VALID_ERROR_KEYS:
-        logging.error('Dropping unknown detail %s: %s', key, value)
+        logging.error("Dropping unknown detail %s: %s", key, value)
         kwargs.pop(key)
       elif isinstance(value, basestring) and len(value) > LIMIT:
-        value = value[:LIMIT-1] + u'\u2026'
+        value = value[: LIMIT - 1] + "\u2026"
         kwargs[key] = value
 
-    if kwargs.get('source') == 'server':
+    if kwargs.get("source") == "server":
       # Automatically use the version of the server code.
-      kwargs.setdefault('version', utils.get_app_version())
-      kwargs.setdefault('python_version', platform.python_version())
+      kwargs.setdefault("version", utils.get_app_version())
+      kwargs.setdefault("python_version", platform.python_version())
 
     error = models.Error(identity=identity, **kwargs)
     error.put()
@@ -64,38 +65,44 @@ def log(**kwargs):
     # The format of the message is important here. The first line is used to
     # generate a signature, so it must be unique for each category of errors.
     logging.error(
-        '%s\n%s\n\nSource: %s\nhttps://%s/restricted/ereporter2/errors/%s',
-        error.message, error.stack, error.source,
-        app_identity.get_default_version_hostname(), key_id)
+      "%s\n%s\n\nSource: %s\nhttps://%s/restricted/ereporter2/errors/%s",
+      error.message,
+      error.stack,
+      error.source,
+      app_identity.get_default_version_hostname(),
+      key_id,
+    )
     return key_id
   except (datastore_errors.BadValueError, TypeError) as e:
     stack = formatter._reformat_stack(traceback.format_exc())
     # That's the error about the error.
     error = models.Error(
-        source='server',
-        category='exception',
-        message='log(%s) caused: %s' % (kwargs, str(e)),
-        exception_type=str(type(e)),
-        stack=stack)
+      source="server",
+      category="exception",
+      message="log(%s) caused: %s" % (kwargs, str(e)),
+      exception_type=str(type(e)),
+      stack=stack,
+    )
     error.put()
     key_id = error.key.integer_id()
     logging.error(
-        'Failed to log a %s error\n%s\n%s', error.source, key_id, error.message)
+      "Failed to log a %s error\n%s\n%s", error.source, key_id, error.message
+    )
     return key_id
 
 
 def log_request(request, add_params=True, **kwargs):
   """Adds an error. This should be used normally."""
-  kwargs['endpoint'] = request.path
-  kwargs['method'] = request.method
-  kwargs['request_id'] = logsutil.RequestID()
-  kwargs['source_ip'] = request.remote_addr
+  kwargs["endpoint"] = request.path
+  kwargs["method"] = request.method
+  kwargs["request_id"] = logsutil.RequestID()
+  kwargs["source_ip"] = request.remote_addr
   if add_params:
-    kwargs['params'] = request.params.mixed()
+    kwargs["params"] = request.params.mixed()
     try:
       as_json = request.json
       if isinstance(as_json, dict):
-        kwargs['params'].update(as_json)
+        kwargs["params"].update(as_json)
     except (LookupError, TypeError, ValueError):
       pass
   return log(**kwargs)

@@ -21,22 +21,22 @@ from . import models
 
 
 # Silence this error message specifically. There's no action item here.
-SOFT_MEMORY_EXCEEDED = u'Exceeded soft memory limit'
+SOFT_MEMORY_EXCEEDED = "Exceeded soft memory limit"
 
 # These are stronger statements, so do not silence them, but still group them.
 MEMORY_EXCEEDED_PREFIXES = (
-    u'Exceeded medium memory limit',
-    u'Exceeded hard memory limit',
+  "Exceeded medium memory limit",
+  "Exceeded hard memory limit",
 )
 
-MEMORY_EXCEEDED = u'Exceeded memory limit'
+MEMORY_EXCEEDED = "Exceeded memory limit"
 
 
 ### Private constants.
 
 
 # Markers to read back a stack trace.
-_STACK_TRACE_MARKER = u'Traceback (most recent call last):'
+_STACK_TRACE_MARKER = "Traceback (most recent call last):"
 
 
 # Number of first error records to show in the category error list.
@@ -64,7 +64,7 @@ class _CappedList(object):
     self.head = []
     self.tail = collections.deque()
     self.total_count = 0
-    for item in (items or []):
+    for item in items or []:
       self.append(item)
 
   def append(self, item):
@@ -106,6 +106,7 @@ class _CappedList(object):
 
 class _ErrorCategory(object):
   """Describes a 'class' of error messages' according to an unique signature."""
+
   def __init__(self, signature):
     assert isinstance(signature, unicode), signature
     # Remove the version embedded in the signature.
@@ -145,19 +146,57 @@ class _ErrorRecord(object):
 
   # Use slots to reduce memory footprint of _ErrorRecord object.
   __slots__ = (
-      'request_id', 'start_time', 'exception_time', 'latency', 'mcycles', 'ip',
-      'nickname', 'referrer', 'user_agent', 'host', 'resource', 'method',
-      'task_queue_name', 'was_loading_request', 'version', 'module',
-      'handler_module', 'gae_version', 'instance', 'status', 'message',
-      'exception_type', 'signature')
+    "request_id",
+    "start_time",
+    "exception_time",
+    "latency",
+    "mcycles",
+    "ip",
+    "nickname",
+    "referrer",
+    "user_agent",
+    "host",
+    "resource",
+    "method",
+    "task_queue_name",
+    "was_loading_request",
+    "version",
+    "module",
+    "handler_module",
+    "gae_version",
+    "instance",
+    "status",
+    "message",
+    "exception_type",
+    "signature",
+  )
 
   def __init__(
-      self, request_id, start_time, exception_time, latency, mcycles,
-      ip, nickname, referrer, user_agent,
-      host, resource, method, task_queue_name,
-      was_loading_request, version, module, handler_module, gae_version,
-      instance,
-      status, message, signature, exception_type):
+    self,
+    request_id,
+    start_time,
+    exception_time,
+    latency,
+    mcycles,
+    ip,
+    nickname,
+    referrer,
+    user_agent,
+    host,
+    resource,
+    method,
+    task_queue_name,
+    was_loading_request,
+    version,
+    module,
+    handler_module,
+    gae_version,
+    instance,
+    status,
+    message,
+    signature,
+    exception_type,
+  ):
     assert isinstance(message, unicode), repr(message)
     # Unique identifier.
     self.request_id = request_id
@@ -204,7 +243,7 @@ class _ErrorRecord(object):
 def _shorten(l):
   assert isinstance(l, unicode), repr(l)
   if len(l) > 256:
-    return u'hash:%s' % hashlib.sha1(l.encode('utf-8')).hexdigest()
+    return "hash:%s" % hashlib.sha1(l.encode("utf-8")).hexdigest()
   return l
 
 
@@ -220,7 +259,7 @@ def _signature_from_message(message):
   assert isinstance(message, unicode), repr(message)
   lines = message.splitlines()
   if not lines:
-    return '', None
+    return "", None
 
   if _STACK_TRACE_MARKER not in lines:
     # Not an exception. Use the first line as the 'signature'.
@@ -228,7 +267,7 @@ def _signature_from_message(message):
     # Look for special messages to reduce.
     if lines[0].startswith(SOFT_MEMORY_EXCEEDED):
       # Ignore soft memory, it's just noise.
-      return '', None
+      return "", None
     if lines[0].startswith(MEMORY_EXCEEDED_PREFIXES):
       # Consider (non-soft) memory exceeded an 'exception'.
       return MEMORY_EXCEEDED, MEMORY_EXCEEDED
@@ -240,13 +279,14 @@ def _signature_from_message(message):
   while index < len(lines):
     if not re.match(formatter.RE_STACK_TRACE_FILE, lines[index]):
       break
-    if (len(lines) > index + 1 and
-        re.match(formatter.RE_STACK_TRACE_FILE, lines[index+1])):
+    if len(lines) > index + 1 and re.match(
+      formatter.RE_STACK_TRACE_FILE, lines[index + 1]
+    ):
       # It happens occasionally with jinja2 templates.
       stacktrace.append(lines[index])
       index += 1
     else:
-      stacktrace.extend(lines[index:index+2])
+      stacktrace.extend(lines[index : index + 2])
       index += 2
 
   if index >= len(lines):
@@ -254,16 +294,16 @@ def _signature_from_message(message):
     return _shorten(lines[0].strip()), None
 
   # SyntaxError produces this.
-  if lines[index].strip() == '^':
+  if lines[index].strip() == "^":
     index += 1
 
   assert index > 0
   while True:
-    ex_type = lines[index].split(':', 1)[0].strip()
+    ex_type = lines[index].split(":", 1)[0].strip()
     if ex_type:
       break
     if not index:
-      logging.error('Failed to process message.\n%s', message)
+      logging.error("Failed to process message.\n%s", message)
       # Fall back to returning the first line.
       return _shorten(lines[0].strip()), None
     index -= 1
@@ -275,16 +315,16 @@ def _signature_from_message(message):
     m = re.match(formatter.RE_STACK_TRACE_FILE, l)
     if m:
       if not path:
-        path = os.path.basename(m.group('file'))
-        line_no = int(m.group('line_no'))
-      if m.group('file').startswith(('appengine', 'python2.7', 'third_party')):
+        path = os.path.basename(m.group("file"))
+        line_no = int(m.group("line_no"))
+      if m.group("file").startswith(("appengine", "python2.7", "third_party")):
         continue
-      function = m.group('function')
+      function = m.group("function")
       break
   if function:
-    signature = '%s@%s' % (ex_type, function)
+    signature = "%s@%s" % (ex_type, function)
   else:
-    signature = '%s@%s:%d' % (ex_type, path, line_no)
+    signature = "%s@%s:%d" % (ex_type, path, line_no)
   return _shorten(signature), ex_type
 
 
@@ -300,15 +340,17 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
   """
   if start_time and end_time and start_time >= end_time:
     raise webob.exc.HTTPBadRequest(
-        'Invalid range, start_time must be before end_time.')
+      "Invalid range, start_time must be before end_time."
+    )
   try:
     for entry in logservice.fetch(
-        start_time=start_time or None,
-        end_time=end_time or None,
-        minimum_log_level=logservice.LOG_LEVEL_ERROR,
-        include_incomplete=True,
-        include_app_logs=True,
-        module_versions=module_versions):
+      start_time=start_time or None,
+      end_time=end_time or None,
+      minimum_log_level=logservice.LOG_LEVEL_ERROR,
+      include_incomplete=True,
+      include_app_logs=True,
+      module_versions=module_versions,
+    ):
       # Merge all error messages. The main reason to do this is that sometimes
       # a single logging.error() 'Traceback' is split on each line as an
       # individual log_line entry.
@@ -321,34 +363,51 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
         # For an unknown reason, it is logged at level info (!?)
         if log_line.level < logservice.LOG_LEVEL_ERROR:
           continue
-        msg = log_line.message.strip('\n')
+        msg = log_line.message.strip("\n")
         if not msg.strip():
           continue
         # The message here is assumed to be utf-8 encoded but that is not
         # guaranteed. The dashboard does prints out utf-8 log entries properly.
         try:
-          msg = msg.decode('utf-8')
+          msg = msg.decode("utf-8")
         except UnicodeDecodeError:
-          msg = msg.decode('ascii', 'replace')
+          msg = msg.decode("ascii", "replace")
         msgs.append(msg)
         log_time = log_time or log_line.time
 
-      message = '\n'.join(msgs)
+      message = "\n".join(msgs)
       # Creates a unique signature string based on the message.
       signature, exception_type = _signature_from_message(message)
       if exception_type:
         yield _ErrorRecord(
-            entry.request_id,
-            entry.start_time, log_time, entry.latency, entry.mcycles,
-            entry.ip, entry.nickname, entry.referrer, entry.user_agent,
-            entry.host, entry.resource, entry.method, entry.task_queue_name,
-            entry.was_loading_request, entry.version_id, entry.module_id,
-            entry.url_map_entry, entry.app_engine_release, entry.instance_key,
-            entry.status, message, signature, exception_type)
+          entry.request_id,
+          entry.start_time,
+          log_time,
+          entry.latency,
+          entry.mcycles,
+          entry.ip,
+          entry.nickname,
+          entry.referrer,
+          entry.user_agent,
+          entry.host,
+          entry.resource,
+          entry.method,
+          entry.task_queue_name,
+          entry.was_loading_request,
+          entry.version_id,
+          entry.module_id,
+          entry.url_map_entry,
+          entry.app_engine_release,
+          entry.instance_key,
+          entry.status,
+          message,
+          signature,
+          exception_type,
+        )
   except logservice.Error as e:
     # It's not worth generating an error log when logservice is temporarily
     # down. Retrying is not worth either.
-    logging.warning('Failed to scrape log:\n%s', e)
+    logging.warning("Failed to scrape log:\n%s", e)
 
 
 def _should_ignore_error_category(monitoring, error_category):
@@ -357,21 +416,22 @@ def _should_ignore_error_category(monitoring, error_category):
     return False
   if monitoring.silenced:
     return True
-  if (monitoring.silenced_until and
-      monitoring.silenced_until >= utils.utcnow()):
+  if monitoring.silenced_until and monitoring.silenced_until >= utils.utcnow():
     return True
-  if (monitoring.threshold and len(error_category.events) <
-      monitoring.threshold):
+  if monitoring.threshold and len(error_category.events) < monitoring.threshold:
     return True
   return False
 
 
 def _log_request_id(request_id):
   """Returns a logservice.RequestLog for a request id or None if not found."""
-  request = list(logservice.fetch(
-      include_incomplete=True, include_app_logs=True, request_ids=[request_id]))
+  request = list(
+    logservice.fetch(
+      include_incomplete=True, include_app_logs=True, request_ids=[request_id]
+    )
+  )
   if not request:
-    logging.info('Dang, didn\'t find the request_id %s', request_id)
+    logging.info("Dang, didn't find the request_id %s", request_id)
     return None
   assert len(request) == 1, request
   return request[0]
@@ -408,12 +468,14 @@ def scrape_logs_for_errors(start_time, end_time, module_versions):
   # Gather all the error categories.
   buckets = {}
   for error_record in _extract_exceptions_from_logs(
-      start_time, end_time, module_versions):
+    start_time, end_time, module_versions
+  ):
     bucket = buckets.setdefault(
-        error_record.signature, _ErrorCategory(error_record.signature))
+      error_record.signature, _ErrorCategory(error_record.signature)
+    )
     bucket.append_error(error_record)
     # Abort, there's too much logs.
-    if (utils.time_time() - start) >= 9*60:
+    if (utils.time_time() - start) >= 9 * 60:
       end_time = error_record.start_time
       break
 
@@ -422,11 +484,13 @@ def scrape_logs_for_errors(start_time, end_time, module_versions):
   ignored = []
   for category in buckets.values():
     # Ignore either the exception or the signature. Signature takes precedence.
-    f = filters.get(models.ErrorReportingMonitoring.error_to_key_id(
-        category.signature))
+    f = filters.get(
+      models.ErrorReportingMonitoring.error_to_key_id(category.signature)
+    )
     if not f and category.exception_type:
-      f = filters.get(models.ErrorReportingMonitoring.error_to_key_id(
-          category.exception_type))
+      f = filters.get(
+        models.ErrorReportingMonitoring.error_to_key_id(category.exception_type)
+      )
     if _should_ignore_error_category(f, category):
       ignored.append(category)
     else:

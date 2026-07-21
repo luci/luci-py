@@ -17,7 +17,7 @@ from . import model
 
 
 # Part of public API of 'auth' component, exposed by this module.
-__all__ = ['prpc_interceptor']
+__all__ = ["prpc_interceptor"]
 
 
 def prpc_interceptor(request, context, call_details, continuation):
@@ -38,7 +38,8 @@ def prpc_interceptor(request, context, call_details, continuation):
   except ValueError as exc:
     context.set_code(prpc.StatusCode.INTERNAL)
     context.set_details(
-        'Could not parse peer IP "%s": %s' % (context.peer(), exc))
+      'Could not parse peer IP "%s": %s' % (context.peer(), exc)
+    )
     logging.error('Could not parse peer IP "%s": %s', context.peer(), exc)
     return
 
@@ -47,11 +48,11 @@ def prpc_interceptor(request, context, call_details, continuation):
     _prepare_auth_context(metadata, peer_ip)
     return continuation(request, context, call_details)
   except api.AuthenticationError as exc:
-    _log_auth_error('Authentication error', exc, metadata, peer_ip)
+    _log_auth_error("Authentication error", exc, metadata, peer_ip)
     context.set_code(prpc.StatusCode.UNAUTHENTICATED)
     context.set_details(exc.message)
   except api.AuthorizationError as exc:
-    _log_auth_error('Authorization error', exc, metadata, peer_ip)
+    _log_auth_error("Authorization error", exc, metadata, peer_ip)
     context.set_code(prpc.StatusCode.PERMISSION_DENIED)
     context.set_details(exc.message)
 
@@ -60,7 +61,7 @@ def prpc_interceptor(request, context, call_details, continuation):
 
 
 # Keys to look up in the metadata. Must be lowercase.
-_AUTHORIZATION_METADATA_KEY = 'authorization'
+_AUTHORIZATION_METADATA_KEY = "authorization"
 _DELEGATION_METADATA_KEY = delegation.HTTP_HEADER.lower()
 _X_LUCI_PROJECT_METADATA_KEY = check.X_LUCI_PROJECT.lower()
 
@@ -71,12 +72,12 @@ def _parse_rpc_peer(rpc_peer):
   Raises:
     ValueError if rpc_peer is malformed.
   """
-  if rpc_peer.startswith('ipv4:'):
-    ip_str = rpc_peer[len('ipv4:'):]
-  elif rpc_peer.startswith('ipv6:'):
-    ip_str = rpc_peer[len('ipv6:'):].strip('[]')
+  if rpc_peer.startswith("ipv4:"):
+    ip_str = rpc_peer[len("ipv4:") :]
+  elif rpc_peer.startswith("ipv6:"):
+    ip_str = rpc_peer[len("ipv6:") :].strip("[]")
   else:
-    raise ValueError('unrecognized RPC peer ID scheme')
+    raise ValueError("unrecognized RPC peer ID scheme")
   return ipaddr.ip_from_string(ip_str)
 
 
@@ -115,14 +116,15 @@ def _prepare_auth_context(metadata, peer_ip):
   # delegation token (if any). It raises AuthorizationError if something is
   # not allowed. Populates auth context fields.
   check.check_request(
-      ctx=ctx,
-      peer_identity=peer_identity,
-      peer_ip=peer_ip,
-      auth_details=auth_details,
-      delegation_token=_grab_metadata(metadata, _DELEGATION_METADATA_KEY),
-      project_header=_grab_metadata(metadata, _X_LUCI_PROJECT_METADATA_KEY),
-      use_project_identites=conf.USE_PROJECT_IDENTITIES,
-      use_bots_ip_whitelist=True)
+    ctx=ctx,
+    peer_identity=peer_identity,
+    peer_ip=peer_ip,
+    auth_details=auth_details,
+    delegation_token=_grab_metadata(metadata, _DELEGATION_METADATA_KEY),
+    project_header=_grab_metadata(metadata, _X_LUCI_PROJECT_METADATA_KEY),
+    use_project_identites=conf.USE_PROJECT_IDENTITIES,
+    use_bots_ip_whitelist=True,
+  )
 
 
 def _log_auth_error(title, exc, metadata, peer_ip):
@@ -135,8 +137,10 @@ def _log_auth_error(title, exc, metadata, peer_ip):
     peer_ip: ipaddr.IP with the peer IP address.
   """
   logging.warning(
-      '%s.\n%s\nPeer: %s\nIP: %s\nOrigin: %s',
-      title, exc.message,
-      api.get_peer_identity().to_bytes(),
-      ipaddr.ip_to_string(peer_ip),
-      _grab_metadata(metadata, 'origin') or '<unknown>')
+    "%s.\n%s\nPeer: %s\nIP: %s\nOrigin: %s",
+    title,
+    exc.message,
+    api.get_peer_identity().to_bytes(),
+    ipaddr.ip_to_string(peer_ip),
+    _grab_metadata(metadata, "origin") or "<unknown>",
+  )

@@ -37,19 +37,19 @@ from .proto import machine_token_pb2
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
-  'BadTokenError',
-  'TransientError',
-  'machine_authentication',
-  'optional_machine_authentication',
+  "BadTokenError",
+  "TransientError",
+  "machine_authentication",
+  "optional_machine_authentication",
 ]
 
 
 # HTTP header that carries the machine token.
-MACHINE_TOKEN_HEADER = 'X-Luci-Machine-Token'
+MACHINE_TOKEN_HEADER = "X-Luci-Machine-Token"
 
 # Name of a group with trusted token servers. This group should contain service
 # account emails of token servers we trust.
-TOKEN_SERVERS_GROUP = 'auth-token-servers'
+TOKEN_SERVERS_GROUP = "auth-token-servers"
 
 # How much clock difference we tolerate.
 ALLOWED_CLOCK_DRIFT_SEC = 10
@@ -65,7 +65,7 @@ class BadTokenError(api.AuthenticationError):
   """
 
   def __init__(self):
-    super(BadTokenError, self).__init__('Bad machine token')
+    super(BadTokenError, self).__init__("Bad machine token")
 
 
 class TransientError(Exception):
@@ -102,7 +102,7 @@ def machine_authentication(request):
   try:
     token = b64_decode(token)
   except TypeError as exc:
-    log_error(request, None, exc, 'Failed to decode base64')
+    log_error(request, None, exc, "Failed to decode base64")
     raise BadTokenError()
 
   try:
@@ -111,60 +111,62 @@ def machine_authentication(request):
     body = machine_token_pb2.MachineTokenBody()
     body.MergeFromString(envelope.token_body)
   except message.DecodeError as exc:
-    log_error(request, None, exc, 'Failed to deserialize the token')
+    log_error(request, None, exc, "Failed to deserialize the token")
     raise BadTokenError()
 
   # Construct an identity of a token server that signed the token to check that
   # it belongs to "auth-token-servers" group.
   try:
-    signer_service_account = model.Identity.from_bytes('user:' + body.issued_by)
+    signer_service_account = model.Identity.from_bytes("user:" + body.issued_by)
   except ValueError as exc:
-    log_error(request, body, exc, 'Bad issued_by field - %s', body.issued_by)
+    log_error(request, body, exc, "Bad issued_by field - %s", body.issued_by)
     raise BadTokenError()
 
   # Reject tokens from unknown token servers right away.
   if not api.is_group_member(TOKEN_SERVERS_GROUP, signer_service_account):
-    log_error(request, body, None, 'Unknown token issuer - %s', body.issued_by)
+    log_error(request, body, None, "Unknown token issuer - %s", body.issued_by)
     raise BadTokenError()
 
   # Check the expiration time before doing any heavier checks.
   now = utils.time_time()
   if now < body.issued_at - ALLOWED_CLOCK_DRIFT_SEC:
-    log_error(request, body, None, 'The token is not yet valid')
+    log_error(request, body, None, "The token is not yet valid")
     raise BadTokenError()
   if now > body.issued_at + body.lifetime + ALLOWED_CLOCK_DRIFT_SEC:
-    log_error(request, body, None, 'The token has expired')
+    log_error(request, body, None, "The token has expired")
     raise BadTokenError()
 
   # Check the token was actually signed by the server.
   try:
     certs = signature.get_service_account_certificates(body.issued_by)
     is_valid_sig = certs.check_signature(
-        blob=envelope.token_body,
-        key_name=envelope.key_id,
-        signature=envelope.rsa_sha256)
+      blob=envelope.token_body,
+      key_name=envelope.key_id,
+      signature=envelope.rsa_sha256,
+    )
     if not is_valid_sig:
-      log_error(request, body, None, 'Bad signature')
+      log_error(request, body, None, "Bad signature")
       raise BadTokenError()
   except signature.CertificateError as exc:
     if exc.transient:
       raise TransientError(str(exc))
     log_error(
-        request, body, exc, 'Unexpected error when checking the signature')
+      request, body, exc, "Unexpected error when checking the signature"
+    )
     raise BadTokenError()
 
   # The token is valid. Construct the bot identity.
   try:
-    ident = model.Identity.from_bytes('bot:' + body.machine_fqdn)
+    ident = model.Identity.from_bytes("bot:" + body.machine_fqdn)
   except ValueError as exc:
-    log_error(request, body, exc, 'Bad machine_fqdn - %s', body.machine_fqdn)
+    log_error(request, body, exc, "Bad machine_fqdn - %s", body.machine_fqdn)
     raise BadTokenError()
 
   # Unfortunately 'bot:*' identity namespace is shared between token-based
   # identities and old IP-whitelist based identity. They shouldn't intersect,
   # but better to enforce this.
   if ident == model.IP_WHITELISTED_BOT_ID:
-    log_error(request, body, None, 'Bot ID %s is forbidden', ident.to_bytes())
+    log_error(request, body, None, "Bot ID %s is forbidden", ident.to_bytes())
     raise BadTokenError()
 
   return ident, None
@@ -179,32 +181,34 @@ def optional_machine_authentication(request):
   try:
     return machine_authentication(request)
   except BadTokenError:
-    return None, None # error details are already logged
+    return None, None  # error details are already logged
 
 
 def b64_decode(data):
   """Decodes standard unpadded base64 encoded string."""
   mod = len(data) % 4
   if mod:
-    data += '=' * (4 - mod)
+    data += "=" * (4 - mod)
   return base64.b64decode(data)
 
 
 def log_error(request, token_body, exc, msg, *args):
   """Logs details about the request and the token, along with error message."""
-  lines = [('machine_auth: ' + msg) % args]
+  lines = [("machine_auth: " + msg) % args]
   if exc:
-    lines.append('  exception: %s (%s)' % (exc, exc.__class__.__name__))
+    lines.append("  exception: %s (%s)" % (exc, exc.__class__.__name__))
   if request:
-    lines.append('  remote_addr: %s' % request.remote_addr)
+    lines.append("  remote_addr: %s" % request.remote_addr)
   if token_body:
-    lines.extend([
-      '  machine_fqdn: %s' % token_body.machine_fqdn,
-      '  issued_by: %s' % token_body.issued_by,
-      '  issued_at: %s' % token_body.issued_at,
-      '  now: %s' % int(utils.time_time()), # for comparison with issued_at
-      '  lifetime: %s' % token_body.lifetime,
-      '  ca_id: %s' % token_body.ca_id,
-      '  cert_sn: %s' % binascii.hexlify(token_body.cert_sn),
-    ])
-  logging.warning('\n'.join(lines))
+    lines.extend(
+      [
+        "  machine_fqdn: %s" % token_body.machine_fqdn,
+        "  issued_by: %s" % token_body.issued_by,
+        "  issued_at: %s" % token_body.issued_at,
+        "  now: %s" % int(utils.time_time()),  # for comparison with issued_at
+        "  lifetime: %s" % token_body.lifetime,
+        "  ca_id: %s" % token_body.ca_id,
+        "  cert_sn: %s" % binascii.hexlify(token_body.cert_sn),
+      ]
+    )
+  logging.warning("\n".join(lines))

@@ -34,25 +34,28 @@ from components import utils
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
-  'get_access_token',
-  'get_access_token_async',
-  'get_project_access_token',
-  'get_project_access_token_async',
-  'AccessTokenError',
-  'ServiceAccountKey',
+  "get_access_token",
+  "get_access_token_async",
+  "get_project_access_token",
+  "get_project_access_token_async",
+  "AccessTokenError",
+  "ServiceAccountKey",
 ]
 
 # Information about @*.iam.gserviceaccount.com. Field values can be extracted
 # from corresponding fields in JSON file produced by "Generate new JSON key"
 # button in "Credentials" section of any Cloud Console project.
-ServiceAccountKey = collections.namedtuple('ServiceAccountKey', [
-  # Service account email.
-  'client_email',
-  # Service account PEM encoded private key.
-  'private_key',
-  # Service account key fingerprint, an unique identifier of this key.
-  'private_key_id',
-])
+ServiceAccountKey = collections.namedtuple(
+  "ServiceAccountKey",
+  [
+    # Service account email.
+    "client_email",
+    # Service account PEM encoded private key.
+    "private_key",
+    # Service account key fingerprint, an unique identifier of this key.
+    "private_key_id",
+  ],
+)
 
 
 class AccessTokenError(Exception):
@@ -68,59 +71,63 @@ ndb.add_flow_exception(AccessTokenError)
 
 
 @ndb.tasklet
-def authenticated_request_async(url, method='GET', payload=None, params=None):
+def authenticated_request_async(url, method="GET", payload=None, params=None):
   """Sends an authenticated JSON API request, returns deserialized response.
 
   Raises:
     TokenCreationError if request failed or response is malformed.
     TokenAuthorizationError on HTTP 401 or 403 response from service.
   """
-  scope = 'https://www.googleapis.com/auth/userinfo.email'
+  scope = "https://www.googleapis.com/auth/userinfo.email"
   access_token = get_access_token(scope)[0]
   headers = {
-    'Accept': 'application/json; charset=utf-8',
-    'Authorization': 'Bearer %s' % access_token,
+    "Accept": "application/json; charset=utf-8",
+    "Authorization": "Bearer %s" % access_token,
   }
 
   if payload is not None:
-    assert method in ('CREATE', 'POST', 'PUT'), method
-    headers['Content-Type'] = 'application/json; charset=utf-8'
+    assert method in ("CREATE", "POST", "PUT"), method
+    headers["Content-Type"] = "application/json; charset=utf-8"
     payload = utils.encode_to_json(payload)
 
   if utils.is_local_dev_server():
-    protocols = ('http://', 'https://')
+    protocols = ("http://", "https://")
   else:
-    protocols = ('https://',)
-  assert url.startswith(protocols) and '?' not in url, url
+    protocols = ("https://",)
+  assert url.startswith(protocols) and "?" not in url, url
   if params:
-    url += '?' + urllib.parse.urlencode(params)
+    url += "?" + urllib.parse.urlencode(params)
 
   try:
     res = yield _urlfetch_async(
-        url=url,
-        payload=payload,
-        method=method,
-        headers=headers,
-        follow_redirects=False,
-        deadline=10,
-        validate_certificate=True)
+      url=url,
+      payload=payload,
+      method=method,
+      headers=headers,
+      follow_redirects=False,
+      deadline=10,
+      validate_certificate=True,
+    )
   except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
     raise exceptions.TokenCreationError(str(e))
 
   if res.status_code == 404:
-    logging.warning('Token server HTTP %d: %s', res.status_code, res.content)
+    logging.warning("Token server HTTP %d: %s", res.status_code, res.content)
     raise exceptions.NotFoundError(
-        'HTTP %d: %s' % (res.status_code, res.content))
+      "HTTP %d: %s" % (res.status_code, res.content)
+    )
 
   if res.status_code in (401, 403):
-    logging.error('Token server HTTP %d: %s', res.status_code, res.content)
+    logging.error("Token server HTTP %d: %s", res.status_code, res.content)
     raise exceptions.TokenAuthorizationError(
-        'HTTP %d: %s' % (res.status_code, res.content))
+      "HTTP %d: %s" % (res.status_code, res.content)
+    )
 
   if res.status_code >= 300:
-    logging.error('Token server HTTP %d: %s', res.status_code, res.content)
+    logging.error("Token server HTTP %d: %s", res.status_code, res.content)
     raise exceptions.TokenCreationError(
-        'HTTP %d: %s' % (res.status_code, res.content))
+      "HTTP %d: %s" % (res.status_code, res.content)
+    )
 
   try:
     content = res.content
@@ -128,7 +135,7 @@ def authenticated_request_async(url, method='GET', payload=None, params=None):
       content = content[5:]
     json_res = json.loads(content)
   except ValueError as e:
-    raise exceptions.TokenCreationError('Bad JSON response: %s' % e)
+    raise exceptions.TokenCreationError("Bad JSON response: %s" % e)
   raise ndb.Return(json_res)
 
 
@@ -138,8 +145,7 @@ def authenticated_request(**kwargs):
 
 
 @ndb.tasklet
-def get_project_access_token_async(
-    project_id, scopes, min_lifetime_sec=5*60):
+def get_project_access_token_async(project_id, scopes, min_lifetime_sec=5 * 60):
   """Returns an OAuth2 access token for a project.
 
   Args:
@@ -158,8 +164,9 @@ def get_project_access_token_async(
   # fresh).
   if min_lifetime_sec <= 0 or min_lifetime_sec > 30 * 60:
     raise ValueError(
-        '"min_lifetime_sec" should be in range (0; 1800], actual: %d'
-        % min_lifetime_sec)
+      '"min_lifetime_sec" should be in range (0; 1800], actual: %d'
+      % min_lifetime_sec
+    )
 
   # Accept a single string to mimic app_identity.get_access_token behavior.
   if isinstance(scopes, basestring):
@@ -168,20 +175,19 @@ def get_project_access_token_async(
 
   # Cache key for the token.
   cache_key = _memcache_key(
-      method='tokenserver',
-      email=project_id,
-      scopes=scopes,
-      key_id=None)
+    method="tokenserver", email=project_id, scopes=scopes, key_id=None
+  )
   # We need token only on cache miss, so generate it lazily.
   token = yield _get_or_mint_token_async(
-      cache_key,
+    cache_key,
+    min_lifetime_sec,
+    lambda: project_tokens.project_token_async(
+      project_id,
+      scopes,
+      authenticated_request_async,
       min_lifetime_sec,
-      lambda: project_tokens.project_token_async(
-          project_id,
-          scopes,
-          authenticated_request_async,
-          min_lifetime_sec,
-      ))
+    ),
+  )
   raise ndb.Return(token)
 
 
@@ -192,7 +198,8 @@ def get_project_access_token(*args, **kwargs):
 
 @ndb.tasklet
 def get_access_token_async(
-    scopes, service_account_key=None, act_as=None, min_lifetime_sec=5*60):
+  scopes, service_account_key=None, act_as=None, min_lifetime_sec=5 * 60
+):
   """Returns an OAuth2 access token for a service account.
 
   If 'service_account_key' is specified, will use it to generate access token
@@ -232,8 +239,9 @@ def get_access_token_async(
   # fresh).
   if min_lifetime_sec <= 0 or min_lifetime_sec > 30 * 60:
     raise ValueError(
-        '"min_lifetime_sec" should be in range (0; 1800], actual: %d'
-        % min_lifetime_sec)
+      '"min_lifetime_sec" should be in range (0; 1800], actual: %d'
+      % min_lifetime_sec
+    )
 
   # Accept a single string to mimic app_identity.get_access_token behavior.
   if isinstance(scopes, basestring):
@@ -246,27 +254,23 @@ def get_access_token_async(
     # Cache key for the target token! Not the IAM-scoped one. The key ID is not
     # known in advance when using signJwt RPC.
     cache_key = _memcache_key(
-        method='iam',
-        email=act_as,
-        scopes=scopes,
-        key_id=None)
+      method="iam", email=act_as, scopes=scopes, key_id=None
+    )
     # We need IAM-scoped token only on cache miss, so generate it lazily.
-    iam_token_factory = (
-      lambda: get_access_token_async(
-        scopes=['https://www.googleapis.com/auth/iam'],
-        service_account_key=service_account_key,
-        act_as=None,
-        min_lifetime_sec=5*60))
+    iam_token_factory = lambda: get_access_token_async(
+      scopes=["https://www.googleapis.com/auth/iam"],
+      service_account_key=service_account_key,
+      act_as=None,
+      min_lifetime_sec=5 * 60,
+    )
     # On cache miss or if the cached token expires too soon, mint a token that
     # lives ~1h, so we can cache and reuse it.
     token = yield _get_or_mint_token_async(
-        cache_key,
-        min_lifetime_sec,
-        lambda: _mint_oauth_token_async(
-            iam_token_factory,
-            act_as,
-            scopes,
-            lifetime_sec=3600)
+      cache_key,
+      min_lifetime_sec,
+      lambda: _mint_oauth_token_async(
+        iam_token_factory, act_as, scopes, lifetime_sec=3600
+      ),
     )
     raise ndb.Return(token)
 
@@ -274,18 +278,19 @@ def get_access_token_async(
   if service_account_key:
     # Empty private_key_id probably means that the app is not configured yet.
     if not service_account_key.private_key_id:
-      raise AccessTokenError('Service account secret key is not initialized')
+      raise AccessTokenError("Service account secret key is not initialized")
     cache_key = _memcache_key(
-        method='pkey',
-        email=service_account_key.client_email,
-        scopes=scopes,
-        key_id=service_account_key.private_key_id)
+      method="pkey",
+      email=service_account_key.client_email,
+      scopes=scopes,
+      key_id=service_account_key.private_key_id,
+    )
     token = yield _get_or_mint_token_async(
-        cache_key,
-        min_lifetime_sec,
-        lambda: _mint_jwt_based_token_async(
-            scopes,
-            _LocalSigner(service_account_key))
+      cache_key,
+      min_lifetime_sec,
+      lambda: _mint_jwt_based_token_async(
+        scopes, _LocalSigner(service_account_key)
+      ),
     )
     raise ndb.Return(token)
 
@@ -300,7 +305,8 @@ def get_access_token(*args, **kwargs):
 
 ## Private stuff.
 
-_MEMCACHE_NS = 'access_tokens'
+_MEMCACHE_NS = "access_tokens"
+
 
 def _memcache_key(method, email, scopes, key_id=None):
   """Returns a string to use as a memcache key for a token.
@@ -311,20 +317,21 @@ def _memcache_key(method, email, scopes, key_id=None):
     scopes: list of strings with scopes.
     key_id: private key ID used (if known).
   """
-  blob = utils.encode_to_json({
-    'method': method,
-    'email': email,
-    'scopes': scopes,
-    'key_id': key_id,
-  })
+  blob = utils.encode_to_json(
+    {
+      "method": method,
+      "email": email,
+      "scopes": scopes,
+      "key_id": key_id,
+    }
+  )
   return hashlib.sha256(blob).hexdigest()
+
 
 @ndb.tasklet
 def _get_or_mint_token_async(
-    cache_key,
-    min_lifetime_sec,
-    minter,
-    namespace=_MEMCACHE_NS):
+  cache_key, min_lifetime_sec, minter, namespace=_MEMCACHE_NS
+):
   """Gets an access token from the cache or triggers mint flow."""
   # Randomize refresh time to avoid the thundering herd effect when token
   # expires. Also add 5 seconds extra to make sure callers will get the token
@@ -333,15 +340,17 @@ def _get_or_mint_token_async(
   # guarantees here though (we'd need to be able to stop time to do that).
   token_info = yield _memcache_get(cache_key, namespace=namespace)
 
-  min_allowed_exp = (
-    utils.time_time() +
-    _randint(min_lifetime_sec + 5, min_lifetime_sec + 305))
+  min_allowed_exp = utils.time_time() + _randint(
+    min_lifetime_sec + 5, min_lifetime_sec + 305
+  )
 
-  if not token_info or token_info['exp_ts'] < min_allowed_exp:
+  if not token_info or token_info["exp_ts"] < min_allowed_exp:
     token_info = yield minter()
-    yield _memcache_set(cache_key, token_info,
-                        token_info['exp_ts'], namespace=namespace)
-  raise ndb.Return(token_info['access_token'], token_info['exp_ts'])
+    yield _memcache_set(
+      cache_key, token_info, token_info["exp_ts"], namespace=namespace
+    )
+  raise ndb.Return(token_info["access_token"], token_info["exp_ts"])
+
 
 @ndb.tasklet
 def _mint_jwt_based_token_async(scopes, signer):
@@ -358,76 +367,90 @@ def _mint_jwt_based_token_async(scopes, signer):
   # future according to Google server clock, the access token request will be
   # denied. It doesn't complain about slightly late clock though.
   logging.info(
-    'Refreshing the access token for %s with scopes %s',
-    signer.email, scopes)
+    "Refreshing the access token for %s with scopes %s", signer.email, scopes
+  )
 
   now = int(utils.time_time()) - 5
-  jwt = yield signer.sign_claimset_async({
-    'aud': 'https://www.googleapis.com/oauth2/v4/token',
-    'exp': now + 3600,
-    'iat': now,
-    'iss': signer.email,
-    'jti': _b64_encode(os.urandom(16)),
-    'scope': ' '.join(scopes),
-  })
+  jwt = yield signer.sign_claimset_async(
+    {
+      "aud": "https://www.googleapis.com/oauth2/v4/token",
+      "exp": now + 3600,
+      "iat": now,
+      "iss": signer.email,
+      "jti": _b64_encode(os.urandom(16)),
+      "scope": " ".join(scopes),
+    }
+  )
 
   # URL encoded body of a token request.
-  request_body = urllib.parse.urlencode({
-      'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      'assertion': jwt,
-  })
+  request_body = urllib.parse.urlencode(
+    {
+      "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      "assertion": jwt,
+    }
+  )
 
   # Exchange signed claimset for an access token.
   token = yield _call_async(
-      url='https://www.googleapis.com/oauth2/v4/token',
-      payload=request_body,
-      method='POST',
-      headers={
-        'Accept': 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      })
-  raise ndb.Return({
-    'access_token': str(token['access_token']),
-    'exp_ts': int(utils.time_time() + token['expires_in'])
-  })
+    url="https://www.googleapis.com/oauth2/v4/token",
+    payload=request_body,
+    method="POST",
+    headers={
+      "Accept": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  )
+  raise ndb.Return(
+    {
+      "access_token": str(token["access_token"]),
+      "exp_ts": int(utils.time_time() + token["expires_in"]),
+    }
+  )
+
 
 @ndb.tasklet
 def _mint_oauth_token_async(
-    token_factory, email, scopes, lifetime_sec=0, delegates=None):
+  token_factory, email, scopes, lifetime_sec=0, delegates=None
+):
   """Creates a new access token using IAM credentials API."""
   # Query IAM credentials generateAccessToken API to obtain an OAuth token for
   # a given service account. Maximum lifetime is 1 hour. And can be obtained
   # through a chain of delegates.
   logging.info(
-      'Refreshing the access token for %s with scopes %s',
-      email, scopes
+    "Refreshing the access token for %s with scopes %s", email, scopes
   )
 
-  request_body = {'scope': scopes}
+  request_body = {"scope": scopes}
   if delegates:
-    request_body['delegates'] = delegates
+    request_body["delegates"] = delegates
   if lifetime_sec > 0:
     # Api accepts number of seconds with trailing 's'
-    request_body['lifetime'] = '%ds' % lifetime_sec
+    request_body["lifetime"] = "%ds" % lifetime_sec
 
   http_auth, _ = yield token_factory()
   response = yield _call_async(
-      url='https://iamcredentials.googleapis.com/v1/projects/-/'
-      'serviceAccounts/%s:generateAccessToken' % urllib.parse.quote_plus(email),
-      method='POST',
-      headers={
-          'Accept': 'application/json',
-          'Authorization': 'Bearer %s' % http_auth,
-          'Content-Type': 'application/json; charset=utf-8',
-      },
-      payload=utils.encode_to_json(request_body),
+    url="https://iamcredentials.googleapis.com/v1/projects/-/"
+    "serviceAccounts/%s:generateAccessToken" % urllib.parse.quote_plus(email),
+    method="POST",
+    headers={
+      "Accept": "application/json",
+      "Authorization": "Bearer %s" % http_auth,
+      "Content-Type": "application/json; charset=utf-8",
+    },
+    payload=utils.encode_to_json(request_body),
   )
-  expired_at = int(utils.datetime_to_timestamp(
-      utils.parse_rfc3339_datetime(response['expireTime'])) / 1e6)
-  raise ndb.Return({
-    'access_token': response['accessToken'],
-    'exp_ts': expired_at,
-  })
+  expired_at = int(
+    utils.datetime_to_timestamp(
+      utils.parse_rfc3339_datetime(response["expireTime"])
+    )
+    / 1e6
+  )
+  raise ndb.Return(
+    {
+      "access_token": response["accessToken"],
+      "exp_ts": expired_at,
+    }
+  )
 
 
 @ndb.tasklet
@@ -440,55 +463,67 @@ def _call_async(url, payload, method, headers):
   attempt = 0
   while attempt < 4:
     if attempt:
-      logging.info('Retrying...')
+      logging.info("Retrying...")
     attempt += 1
-    logging.info('%s %s', method, url)
+    logging.info("%s %s", method, url)
     try:
       response = yield _urlfetch(
-          url=url,
-          payload=payload,
-          method=method,
-          headers=headers,
-          follow_redirects=False,
-          deadline=5,  # all RPCs we do should be fast
-          validate_certificate=True)
+        url=url,
+        payload=payload,
+        method=method,
+        headers=headers,
+        follow_redirects=False,
+        deadline=5,  # all RPCs we do should be fast
+        validate_certificate=True,
+      )
     except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
       # Transient network error or URL fetch service RPC deadline.
-      logging.warning('%s %s failed: %s', method, url, e)
+      logging.warning("%s %s failed: %s", method, url, e)
       continue
 
     # Transient error on the other side.
     if response.status_code >= 500:
       logging.warning(
-          '%s %s failed with HTTP %d: %r',
-          method, url, response.status_code, response.content)
+        "%s %s failed with HTTP %d: %r",
+        method,
+        url,
+        response.status_code,
+        response.content,
+      )
       continue
 
     # Non-transient error.
     if 300 <= response.status_code < 500:
       logging.warning(
-          '%s %s failed with HTTP %d: %r',
-          method, url, response.status_code, response.content)
+        "%s %s failed with HTTP %d: %r",
+        method,
+        url,
+        response.status_code,
+        response.content,
+      )
       raise AccessTokenError(
-          'Failed to call %s: HTTP %d' % (url, response.status_code))
+        "Failed to call %s: HTTP %d" % (url, response.status_code)
+      )
 
     # Success.
     try:
       body = json.loads(response.content)
     except ValueError:
-      logging.error('Non-JSON response from %s: %r', url, response.content)
-      raise AccessTokenError('Non-JSON response from %s' % url)
+      logging.error("Non-JSON response from %s: %r", url, response.content)
+      raise AccessTokenError("Non-JSON response from %s" % url)
     raise ndb.Return(body)
 
   # All our attempts failed with transient errors. Perhaps some later retry
   # can help, so set transient to True.
   raise AccessTokenError(
-      'Failed to call %s after multiple attempts' % url, transient=True)
+    "Failed to call %s after multiple attempts" % url, transient=True
+  )
 
 
 def _randint(*args, **kwargs):
   """To be mocked in tests."""
   return random.randint(*args, **kwargs)
+
 
 def _urlfetch(**kwargs):
   """To be mocked in tests."""
@@ -519,47 +554,65 @@ def _log_jwt(email, method, jwt):
   Does some minimal validation which fails only if Google backends misbehave,
   which should not happen. Logs broken JWTs, assuming they are unusable.
   """
-  parts = jwt.split('.')
+  parts = jwt.split(".")
   if len(parts) != 3:
     logging.error(
-        'Got broken JWT (not <hdr>.<claims>.<sig>): by=%s method=%s jwt=%r',
-        email, method, jwt)
-    raise AccessTokenError('Got broken JWT, see logs')
+      "Got broken JWT (not <hdr>.<claims>.<sig>): by=%s method=%s jwt=%r",
+      email,
+      method,
+      jwt,
+    )
+    raise AccessTokenError("Got broken JWT, see logs")
 
   try:
-    hdr = _b64_decode(parts[0])     # includes key ID
+    hdr = _b64_decode(parts[0])  # includes key ID
     claims = _b64_decode(parts[1])  # includes scopes and timestamp
-    sig = parts[2][:12]             # only 9 bytes of the signature
+    sig = parts[2][:12]  # only 9 bytes of the signature
   except (TypeError, ValueError):
     logging.error(
-        'Got broken JWT (can\'t base64-decode): by=%s method=%s jwt=%r',
-        email, method, jwt)
-    raise AccessTokenError('Got broken JWT, see logs')
+      "Got broken JWT (can't base64-decode): by=%s method=%s jwt=%r",
+      email,
+      method,
+      jwt,
+    )
+    raise AccessTokenError("Got broken JWT, see logs")
 
   if not _is_json_object(hdr):
     logging.error(
-        'Got broken JWT (the header is not JSON dict): by=%s method=%s jwt=%r',
-        email, method, jwt)
-    raise AccessTokenError('Got broken JWT, see logs')
+      "Got broken JWT (the header is not JSON dict): by=%s method=%s jwt=%r",
+      email,
+      method,
+      jwt,
+    )
+    raise AccessTokenError("Got broken JWT, see logs")
   if not _is_json_object(claims):
     logging.error(
-        'Got broken JWT (claims are not JSON dict): by=%s method=%s jwt=%r',
-        email, method, jwt)
-    raise AccessTokenError('Got broken JWT, see logs')
+      "Got broken JWT (claims are not JSON dict): by=%s method=%s jwt=%r",
+      email,
+      method,
+      jwt,
+    )
+    raise AccessTokenError("Got broken JWT, see logs")
 
   logging.info(
-      'signed_jwt: by=%s method=%s hdr=%s claims=%s sig_prefix=%s fp=%s',
-      email, method, hdr, claims, sig, utils.get_token_fingerprint(jwt))
+    "signed_jwt: by=%s method=%s hdr=%s claims=%s sig_prefix=%s fp=%s",
+    email,
+    method,
+    hdr,
+    claims,
+    sig,
+    utils.get_token_fingerprint(jwt),
+  )
 
 
 def _b64_encode(data):
-  return base64.urlsafe_b64encode(data).rstrip('=')
+  return base64.urlsafe_b64encode(data).rstrip("=")
 
 
 def _b64_decode(data):
   mod = len(data) % 4
   if mod:
-    data += '=' * (4 - mod)
+    data += "=" * (4 - mod)
   return base64.urlsafe_b64decode(data)
 
 
@@ -579,17 +632,24 @@ class _LocalSigner(object):
   @ndb.tasklet
   def sign_claimset_async(self, claimset):
     # Prepare JWT header and claimset as base 64.
-    header_b64 = _b64_encode(utils.encode_to_json({
-      'alg': 'RS256',
-      'kid': self._key.private_key_id,
-      'typ': 'JWT',
-    }))
+    header_b64 = _b64_encode(
+      utils.encode_to_json(
+        {
+          "alg": "RS256",
+          "kid": self._key.private_key_id,
+          "typ": "JWT",
+        }
+      )
+    )
     claimset_b64 = _b64_encode(utils.encode_to_json(claimset))
     # Sign <header>.<claimset> with account's private key.
-    signature_b64 = _b64_encode(self._rsa_sign(
-        '%s.%s' % (header_b64, claimset_b64), self._key.private_key))
-    jwt = '%s.%s.%s' % (header_b64, claimset_b64, signature_b64)
-    _log_jwt(self.email, 'local', jwt)
+    signature_b64 = _b64_encode(
+      self._rsa_sign(
+        "%s.%s" % (header_b64, claimset_b64), self._key.private_key
+      )
+    )
+    jwt = "%s.%s.%s" % (header_b64, claimset_b64, signature_b64)
+    _log_jwt(self.email, "local", jwt)
     raise ndb.Return(jwt)
 
   @staticmethod
@@ -599,6 +659,7 @@ class _LocalSigner(object):
     from Crypto.Hash import SHA256
     from Crypto.PublicKey import RSA
     from Crypto.Signature import PKCS1_v1_5
+
     pkey = RSA.importKey(private_key_pem)
     return PKCS1_v1_5.new(pkey).sign(SHA256.new(blob))
 

@@ -11,14 +11,14 @@ from components import utils
 
 
 __all__ = [
-  'BytesSerializable',
-  'BytesSerializableProperty',
-  'JsonSerializable',
-  'JsonSerializableProperty',
-  'READABLE',
-  'SerializableModelMixin',
-  'WRITABLE',
-  'register_converter',
+  "BytesSerializable",
+  "BytesSerializableProperty",
+  "JsonSerializable",
+  "JsonSerializableProperty",
+  "READABLE",
+  "SerializableModelMixin",
+  "WRITABLE",
+  "register_converter",
 ]
 
 
@@ -52,10 +52,11 @@ def _register_simple_converters():
   noop = lambda _prop, x: x
   for simple_prop_cls in _SIMPLE_PROPERTIES:
     register_converter(
-        property_cls=simple_prop_cls,
-        include_subclasses=False,
-        rich_to_simple=noop,
-        simple_to_rich=noop)
+      property_cls=simple_prop_cls,
+      include_subclasses=False,
+      rich_to_simple=noop,
+      simple_to_rich=noop,
+    )
 
 
 class _ModelDictConverter(object):
@@ -120,7 +121,8 @@ class _ModelDictConverter(object):
     """
     if not isinstance(model_dict, dict):
       raise ValueError(
-          'Expecting a dict, got \'%s\' instead' % type(model_dict).__name__)
+        "Expecting a dict, got '%s' instead" % type(model_dict).__name__
+      )
     allowed_properties = self.get_allowed_properties(model_cls)
     result = {}
     for key, value in model_dict.items():
@@ -145,8 +147,9 @@ class _ModelDictConverter(object):
       # repeated property in populate(...) or entity constructor.
       if not isinstance(value, (list, tuple)):
         raise ValueError(
-            'Expecting a list or tuple for \'%s\', got \'%s\' instead' % (
-                prop._name, type(value).__name__))
+          "Expecting a list or tuple for '%s', got '%s' instead"
+          % (prop._name, type(value).__name__)
+        )
       converter = self.get_property_converter(prop)
       return [converter(prop, x) for x in value]
 
@@ -166,14 +169,16 @@ class _ModelDictConverter(object):
     Return value of None means all defined properties should be used.
     """
     assert issubclass(model_cls, ndb.Model)
-    assert not issubclass(model_cls, ndb.Expando), 'Expando is not supported'
+    assert not issubclass(model_cls, ndb.Expando), "Expando is not supported"
     if not issubclass(model_cls, SerializableModelMixin):
       return None
     if model_cls.serializable_properties is None:
       return None
     return set(
-        field for field, mode in model_cls.serializable_properties.items()
-        if self.field_mode_predicate(mode))
+      field
+      for field, mode in model_cls.serializable_properties.items()
+      if self.field_mode_predicate(mode)
+    )
 
   def get_property_converter(self, prop):
     """Returns callable that can convert values corresponding to ndb property.
@@ -190,11 +195,15 @@ class _ModelDictConverter(object):
     # For other properties consult the registry of converters.
     # pylint: disable=unidiomatic-typecheck
     for prop_cls, include_subclasses, conv in self.property_converters:
-      if (include_subclasses and isinstance(prop, prop_cls) or
-          not include_subclasses and type(prop) == prop_cls):
+      if (
+        include_subclasses
+        and isinstance(prop, prop_cls)
+        or not include_subclasses
+        and type(prop) == prop_cls
+      ):
         return conv
     # Give up.
-    raise TypeError('Don\'t know how to work with %s' % type(prop).__name__)
+    raise TypeError("Don't know how to work with %s" % type(prop).__name__)
 
 
 ### Public API.
@@ -234,10 +243,12 @@ class SerializableModelMixin(object):
     """
     # TODO(vadimsh): Add 'include' and 'exclude' support when needed.
     conv = _ModelDictConverter(
-        property_converters=_rich_to_simple_converters,
-        field_mode_predicate=lambda mode: bool(mode & READABLE))
+      property_converters=_rich_to_simple_converters,
+      field_mode_predicate=lambda mode: bool(mode & READABLE),
+    )
     serializable_dict = conv.convert_dict(
-        self.__class__, self.to_dict(exclude=exclude))
+      self.__class__, self.to_dict(exclude=exclude)
+    )
     if with_id_as:
       assert isinstance(with_id_as, basestring)
       serializable_dict[with_id_as] = self.key.string_id()
@@ -282,8 +293,9 @@ class SerializableModelMixin(object):
     properties not explicitly marked as WRITABLE) are silently ignored.
     """
     conv = _ModelDictConverter(
-        property_converters=_simple_to_rich_converters,
-        field_mode_predicate=lambda mode: bool(mode & WRITABLE))
+      property_converters=_simple_to_rich_converters,
+      field_mode_predicate=lambda mode: bool(mode & WRITABLE),
+    )
     return conv.convert_dict(cls, serializable_dict)
 
 
@@ -348,7 +360,8 @@ class BytesSerializableProperty(ndb.BlobProperty):
     # pylint: disable=isinstance-second-argument-not-valid-type
     if not isinstance(value, self._value_type):
       raise TypeError(
-          'Expecting %s, got %r' % (self._value_type.__name__, value))
+        "Expecting %s, got %r" % (self._value_type.__name__, value)
+      )
 
   def _to_base_type(self, value):
     result = value.to_bytes()
@@ -389,7 +402,8 @@ class JsonSerializableProperty(ndb.JsonProperty):
     # pylint: disable=isinstance-second-argument-not-valid-type
     if not isinstance(value, self._value_type):
       raise TypeError(
-          'Expecting %s, got %r' % (self._value_type.__name__, value))
+        "Expecting %s, got %r" % (self._value_type.__name__, value)
+      )
 
   def _to_base_type(self, value):
     return value.to_jsonish()
@@ -399,7 +413,8 @@ class JsonSerializableProperty(ndb.JsonProperty):
 
 
 def register_converter(
-    property_cls, include_subclasses, rich_to_simple, simple_to_rich):
+  property_cls, include_subclasses, rich_to_simple, simple_to_rich
+):
   """Register a pair of functions that can convert some ndb.Property subclass.
 
   Used by ndb.Model, utils.SerializableModelMixin to convert entities to
@@ -415,9 +430,11 @@ def register_converter(
   """
   assert issubclass(property_cls, ndb.Property)
   _rich_to_simple_converters.append(
-      (property_cls, include_subclasses, rich_to_simple))
+    (property_cls, include_subclasses, rich_to_simple)
+  )
   _simple_to_rich_converters.append(
-      (property_cls, include_subclasses, simple_to_rich))
+    (property_cls, include_subclasses, simple_to_rich)
+  )
 
 
 ### Function calls.
@@ -428,23 +445,26 @@ _register_simple_converters()
 
 # TODO(vadimsh): Add ndb.DateProperty if needed.
 register_converter(
-    property_cls=ndb.DateTimeProperty,
-    include_subclasses=False,
-    rich_to_simple=lambda _prop, x: utils.datetime_to_timestamp(x),
-    simple_to_rich=lambda _prop, x: utils.timestamp_to_datetime(x))
+  property_cls=ndb.DateTimeProperty,
+  include_subclasses=False,
+  rich_to_simple=lambda _prop, x: utils.datetime_to_timestamp(x),
+  simple_to_rich=lambda _prop, x: utils.timestamp_to_datetime(x),
+)
 
 
 # Handles all property classes inherited from JsonSerializableProperty.
 register_converter(
-    property_cls=JsonSerializableProperty,
-    include_subclasses=True,
-    rich_to_simple=lambda prop, value: value.to_jsonish(),
-    simple_to_rich=lambda prop, value: prop._value_type.from_jsonish(value))
+  property_cls=JsonSerializableProperty,
+  include_subclasses=True,
+  rich_to_simple=lambda prop, value: value.to_jsonish(),
+  simple_to_rich=lambda prop, value: prop._value_type.from_jsonish(value),
+)
 
 
 # Handles all property classes inherited from BytesSerializableProperty.
 register_converter(
-    property_cls=BytesSerializableProperty,
-    include_subclasses=True,
-    rich_to_simple=lambda prop, value: value.to_bytes(),
-    simple_to_rich=lambda prop, value: prop._value_type.from_bytes(value))
+  property_cls=BytesSerializableProperty,
+  include_subclasses=True,
+  rich_to_simple=lambda prop, value: value.to_bytes(),
+  simple_to_rich=lambda prop, value: prop._value_type.from_bytes(value),
+)

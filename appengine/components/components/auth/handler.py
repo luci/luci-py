@@ -23,30 +23,33 @@ from . import tokens
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
-  'ApiHandler',
-  'AuthenticatingHandler',
-  'gae_cookie_authentication',
-  'get_authenticated_routes',
-  'oauth_authentication',
-  'require_xsrf_token_request',
-  'service_to_service_authentication',
+  "ApiHandler",
+  "AuthenticatingHandler",
+  "gae_cookie_authentication",
+  "get_authenticated_routes",
+  "oauth_authentication",
+  "require_xsrf_token_request",
+  "service_to_service_authentication",
 ]
 
 
 def require_xsrf_token_request(f):
   """Use for handshaking APIs."""
+
   @functools.wraps(f)
   def hook(self, *args, **kwargs):
-    if not self.request.headers.get('X-XSRF-Token-Request'):
-      raise api.AuthorizationError('Missing required XSRF request header')
+    if not self.request.headers.get("X-XSRF-Token-Request"):
+      raise api.AuthorizationError("Missing required XSRF request header")
     return f(self, *args, **kwargs)
+
   return hook
 
 
 class XSRFToken(tokens.TokenKind):
   """XSRF token parameters."""
+
   expiration_sec = 4 * 3600
-  secret_key = api.SecretKey('xsrf_token')
+  secret_key = api.SecretKey("xsrf_token")
   version = 1
 
 
@@ -58,8 +61,9 @@ class AuthenticatingHandlerMetaclass(type):
       func = attributes.get(method.lower())
       if func and not api.is_decorated(func):
         raise TypeError(
-            'Method \'%s\' of \'%s\' is not protected by @require or @public '
-            'decorator' % (method.lower(), name))
+          "Method '%s' of '%s' is not protected by @require or @public "
+          "decorator" % (method.lower(), name)
+        )
     return type.__new__(mcs, name, bases, attributes)
 
 
@@ -77,16 +81,16 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   __metaclass__ = AuthenticatingHandlerMetaclass
 
   # List of HTTP methods that trigger XSRF token validation.
-  xsrf_token_enforce_on = ('DELETE', 'POST', 'PUT')
+  xsrf_token_enforce_on = ("DELETE", "POST", "PUT")
   # If not None, the header to search for XSRF token.
-  xsrf_token_header = 'X-XSRF-Token'
+  xsrf_token_header = "X-XSRF-Token"
   # If not None, the request parameter (GET or POST) to search for XSRF token.
-  xsrf_token_request_param = 'xsrf_token'
+  xsrf_token_request_param = "xsrf_token"
   # Embedded data extracted from XSRF token of current request.
   xsrf_token_data = None
 
   # If not None, sets X-Frame-Options on all replies.
-  frame_options = 'DENY'
+  frame_options = "DENY"
 
   # If true, will add 'nonce-*' to script-src CSP. Forbids inline scripts.
   csp_use_script_nonce = False
@@ -110,18 +114,19 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # Set CSP header, if necessary. Subclasses may extend it or disable it.
     policy = self.get_content_security_policy()
     if policy:
-      self.response.headers['Content-Security-Policy'] = '; '.join(
-        str('%s %s' % (directive, ' '.join(sources)))
+      self.response.headers["Content-Security-Policy"] = "; ".join(
+        str("%s %s" % (directive, " ".join(sources)))
         for directive, sources in sorted(policy.items())
       )
     # Enforce HTTPS by adding the HSTS header; 365*24*60*60s.
     # https://www.owasp.org/index.php/HTTP_Strict_Transport_Security
-    self.response.headers['Strict-Transport-Security'] = (
-        'max-age=31536000; includeSubDomains; preload')
+    self.response.headers["Strict-Transport-Security"] = (
+      "max-age=31536000; includeSubDomains; preload"
+    )
     # Disable frame support wholesale.
     # https://www.owasp.org/index.php/Clickjacking_Defense_Cheat_Sheet
     if self.frame_options:
-      self.response.headers['X-Frame-Options'] = self.frame_options
+      self.response.headers["X-Frame-Options"] = self.frame_options
 
     peer_identity = None
     auth_details = None
@@ -150,28 +155,32 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       # delegation token (if any). It raises AuthorizationError if something is
       # not allowed. Populates auth context fields.
       check.check_request(
-          ctx=ctx,
-          peer_identity=peer_identity,
-          peer_ip=ipaddr.ip_from_string(self.request.remote_addr),
-          auth_details=auth_details,
-          delegation_token=self.request.headers.get(delegation.HTTP_HEADER),
-          project_header=self.request.headers.get(check.X_LUCI_PROJECT),
-          use_project_identites=conf.USE_PROJECT_IDENTITIES,
-          use_bots_ip_whitelist=self.use_bots_ip_whitelist)
+        ctx=ctx,
+        peer_identity=peer_identity,
+        peer_ip=ipaddr.ip_from_string(self.request.remote_addr),
+        auth_details=auth_details,
+        delegation_token=self.request.headers.get(delegation.HTTP_HEADER),
+        project_header=self.request.headers.get(check.X_LUCI_PROJECT),
+        use_project_identites=conf.USE_PROJECT_IDENTITIES,
+        use_bots_ip_whitelist=self.use_bots_ip_whitelist,
+      )
 
       # XSRF token is required only if using Cookie based or IP whitelist auth.
       # A browser doesn't send Authorization: 'Bearer ...' or any other headers
       # by itself. So XSRF check is not required if header based authentication
       # is used.
       using_headers_auth = method_func in (
-          oauth_authentication, service_to_service_authentication)
+        oauth_authentication,
+        service_to_service_authentication,
+      )
 
       # Fail if XSRF token is required, but not provided.
       need_xsrf_token = (
-          not using_headers_auth and
-          self.request.method in self.xsrf_token_enforce_on)
+        not using_headers_auth
+        and self.request.method in self.xsrf_token_enforce_on
+      )
       if need_xsrf_token and self.xsrf_token is None:
-        raise api.AuthorizationError('XSRF token is missing')
+        raise api.AuthorizationError("XSRF token is missing")
 
       # If XSRF token is present, verify it is valid and extract its payload.
       # Do it even if XSRF token is not strictly required, since some handlers
@@ -183,7 +192,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
           self.xsrf_token_data = self.verify_xsrf_token()
         except api.AuthorizationError as exc:
           if not need_xsrf_token:
-            logging.warning('XSRF token is broken, ignoring - %s', exc)
+            logging.warning("XSRF token is broken, ignoring - %s", exc)
           else:
             raise
 
@@ -226,9 +235,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       conf: components.auth GAE config, see config.py.
     """
     return (
-        oauth_authentication,
-        gae_cookie_authentication,
-        service_to_service_authentication)
+      oauth_authentication,
+      gae_cookie_authentication,
+      service_to_service_authentication,
+    )
 
   def generate_xsrf_token(self, xsrf_token_data=None):
     """Returns new XSRF token that embeds |xsrf_token_data|.
@@ -237,7 +247,8 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     identity.
     """
     return XSRFToken.generate(
-        [api.get_current_identity().to_bytes()], xsrf_token_data)
+      [api.get_current_identity().to_bytes()], xsrf_token_data
+    )
 
   @property
   def xsrf_token(self):
@@ -267,7 +278,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     """
     token = self.xsrf_token
     if not token:
-      raise api.AuthorizationError('XSRF token is missing')
+      raise api.AuthorizationError("XSRF token is missing")
     # Check that it was generated for the same identity.
     try:
       return XSRFToken.validate(token, [api.get_current_identity().to_bytes()])
@@ -325,58 +336,50 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # all HTML tags were removed. Warning if seeing this post 2016, it could
     # take a while.
     csp = {
-      'default-src': ["'self'"],
-
-      'script-src': [
+      "default-src": ["'self'"],
+      "script-src": [
         "'self'",
         "'unsafe-inline'",  # fallback if the browser doesn't support nonces
-        "'unsafe-eval'",    # required by Polymer and Handlebars templates
-
-        'https://www.google-analytics.com',
-        'https://www.google.com/jsapi',
-        'https://apis.google.com',
-        'https://www.gstatic.com', # Google charts loader
-        'https://www.googletagmanager.com', # gtag for Google Analytics
+        "'unsafe-eval'",  # required by Polymer and Handlebars templates
+        "https://www.google-analytics.com",
+        "https://www.google.com/jsapi",
+        "https://apis.google.com",
+        "https://www.gstatic.com",  # Google charts loader
+        "https://www.googletagmanager.com",  # gtag for Google Analytics
       ],
-
-      'style-src': [
+      "style-src": [
         "'self'",
         "'unsafe-inline'",  # fallback if the browser doesn't support nonces
         "https://fonts.googleapis.com",
-        "https://www.gstatic.com", # Google charts styling
+        "https://www.gstatic.com",  # Google charts styling
       ],
-
-      'frame-src': [
-        'https://accounts.google.com',  # Google OAuth2 library opens iframes
+      "frame-src": [
+        "https://accounts.google.com",  # Google OAuth2 library opens iframes
       ],
-
-      'img-src': [
+      "img-src": [
         "'self'",
-        'https://www.google-analytics.com',
-        'https://*.googleusercontent.com',  # Google user avatars
+        "https://www.google-analytics.com",
+        "https://*.googleusercontent.com",  # Google user avatars
       ],
-
-      'font-src': [
+      "font-src": [
         "'self'",
         "https://fonts.gstatic.com",  # Google-hosted fonts
       ],
-
-      'connect-src': [
+      "connect-src": [
         "'self'",
         "https://www.google-analytics.com",
         "https://*.google-analytics.com",
       ],
-
-      'object-src': ["'none'"],  # we don't generally use Flash or Java
+      "object-src": ["'none'"],  # we don't generally use Flash or Java
     }
 
     # When 'unsafe-inline' and 'nonce-*' are both specified, newer browsers
     # prefer nonces. Older browsers (that don't support nonces), fall back to
     # 'unsafe-inline' and just ignore nonces.
     if self.csp_use_script_nonce:
-      csp['script-src'].append("'nonce-%s'" % self.csp_nonce)
+      csp["script-src"].append("'nonce-%s'" % self.csp_nonce)
     if self.csp_use_style_nonce:
-      csp['style-src'].append("'nonce-%s'" % self.csp_nonce)
+      csp["style-src"].append("'nonce-%s'" % self.csp_nonce)
 
     return csp
 
@@ -393,7 +396,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     Args:
       error: instance of AuthenticationError subclass.
     """
-    logging.warning('Authentication error.\n%s', error)
+    logging.warning("Authentication error.\n%s", error)
     self.abort(401, detail=str(error))
 
   def authorization_error(self, error):
@@ -410,9 +413,12 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       error: instance of AuthorizationError subclass.
     """
     logging.warning(
-        'Authorization error.\n%s\nPeer: %s\nIP: %s\nOrigin: %s',
-        error, api.get_peer_identity().to_bytes(), self.request.remote_addr,
-        self.request.headers.get('Origin'))
+      "Authorization error.\n%s\nPeer: %s\nIP: %s\nOrigin: %s",
+      error,
+      api.get_peer_identity().to_bytes(),
+      self.request.remote_addr,
+      self.request.headers.get("Origin"),
+    )
     self.abort(403, detail=str(error))
 
   ### Wrappers around Users API or its equivalent.
@@ -441,17 +447,17 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         if method in _METHOD_TO_USERS_API:
           break
       else:
-        raise NotImplementedError('No methods support UsersAPI')
+        raise NotImplementedError("No methods support UsersAPI")
     elif method not in _METHOD_TO_USERS_API:
-      raise NotImplementedError(
-          '%s doesn\'t support UsersAPI' % method.__name__)
+      raise NotImplementedError("%s doesn't support UsersAPI" % method.__name__)
     return _METHOD_TO_USERS_API[method]
 
 
 class ApiHandler(AuthenticatingHandler):
   """Parses JSON request body to a dict, serializes response to JSON."""
-  CONTENT_TYPE_BASE = 'application/json'
-  CONTENT_TYPE_FULL = 'application/json; charset=utf-8'
+
+  CONTENT_TYPE_BASE = "application/json"
+  CONTENT_TYPE_FULL = "application/json; charset=utf-8"
   _json_body = None
 
   # Clickjacking not applicable to APIs.
@@ -462,30 +468,32 @@ class ApiHandler(AuthenticatingHandler):
     return None
 
   def authentication_error(self, error):
-    logging.warning('Authentication error.\n%s', error)
+    logging.warning("Authentication error.\n%s", error)
     self.abort_with_error(401, text=str(error))
 
   def authorization_error(self, error):
     logging.warning(
-        'Authorization error.\n%s\nPeer: %s\nIP: %s\nOrigin: %s',
-        error, api.get_peer_identity().to_bytes(), self.request.remote_addr,
-        self.request.headers.get('Origin'))
+      "Authorization error.\n%s\nPeer: %s\nIP: %s\nOrigin: %s",
+      error,
+      api.get_peer_identity().to_bytes(),
+      self.request.remote_addr,
+      self.request.headers.get("Origin"),
+    )
     self.abort_with_error(403, text=str(error))
 
   def send_response(self, response, http_code=200, headers=None):
     """Sends successful reply and continues execution."""
     self.response.set_status(http_code)
     self.response.headers.update(headers or {})
-    self.response.headers['Content-Type'] = self.CONTENT_TYPE_FULL
+    self.response.headers["Content-Type"] = self.CONTENT_TYPE_FULL
     self.response.write(json.dumps(response))
 
   def abort_with_error(self, http_code, **kwargs):
     """Sends error reply and stops execution."""
-    logging.warning('abort_with_error(%s)', kwargs)
+    logging.warning("abort_with_error(%s)", kwargs)
     self.abort(
-        http_code,
-        json=kwargs,
-        headers={'Content-Type': self.CONTENT_TYPE_FULL})
+      http_code, json=kwargs, headers={"Content-Type": self.CONTENT_TYPE_FULL}
+    )
 
   def parse_body(self):
     """Parses JSON body and verifies it's a dict.
@@ -493,18 +501,20 @@ class ApiHandler(AuthenticatingHandler):
     webob.Request doesn't cache the decoded json body, this function does.
     """
     if self._json_body is None:
-      if (self.CONTENT_TYPE_BASE and
-          self.request.content_type != self.CONTENT_TYPE_BASE):
+      if (
+        self.CONTENT_TYPE_BASE
+        and self.request.content_type != self.CONTENT_TYPE_BASE
+      ):
         msg = (
-            'Expecting JSON body with content type \'%s\'' %
-            self.CONTENT_TYPE_BASE)
+          "Expecting JSON body with content type '%s'" % self.CONTENT_TYPE_BASE
+        )
         self.abort_with_error(400, text=msg)
       try:
         self._json_body = self.request.json
         if not isinstance(self._json_body, dict):
           raise ValueError()
       except (LookupError, ValueError):
-        self.abort_with_error(400, text='Not a valid json dict body')
+        self.abort_with_error(400, text="Not a valid json dict body")
     return self._json_body.copy()
 
 
@@ -517,8 +527,10 @@ def get_authenticated_routes(app):
   # all routes for pretty-printing).
   routes = list(app.router.match_routes)
   routes.extend(
-      v for k, v in app.router.build_routes.items()
-      if v not in app.router.match_routes)
+    v
+    for k, v in app.router.build_routes.items()
+    if v not in app.router.match_routes
+  )
   return [r for r in routes if issubclass(r.handler, AuthenticatingHandler)]
 
 
@@ -534,13 +546,13 @@ def gae_cookie_authentication(_request):
   try:
     ident = model.Identity(model.IDENTITY_USER, user.email())
   except ValueError:
-    raise api.AuthenticationError('Unsupported user email: %s' % user.email())
+    raise api.AuthenticationError("Unsupported user email: %s" % user.email())
   return ident, api.new_auth_details(is_superuser=users.is_current_user_admin())
 
 
 def oauth_authentication(request):
   """OAuth2 based authentication via access tokens."""
-  auth_header = request.headers.get('Authorization')
+  auth_header = request.headers.get("Authorization")
   if not auth_header:
     return None, None
   return api.check_oauth_access_token(auth_header)
@@ -552,11 +564,11 @@ def service_to_service_authentication(request):
   Relies on X-Appengine-Inbound-Appid header set by AppEngine itself. It can't
   be set by external users (with exception of admins).
   """
-  app_id = request.headers.get('X-Appengine-Inbound-Appid')
+  app_id = request.headers.get("X-Appengine-Inbound-Appid")
   try:
     ident = model.Identity(model.IDENTITY_SERVICE, app_id) if app_id else None
   except ValueError:
-    raise api.AuthenticationError('Unsupported application ID: %s' % app_id)
+    raise api.AuthenticationError("Unsupported application ID: %s" % app_id)
   return ident, None
 
 

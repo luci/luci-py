@@ -13,9 +13,9 @@ from components import utils
 
 
 __all__ = [
-  'BytesComputedProperty',
-  'DeterministicJsonProperty',
-  'ProtobufProperty',
+  "BytesComputedProperty",
+  "DeterministicJsonProperty",
+  "ProtobufProperty",
 ]
 
 
@@ -45,12 +45,14 @@ class DeterministicJsonProperty(ndb.BlobProperty):
   Sadly, we can't inherit from JsonProperty because it would result in
   duplicate encoding. So copy-paste the class from SDK v1.9.0 here.
   """
+
   _json_type = None
 
   @ndb.utils.positional(1 + ndb.BlobProperty._positional)
   def __init__(self, name=None, compressed=False, json_type=None, **kwds):
     super(DeterministicJsonProperty, self).__init__(
-        name=name, compressed=compressed, **kwds)
+      name=name, compressed=compressed, **kwds
+    )
     self._json_type = json_type
 
   def _validate(self, value):
@@ -58,7 +60,8 @@ class DeterministicJsonProperty(ndb.BlobProperty):
       # Add the property name, otherwise it's annoying to try to figure out
       # which property is incorrect.
       raise TypeError(
-          'Property %s must be a %s' % (self._name, self._json_type))
+        "Property %s must be a %s" % (self._name, self._json_type)
+      )
 
   def _to_base_type(self, value):
     """Makes it deterministic compared to ndb.JsonProperty._to_base_type()."""
@@ -73,15 +76,17 @@ class ProtobufProperty(ndb.BlobProperty):
 
   Supports length limiting and compression. Not indexable.
   """
+
   _message_class = None
   _max_length = None
 
   @ndb.utils.positional(2 + ndb.BlobProperty._positional)
   def __init__(
-      self, message_class, name=None, compressed=False, max_length=None,
-      **kwds):
+    self, message_class, name=None, compressed=False, max_length=None, **kwds
+  ):
     super(ProtobufProperty, self).__init__(
-        name=name, compressed=compressed, **kwds)
+      name=name, compressed=compressed, **kwds
+    )
     assert message_class, message_class
     self._message_class = message_class
     self._max_length = max_length
@@ -91,10 +96,12 @@ class ProtobufProperty(ndb.BlobProperty):
       # Add the property name, otherwise it's annoying to try to figure out
       # which property is incorrect.
       raise TypeError(
-          'Property %s must be a %s' % (self._name, self._message_class))
+        "Property %s must be a %s" % (self._name, self._message_class)
+      )
     if self._max_length is not None and value.ByteSize() > self._max_length:
       raise datastore_errors.BadValueError(
-          'Property %s is more than %d bytes' % (self._name, self._max_length))
+        "Property %s is more than %d bytes" % (self._name, self._max_length)
+      )
 
   def _to_base_type(self, value):
     """Interprets value as a protobuf message and serialized to bytes."""

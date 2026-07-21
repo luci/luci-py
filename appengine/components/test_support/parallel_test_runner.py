@@ -14,8 +14,8 @@ from nose2 import discover
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
 LUCI_DIR = os.path.dirname(os.path.dirname(os.path.dirname(THIS_DIR)))
-PLUGINS_DIR = os.path.join(THIS_DIR, 'nose2_plugins')
-CLIENT_THIRD_PARTY_DIR = os.path.join(LUCI_DIR, 'client', 'third_party')
+PLUGINS_DIR = os.path.join(THIS_DIR, "nose2_plugins")
+CLIENT_THIRD_PARTY_DIR = os.path.join(LUCI_DIR, "client", "third_party")
 
 
 def run_tests(python3=False, plugins=None):
@@ -26,11 +26,12 @@ def run_tests(python3=False, plugins=None):
   if plugins is None:
     plugins = []
   if python3:
-    plugins.append('py3filter')
+    plugins.append("py3filter")
 
   # fix_encoding
   sys.path.insert(0, CLIENT_THIRD_PARTY_DIR)
   from depot_tools import fix_encoding
+
   fix_encoding.fix_encoding()
 
   # add nose2 plugin dir to path
@@ -43,8 +44,8 @@ def run_tests(python3=False, plugins=None):
 
 def hook_args():
   parser = argparse.ArgumentParser(add_help=False)
-  parser.add_argument('-v', '--verbose', action='store_true')
-  parser.add_argument('--log-level')
+  parser.add_argument("-v", "--verbose", action="store_true")
+  parser.add_argument("--log-level")
   args, _ = parser.parse_known_args()
 
   if args.verbose:
@@ -55,5 +56,5 @@ def hook_args():
     logging.basicConfig(level=logging.CRITICAL)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   sys.exit(run_tests(python3=six.PY3))

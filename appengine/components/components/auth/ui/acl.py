@@ -7,7 +7,7 @@
 from .. import api
 
 
-ACCESS_GROUP_NAME = 'auth-service-access'
+ACCESS_GROUP_NAME = "auth-service-access"
 
 
 def has_access(identity=None):
@@ -26,14 +26,13 @@ def has_access(identity=None):
   # to 'auth-service-access'.
   identity = identity or api.get_current_identity()
   return (
-      is_super or
-      api.is_admin(identity) or
-      api.is_group_member(ACCESS_GROUP_NAME, identity) or
-      api.is_group_member('groups-readonly-access', identity))
+    is_super
+    or api.is_admin(identity)
+    or api.is_group_member(ACCESS_GROUP_NAME, identity)
+    or api.is_group_member("groups-readonly-access", identity)
+  )
 
 
 def is_admin():
   """Returns True if the current caller has admin or superuser access."""
-  return (
-      api.is_superuser() or
-      api.is_admin())
+  return api.is_superuser() or api.is_admin()

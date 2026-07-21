@@ -13,11 +13,11 @@ from google.appengine.api import lib_config
 
 class Config(object):
   # Name of a group that lists users that receive ereporter2 reports.
-  RECIPIENTS_AUTH_GROUP = 'ereporter2-reports'
+  RECIPIENTS_AUTH_GROUP = "ereporter2-reports"
 
   # Group that can view all ereporter2 reports without being a general auth
   # admin. It can also silence reports.
-  VIEWERS_AUTH_GROUP = 'ereporter2-viewers'
+  VIEWERS_AUTH_GROUP = "ereporter2-viewers"
 
 
-config = lib_config.register('components_ereporter2', Config.__dict__)
+config = lib_config.register("components_ereporter2", Config.__dict__)

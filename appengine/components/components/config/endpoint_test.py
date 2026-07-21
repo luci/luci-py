@@ -8,6 +8,7 @@ import sys
 import unittest
 
 from test_support import test_env
+
 test_env.setup_test_env()
 
 from test_support import test_case
@@ -23,82 +24,89 @@ class EndpointTestCase(test_case.EndpointsTestCase):
 
   def test_metadata(self):
     rule_set = validation.RuleSet()
-    self.mock(validation, 'DEFAULT_RULE_SET', rule_set)
-    validation.rule('projects/foo', 'bar.cfg', rule_set=rule_set)
-    validation.rule('services/foo', 'foo.cfg', rule_set=rule_set)
+    self.mock(validation, "DEFAULT_RULE_SET", rule_set)
+    validation.rule("projects/foo", "bar.cfg", rule_set=rule_set)
+    validation.rule("services/foo", "foo.cfg", rule_set=rule_set)
 
-    self.mock(auth, 'is_admin', lambda: True)
-    resp = self.call_api('get_metadata', {}).json_body
+    self.mock(auth, "is_admin", lambda: True)
+    resp = self.call_api("get_metadata", {}).json_body
     self.assertEqual(
-        resp,
-        {
-          'version': '1.0',
-          'validation': {
-            'url': 'https://localhost:80/_ah/api/config/v1/validate',
-            'patterns': [
-              {'config_set': 'projects/foo', 'path': 'bar.cfg'},
-              {'config_set': 'services/foo', 'path': 'foo.cfg'},
-            ],
-          },
-        }
+      resp,
+      {
+        "version": "1.0",
+        "validation": {
+          "url": "https://localhost:80/_ah/api/config/v1/validate",
+          "patterns": [
+            {"config_set": "projects/foo", "path": "bar.cfg"},
+            {"config_set": "services/foo", "path": "foo.cfg"},
+          ],
+        },
+      },
     )
 
   def test_metadata_without_permissions(self):
     with self.call_should_fail(403):
-      self.call_api('get_metadata', {})
+      self.call_api("get_metadata", {})
 
   def test_config_service_is_trusted_requester(self):
-    self.mock(auth, 'is_admin', lambda: False)
+    self.mock(auth, "is_admin", lambda: False)
     config_identity = auth.Identity(
-        'user', 'luci-config@appspot.gserviceaccount.com')
-    self.mock(auth, 'get_current_identity', lambda: config_identity)
+      "user", "luci-config@appspot.gserviceaccount.com"
+    )
+    self.mock(auth, "get_current_identity", lambda: config_identity)
     self.assertFalse(endpoint.is_trusted_requester())
 
     common.ConfigSettings().modify(
-        updated_by='unit-test',
-        service_hostname='luci-config.appspot.com',
-        trusted_config_account=auth.Identity(
-            'user', 'luci-config@appspot.gserviceaccount.com'),
+      updated_by="unit-test",
+      service_hostname="luci-config.appspot.com",
+      trusted_config_account=auth.Identity(
+        "user", "luci-config@appspot.gserviceaccount.com"
+      ),
     )
     common.ConfigSettings.clear_cache()
     self.assertTrue(endpoint.is_trusted_requester())
 
     # now use the new LUCI Config service account to call.
     config_identity = auth.Identity(
-        'user', 'config-service@luci-config.iam.gserviceaccount.com')
-    self.mock(auth, 'get_current_identity', lambda: config_identity)
-    self.mock(auth, 'is_group_member', lambda _group, _id: True)
+      "user", "config-service@luci-config.iam.gserviceaccount.com"
+    )
+    self.mock(auth, "get_current_identity", lambda: config_identity)
+    self.mock(auth, "is_group_member", lambda _group, _id: True)
     self.assertTrue(endpoint.is_trusted_requester())
     config_identity = auth.Identity(
-        'user', 'config-service@luci-config-dev.iam.gserviceaccount.com')
-    self.mock(auth, 'is_group_member', lambda _group, _id: False)
+      "user", "config-service@luci-config-dev.iam.gserviceaccount.com"
+    )
+    self.mock(auth, "is_group_member", lambda _group, _id: False)
     self.assertFalse(endpoint.is_trusted_requester())
 
   def test_bad_message_text_characters(self):
     rule_set = validation.RuleSet()
-    self.mock(validation, 'DEFAULT_RULE_SET', rule_set)
+    self.mock(validation, "DEFAULT_RULE_SET", rule_set)
 
-    @validation.rule('projects/foo', 'bar.cfg', rule_set=rule_set)
+    @validation.rule("projects/foo", "bar.cfg", rule_set=rule_set)
     def _validate(cfg, ctx):
-      ctx.error('a\x80b')
+      ctx.error("a\x80b")
 
-    self.mock(auth, 'is_admin', lambda: True)
+    self.mock(auth, "is_admin", lambda: True)
 
     req = {
-      'config_set': 'projects/foo',
-      'path': 'bar.cfg',
-      'content': '',
+      "config_set": "projects/foo",
+      "path": "bar.cfg",
+      "content": "",
     }
-    resp = self.call_api('validate', req).json_body
-    self.assertEqual(resp, {
-      'messages': [
-        {'path': 'bar.cfg', 'severity': 'ERROR', 'text': u'a\ufffdb'},
-      ],
-    })
+    resp = self.call_api("validate", req).json_body
+    self.assertEqual(
+      resp,
+      {
+        "messages": [
+          {"path": "bar.cfg", "severity": "ERROR", "text": "a\ufffdb"},
+        ],
+      },
+    )
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
     logging.basicConfig(level=logging.DEBUG)
   else:
