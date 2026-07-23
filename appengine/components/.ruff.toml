@@ -1,3 +1,0 @@
-line-length = 80
-indent-width = 2
-extend-exclude = ["*_pb2.py", "third_party"]

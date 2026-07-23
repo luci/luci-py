@@ -23,43 +23,43 @@ from components import natsort
 from components import protoutil
 
 # Can't be imported:
-#from components import auth
-#from components import config
-#from components import datastore_utils
-#from components import endpoints_webapp2
-#from components import ereporter2
-#from components import gce
-#from components import gerrit
-#from components import gitiles
-#from components import net
-#from components import prpc
-#from components import pubsub
-#from components import template
-#from components import utils
+# from components import auth
+# from components import config
+# from components import datastore_utils
+# from components import endpoints_webapp2
+# from components import ereporter2
+# from components import gce
+# from components import gerrit
+# from components import gitiles
+# from components import net
+# from components import prpc
+# from components import pubsub
+# from components import template
+# from components import utils
 
 # TODO(maruel): Connect to the datastore.
-#bigquery_client = bigquery.Client()
-#datastore_client = datastore.Client()
-#ndb_client = ndb.Client()
+# bigquery_client = bigquery.Client()
+# datastore_client = datastore.Client()
+# ndb_client = ndb.Client()
 
 # If `entrypoint` is not defined in app.yaml, App Engine will look for an app
 # called `app` in `main.py`.
 app = Flask(__name__)
 
 
-@app.route('/')
+@app.route("/")
 def hello():
-  return 'Please try again!'
+  return "Please try again!"
 
 
-@app.route('/_ah/warmup')
+@app.route("/_ah/warmup")
 def warmup():
   # Handle your warmup logic here, e.g. set up a database connection pool.
-  return '', 200, {}
+  return "", 200, {}
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   # This is used when running locally only. When deploying to Google App Engine,
   # a webserver process such as Gunicorn will serve the app. This can be
   # configured by adding an `entrypoint` to app.yaml.
-  app.run(host='127.0.0.1', port=8080, debug=True)
+  app.run(host="127.0.0.1", port=8080, debug=True)
