@@ -9,23 +9,24 @@ import os
 import sys
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(
-    __file__.decode(sys.getfilesystemencoding())))
+BASE_DIR = os.path.dirname(
+  os.path.abspath(__file__.decode(sys.getfilesystemencoding()))
+)
 
 
 def main():
-  print('Only look if a file exists but do not open it.')
+  print("Only look if a file exists but do not open it.")
   assert len(sys.argv) == 2
-  path = os.path.join(BASE_DIR, 'test_file.txt')
+  path = os.path.join(BASE_DIR, "test_file.txt")
   command = sys.argv[1]
-  if command == 'access':
+  if command == "access":
     return not os.access(path, os.R_OK)
-  if command == 'isfile':
+  if command == "isfile":
     return not os.path.isfile(path)
-  if command == 'stat':
+  if command == "stat":
     return not os.stat(path).st_size
   return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   sys.exit(main())

@@ -22,6 +22,7 @@ class LRUDict:
 
   Can also store its state as *.json file on disk.
   """
+
   @staticmethod
   def time_fn():
     """Called to determine current timestamp when adding an entry.
@@ -66,45 +67,53 @@ class LRUDict:
 
     try:
       json_state = None
-      with open(state_file, 'r') as f:
+      with open(state_file, "r") as f:
         json_state = f.read()
         state = json.loads(json_state)
     except (IOError, ValueError) as e:
       raise ValueError(
-          'Broken state file %s with "%s": %s' % (state_file, json_state, e))
+        'Broken state file %s with "%s": %s' % (state_file, json_state, e)
+      )
     if not isinstance(state, dict):
       raise ValueError(
-          'Broken state file %s, should be json object or list' % (state_file,))
-    state_ver = state.get('version')
+        "Broken state file %s, should be json object or list" % (state_file,)
+      )
+    state_ver = state.get("version")
     if state_ver != CURRENT_VERSION:
       raise ValueError(
-          'Unsupported state file %s, version is %s. '
-          'Latest supported is %d' % (state_file, state_ver, CURRENT_VERSION))
-    state_items = state.get('items')
+        "Unsupported state file %s, version is %s. "
+        "Latest supported is %d" % (state_file, state_ver, CURRENT_VERSION)
+      )
+    state_items = state.get("items")
     if not isinstance(state_items, list):
       raise ValueError(
-          'Broken state file %s, items should be json list' % (state_file,))
+        "Broken state file %s, items should be json list" % (state_file,)
+      )
     lru = cls()
     # Items are stored oldest to newest. Put them back in the same order.
     for item in state_items:
       if not isinstance(item, list) or len(item) != 2:
         raise ValueError(
-            'Broken state file %s, expecting pairs: %s' % (state_file, item))
+          "Broken state file %s, expecting pairs: %s" % (state_file, item)
+        )
       if not isinstance(item[1], list) or len(item[1]) != 2:
         raise ValueError(
-            'Broken state file %s, expecting second item to be a item: %s' % (
-              state_file, item))
+          "Broken state file %s, expecting second item to be a item: %s"
+          % (state_file, item)
+        )
       if not isinstance(item[1][1], (int, float)):
         raise ValueError(
-            'Broken state file %s, expecting second item of the second item '
-            'to be a number: %s' % (state_file, item))
+          "Broken state file %s, expecting second item of the second item "
+          "to be a number: %s" % (state_file, item)
+        )
 
     lru._items = collections.OrderedDict(state_items)
 
     # Check for duplicate keys.
     if len(lru) != len(state_items):
       raise ValueError(
-          'Broken state file %s, found duplicate keys' % (state_file,))
+        "Broken state file %s, found duplicate keys" % (state_file,)
+      )
 
     # Now state from the file corresponds to state in the memory.
     lru._dirty = False
@@ -115,12 +124,12 @@ class LRUDict:
     if not self._dirty:
       return False
 
-    with open(state_file, 'w') as f:
+    with open(state_file, "w") as f:
       contents = {
-          'version': CURRENT_VERSION,
-          'items': list(self._items.items()),
+        "version": CURRENT_VERSION,
+        "items": list(self._items.items()),
       }
-      json.dump(contents, f, sort_keys=True, separators=(',', ':'))
+      json.dump(contents, f, sort_keys=True, separators=(",", ":"))
 
     self._dirty = False
     return True
@@ -162,7 +171,7 @@ class LRUDict:
     # self._items.items() is slow if self._items has many items.
     for key in self._items:
       return (key, self._items[key])
-    raise KeyError('dictionary is empty')
+    raise KeyError("dictionary is empty")
 
   def pop_oldest(self):
     """Removes oldest item and returns it as (key, (value, timestamp)).

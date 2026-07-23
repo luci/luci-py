@@ -7,13 +7,14 @@ import re
 import string
 import urllib
 
-_STREAM_SEP = '/'
+_STREAM_SEP = "/"
 _ALNUM_CHARS = string.ascii_letters + string.digits
-_VALID_SEG_CHARS = _ALNUM_CHARS + ':_-.'
-_SEGMENT_RE_BASE = r'[a-zA-Z0-9][a-zA-Z0-9:_\-.]*'
-_SEGMENT_RE = re.compile('^' + _SEGMENT_RE_BASE + '$')
-_STREAM_NAME_RE = re.compile('^(' + _SEGMENT_RE_BASE + ')(/' +
-                             _SEGMENT_RE_BASE + ')*$')
+_VALID_SEG_CHARS = _ALNUM_CHARS + ":_-."
+_SEGMENT_RE_BASE = r"[a-zA-Z0-9][a-zA-Z0-9:_\-.]*"
+_SEGMENT_RE = re.compile("^" + _SEGMENT_RE_BASE + "$")
+_STREAM_NAME_RE = re.compile(
+  "^(" + _SEGMENT_RE_BASE + ")(/" + _SEGMENT_RE_BASE + ")*$"
+)
 _MAX_STREAM_NAME_LENGTH = 4096
 
 _MAX_TAG_KEY_LENGTH = 64
@@ -32,9 +33,9 @@ def validate_stream_name(v, maxlen=None):
   """
   maxlen = maxlen or _MAX_STREAM_NAME_LENGTH
   if len(v) > maxlen:
-    raise ValueError('Maximum length exceeded (%d > %d)' % (len(v), maxlen))
+    raise ValueError("Maximum length exceeded (%d > %d)" % (len(v), maxlen))
   if _STREAM_NAME_RE.match(v) is None:
-    raise ValueError('Invalid stream name: %r' % v)
+    raise ValueError("Invalid stream name: %r" % v)
 
 
 def validate_tag(key, value):
@@ -68,23 +69,24 @@ def normalize_segment(seg, prefix=None):
   """
   if not seg:
     if prefix is None:
-      raise ValueError('Cannot normalize empty segment with no prefix.')
+      raise ValueError("Cannot normalize empty segment with no prefix.")
     seg = prefix
   else:
 
     def replace_if_invalid(ch, first=False):
-      ret = ch if ch in _VALID_SEG_CHARS else '_'
+      ret = ch if ch in _VALID_SEG_CHARS else "_"
       if first and ch not in _ALNUM_CHARS:
         if prefix is None:
-          raise ValueError('Segment has invalid beginning, and no prefix was '
-                           'provided.')
+          raise ValueError(
+            "Segment has invalid beginning, and no prefix was provided."
+          )
         return prefix + ret
       return ret
 
-    seg = ''.join(replace_if_invalid(ch, i == 0) for i, ch in enumerate(seg))
+    seg = "".join(replace_if_invalid(ch, i == 0) for i, ch in enumerate(seg))
 
   if _SEGMENT_RE.match(seg) is None:
-    raise AssertionError('Normalized segment is still invalid: %r' % seg)
+    raise AssertionError("Normalized segment is still invalid: %r" % seg)
 
   return seg
 
@@ -105,13 +107,14 @@ def normalize(v, prefix=None):
     ValueError: If normalization could not be successfully performed.
   """
   normalized = _STREAM_SEP.join(
-      normalize_segment(seg, prefix=prefix) for seg in v.split(_STREAM_SEP))
+    normalize_segment(seg, prefix=prefix) for seg in v.split(_STREAM_SEP)
+  )
   # Validate the resulting string.
   validate_stream_name(normalized)
   return normalized
 
 
-class StreamPath(collections.namedtuple('_StreamPath', ('prefix', 'name'))):
+class StreamPath(collections.namedtuple("_StreamPath", ("prefix", "name"))):
   """StreamPath is a full stream path.
 
   This consists of both a stream prefix and a stream name.
@@ -146,9 +149,9 @@ class StreamPath(collections.namedtuple('_StreamPath', ('prefix', 'name'))):
     Raises:
       ValueError: If path is not a full, valid stream path string.
     """
-    parts = path.split('/+/', 1)
+    parts = path.split("/+/", 1)
     if len(parts) != 2:
-      raise ValueError('Not a full stream path: [%s]' % (path,))
+      raise ValueError("Not a full stream path: [%s]" % (path,))
     return cls.make(*parts)
 
   def validate(self):
@@ -156,15 +159,27 @@ class StreamPath(collections.namedtuple('_StreamPath', ('prefix', 'name'))):
     try:
       validate_stream_name(self.prefix)
     except ValueError as e:
-      raise ValueError('Invalid prefix component [%s]: %s' % (self.prefix, e,))
+      raise ValueError(
+        "Invalid prefix component [%s]: %s"
+        % (
+          self.prefix,
+          e,
+        )
+      )
 
     try:
       validate_stream_name(self.name)
     except ValueError as e:
-      raise ValueError('Invalid name component [%s]: %s' % (self.name, e,))
+      raise ValueError(
+        "Invalid name component [%s]: %s"
+        % (
+          self.name,
+          e,
+        )
+      )
 
   def __str__(self):
-    return '%s/+/%s' % (self.prefix, self.name)
+    return "%s/+/%s" % (self.prefix, self.name)
 
 
 def get_logdog_viewer_url(host, project, *stream_paths):
@@ -176,12 +191,18 @@ def get_logdog_viewer_url(host, project, *stream_paths):
     stream_paths: A set of StreamPath instances for the stream paths to
         generate the URL for.
   """
-  return urllib.parse.urlunparse((
-      'https',  # Scheme
+  return urllib.parse.urlunparse(
+    (
+      "https",  # Scheme
       host,  # netloc
-      'v/',  # path
-      '',  # params
-      '&'.join(('s=%s' % (urllib.parse.quote('%s/%s' % (project, path), ''))
-                for path in stream_paths)),  # query
-      '',  # fragment
-  ))
+      "v/",  # path
+      "",  # params
+      "&".join(
+        (
+          "s=%s" % (urllib.parse.quote("%s/%s" % (project, path), ""))
+          for path in stream_paths
+        )
+      ),  # query
+      "",  # fragment
+    )
+  )

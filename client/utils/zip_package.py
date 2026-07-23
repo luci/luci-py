@@ -21,12 +21,11 @@ import zipimport
 # Glob patterns for files to exclude from a package by default.
 EXCLUDE_LIST = (
   # Ignore hidden files (including .svn and .git).
-  r'\..*',
-
+  r"\..*",
   # Ignore precompiled python files since they depend on python version and we
   # don't want zip package to be version-depended.
-  r'.*\.pyc$',
-  r'.*\.pyo$',
+  r".*\.pyc$",
+  r".*\.pyo$",
 )
 
 
@@ -52,8 +51,8 @@ class ZipPackage:
     package.zip_into_file('my_zip.zip')
   """
 
-  _FileRef = collections.namedtuple('_FileRef', ['abs_path'])
-  _BufferRef = collections.namedtuple('_BufferRef', ['buffer'])
+  _FileRef = collections.namedtuple("_FileRef", ["abs_path"])
+  _BufferRef = collections.namedtuple("_BufferRef", ["buffer"])
 
   def __init__(self, root):
     """Initializes new empty ZipPackage.
@@ -86,12 +85,13 @@ class ZipPackage:
     # If |archive_path| is not given, ensure that |absolute_path| is under root.
     if not archive_path and not absolute_path.startswith(self.root):
       raise ZipPackageError(
-          'Path %s is not inside root %s' % (absolute_path, self.root))
+        "Path %s is not inside root %s" % (absolute_path, self.root)
+      )
     if not os.path.exists(absolute_path):
-      raise ZipPackageError('No such file: %s' % absolute_path)
+      raise ZipPackageError("No such file: %s" % absolute_path)
     if not os.path.isfile(absolute_path):
-      raise ZipPackageError('Object %s is not a regular file' % absolute_path)
-    archive_path = archive_path or absolute_path[len(self.root):]
+      raise ZipPackageError("Object %s is not a regular file" % absolute_path)
+    archive_path = archive_path or absolute_path[len(self.root) :]
     self._add_entry(archive_path, ZipPackage._FileRef(absolute_path))
 
   def add_python_file(self, absolute_path, archive_path=None):
@@ -100,14 +100,15 @@ class ZipPackage:
     Recognizes *.pyc files and adds corresponding *.py file instead.
     """
     base, ext = os.path.splitext(absolute_path)
-    if ext in ('.pyc', '.pyo'):
-      absolute_path = base + '.py'
-    elif ext != '.py':
-      raise ZipPackageError('Not a python file: %s' % absolute_path)
+    if ext in (".pyc", ".pyo"):
+      absolute_path = base + ".py"
+    elif ext != ".py":
+      raise ZipPackageError("Not a python file: %s" % absolute_path)
     self.add_file(absolute_path, archive_path)
 
-  def add_directory(self, absolute_path, archive_path=None,
-                    exclude=EXCLUDE_LIST):
+  def add_directory(
+    self, absolute_path, archive_path=None, exclude=EXCLUDE_LIST
+  ):
     """Recursively adds all files from given directory to the package.
 
     |archive_path| is a relative path in archive for this directory, by default
@@ -126,24 +127,25 @@ class ZipPackage:
     # If |archive_path| is not given, ensure that |path| is under root.
     if not archive_path and not absolute_path.startswith(self.root):
       raise ZipPackageError(
-          'Path %s is not inside root %s' % (absolute_path, self.root))
+        "Path %s is not inside root %s" % (absolute_path, self.root)
+      )
     if not os.path.exists(absolute_path):
-      raise ZipPackageError('No such directory: %s' % absolute_path)
+      raise ZipPackageError("No such directory: %s" % absolute_path)
     if not os.path.isdir(absolute_path):
-      raise ZipPackageError('Object %s is not a directory' % absolute_path)
+      raise ZipPackageError("Object %s is not a directory" % absolute_path)
 
     # Precompile regular expressions.
     exclude_regexps = [re.compile(r) for r in exclude]
     # Returns True if |name| should be excluded from the package.
     should_exclude = lambda name: any(r.match(name) for r in exclude_regexps)
 
-    archive_path = archive_path or absolute_path[len(self.root):]
+    archive_path = archive_path or absolute_path[len(self.root) :]
     for cur_dir, dirs, files in os.walk(absolute_path):
       # Add all non-excluded files.
       for name in files:
         if not should_exclude(name):
           absolute = os.path.join(cur_dir, name)
-          relative = absolute[len(absolute_path):]
+          relative = absolute[len(absolute_path) :]
           assert absolute.startswith(absolute_path)
           self.add_file(absolute, os.path.join(archive_path, relative))
       # Remove excluded directories from enumeration.
@@ -169,18 +171,18 @@ class ZipPackage:
 
   def zip_into_file(self, path, compress=True):
     """Zips added files into a file on disk."""
-    with open(path, 'wb') as stream:
+    with open(path, "wb") as stream:
       self._zip_into_stream(stream, compress)
 
   def _add_entry(self, archive_path, ref):
     """Adds new zip package entry."""
     # Always use forward slashes in zip.
-    archive_path = archive_path.replace(os.sep, '/')
+    archive_path = archive_path.replace(os.sep, "/")
     # Ensure there are no suspicious components in the path.
-    assert not any(p in ('', '.', '..') for p in archive_path.split('/'))
+    assert not any(p in ("", ".", "..") for p in archive_path.split("/"))
     # Ensure there's no file overwrites.
     if archive_path in self._items:
-      raise ZipPackageError('Duplicated entry: %s' % archive_path)
+      raise ZipPackageError("Duplicated entry: %s" % archive_path)
     self._items[archive_path] = ref
 
   def _zip_into_stream(self, stream, compress):
@@ -192,7 +194,7 @@ class ZipPackage:
       * Entries are sorted by file name in archive.
     """
     compression = zipfile.ZIP_DEFLATED if compress else zipfile.ZIP_STORED
-    zip_file = zipfile.ZipFile(stream, 'w', compression)
+    zip_file = zipfile.ZipFile(stream, "w", compression)
     try:
       for archive_path in sorted(self._items):
         ref = self._items[archive_path]
@@ -201,12 +203,12 @@ class ZipPackage:
         info.create_system = 3
         if isinstance(ref, ZipPackage._FileRef):
           info.external_attr = (os.stat(ref.abs_path)[0] & 0xFFFF) << 16
-          with open(ref.abs_path, 'rb') as f:
+          with open(ref.abs_path, "rb") as f:
             buf = f.read()
         elif isinstance(ref, ZipPackage._BufferRef):
           buf = ref.buffer
         else:
-          assert False, 'Unexpected type %s' % ref
+          assert False, "Unexpected type %s" % ref
         zip_file.writestr(info, buf)
     finally:
       zip_file.close()
@@ -216,7 +218,7 @@ def get_module_zip_archive(module):
   """Given a module, returns path to a zip package that contains it or None."""
   loader = pkgutil.get_loader(module)
   # Handle zipimporter and its variations.
-  if loader and hasattr(loader, 'archive'):
+  if loader and hasattr(loader, "archive"):
     return loader.archive
 
 
@@ -234,22 +236,22 @@ def get_main_script_path():
   Returns path relative to a current directory of when process was started.
   """
   # If running from interactive console __file__ is not defined.
-  main = sys.modules['__main__']
+  main = sys.modules["__main__"]
   path = get_module_zip_archive(main)
   if path:
     return path
 
-  path = getattr(main, '__file__', None)
+  path = getattr(main, "__file__", None)
   if path:
     return path
 
 
 def _write_temp_data(name, data, temp_dir):
   """Writes content-addressed file in `temp_dir` if relevant."""
-  filename = '%s-%s' % (hashlib.sha256(data).hexdigest(), name)
+  filename = "%s-%s" % (hashlib.sha256(data).hexdigest(), name)
   filepath = os.path.join(temp_dir, filename)
   if os.path.isfile(filepath):
-    with open(filepath, 'rb') as f:
+    with open(filepath, "rb") as f:
       if f.read() == data:
         # It already exists.
         return filepath
@@ -257,8 +259,8 @@ def _write_temp_data(name, data, temp_dir):
     return None
 
   try:
-    fd = os.open(filepath, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)
-    with os.fdopen(fd, 'wb') as f:
+    fd = os.open(filepath, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as f:
       f.write(data)
     return filepath
   except (IOError, OSError):
@@ -283,26 +285,25 @@ def extract_resource(package, resource, temp_dir=None):
   if not is_zipped_module(package):
     # Package's __file__ attribute is always an absolute path.
     ppath = package.__file__
-    path = os.path.join(os.path.dirname(ppath),
-        resource.replace('/', os.sep))
+    path = os.path.join(os.path.dirname(ppath), resource.replace("/", os.sep))
     if not os.path.exists(path):
-      raise ValueError('No such resource in %s: %s' % (package, resource))
+      raise ValueError("No such resource in %s: %s" % (package, resource))
     return path
 
   # For zipped packages extract the resource into a temp file.
   data = pkgutil.get_data(package.__name__, resource)
   if data is None:
-    raise ValueError('No such resource in zipped %s: %s' % (package, resource))
+    raise ValueError("No such resource in zipped %s: %s" % (package, resource))
 
   if temp_dir:
     filepath = _write_temp_data(os.path.basename(resource), data, temp_dir)
     if filepath:
       return filepath
 
-  fd, filepath = tempfile.mkstemp(prefix='.zip_pkg-',
-                                  suffix='-' + os.path.basename(resource),
-                                  dir=temp_dir)
-  with os.fdopen(fd, 'wb') as stream:
+  fd, filepath = tempfile.mkstemp(
+    prefix=".zip_pkg-", suffix="-" + os.path.basename(resource), dir=temp_dir
+  )
+  with os.fdopen(fd, "wb") as stream:
     stream.write(data)
 
   # Register it for removal when process dies.
@@ -335,9 +336,9 @@ def generate_version():
   has other side effects that kicks in, like zlib's library version, compression
   level, order in which the files were specified, etc.
   """
-  assert is_zipped_module(sys.modules['__main__'])
+  assert is_zipped_module(sys.modules["__main__"])
   h = hashlib.sha256()
-  with zipfile.ZipFile(get_main_script_path(), 'r') as z:
+  with zipfile.ZipFile(get_main_script_path(), "r") as z:
     for name in sorted(z.namelist()):
       with z.open(name) as f:
         h.update(str(len(name)).encode())

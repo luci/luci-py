@@ -26,7 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # ENV_KEY is the environment variable that we look for to find out where the
 # LUCI context file is.
-ENV_KEY = 'LUCI_CONTEXT'
+ENV_KEY = "LUCI_CONTEXT"
 
 # _CUR_CONTEXT contains the cached LUCI Context that is currently available to
 # read. A value of None indicates that the value has not yet been populated.
@@ -41,8 +41,9 @@ _WRITE_LOCK = threading.RLock()
 @contextlib.contextmanager
 def _tf(data, data_raw=False, leak=False, workdir=None):
   tf = tempfile.NamedTemporaryFile(
-      mode='w', prefix='luci_ctx.', suffix='.json', delete=False, dir=workdir)
-  _LOGGER.debug('Writing LUCI_CONTEXT file %r', tf.name)
+    mode="w", prefix="luci_ctx.", suffix=".json", delete=False, dir=workdir
+  )
+  _LOGGER.debug("Writing LUCI_CONTEXT file %r", tf.name)
   try:
     if not data_raw:
       json.dump(_to_encodable(data), tf)
@@ -56,40 +57,42 @@ def _tf(data, data_raw=False, leak=False, workdir=None):
       try:
         os.unlink(tf.name)
       except OSError as ex:
-        _LOGGER.error('Failed to delete written LUCI_CONTEXT file %r: %s',
-                      tf.name, ex)
+        _LOGGER.error(
+          "Failed to delete written LUCI_CONTEXT file %r: %s", tf.name, ex
+        )
 
 
 def _to_encodable(obj):
   if isinstance(obj, dict):
     return {
-        _to_encodable(key): _to_encodable(value) for key, value in obj.items()
+      _to_encodable(key): _to_encodable(value) for key, value in obj.items()
     }
   if isinstance(obj, list):
     return [_to_encodable(item) for item in obj]
   if isinstance(obj, bytes):
-    return obj.decode('utf-8')
+    return obj.decode("utf-8")
   return obj
 
 
 class MultipleLUCIContextException(Exception):
   def __init__(self):
     super(MultipleLUCIContextException, self).__init__(
-      'Attempted to write LUCI_CONTEXT in multiple threads')
+      "Attempted to write LUCI_CONTEXT in multiple threads"
+    )
 
 
 def _check_ok(data):
   if not isinstance(data, dict):
     _LOGGER.error(
-      'LUCI_CONTEXT does not contain a dict: %s', type(data).__name__)
+      "LUCI_CONTEXT does not contain a dict: %s", type(data).__name__
+    )
     return False
 
   bad = False
   for k, v in data.items():
     if not isinstance(v, dict):
       bad = True
-      _LOGGER.error(
-        'LUCI_CONTEXT[%r] is not a dict: %s', k, type(v).__name__)
+      _LOGGER.error("LUCI_CONTEXT[%r] is not a dict: %s", k, type(v).__name__)
 
   return not bad
 
@@ -101,16 +104,16 @@ def _initial_load():
 
   ctx_path = os.environ.get(ENV_KEY)
   if ctx_path:
-    _LOGGER.debug('Loading LUCI_CONTEXT: %r', ctx_path)
+    _LOGGER.debug("Loading LUCI_CONTEXT: %r", ctx_path)
     try:
-      with open(ctx_path, 'r') as f:
+      with open(ctx_path, "r") as f:
         loaded = json.load(f)
         if _check_ok(loaded):
           to_assign = loaded
     except OSError as ex:
-      _LOGGER.error('LUCI_CONTEXT failed to open or read: %s', ex)
+      _LOGGER.error("LUCI_CONTEXT failed to open or read: %s", ex)
     except ValueError as ex:
-      _LOGGER.error('LUCI_CONTEXT failed to decode: %s', ex)
+      _LOGGER.error("LUCI_CONTEXT failed to decode: %s", ex)
 
   _CUR_CONTEXT = to_assign
 
@@ -136,8 +139,9 @@ def _mutate(section_values):
         changed = True
       new_val[section] = value
     else:
-      raise ValueError('Bad type for LUCI_CONTEXT[%r]: %s' %
-                       (section, type(value).__name__))
+      raise ValueError(
+        "Bad type for LUCI_CONTEXT[%r]: %s" % (section, type(value).__name__)
+      )
   return new_val, changed
 
 

@@ -56,16 +56,19 @@ class OAuthAuthenticator(Authenticator):
           need_refresh = False
       if need_refresh:
         self._access_token = oauth.create_access_token(
-            self.urlhost, self.config, False)
+          self.urlhost, self.config, False
+        )
       if self._access_token:
-        request.headers['Authorization'] = (
-            'Bearer %s' % self._access_token.token)
+        request.headers["Authorization"] = (
+          "Bearer %s" % self._access_token.token
+        )
 
   def login(self, allow_user_interaction):
     with self._lock:
       # Forcefully refresh the token.
       self._access_token = oauth.create_access_token(
-          self.urlhost, self.config, allow_user_interaction)
+        self.urlhost, self.config, allow_user_interaction
+      )
       return self._access_token is not None
 
   def logout(self):
@@ -98,12 +101,12 @@ class LuciContextAuthenticator(Authenticator):
           self._access_token = access_token
 
     if access_token:
-      request.headers['Authorization'] = 'Bearer %s' % access_token.token
+      request.headers["Authorization"] = "Bearer %s" % access_token.token
 
   def login(self, allow_user_interaction):
     """Run interactive authentication flow refreshing the token."""
-    raise RuntimeError('Interactive login not supported.')
+    raise RuntimeError("Interactive login not supported.")
 
   def logout(self):
     """Purges access credentials from local cache."""
-    raise RuntimeError('Interactive logout not supported.')
+    raise RuntimeError("Interactive logout not supported.")

@@ -9,7 +9,7 @@ import threading
 from six.moves import BaseHTTPServer
 from six.moves import http_client
 
-_STOP_EVENT = '/fakeserver/__stop__'
+_STOP_EVENT = "/fakeserver/__stop__"
 
 
 class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -20,14 +20,14 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
   def send_json(self, data):
     """Sends a JSON response."""
     self.send_response(200)
-    self.send_header('Content-type', 'application/json')
+    self.send_header("Content-type", "application/json")
     self.end_headers()
     self.wfile.write(json.dumps(data).encode())
 
   def send_octet_stream(self, data, headers=None):
     """Sends a binary response."""
     self.send_response(200)
-    self.send_header('Content-type', 'application/octet-stream')
+    self.send_header("Content-type", "application/octet-stream")
     for key, value in (headers or {}).items():
       self.send_header(key, value)
     self.end_headers()
@@ -35,11 +35,11 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   def read_body(self):
     """Reads the request body."""
-    return self.rfile.read(int(self.headers['Content-Length']))
+    return self.rfile.read(int(self.headers["Content-Length"]))
 
   def yield_body(self):
     """Yields the request body as 4kiB chunks."""
-    size = int(self.headers['Content-Length'])
+    size = int(self.headers["Content-Length"])
     while size:
       chunk = min(4096, size)
       yield self.rfile.read(chunk)
@@ -50,16 +50,20 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
   def do_OPTIONS(self):
     if self.path == _STOP_EVENT:
       self.server.parent._stopped = True
-    self.send_octet_stream(b'')
+    self.send_octet_stream(b"")
 
   def log_message(self, fmt, *args):
     logging.info(
-        '%s - - [%s] %s', self.address_string(), self.log_date_time_string(),
-        fmt % args)
+      "%s - - [%s] %s",
+      self.address_string(),
+      self.log_date_time_string(),
+      fmt % args,
+    )
 
 
 class Server:
   """Server implements a simple HTTP server to implement a fake."""
+
   _HANDLER_CLS = None
 
   def __init__(self):
@@ -67,14 +71,16 @@ class Server:
     self._closed = False
     self._stopped = False
     self._server = BaseHTTPServer.HTTPServer(
-        ('127.0.0.1', 0), self._HANDLER_CLS)
+      ("127.0.0.1", 0), self._HANDLER_CLS
+    )
     self._server.parent = self
-    self._server.url = self.url = 'http://127.0.0.1:%d' % (
-        self._server.server_port)
-    self._thread = threading.Thread(target=self._run, name='httpd')
+    self._server.url = self.url = "http://127.0.0.1:%d" % (
+      self._server.server_port
+    )
+    self._thread = threading.Thread(target=self._run, name="httpd")
     self._thread.daemon = True
     self._thread.start()
-    logging.info('%s', self.url)
+    logging.info("%s", self.url)
 
   def close(self):
     assert not self._closed
@@ -89,9 +95,10 @@ class Server:
 
   def _send_event(self, path):
     conn = http_client.HTTPConnection(
-        '127.0.0.1:%d' % self._server.server_port, timeout=60)
+      "127.0.0.1:%d" % self._server.server_port, timeout=60
+    )
     try:
-      conn.request('OPTIONS', path)
+      conn.request("OPTIONS", path)
       conn.getresponse()
     finally:
       conn.close()

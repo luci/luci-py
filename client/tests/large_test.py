@@ -34,9 +34,9 @@ class LargeTest(unittest.TestCase):
     self.assertEqual(array, large.unpack(data))
 
   def test_empty(self):
-    self.assertEqual(b'', large.pack([]))
-    self.assertEqual([], large.unpack(b''))
+    self.assertEqual(b"", large.pack([]))
+    self.assertEqual([], large.unpack(b""))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   test_env.main()

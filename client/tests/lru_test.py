@@ -16,10 +16,10 @@ from utils import lru
 
 def _load_from_raw(state_text):
   """Makes a LRUDict by loading the given JSON from a file."""
-  handle, tmp_name = tempfile.mkstemp(prefix='lru_test')
+  handle, tmp_name = tempfile.mkstemp(prefix="lru_test")
   os.close(handle)
   try:
-    with open(tmp_name, 'w') as f:
+    with open(tmp_name, "w") as f:
       f.write(state_text)
     return lru.LRUDict.load(tmp_name)
   finally:
@@ -31,7 +31,7 @@ def _load_from_raw(state_text):
 
 def _save_and_load(lru_dict):
   """Saves then reloads a LRUDict instance."""
-  handle, tmp_name = tempfile.mkstemp(prefix='lru_test')
+  handle, tmp_name = tempfile.mkstemp(prefix="lru_test")
   os.close(handle)
   try:
     lru_dict.save(tmp_name)
@@ -81,47 +81,47 @@ class LRUDictTest(unittest.TestCase):
     """Tests __nonzero__, __iter, __len__, __getitem__ and __contains__."""
     # Dict with one item.
     lru_dict = lru.LRUDict()
-    lru_dict.add(1, 'one')
+    lru_dict.add(1, "one")
     self.assertTrue(lru_dict)
     self.assertEqual(len(lru_dict), 1)
     self.assertTrue(1 in lru_dict)
     self.assertFalse(2 in lru_dict)
     self.assertTrue(list(lru_dict))
-    self.assertEqual('one', lru_dict[1])
+    self.assertEqual("one", lru_dict[1])
 
   def test_add(self):
-    lru_dict = _prepare_lru_dict([(1, 'one'), (2, 'two'), (3, 'three')])
-    lru_dict.add(1, 'one!!!')
-    expected = [(2, 'two'), (3, 'three'), (1, 'one!!!')]
+    lru_dict = _prepare_lru_dict([(1, "one"), (2, "two"), (3, "three")])
+    lru_dict.add(1, "one!!!")
+    expected = [(2, "two"), (3, "three"), (1, "one!!!")]
     self.assert_same_data(expected, lru_dict)
-    lru_dict.add(0, 'zero')
-    expected = [(2, 'two'), (3, 'three'), (1, 'one!!!'), (0, 'zero')]
+    lru_dict.add(0, "zero")
+    expected = [(2, "two"), (3, "three"), (1, "one!!!"), (0, "zero")]
     self.assert_same_data(expected, lru_dict)
 
   def test_pop_first(self):
-    lru_dict = _prepare_lru_dict([(1, 'one'), (2, 'two'), (3, 'three')])
+    lru_dict = _prepare_lru_dict([(1, "one"), (2, "two"), (3, "three")])
     lru_dict.pop(1)
-    self.assert_same_data([(2, 'two'), (3, 'three')], lru_dict)
+    self.assert_same_data([(2, "two"), (3, "three")], lru_dict)
 
   def test_pop_middle(self):
-    lru_dict = _prepare_lru_dict([(1, 'one'), (2, 'two'), (3, 'three')])
+    lru_dict = _prepare_lru_dict([(1, "one"), (2, "two"), (3, "three")])
     lru_dict.pop(2)
-    self.assert_same_data([(1, 'one'), (3, 'three')], lru_dict)
+    self.assert_same_data([(1, "one"), (3, "three")], lru_dict)
 
   def test_pop_last(self):
-    lru_dict = _prepare_lru_dict([(1, 'one'), (2, 'two'), (3, 'three')])
+    lru_dict = _prepare_lru_dict([(1, "one"), (2, "two"), (3, "three")])
     lru_dict.pop(3)
-    self.assert_same_data([(1, 'one'), (2, 'two')], lru_dict)
+    self.assert_same_data([(1, "one"), (2, "two")], lru_dict)
 
   def test_pop_missing(self):
-    lru_dict = _prepare_lru_dict([(1, 'one'), (2, 'two'), (3, 'three')])
+    lru_dict = _prepare_lru_dict([(1, "one"), (2, "two"), (3, "three")])
     with self.assertRaises(KeyError):
       lru_dict.pop(4)
 
   def test_touch(self):
-    lru_dict = _prepare_lru_dict([(1, 'one'), (2, 'two'), (3, 'three')])
+    lru_dict = _prepare_lru_dict([(1, "one"), (2, "two"), (3, "three")])
     lru_dict.touch(2)
-    self.assert_same_data([(1, 'one'), (3, 'three'), (2, 'two')], lru_dict)
+    self.assert_same_data([(1, "one"), (3, "three"), (2, "two")], lru_dict)
     with self.assertRaises(KeyError):
       lru_dict.touch(4)
 
@@ -132,23 +132,23 @@ class LRUDictTest(unittest.TestCase):
     now = 0
     lru_dict.time_fn = lambda: now
 
-    lru_dict.add('ka', 'va')
+    lru_dict.add("ka", "va")
     now += 1
 
-    lru_dict.add('kb', 'vb')
+    lru_dict.add("kb", "vb")
     now += 1
 
-    self.assertEqual(lru_dict.get_oldest(), ('ka', ('va', 0)))
-    self.assertEqual(lru_dict.pop_oldest(), ('ka', ('va', 0)))
-    self.assertEqual(lru_dict.get_oldest(), ('kb', ('vb', 1)))
-    self.assertEqual(lru_dict.pop_oldest(), ('kb', ('vb', 1)))
+    self.assertEqual(lru_dict.get_oldest(), ("ka", ("va", 0)))
+    self.assertEqual(lru_dict.pop_oldest(), ("ka", ("va", 0)))
+    self.assertEqual(lru_dict.get_oldest(), ("kb", ("vb", 1)))
+    self.assertEqual(lru_dict.pop_oldest(), ("kb", ("vb", 1)))
 
   def test_transform(self):
     lru_dict = lru.LRUDict()
-    lru_dict.add('ka', 'va')
-    lru_dict.add('kb', 'vb')
-    lru_dict.transform(lambda k, v: v + '*')
-    self.assert_same_data([('ka', 'va*'), ('kb', 'vb*')], lru_dict)
+    lru_dict.add("ka", "va")
+    lru_dict.add("kb", "vb")
+    lru_dict.transform(lambda k, v: v + "*")
+    self.assert_same_data([("ka", "va*"), ("kb", "vb*")], lru_dict)
 
   def test_load_save_empty(self):
     self.assertFalse(_save_and_load(lru.LRUDict()))
@@ -181,37 +181,48 @@ class LRUDictTest(unittest.TestCase):
   def test_corrupted_state_file(self):
     # Loads correct state just fine.
     s = _load_from_raw(
-        json.dumps({
-            'version': lru.CURRENT_VERSION,
-            'items': [
-                ['key1', ['value1', 1]],
-                ['key2', ['value2', 2]],
-            ],
-        }))
+      json.dumps(
+        {
+          "version": lru.CURRENT_VERSION,
+          "items": [
+            ["key1", ["value1", 1]],
+            ["key2", ["value2", 2]],
+          ],
+        }
+      )
+    )
     self.assertIsNotNone(s)
     self.assertEqual(2, len(s))
 
     # Not a json.
     with self.assertRaises(ValueError):
-      _load_from_raw('garbage, not a state')
+      _load_from_raw("garbage, not a state")
 
     # Not a list.
     with self.assertRaises(ValueError):
-      _load_from_raw('{}')
+      _load_from_raw("{}")
 
     # Not a list of pairs.
     with self.assertRaises(ValueError):
-      _load_from_raw(json.dumps([
-          ['key', 'value', 'and whats this?'],
-      ]))
+      _load_from_raw(
+        json.dumps(
+          [
+            ["key", "value", "and whats this?"],
+          ]
+        )
+      )
 
     # Duplicate keys.
     with self.assertRaises(ValueError):
-      _load_from_raw(json.dumps([
-          ['key', 'value'],
-          ['key', 'another_value'],
-      ]))
+      _load_from_raw(
+        json.dumps(
+          [
+            ["key", "value"],
+            ["key", "another_value"],
+          ]
+        )
+      )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   test_env.main()

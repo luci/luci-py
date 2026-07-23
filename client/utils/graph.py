@@ -9,14 +9,14 @@ import re
 import colorama
 
 
-UNITS = ('', 'k', 'm', 'g', 't', 'p', 'e', 'z', 'y')
+UNITS = ("", "k", "m", "g", "t", "p", "e", "z", "y")
 
 
 def get_console_width(default=80):
   """Returns the console width, if available."""
   # TODO(maruel): Implement Windows.
   try:
-    _, columns = os.popen('stty size', 'r').read().split()
+    _, columns = os.popen("stty size", "r").read().split()
   except (IOError, OSError, ValueError):
     columns = default
   return int(columns)
@@ -39,11 +39,11 @@ def generate_histogram(data, buckets):
     return {data[0]: len(data)}
 
   buckets = min(len(data), buckets)
-  bucket_size = (maximum-minimum)/buckets
+  bucket_size = (maximum - minimum) / buckets
   out = dict((i, 0) for i in range(buckets))
   for i in data:
-    out[min(int((i-minimum)/bucket_size), buckets-1)] += 1
-  return dict(((k*bucket_size)+minimum, v) for k, v in out.items())
+    out[min(int((i - minimum) / bucket_size), buckets - 1)] += 1
+  return dict(((k * bucket_size) + minimum, v) for k, v in out.items())
 
 
 def print_histogram(data, columns=0, key_format=None):
@@ -60,7 +60,7 @@ def print_histogram(data, columns=0, key_format=None):
     return
 
   columns = columns or get_console_width()
-  key_format = key_format or '%s'
+  key_format = key_format or "%s"
 
   max_key_width = max(len(key_format % k) for k in data)
   # 3 == 1 for ' ' prefix, 2 for ': ' suffix.
@@ -72,9 +72,9 @@ def print_histogram(data, columns=0, key_format=None):
     width = maxvalue
   norm = float(maxvalue) / width
 
-  form = '%s: %s%s%s'
+  form = "%s: %s%s%s"
   for k in sorted(data):
-    line = '*' * int(data[k] / norm)
+    line = "*" * int(data[k] / norm)
     key = (key_format % k).rjust(max_key_width)
     print(form % (key, colorama.Fore.GREEN, line, colorama.Fore.RESET))
 
@@ -82,14 +82,14 @@ def print_histogram(data, columns=0, key_format=None):
 def to_units(number):
   """Convert a string to numbers."""
   unit = 0
-  while number >= 1024.:
+  while number >= 1024.0:
     unit += 1
-    number = number / 1024.
+    number = number / 1024.0
     if unit == len(UNITS) - 1:
       break
   if unit:
-    return '%.2f%s' % (number, UNITS[unit])
-  return '%d' % number
+    return "%.2f%s" % (number, UNITS[unit])
+  return "%d" % number
 
 
 def from_units(text):
@@ -97,25 +97,31 @@ def from_units(text):
 
   Example: from_unit('0.1k') == 102
   """
-  match = re.match(r'^([0-9\.]+)(|[' + ''.join(UNITS[1:]) + r'])$', text)
+  match = re.match(r"^([0-9\.]+)(|[" + "".join(UNITS[1:]) + r"])$", text)
   if not match:
     return None
 
   number = float(match.group(1))
   unit = match.group(2)
-  return int(number * 1024**UNITS.index(unit))
+  return int(number * 1024 ** UNITS.index(unit))
 
 
 def unit_arg(option, opt, value, parser):
   """OptionParser callback that supports units like 10.5m or 20k."""
   actual = from_units(value)
   if actual is None:
-    parser.error('Invalid value \'%s\' for %s' % (value, opt))
+    parser.error("Invalid value '%s' for %s" % (value, opt))
   setattr(parser.values, option.dest, actual)
 
 
 def unit_option(parser, *args, **kwargs):
   """Add an option that uses unit_arg()."""
   parser.add_option(
-      *args, type='str', metavar='N', action='callback', callback=unit_arg,
-      nargs=1, **kwargs)
+    *args,
+    type="str",
+    metavar="N",
+    action="callback",
+    callback=unit_arg,
+    nargs=1,
+    **kwargs,
+  )

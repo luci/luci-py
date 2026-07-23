@@ -15,9 +15,9 @@ CLIENT_DIR = os.path.dirname(TESTS_DIR)
 sys.path.insert(0, CLIENT_DIR)
 
 # Fix import path.
-sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party', 'pyasn1'))
-sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party', 'rsa'))
-sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
+sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party", "pyasn1"))
+sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party", "rsa"))
+sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party"))
 
 # third_party/
 from depot_tools import fix_encoding
@@ -43,19 +43,19 @@ def umask():
 
 def make_tree(out, contents):
   for relpath, content in sorted(contents.items()):
-    filepath = os.path.join(out, relpath.replace('/', os.path.sep))
+    filepath = os.path.join(out, relpath.replace("/", os.path.sep))
     dirpath = os.path.dirname(filepath)
     if not fs.isdir(dirpath):
       fs.makedirs(dirpath, 0o700)
     if isinstance(content, SymLink):
       fs.symlink(content, filepath)
     else:
-      mode = 0o700 if relpath.endswith('.py') else 0o600
+      mode = 0o700 if relpath.endswith(".py") else 0o600
       flags = os.O_WRONLY | os.O_CREAT
-      if sys.platform == 'win32':
+      if sys.platform == "win32":
         # pylint: disable=no-member
         flags |= os.O_BINARY
-      with os.fdopen(os.open(filepath, flags, mode), 'wb') as f:
+      with os.fdopen(os.open(filepath, flags, mode), "wb") as f:
         f.write(content)
 
 
@@ -69,9 +69,10 @@ def setup():
 def main():
   """Improvement over unittest.main()."""
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR,
-      format='%(levelname)5s %(filename)15s(%(lineno)3d): %(message)s')
-  if '-v' in sys.argv:
+    level=logging.DEBUG if "-v" in sys.argv else logging.ERROR,
+    format="%(levelname)5s %(filename)15s(%(lineno)3d): %(message)s",
+  )
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   setup()
   unittest.main()

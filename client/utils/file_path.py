@@ -28,71 +28,83 @@ from utils import tools
 
 # Types of action accepted by link_file().
 HARDLINK, HARDLINK_WITH_FALLBACK, SYMLINK, SYMLINK_WITH_FALLBACK, COPY = range(
-    1, 6)
+  1, 6
+)
 
 
 ## OS-specific imports
 
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
   import locale
   from ctypes import wintypes  # pylint: disable=ungrouped-imports
   from ctypes import windll  # pylint: disable=ungrouped-imports
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
+
   class LUID(ctypes.Structure):
     _fields_ = [
-      ('low_part', wintypes.DWORD), ('high_part', wintypes.LONG),
+      ("low_part", wintypes.DWORD),
+      ("high_part", wintypes.LONG),
     ]
 
-
   class LUID_AND_ATTRIBUTES(ctypes.Structure):
-    _fields_ = [('LUID', LUID), ('attributes', wintypes.DWORD)]
-
+    _fields_ = [("LUID", LUID), ("attributes", wintypes.DWORD)]
 
   class TOKEN_PRIVILEGES(ctypes.Structure):
     _fields_ = [
-      ('count', wintypes.DWORD), ('privileges', LUID_AND_ATTRIBUTES*0),
+      ("count", wintypes.DWORD),
+      ("privileges", LUID_AND_ATTRIBUTES * 0),
     ]
 
     def get_array(self):
       array_type = LUID_AND_ATTRIBUTES * self.count
       return ctypes.cast(self.privileges, ctypes.POINTER(array_type)).contents
 
-
   GetCurrentProcess = windll.kernel32.GetCurrentProcess
   GetCurrentProcess.restype = wintypes.HANDLE
   OpenProcessToken = windll.advapi32.OpenProcessToken
   OpenProcessToken.argtypes = (
-      wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE))
+    wintypes.HANDLE,
+    wintypes.DWORD,
+    ctypes.POINTER(wintypes.HANDLE),
+  )
   OpenProcessToken.restype = wintypes.BOOL
   LookupPrivilegeValue = windll.advapi32.LookupPrivilegeValueW
   LookupPrivilegeValue.argtypes = (
-      wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.POINTER(LUID))
+    wintypes.LPCWSTR,
+    wintypes.LPCWSTR,
+    ctypes.POINTER(LUID),
+  )
   LookupPrivilegeValue.restype = wintypes.BOOL
   LookupPrivilegeName = windll.advapi32.LookupPrivilegeNameW
   LookupPrivilegeName.argtypes = (
-      wintypes.LPCWSTR, ctypes.POINTER(LUID), wintypes.LPWSTR,
-      ctypes.POINTER(wintypes.DWORD))
+    wintypes.LPCWSTR,
+    ctypes.POINTER(LUID),
+    wintypes.LPWSTR,
+    ctypes.POINTER(wintypes.DWORD),
+  )
   LookupPrivilegeName.restype = wintypes.BOOL
   PTOKEN_PRIVILEGES = ctypes.POINTER(TOKEN_PRIVILEGES)
   AdjustTokenPrivileges = windll.advapi32.AdjustTokenPrivileges
   AdjustTokenPrivileges.restype = wintypes.BOOL
   AdjustTokenPrivileges.argtypes = (
-      wintypes.HANDLE, wintypes.BOOL, PTOKEN_PRIVILEGES,
-      wintypes.DWORD, PTOKEN_PRIVILEGES,
-      ctypes.POINTER(wintypes.DWORD))
-
+    wintypes.HANDLE,
+    wintypes.BOOL,
+    PTOKEN_PRIVILEGES,
+    wintypes.DWORD,
+    PTOKEN_PRIVILEGES,
+    ctypes.POINTER(wintypes.DWORD),
+  )
 
   def FormatError(err):
     """Returns a formatted error on Windows."""
     # We need to take in account the current code page.
     return ctypes.FormatError(err)
 
-
   def QueryDosDevice(drive_letter):
     """Returns the Windows 'native' path for a DOS drive letter."""
-    assert re.match(r'^[a-zA-Z]:$', drive_letter), drive_letter
+    assert re.match(r"^[a-zA-Z]:$", drive_letter), drive_letter
     assert isinstance(drive_letter, str)
     # Guesswork. QueryDosDeviceW never returns the required number of bytes.
     chars = 1024
@@ -101,11 +113,13 @@ if sys.platform == 'win32':
       err = ctypes.GetLastError()
       if err:
         # pylint: disable=undefined-variable
-        msg = 'QueryDosDevice(%s): %s (%d)' % (drive_letter, FormatError(err),
-                                               err)
-        raise WindowsError(err, msg.encode('utf-8'))
+        msg = "QueryDosDevice(%s): %s (%d)" % (
+          drive_letter,
+          FormatError(err),
+          err,
+        )
+        raise WindowsError(err, msg.encode("utf-8"))
     return p.value
-
 
   def GetShortPathName(long_path):
     """Returns the Windows short path equivalent for a 'long' path."""
@@ -119,10 +133,9 @@ if sys.platform == 'win32':
     err = ctypes.GetLastError()
     if err:
       # pylint: disable=undefined-variable
-      msg = 'GetShortPathName(%s): %s (%d)' % (long_path, FormatError(err), err)
-      raise WindowsError(err, msg.encode('utf-8'))
+      msg = "GetShortPathName(%s): %s (%d)" % (long_path, FormatError(err), err)
+      raise WindowsError(err, msg.encode("utf-8"))
     return None
-
 
   def GetLongPathName(short_path):
     """Returns the Windows long path equivalent for a 'short' path."""
@@ -136,10 +149,9 @@ if sys.platform == 'win32':
     err = ctypes.GetLastError()
     if err:
       # pylint: disable=undefined-variable
-      msg = 'GetLongPathName(%s): %s (%d)' % (short_path, FormatError(err), err)
-      raise WindowsError(err, msg.encode('utf-8'))
+      msg = "GetLongPathName(%s): %s (%d)" % (short_path, FormatError(err), err)
+      raise WindowsError(err, msg.encode("utf-8"))
     return None
-
 
   def MoveFileEx(oldpath, newpath, flags):
     """Calls MoveFileEx, converting errors to WindowsError exceptions."""
@@ -148,13 +160,18 @@ if sys.platform == 'win32':
     if not windll.kernel32.MoveFileExW(old_p, new_p, int(flags)):
       # pylint: disable=undefined-variable
       err = ctypes.GetLastError()
-      msg = 'MoveFileEx(%s, %s, %d): %s (%d)' % (oldpath, newpath, flags,
-                                                 FormatError(err), err)
-      raise WindowsError(err, msg.encode('utf-8'))
-
+      msg = "MoveFileEx(%s, %s, %d): %s (%d)" % (
+        oldpath,
+        newpath,
+        flags,
+        FormatError(err),
+        err,
+      )
+      raise WindowsError(err, msg.encode("utf-8"))
 
   class DosDriveMap:
     """Maps \\Device\\HarddiskVolumeN to N: on Windows."""
+
     # Keep one global cache.
     _MAPPING = {}
 
@@ -162,21 +179,24 @@ if sys.platform == 'win32':
       """Lazy loads the cache."""
       if not self._MAPPING:
         # This is related to UNC resolver on windows. Ignore that.
-        self._MAPPING['\\Device\\Mup'] = None
-        self._MAPPING['\\SystemRoot'] = os.environ['SystemRoot']
+        self._MAPPING["\\Device\\Mup"] = None
+        self._MAPPING["\\SystemRoot"] = os.environ["SystemRoot"]
 
-        for letter in (chr(l) for l in range(ord('C'), ord('Z') + 1)):
+        for letter in (chr(l) for l in range(ord("C"), ord("Z") + 1)):
           try:
-            letter = '%s:' % letter
+            letter = "%s:" % letter
             mapped = QueryDosDevice(letter)
             if mapped in self._MAPPING:
               logging.warning(
-                  ('Two drives: \'%s\' and \'%s\', are mapped to the same disk'
-                   '. Drive letters are a user-mode concept and the kernel '
-                   'traces only have NT path, so all accesses will be '
-                   'associated with the first drive letter, independent of the '
-                   'actual letter used by the code') % (self._MAPPING[mapped],
-                                                        letter))
+                (
+                  "Two drives: '%s' and '%s', are mapped to the same disk"
+                  ". Drive letters are a user-mode concept and the kernel "
+                  "traces only have NT path, so all accesses will be "
+                  "associated with the first drive letter, independent of the "
+                  "actual letter used by the code"
+                )
+                % (self._MAPPING[mapped], letter)
+              )
             else:
               self._MAPPING[mapped] = letter
           except WindowsError:  # pylint: disable=undefined-variable
@@ -184,11 +204,11 @@ if sys.platform == 'win32':
 
     def to_win32(self, path):
       """Converts a native NT path to Win32/DOS compatible path."""
-      match = re.match(r'(^\\Device\\[a-zA-Z0-9]+)(\\.*)?$', path)
+      match = re.match(r"(^\\Device\\[a-zA-Z0-9]+)(\\.*)?$", path)
       if not match:
         raise ValueError(
-            'Can\'t convert %s into a Win32 compatible path' % path,
-            path)
+          "Can't convert %s into a Win32 compatible path" % path, path
+        )
       if not match.group(1) in self._MAPPING:
         # Unmapped partitions may be accessed by windows for the
         # fun of it while the test is running. Discard these.
@@ -197,7 +217,6 @@ if sys.platform == 'win32':
       if not drive or not match.group(2):
         return drive
       return drive + match.group(2)
-
 
   def change_acl_for_delete(path):
     """Zaps the SECURITY_DESCRIPTOR's DACL on a directory entry that is tedious
@@ -208,57 +227,58 @@ if sys.platform == 'win32':
 
     Used as last resort.
     """
-    STANDARD_RIGHTS_REQUIRED = 0xf0000
+    STANDARD_RIGHTS_REQUIRED = 0xF0000
     SYNCHRONIZE = 0x100000
-    FILE_ALL_ACCESS = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0x3ff
+    FILE_ALL_ACCESS = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0x3FF
 
     import win32security
+
     user, _domain, _type = win32security.LookupAccountName(
-        '', getpass.getuser())
+      "", getpass.getuser()
+    )
     sd = win32security.SECURITY_DESCRIPTOR()
     sd.Initialize()
     sd.SetSecurityDescriptorOwner(user, False)
     dacl = win32security.ACL()
     dacl.Initialize()
     dacl.AddAccessAllowedAce(
-        win32security.ACL_REVISION_DS, FILE_ALL_ACCESS, user)
+      win32security.ACL_REVISION_DS, FILE_ALL_ACCESS, user
+    )
     sd.SetSecurityDescriptorDacl(1, dacl, 0)
     # Note that this assumes the object is either owned by the current user or
     # its group or that the current ACL permits this. Otherwise it will silently
     # fail.
     win32security.SetFileSecurity(
-        fs.extend(path), win32security.DACL_SECURITY_INFORMATION, sd)
+      fs.extend(path), win32security.DACL_SECURITY_INFORMATION, sd
+    )
     # It's important to also look for the read only bit after, as it's possible
     # the set_read_only() call to remove the read only bit had silently failed
     # because there was no DACL for the user.
     if not (os.stat(path).st_mode & stat.S_IWUSR):
       os.chmod(path, 0o777)
 
-
   def isabs(path):
     """Accepts X: as an absolute path, unlike python's os.path.isabs()."""
-    return os.path.isabs(path) or len(path) == 2 and path[1] == ':'
-
+    return os.path.isabs(path) or len(path) == 2 and path[1] == ":"
 
   def get_process_token():
     """Get the current process token."""
     TOKEN_ALL_ACCESS = 0xF01FF
     token = ctypes.wintypes.HANDLE()
     if not OpenProcessToken(
-        GetCurrentProcess(), TOKEN_ALL_ACCESS, ctypes.byref(token)):
+      GetCurrentProcess(), TOKEN_ALL_ACCESS, ctypes.byref(token)
+    ):
       # pylint: disable=undefined-variable
-      raise WindowsError('Couldn\'t get process token')
+      raise WindowsError("Couldn't get process token")
     return token
-
 
   def get_luid(name):
     """Returns the LUID for a privilege."""
     luid = LUID()
     if not LookupPrivilegeValue(None, str(name), ctypes.byref(luid)):
       # pylint: disable=undefined-variable
-      raise WindowsError('Couldn\'t lookup privilege value')
+      raise WindowsError("Couldn't lookup privilege value")
     return luid
-
 
   def enable_privilege(name):
     """Enables the privilege for the current process token.
@@ -279,12 +299,13 @@ if sys.platform == 'win32':
     try:
       if not AdjustTokenPrivileges(token, False, tp, 0, None, None):
         # pylint: disable=undefined-variable
-        raise WindowsError('AdjustTokenPrivileges(%r): failed: %s' %
-                           (name, ctypes.GetLastError()))
+        raise WindowsError(
+          "AdjustTokenPrivileges(%r): failed: %s"
+          % (name, ctypes.GetLastError())
+        )
     finally:
       windll.kernel32.CloseHandle(token)
     return ctypes.GetLastError() != ERROR_NOT_ALL_ASSIGNED
-
 
   def enable_symlink():
     """Enable SeCreateSymbolicLinkPrivilege for the current token.
@@ -305,8 +326,7 @@ if sys.platform == 'win32':
     Returns:
     - True if symlink support is enabled.
     """
-    return enable_privilege('SeCreateSymbolicLinkPrivilege')
-
+    return enable_privilege("SeCreateSymbolicLinkPrivilege")
 
   def kill_children_processes(root):
     """Try to kill all children processes indistriminately and prints updates to
@@ -318,23 +338,26 @@ if sys.platform == 'win32':
     processes = _get_children_processes_win(root)
     if not processes:
       return False
-    logging.debug('Enumerating processes:\n')
+    logging.debug("Enumerating processes:\n")
     for _, proc in sorted(processes.items()):
-      logging.debug('- pid %d; Handles: %d; Exe: %s; Cmd: %s\n', proc.ProcessId,
-                    proc.HandleCount, proc.ExecutablePath, proc.CommandLine)
-    logging.debug('Terminating %d processes:\n', len(processes))
+      logging.debug(
+        "- pid %d; Handles: %d; Exe: %s; Cmd: %s\n",
+        proc.ProcessId,
+        proc.HandleCount,
+        proc.ExecutablePath,
+        proc.CommandLine,
+      )
+    logging.debug("Terminating %d processes:\n", len(processes))
     for pid in sorted(processes):
       try:
         # Killing is asynchronous.
         os.kill(pid, 9)
-        logging.debug('- %d killed\n', pid)
+        logging.debug("- %d killed\n", pid)
       except OSError as e:
-        logging.error('- failed to kill %s, error %s\n', pid, e)
+        logging.error("- failed to kill %s, error %s\n", pid, e)
     return True
 
-
   ## Windows private code.
-
 
   def _enum_processes_win():
     """Returns all processes on the system that are accessible to this process.
@@ -344,15 +367,16 @@ if sys.platform == 'win32':
       http://msdn.microsoft.com/library/aa394372.aspx for more details.
     """
     import win32com.client  # pylint: disable=F0401
-    wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
-    wbem = wmi_service.ConnectServer('.', 'root\\cimv2')
-    return list(wbem.ExecQuery('SELECT * FROM Win32_Process'))
 
+    wmi_service = win32com.client.Dispatch("WbemScripting.SWbemLocator")
+    wbem = wmi_service.ConnectServer(".", "root\\cimv2")
+    return list(wbem.ExecQuery("SELECT * FROM Win32_Process"))
 
   def _filter_processes_dir_win(processes, root_dir):
     """Returns all processes which has their main executable located inside
     root_dir.
     """
+
     def normalize_path(filename):
       try:
         return GetLongPathName(str(filename)).lower()
@@ -376,10 +400,10 @@ if sys.platform == 'win32':
     long_names = ((process_name(proc), proc) for proc in processes)
 
     return [
-      proc for name, proc in long_names
+      proc
+      for name, proc in long_names
       if name is not None and name.startswith(root_dir)
     ]
-
 
   def _filter_processes_tree_win(processes):
     """Returns all the processes under the current process."""
@@ -391,14 +415,13 @@ if sys.platform == 'win32':
       found = set()
       for pid in out:
         found.update(
-            p.ProcessId for p in processes.values()
-            if p.ParentProcessId == pid)
+          p.ProcessId for p in processes.values() if p.ParentProcessId == pid
+        )
       found -= set(out)
       if not found:
         break
       out.update((p, processes[p]) for p in found)
     return out.values()
-
 
   def _get_children_processes_win(root):
     """Returns a list of processes.
@@ -421,9 +444,7 @@ if sys.platform == 'win32':
     return processes
 
 
-elif sys.platform == 'darwin':
-
-
+elif sys.platform == "darwin":
   # On non-windows, keep the stdlib behavior.
   isabs = os.path.isabs
 
@@ -431,8 +452,6 @@ elif sys.platform == 'darwin':
     return True
 
 else:  # OSes other than Windows and OSX.
-
-
   # On non-windows, keep the stdlib behavior.
   isabs = os.path.isabs
 
@@ -440,8 +459,7 @@ else:  # OSes other than Windows and OSX.
     return True
 
 
-if sys.platform != 'win32':  # All non-Windows OSes.
-
+if sys.platform != "win32":  # All non-Windows OSes.
 
   def safe_join(*args):
     """Joins path elements like os.path.join() but doesn't abort on absolute
@@ -450,7 +468,7 @@ if sys.platform != 'win32':  # All non-Windows OSes.
     os.path.join('foo', '/bar') == '/bar'
     but safe_join('foo', '/bar') == 'foo/bar'.
     """
-    out = ''
+    out = ""
     for element in args:
       if element.startswith(os.path.sep):
         if out.endswith(os.path.sep):
@@ -463,7 +481,6 @@ if sys.platform != 'win32':  # All non-Windows OSes.
         else:
           out += os.path.sep + element
     return out
-
 
   @tools.profile
   def split_at_symlink(base_dir, relfile):
@@ -498,14 +515,14 @@ if sys.platform != 'win32':  # All non-Windows OSes.
         symlink = os.path.basename(relfile[:index])
         rest = relfile[index:]
         logging.debug(
-            'split_at_symlink(%s, %s) -> (%s, %s, %s)' %
-            (base_dir, relfile, base, symlink, rest))
+          "split_at_symlink(%s, %s) -> (%s, %s, %s)"
+          % (base_dir, relfile, base, symlink, rest)
+        )
         return base, symlink, rest
       if index == len(relfile):
         break
       index += 1
     return relfile, None, None
-
 
   def kill_children_processes(root):
     """Not yet implemented on posix."""
@@ -531,7 +548,7 @@ def safe_relpath(filepath, basepath):
   try:
     return os.path.relpath(filepath, basepath)
   except ValueError:
-    assert sys.platform == 'win32'
+    assert sys.platform == "win32"
     return filepath
 
 
@@ -549,14 +566,14 @@ def posix_relpath(path, root):
   It is different from relpath() since it can be used on Windows.
   """
   out = posixpath.relpath(path, root)
-  if path.endswith('/'):
-    out += '/'
+  if path.endswith("/"):
+    out += "/"
   return out
 
 
 def is_url(path):
   """Returns True if it looks like an HTTP url instead of a file path."""
-  return bool(re.match(r'^https?://.+$', path))
+  return bool(re.match(r"^https?://.+$", path))
 
 
 def path_starts_with(prefix, path):
@@ -564,14 +581,15 @@ def path_starts_with(prefix, path):
   initial components of |path| (or all of the components of |path|). The paths
   must be absolute.
   """
-  #assert os.path.isabs(prefix) and os.path.isabs(path)
+  # assert os.path.isabs(prefix) and os.path.isabs(path)
   prefix = os.path.normpath(prefix)
   path = os.path.normpath(path)
-  #assert prefix == get_native_path_case(prefix), prefix
-  #assert path == get_native_path_case(path), path
+  # assert prefix == get_native_path_case(prefix), prefix
+  # assert path == get_native_path_case(path), path
   prefix = prefix.rstrip(os.path.sep) + os.path.sep
   path = path.rstrip(os.path.sep) + os.path.sep
   return path.startswith(prefix)
+
 
 def ensure_command_has_abs_path(command, cwd):
   """Ensures that an isolate command uses absolute path.
@@ -590,12 +608,12 @@ def is_same_filesystem(path1, path2):
   """
   assert os.path.isabs(path1), path1
   assert os.path.isabs(path2), path2
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     # If the drive letter mismatches, assume it's a separate partition.
     # TODO(maruel): It should look at the underlying drive, a drive letter could
     # be a mount point to a directory on another drive.
-    assert re.match(r'^[a-zA-Z]\:\\.*', path1), path1
-    assert re.match(r'^[a-zA-Z]\:\\.*', path2), path2
+    assert re.match(r"^[a-zA-Z]\:\\.*", path1), path1
+    assert re.match(r"^[a-zA-Z]\:\\.*", path2), path2
     if path1[0].lower() != path2[0].lower():
       return False
   return fs.stat(path1).st_dev == fs.stat(path2).st_dev
@@ -608,10 +626,11 @@ def get_free_space(path):
   user. On some systems, there's a percentage of the free space on the partition
   that is only accessible as the root user.
   """
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     free_bytes = ctypes.c_ulonglong(0)
     windll.kernel32.GetDiskFreeSpaceExW(
-        ctypes.c_wchar_p(path), None, None, ctypes.pointer(free_bytes))
+      ctypes.c_wchar_p(path), None, None, ctypes.pointer(free_bytes)
+    )
     return free_bytes.value
   # For OSes other than Windows.
   f = fs.statvfs(path)  # pylint: disable=E1101
@@ -628,9 +647,10 @@ def hardlink(source, link_name):
   """
   assert isinstance(source, str), source
   assert isinstance(link_name, str), link_name
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     if not windll.kernel32.CreateHardLinkW(
-        fs.extend(link_name), fs.extend(source), 0):
+      fs.extend(link_name), fs.extend(source), 0
+    ):
       raise OSError()
   else:
     fs.link(source, link_name)
@@ -640,8 +660,9 @@ def readable_copy(outfile, infile):
   """Makes a copy of the file that is readable by everyone."""
   fs.copy2(infile, outfile)
   fs.chmod(
-      outfile,
-      fs.stat(outfile).st_mode | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+    outfile,
+    fs.stat(outfile).st_mode | stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH,
+  )
 
 
 def set_read_only(path, read_only, orig_mode=None):
@@ -657,9 +678,9 @@ def set_read_only(path, read_only, orig_mode=None):
     mode &= stat.S_IRUSR | stat.S_IXUSR  # 0500
   else:
     mode |= stat.S_IRUSR | stat.S_IWUSR  # 0600
-    if sys.platform != 'win32' and stat.S_ISDIR(mode):
+    if sys.platform != "win32" and stat.S_ISDIR(mode):
       mode |= stat.S_IXUSR  # 0100
-  if hasattr(os, 'lchmod'):
+  if hasattr(os, "lchmod"):
     fs.lchmod(path, mode)  # pylint: disable=E1101
   else:
     if stat.S_ISLNK(orig_mode):
@@ -683,7 +704,7 @@ def remove(filepath):
   """Removes a file, even if it is read-only."""
   # TODO(maruel): Not do it unless necessary since it slows this function
   # down.
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     # Deleting a read-only file will fail if it is read-only.
     set_read_only(filepath, False)
   else:
@@ -712,14 +733,15 @@ def link_file(outfile, infile, action):
     True if the action was carried on, False if fallback was used.
   """
   if action < 1 or action > COPY:
-    raise ValueError('Unknown mapping action %s' % action)
+    raise ValueError("Unknown mapping action %s" % action)
   # TODO(maruel): Skip these checks.
   if not fs.isfile(infile):
-    raise OSError('%s is missing' % infile)
+    raise OSError("%s is missing" % infile)
   if fs.isfile(outfile):
     raise OSError(
-        '%s already exist; insize:%d; outsize:%d' %
-        (outfile, fs.stat(infile).st_size, fs.stat(outfile).st_size))
+      "%s already exist; insize:%d; outsize:%d"
+      % (outfile, fs.stat(infile).st_size, fs.stat(outfile).st_size)
+    )
 
   if action == COPY:
     readable_copy(outfile, infile)
@@ -733,8 +755,8 @@ def link_file(outfile, infile, action):
       if action == SYMLINK:
         raise
       logging.warning(
-          'Failed to symlink, falling back to copy %s to %s' % (
-            infile, outfile))
+        "Failed to symlink, falling back to copy %s to %s" % (infile, outfile)
+      )
       # Signal caller that fallback copy was used.
       readable_copy(outfile, infile)
       return False
@@ -745,12 +767,12 @@ def link_file(outfile, infile, action):
     return True
   except OSError as e:
     if action == HARDLINK:
-      raise OSError('Failed to hardlink %s to %s: %s' % (infile, outfile, e))
+      raise OSError("Failed to hardlink %s to %s: %s" % (infile, outfile, e))
 
   # Probably a different file system.
   logging.warning(
-      'Failed to hardlink, falling back to copy %s to %s' % (
-        infile, outfile))
+    "Failed to hardlink, falling back to copy %s to %s" % (infile, outfile)
+  )
   readable_copy(outfile, infile)
   # Signal caller that fallback copy was used.
   return False
@@ -771,26 +793,28 @@ def atomic_replace(path, body):
   path = os.path.abspath(path)
   dir_name, base_name = os.path.split(path)
 
-  fd, tmp_name = tempfile.mkstemp(dir=dir_name, prefix=base_name+'_')
+  fd, tmp_name = tempfile.mkstemp(dir=dir_name, prefix=base_name + "_")
   try:
-    with os.fdopen(fd, 'wb') as f:
+    with os.fdopen(fd, "wb") as f:
       f.write(body)
       f.flush()
       os.fsync(fd)
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
       os.rename(tmp_name, path)
     else:
       # Flags are MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH.
       MoveFileEx(tmp_name, path, 0x1 | 0x8)
-    tmp_name = None # no need to remove it in 'finally' block anymore
+    tmp_name = None  # no need to remove it in 'finally' block anymore
   finally:
     if tmp_name:
       try:
         os.remove(tmp_name)
       except OSError as e:
         logging.warning(
-            'Failed to delete temp file %s in replace_file_content: %s',
-            tmp_name, e)
+          "Failed to delete temp file %s in replace_file_content: %s",
+          tmp_name,
+          e,
+        )
 
 
 ### Write directory functions.
@@ -809,7 +833,7 @@ def ensure_tree(path, perm=0o777):
 
 def create_directories(base_directory, files):
   """Creates the directory structure needed by the given list of files."""
-  logging.debug('create_directories(%s, %d)', base_directory, len(files))
+  logging.debug("create_directories(%s, %d)", base_directory, len(files))
   # Creates the tree of directories to create.
   directories = set(os.path.dirname(f) for f in files)
   for item in list(directories):
@@ -829,13 +853,13 @@ def make_tree_files_read_only(root):
 
   This means files can be created or deleted.
   """
-  logging.debug('make_tree_files_read_only(%s)', root)
-  if sys.platform != 'win32':
+  logging.debug("make_tree_files_read_only(%s)", root)
+  if sys.platform != "win32":
     set_read_only(root, False)
   for dirpath, dirnames, filenames in fs.walk(root, topdown=True):
     for filename in filenames:
       set_read_only(os.path.join(dirpath, filename), True)
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
       # It must not be done on Windows.
       for dirname in dirnames:
         set_read_only(os.path.join(dirpath, dirname), False)
@@ -852,14 +876,14 @@ def make_tree_deleteable(root):
   modified. This means that for hard-linked files, every directory entry for the
   file node has its file permission modified.
   """
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     make_tree_deleteable_win(root)
   else:
     make_tree_deleteable_posix(root)
 
 
 def make_tree_deleteable_win(root):
-  logging.debug('Using file_path.make_tree_deleteable_win')
+  logging.debug("Using file_path.make_tree_deleteable_win")
   err = None
 
   dirs = deque([root])
@@ -879,7 +903,7 @@ def make_tree_deleteable_win(root):
 
 
 def make_tree_deleteable_posix(root):
-  logging.debug('Using file_path.make_tree_deleteable_posix')
+  logging.debug("Using file_path.make_tree_deleteable_posix")
   err = None
   sudo_failed = False
 
@@ -888,10 +912,10 @@ def make_tree_deleteable_posix(root):
       return True
     # Try passwordless sudo, just in case. In practice, it is preferable
     # to use linux capabilities.
-    with open(os.devnull, 'rb') as f:
-      if not subprocess42.call(['sudo', '-n', 'chmod', 'a+rwX,-t', p], stdin=f):
+    with open(os.devnull, "rb") as f:
+      if not subprocess42.call(["sudo", "-n", "chmod", "a+rwX,-t", p], stdin=f):
         return False
-    logging.debug('sudo chmod %s failed', p)
+    logging.debug("sudo chmod %s failed", p)
     return True
 
   e = set_read_only_swallow(root, False)
@@ -924,110 +948,127 @@ def rmtree(root):
 
   Raises an exception if it failed.
   """
-  logging.info('file_path.rmtree(%s)', root)
+  logging.info("file_path.rmtree(%s)", root)
   assert isinstance(root, str), repr(root)
 
   def change_tree_permission():
-    logging.debug('file_path.make_tree_deleteable(%s) starting', root)
+    logging.debug("file_path.make_tree_deleteable(%s) starting", root)
     start = time.time()
     try:
       make_tree_deleteable(root)
     except OSError as e:
-      logging.warning('Swallowing make_tree_deleteable() error: %s', e)
-    logging.debug('file_path.make_tree_deleteable(%s) took %s seconds', root,
-                  time.time() - start)
+      logging.warning("Swallowing make_tree_deleteable() error: %s", e)
+    logging.debug(
+      "file_path.make_tree_deleteable(%s) took %s seconds",
+      root,
+      time.time() - start,
+    )
 
   # First try the soft way: tries 3 times to delete and sleep a bit in between.
   # On Windows, try 6 times with a total of up to 30 seconds of sleep.
   # Retries help if test subprocesses outlive main process and try to actively
   # use or write to the directory while it is being deleted.
-  max_tries = 6 if sys.platform == 'win32' else 3
+  max_tries = 6 if sys.platform == "win32" else 3
   has_called_change_tree_permission = False
   has_called_change_acl_for_delete = False
   for i in range(max_tries):
     # pylint: disable=cell-var-from-loop
     # errors is a list of tuple(function, path, excinfo).
     errors = []
-    logging.debug('file_path.rmtree(%s) try=%d', root, i)
+    logging.debug("file_path.rmtree(%s) try=%d", root, i)
     start = time.time()
     fs.rmtree(root, onerror=lambda *args: errors.append(args))
-    logging.debug('file_path.rmtree(%s) try=%d took %s seconds', root, i,
-                  time.time() - start)
+    logging.debug(
+      "file_path.rmtree(%s) try=%d took %s seconds",
+      root,
+      i,
+      time.time() - start,
+    )
     if not errors or not fs.exists(root):
       if i:
-        logging.debug('Succeeded.\n')
+        logging.debug("Succeeded.\n")
       return
 
     # Try to change tree permission.
     if not has_called_change_tree_permission:
       logging.warning(
-          'Failed to delete %s (%d files remaining).\n'
-          '  Maybe tree permission needs to be changed.\n', root, len(errors))
+        "Failed to delete %s (%d files remaining).\n"
+        "  Maybe tree permission needs to be changed.\n",
+        root,
+        len(errors),
+      )
       change_tree_permission()
       has_called_change_tree_permission = True
       # do not sleep here.
       continue
 
     # Try change_acl_for_delete on Windows.
-    if not has_called_change_acl_for_delete and sys.platform == 'win32':
+    if not has_called_change_acl_for_delete and sys.platform == "win32":
       for path in sorted(set(path for _, path, _ in errors)):
         try:
           change_acl_for_delete(path)
         except Exception as e:
-          logging.error('- %s (failed to update ACL: %s)\n', path, e)
+          logging.error("- %s (failed to update ACL: %s)\n", path, e)
       has_called_change_acl_for_delete = True
 
     if i < max_tries - 1:
-      delay = (i+1)*2
+      delay = (i + 1) * 2
       logging.warning(
-          'Failed to delete %s (%d files remaining).\n'
-          '  Maybe the test has a subprocess outliving it.\n'
-          '  Sleeping %d seconds.\n', root, len(errors), delay)
+        "Failed to delete %s (%d files remaining).\n"
+        "  Maybe the test has a subprocess outliving it.\n"
+        "  Sleeping %d seconds.\n",
+        root,
+        len(errors),
+        delay,
+      )
       time.sleep(delay)
 
-  logging.error('Failed to delete %s. The following files remain:\n', root)
+  logging.error("Failed to delete %s. The following files remain:\n", root)
   # The same path may be listed multiple times.
   for path in sorted(set(path for _, path, _ in errors)):
-    logging.error('- %s\n', path)
+    logging.error("- %s\n", path)
 
   # If soft retries fail on Linux, there's nothing better we can do.
-  if sys.platform != 'win32':
+  if sys.platform != "win32":
     raise errors[0][2][1]
 
   # The soft way was not good enough. Try the hard way.
   start = time.time()
-  logging.debug('file_path.rmtree(%s) killing children processes', root)
+  logging.debug("file_path.rmtree(%s) killing children processes", root)
   for i in range(max_tries):
     if not kill_children_processes(root):
       break
     if i != max_tries - 1:
-      time.sleep((i+1)*2)
+      time.sleep((i + 1) * 2)
   else:
     processes = _get_children_processes_win(root)
     if processes:
-      logging.error('Failed to terminate processes.\n')
+      logging.error("Failed to terminate processes.\n")
       raise errors[0][2][1]
   logging.debug(
-      'file_path.rmtree(%s) killing children processes took %d seconds', root,
-      time.time() - start)
+    "file_path.rmtree(%s) killing children processes took %d seconds",
+    root,
+    time.time() - start,
+  )
 
   # Now that annoying processes in root are evicted, try again.
   start = time.time()
   errors = []
-  logging.debug('file_path.rmtree(%s) final try', root)
+  logging.debug("file_path.rmtree(%s) final try", root)
   fs.rmtree(root, onerror=lambda *args: errors.append(args))
-  logging.debug('file_path.rmtree(%s) final try took %d seconds', root,
-                time.time() - start)
+  logging.debug(
+    "file_path.rmtree(%s) final try took %d seconds", root, time.time() - start
+  )
   if not errors or not fs.exists(root):
-    logging.debug('Succeeded at final try.\n')
+    logging.debug("Succeeded at final try.\n")
     return
 
   # There's no hope: the directory was tried to be removed 4 times. Give up
   # and raise an exception.
-  logging.error('Failed to delete %s. The following files remain:\n', root)
+  logging.error("Failed to delete %s. The following files remain:\n", root)
   # The same path may be listed multiple times.
   for path in sorted(set(path for _, path, _ in errors)):
-    logging.error('- %s\n', path)
+    logging.error("- %s\n", path)
   raise errors[0][2][1]
 
 
@@ -1040,15 +1081,22 @@ def get_recursive_size(path):
   start = time.time()
   try:
     total, n_dirs, n_files, n_links, n_others = _get_recur_size_with_scandir(
-        path)
+      path
+    )
     elapsed = time.time() - start
     logging.debug(
-        '_get_recursive_size: traversed %s took %s seconds. '
-        'files: %d, links: %d, dirs: %d, others: %d', path, elapsed, n_files,
-        n_links, n_dirs, n_others)
+      "_get_recursive_size: traversed %s took %s seconds. "
+      "files: %d, links: %d, dirs: %d, others: %d",
+      path,
+      elapsed,
+      n_files,
+      n_links,
+      n_dirs,
+      n_others,
+    )
     return total
   except (IOError, OSError, UnicodeEncodeError):
-    logging.exception('Exception while getting the size of %s', path)
+    logging.exception("Exception while getting the size of %s", path)
     return None
 
 
@@ -1058,12 +1106,13 @@ def get_recursive_size(path):
 def _is_symlink_entry(entry):
   if entry.is_symlink():
     return True
-  if sys.platform != 'win32':
+  if sys.platform != "win32":
     return False
   # both st_file_attributes and FILE_ATTRIBUTE_REPARSE_POINT are
   # windows-only symbols.
-  return bool(entry.stat().st_file_attributes
-              & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+  return bool(
+    entry.stat().st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT
+  )
 
 
 def _get_recur_size_with_scandir(path):
@@ -1087,7 +1136,7 @@ def _get_recur_size_with_scandir(path):
           stack.append(entry.path)
         else:
           n_others += 1
-          logging.warning('non directory/file entry: %s', entry)
+          logging.warning("non directory/file entry: %s", entry)
     except (PermissionError, FileNotFoundError):
-      logging.warning('Failed to scan directory', exc_info=True)
+      logging.warning("Failed to scan directory", exc_info=True)
   return total, n_dirs, n_files, n_links, n_others

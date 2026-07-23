@@ -17,7 +17,7 @@ from utils import fs
 
 
 def write_content(path, content):
-  with fs.open(path, 'wb') as f:
+  with fs.open(path, "wb") as f:
     f.write(content)
 
 
@@ -25,7 +25,7 @@ class FSTest(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     if not file_path.enable_symlink():
-      raise Exception('Failed to enable symlink support')
+      raise Exception("Failed to enable symlink support")
 
   def setUp(self):
     super(FSTest, self).setUp()
@@ -41,7 +41,7 @@ class FSTest(unittest.TestCase):
   @property
   def tempdir(self):
     if not self._tempdir:
-      self._tempdir = tempfile.mkdtemp(prefix='fs_test')
+      self._tempdir = tempfile.mkdtemp(prefix="fs_test")
     return self._tempdir
 
   def test_symlink_relative(self):
@@ -50,30 +50,30 @@ class FSTest(unittest.TestCase):
     # /dir/file
     # /ld -> /dir
     # /lf -> /ld/file
-    dirpath = os.path.join(self.tempdir, 'dir')
-    filepath = os.path.join(dirpath, 'file')
+    dirpath = os.path.join(self.tempdir, "dir")
+    filepath = os.path.join(dirpath, "file")
     fs.mkdir(dirpath)
-    write_content(filepath, b'hello')
+    write_content(filepath, b"hello")
 
-    linkfile = os.path.join(self.tempdir, 'lf')
-    linkdir = os.path.join(self.tempdir, 'ld')
-    dstfile = os.path.join('ld', 'file')
+    linkfile = os.path.join(self.tempdir, "lf")
+    linkdir = os.path.join(self.tempdir, "ld")
+    dstfile = os.path.join("ld", "file")
     fs.symlink(dstfile, linkfile)
-    fs.symlink('dir', linkdir)
+    fs.symlink("dir", linkdir)
 
     self.assertEqual(True, fs.islink(linkfile))
     self.assertEqual(True, fs.islink(linkdir))
     self.assertEqual(dstfile, fs.readlink(linkfile))
-    self.assertEqual('dir', fs.readlink(linkdir))
-    self.assertEqual(['file'], fs.listdir(linkdir))
+    self.assertEqual("dir", fs.readlink(linkdir))
+    self.assertEqual(["file"], fs.listdir(linkdir))
     # /lf resolves to /dir/file.
     with fs.open(linkfile) as f:
-      self.assertEqual('hello', f.read())
+      self.assertEqual("hello", f.read())
 
     # Ensures that followlinks is respected in walk().
     expected = [
-      (self.tempdir, ['dir', 'ld'], ['lf']),
-      (dirpath, [], ['file']),
+      (self.tempdir, ["dir", "ld"], ["lf"]),
+      (dirpath, [], ["file"]),
     ]
     actual = [
       (r, sorted(d), sorted(f))
@@ -81,9 +81,9 @@ class FSTest(unittest.TestCase):
     ]
     self.assertEqual(expected, actual)
     expected = [
-      (self.tempdir, ['dir', 'ld'], ['lf']),
-      (dirpath, [], ['file']),
-      (linkdir, [], ['file']),
+      (self.tempdir, ["dir", "ld"], ["lf"]),
+      (dirpath, [], ["file"]),
+      (linkdir, [], ["file"]),
     ]
     actual = [
       (r, sorted(d), sorted(f))
@@ -97,14 +97,14 @@ class FSTest(unittest.TestCase):
     # /dir/file
     # /ld -> /dir
     # /lf -> /ld/file
-    dirpath = os.path.join(self.tempdir, 'dir')
-    filepath = os.path.join(dirpath, 'file')
+    dirpath = os.path.join(self.tempdir, "dir")
+    filepath = os.path.join(dirpath, "file")
     fs.mkdir(dirpath)
-    write_content(filepath, b'hello')
+    write_content(filepath, b"hello")
 
-    linkfile = os.path.join(self.tempdir, 'lf')
-    linkdir = os.path.join(self.tempdir, 'ld')
-    dstfile = os.path.join(linkdir, 'file')
+    linkfile = os.path.join(self.tempdir, "lf")
+    linkdir = os.path.join(self.tempdir, "ld")
+    dstfile = os.path.join(linkdir, "file")
     fs.symlink(dstfile, linkfile)
     fs.symlink(dirpath, linkdir)
 
@@ -112,15 +112,15 @@ class FSTest(unittest.TestCase):
     self.assertEqual(True, fs.islink(linkdir))
     self.assertEqual(dstfile, fs.readlink(linkfile))
     self.assertEqual(dirpath, fs.readlink(linkdir))
-    self.assertEqual(['file'], fs.listdir(linkdir))
+    self.assertEqual(["file"], fs.listdir(linkdir))
     # /lf resolves to /dir/file.
     with fs.open(linkfile) as f:
-      self.assertEqual('hello', f.read())
+      self.assertEqual("hello", f.read())
 
     # Ensures that followlinks is respected in walk().
     expected = [
-      (self.tempdir, ['dir', 'ld'], ['lf']),
-      (dirpath, [], ['file']),
+      (self.tempdir, ["dir", "ld"], ["lf"]),
+      (dirpath, [], ["file"]),
     ]
     actual = [
       (r, sorted(d), sorted(f))
@@ -128,9 +128,9 @@ class FSTest(unittest.TestCase):
     ]
     self.assertEqual(expected, actual)
     expected = [
-      (self.tempdir, ['dir', 'ld'], ['lf']),
-      (dirpath, [], ['file']),
-      (linkdir, [], ['file']),
+      (self.tempdir, ["dir", "ld"], ["lf"]),
+      (dirpath, [], ["file"]),
+      (linkdir, [], ["file"]),
     ]
     actual = [
       (r, sorted(d), sorted(f))
@@ -140,8 +140,8 @@ class FSTest(unittest.TestCase):
 
   def test_symlink_missing_destination_rel(self):
     # A symlink to a missing destination is valid and can be read back.
-    filepath = 'file'
-    linkfile = os.path.join(self.tempdir, 'lf')
+    filepath = "file"
+    linkfile = os.path.join(self.tempdir, "lf")
     fs.symlink(filepath, linkfile)
 
     self.assertEqual(True, fs.islink(linkfile))
@@ -149,8 +149,8 @@ class FSTest(unittest.TestCase):
 
   def test_symlink_missing_destination_abs(self):
     # A symlink to a missing destination is valid and can be read back.
-    filepath = os.path.join(self.tempdir, 'file')
-    linkfile = os.path.join(self.tempdir, 'lf')
+    filepath = os.path.join(self.tempdir, "file")
+    linkfile = os.path.join(self.tempdir, "lf")
     fs.symlink(filepath, linkfile)
 
     self.assertEqual(True, fs.islink(linkfile))
@@ -158,9 +158,9 @@ class FSTest(unittest.TestCase):
 
   def test_symlink_existing(self):
     # Creating a symlink that overrides a file fails.
-    filepath = os.path.join(self.tempdir, 'file')
-    linkfile = os.path.join(self.tempdir, 'lf')
-    write_content(linkfile, b'hello')
+    filepath = os.path.join(self.tempdir, "file")
+    linkfile = os.path.join(self.tempdir, "lf")
+    write_content(linkfile, b"hello")
     with self.assertRaises(OSError):
       fs.symlink(filepath, linkfile)
 
@@ -168,14 +168,14 @@ class FSTest(unittest.TestCase):
     # Reading a non-existing symlink fails. Obvious but it's to make sure the
     # Windows part acts the same.
     with self.assertRaises(OSError):
-      fs.readlink(os.path.join(self.tempdir, 'not_there'))
+      fs.readlink(os.path.join(self.tempdir, "not_there"))
 
   def test_remove_invalid_symlink(self):
-    src = os.path.join(self.tempdir, 'src')
-    dst = os.path.join(self.tempdir, 'dst')
+    src = os.path.join(self.tempdir, "src")
+    dst = os.path.join(self.tempdir, "dst")
     os.symlink(src, dst)  # This is invalid symlink.
     fs.remove(dst)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   test_env.main()

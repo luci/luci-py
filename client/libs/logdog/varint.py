@@ -20,16 +20,16 @@ def write_uvarint(w, val):
     ValueError if 'val' is < 0.
   """
   if val < 0:
-    raise ValueError('Cannot encode negative value, %d' % (val,))
+    raise ValueError("Cannot encode negative value, %d" % (val,))
 
   count = 0
   while val > 0 or count == 0:
-    byte = (val & 0b01111111)
+    byte = val & 0b01111111
     val >>= 7
     if val > 0:
       byte |= 0b10000000
 
-    w.write(struct.pack('B', byte))
+    w.write(struct.pack("B", byte))
     count += 1
   return count
 
@@ -54,10 +54,10 @@ def read_uvarint(r):
   while True:
     byte = r.read(1)
     if len(byte) == 0:
-      raise ValueError('UVarint was not terminated')
+      raise ValueError("UVarint was not terminated")
 
-    byte = struct.unpack('B', byte)[0]
-    result |= ((byte & 0b01111111) << (7 * count))
+    byte = struct.unpack("B", byte)[0]
+    result |= (byte & 0b01111111) << (7 * count)
     count += 1
     if byte & 0b10000000 == 0:
       break

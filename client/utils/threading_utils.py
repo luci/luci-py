@@ -34,7 +34,7 @@ class LockWithAssert:
     self._owner = threading.current_thread()
 
   def __exit__(self, _exc_type, _exec_value, _traceback):
-    self.assert_locked('Releasing unowned lock')
+    self.assert_locked("Releasing unowned lock")
     self._owner = None
     self._lock.release()
     return False
@@ -61,6 +61,7 @@ class ThreadPool:
 
   When the priority of tasks match, it works in strict FIFO mode.
   """
+
   QUEUE_CLASS = queue.PriorityQueue
   # Enqueueing None causes the worker to stop.
   # Python3 doesn't support to compare None with any integer, so putting None
@@ -82,10 +83,14 @@ class ThreadPool:
       prefix: Prefix to use for thread names. Pool's threads will be
               named '<prefix>-<thread index>'.
     """
-    prefix = prefix or 'tp-0x%0x' % id(self)
+    prefix = prefix or "tp-0x%0x" % id(self)
     logging.debug(
-        'New ThreadPool(%d, %d, %d): %s', initial_threads, max_threads,
-        queue_size, prefix)
+      "New ThreadPool(%d, %d, %d): %s",
+      initial_threads,
+      max_threads,
+      queue_size,
+      prefix,
+    )
     assert initial_threads <= max_threads
     assert max_threads <= 1024
 
@@ -126,10 +131,11 @@ class ThreadPool:
       if len(self._workers) >= self._max_threads or self._is_closed:
         return False
       worker = threading.Thread(
-        name='%s-%d' % (self._prefix, len(self._workers)), target=self._run)
+        name="%s-%d" % (self._prefix, len(self._workers)), target=self._run
+      )
       self._workers.append(worker)
       self._starting += 1
-    logging.debug('Starting worker thread %s', worker.name)
+    logging.debug("Starting worker thread %s", worker.name)
     worker.daemon = True
     worker.start()
     return True
@@ -155,10 +161,11 @@ class ThreadPool:
     assert callable(func)
     with self._lock:
       if self._is_closed:
-        raise ThreadPoolClosed('Can not add a task to a closed ThreadPool')
+        raise ThreadPoolClosed("Can not add a task to a closed ThreadPool")
       start_new_worker = (
         # Pending task count plus new task > number of available workers.
-        self.tasks.qsize() + 1 > self._ready + self._starting and
+        self.tasks.qsize() + 1 > self._ready + self._starting
+        and
         # Enough slots.
         len(self._workers) < self._max_threads
       )
@@ -195,9 +202,9 @@ class ThreadPool:
           out = func(*args, **kwargs)
           self._output_append(out)
       except Exception as e:
-        logging.warning('Caught exception: %s', e)
+        logging.warning("Caught exception: %s", e)
         exc_info = sys.exc_info()
-        logging.info(''.join(traceback.format_tb(exc_info[2])))
+        logging.info("".join(traceback.format_tb(exc_info[2])))
         with self._outputs_exceptions_cond:
           self._exceptions.append(exc_info)
           self._outputs_exceptions_cond.notifyAll()
@@ -215,8 +222,9 @@ class ThreadPool:
         except Exception as e:
           # We need to catch and log this error here because this is the root
           # function for the thread, nothing higher will catch the error.
-          logging.exception('Caught exception while marking task as done: %s',
-                            e)
+          logging.exception(
+            "Caught exception while marking task as done: %s", e
+          )
 
   def _output_append(self, out):
     if out is not None:
@@ -253,7 +261,7 @@ class ThreadPool:
     for result in self.iter_results():
       return result
     # No results -> tasks queue is empty.
-    raise ThreadPoolEmpty('Task queue is empty')
+    raise ThreadPoolEmpty("Task queue is empty")
 
   def iter_results(self):
     """Yields results as they appear until all tasks are processed."""
@@ -285,7 +293,7 @@ class ThreadPool:
     # a constant after that and can be accessed outside the lock.
     with self._lock:
       if self._is_closed:
-        raise ThreadPoolClosed('Can not close already closed ThreadPool')
+        raise ThreadPoolClosed("Can not close already closed ThreadPool")
       self._is_closed = True
     for _ in range(len(self._workers)):
       self.tasks.put(self.TASK_END_SENTINEL)
@@ -294,8 +302,10 @@ class ThreadPool:
       while t.is_alive():
         t.join(30)
     logging.debug(
-      'Thread pool \'%s\' closed: spawned %d threads total',
-      self._prefix, len(self._workers))
+      "Thread pool '%s' closed: spawned %d threads total",
+      self._prefix,
+      len(self._workers),
+    )
 
   def abort(self):
     """Empties the queue.
@@ -328,8 +338,9 @@ class ThreadPool:
 
 class AutoRetryThreadPool(ThreadPool):
   """Automatically retries enqueued operations on exception."""
+
   # See also PRIORITY_* module-level constants.
-  INTERNAL_PRIORITY_BITS = (1<<8) - 1
+  INTERNAL_PRIORITY_BITS = (1 << 8) - 1
 
   def __init__(self, exceptions, retries, *args, **kwargs):
     """
@@ -338,7 +349,8 @@ class AutoRetryThreadPool(ThreadPool):
       retries: maximum number of retries to do.
     """
     assert exceptions and all(issubclass(e, Exception) for e in exceptions), (
-        exceptions)
+      exceptions
+    )
     assert 1 <= retries <= self.INTERNAL_PRIORITY_BITS
     super(AutoRetryThreadPool, self).__init__(*args, **kwargs)
     self._swallowed_exceptions = tuple(exceptions)
@@ -350,13 +362,8 @@ class AutoRetryThreadPool(ThreadPool):
     """
     assert (priority & self.INTERNAL_PRIORITY_BITS) == 0
     return super(AutoRetryThreadPool, self).add_task(
-        priority,
-        self._task_executer,
-        priority,
-        None,
-        func,
-        *args,
-        **kwargs)
+      priority, self._task_executer, priority, None, func, *args, **kwargs
+    )
 
   def add_task_with_channel(self, channel, priority, func, *args, **kwargs):
     """Tasks added must not use the lower priority bits since they are reserved
@@ -364,13 +371,8 @@ class AutoRetryThreadPool(ThreadPool):
     """
     assert (priority & self.INTERNAL_PRIORITY_BITS) == 0
     return super(AutoRetryThreadPool, self).add_task(
-        priority,
-        self._task_executer,
-        priority,
-        channel,
-        func,
-        *args,
-        **kwargs)
+      priority, self._task_executer, priority, channel, func, *args, **kwargs
+    )
 
   def _task_executer(self, priority, channel, func, *args, **kwargs):
     """Wraps the function and automatically retry on exceptions."""
@@ -386,16 +388,17 @@ class AutoRetryThreadPool(ThreadPool):
       if actual_retries < self._retries:
         priority += 1
         logging.debug(
-            'Swallowed exception \'%s\'. Retrying at lower priority %X',
-            e, priority)
+          "Swallowed exception '%s'. Retrying at lower priority %X", e, priority
+        )
         super(AutoRetryThreadPool, self).add_task(
-            priority,
-            self._task_executer,
-            priority,
-            channel,
-            func,
-            *args,
-            **kwargs)
+          priority,
+          self._task_executer,
+          priority,
+          channel,
+          func,
+          *args,
+          **kwargs,
+        )
         return
       if channel is None:
         raise
@@ -412,6 +415,7 @@ class IOAutoRetryThreadPool(AutoRetryThreadPool):
   Supposed to be used for IO bound tasks, and thus default maximum number of
   worker threads is independent of number of CPU cores.
   """
+
   # Initial and maximum number of worker threads.
   INITIAL_WORKERS = 2
   MAX_WORKERS = 16 if sys.maxsize > 2**32 else 8
@@ -419,16 +423,13 @@ class IOAutoRetryThreadPool(AutoRetryThreadPool):
 
   def __init__(self):
     super(IOAutoRetryThreadPool, self).__init__(
-        [IOError],
-        self.RETRIES,
-        self.INITIAL_WORKERS,
-        self.MAX_WORKERS,
-        0,
-        'io')
+      [IOError], self.RETRIES, self.INITIAL_WORKERS, self.MAX_WORKERS, 0, "io"
+    )
 
 
 class Progress:
   """Prints progress and accepts updates thread-safely."""
+
   def __init__(self, columns):
     """Creates a Progress bar that will updates asynchronously from the worker
     threads.
@@ -438,13 +439,14 @@ class Progress:
                columns and their initial values.
     """
     assert all(
-        len(c) == 2 and isinstance(c[0], str) and isinstance(c[1], int)
-        for c in columns), columns
+      len(c) == 2 and isinstance(c[0], str) and isinstance(c[1], int)
+      for c in columns
+    ), columns
     # Members to be used exclusively in the primary thread.
     self.use_cr_only = True
     self.unfinished_commands = set()
     self.start = time.time()
-    self._last_printed_line = ''
+    self._last_printed_line = ""
     self._columns = [c[1] for c in columns]
     self._columns_lookup = dict((c[0], i) for i, c in enumerate(columns))
     # Setting it to True forces a print on the first print_update() call.
@@ -492,15 +494,15 @@ class Progress:
       got_one = True
       if raw:
         # Prints the data as-is.
-        self._last_printed_line = ''
-        sys.stdout.write('\n%s\n' % name.strip('\n'))
+        self._last_printed_line = ""
+        sys.stdout.write("\n%s\n" % name.strip("\n"))
       else:
         line, self._last_printed_line = self._gen_line(name)
         sys.stdout.write(line)
 
     if not got_one and self._value_changed:
       # Make sure a line is printed in that case where statistics changes.
-      line, self._last_printed_line = self._gen_line('')
+      line, self._last_printed_line = self._gen_line("")
       sys.stdout.write(line)
       got_one = True
     self._value_changed = False
@@ -510,32 +512,38 @@ class Progress:
       sys.stdout.flush()
 
     if self.unfinished_commands:
-      logging.debug('Waiting for the following commands to finish:\n%s',
-                    '\n'.join(self.unfinished_commands))
+      logging.debug(
+        "Waiting for the following commands to finish:\n%s",
+        "\n".join(self.unfinished_commands),
+      )
 
   def _gen_line(self, name):
     """Generates the line to be printed."""
-    next_line = ('[%s] %6.2fs %s') % (
-        self._render_columns(), time.time() - self.start, name)
+    next_line = ("[%s] %6.2fs %s") % (
+      self._render_columns(),
+      time.time() - self.start,
+      name,
+    )
     # Fill it with whitespace only if self.use_cr_only is set.
-    prefix = ''
+    prefix = ""
     if self.use_cr_only and self._last_printed_line:
-      prefix = '\r'
+      prefix = "\r"
     if self.use_cr_only:
-      suffix = ' ' * max(0, len(self._last_printed_line) - len(next_line))
+      suffix = " " * max(0, len(self._last_printed_line) - len(next_line))
     else:
-      suffix = '\n'
-    return '%s%s%s' % (prefix, next_line, suffix), next_line
+      suffix = "\n"
+    return "%s%s%s" % (prefix, next_line, suffix), next_line
 
   def _render_columns(self):
     """Renders the columns."""
     columns_as_str = map(str, self._columns)
     max_len = max(map(len, columns_as_str))
-    return '/'.join(i.rjust(max_len) for i in columns_as_str)
+    return "/".join(i.rjust(max_len) for i in columns_as_str)
 
 
 class QueueWithProgress(queue.PriorityQueue):
   """Implements progress support in join()."""
+
   def __init__(self, progress, *args, **kwargs):
     queue.PriorityQueue.__init__(self, *args, **kwargs)
     self.progress = progress
@@ -548,12 +556,12 @@ class QueueWithProgress(queue.PriorityQueue):
       try:
         unfinished = self.unfinished_tasks - 1
         if unfinished < 0:
-          raise ValueError('task_done() called too many times')
+          raise ValueError("task_done() called too many times")
         self.unfinished_tasks = unfinished
         # This is less efficient, because we want the Progress to be updated.
         self.all_tasks_done.notify_all()
       except Exception as e:
-        logging.exception('task_done threw an exception.\n%s', e)
+        logging.exception("task_done threw an exception.\n%s", e)
 
   def wake_up(self):
     """Wakes up all_tasks_done.
@@ -627,7 +635,7 @@ class DeadlockDetector:
     """Starts internal watcher thread."""
     assert self._thread is None
     self.ping()
-    self._thread = threading.Thread(name='deadlock-detector', target=self._run)
+    self._thread = threading.Thread(name="deadlock-detector", target=self._run)
     self._thread.daemon = True
     self._thread.start()
     return self
@@ -689,13 +697,13 @@ class DeadlockDetector:
         continue
 
       # Try to get more informative symbolic thread name.
-      name = 'untitled'
+      name = "untitled"
       for thread in all_threads:
         if thread.ident == thread_id:
           name = thread.name
           break
-      name += ' #%d' % (thread_id,)
-      tracebacks[name] = ''.join(traceback.format_stack(frame))
+      name += " #%d" % (thread_id,)
+      tracebacks[name] = "".join(traceback.format_stack(frame))
 
     # Function to print a message. Makes it easier to change output destination.
     def output(msg):
@@ -703,13 +711,13 @@ class DeadlockDetector:
 
     # Print tracebacks, sorting them by thread name. That way a thread pool's
     # threads will be printed as one group.
-    output('=============== Potential deadlock detected ===============')
+    output("=============== Potential deadlock detected ===============")
     if timeout is not None:
-      output('No pings in last %d sec.' % (timeout,))
-    output('Dumping stack frames for all threads:')
+      output("No pings in last %d sec." % (timeout,))
+    output("Dumping stack frames for all threads:")
     for name in sorted(tracebacks):
-      output('Traceback for \'%s\':\n%s' % (name, tracebacks[name]))
-    output('===========================================================')
+      output("Traceback for '%s':\n%s" % (name, tracebacks[name]))
+    output("===========================================================")
 
 
 class TaskChannel:
@@ -749,9 +757,10 @@ class TaskChannel:
     # explanation.
     if isinstance(exc_info[1], TaskChannel.Timeout):
       exc_info = (
-          RuntimeError,
-          RuntimeError('Task raised Timeout exception'),
-          exc_info[2])
+        RuntimeError,
+        RuntimeError("Task raised Timeout exception"),
+        exc_info[2],
+      )
     self._queue.put((self._ITEM_EXCEPTION, exc_info))
 
   def __iter__(self):
@@ -776,7 +785,8 @@ class TaskChannel:
     while True:
       try:
         item_type, value = self._queue.get(
-            timeout=timeout if timeout is not None else 30.0)
+          timeout=timeout if timeout is not None else 30.0
+        )
         break
       except queue.Empty:
         if timeout is None:
@@ -792,7 +802,7 @@ class TaskChannel:
       raise value[1]
     if item_type == self._ITEM_DONE:
       raise StopIteration()
-    assert False, 'Impossible queue item type: %r' % item_type
+    assert False, "Impossible queue item type: %r" % item_type
 
   def __next__(self):
     # For python3 compatibility
@@ -800,12 +810,14 @@ class TaskChannel:
 
   def wrap_task(self, task):
     """Decorator that makes a function push results into this channel."""
+
     @functools.wraps(task)
     def wrapped(*args, **kwargs):
       try:
         self.send_result(task(*args, **kwargs))
       except Exception:
         self.send_exception()
+
     return wrapped
 
 
@@ -817,11 +829,12 @@ def num_processors():
   try:
     # Multiprocessing
     import multiprocessing
+
     return multiprocessing.cpu_count()
   except:  # pylint: disable=W0702
     try:
       # Mac OS 10.6
-      return int(os.sysconf('SC_NPROCESSORS_ONLN'))  # pylint: disable=E1101
+      return int(os.sysconf("SC_NPROCESSORS_ONLN"))  # pylint: disable=E1101
     except:
       # Some of the windows builders seem to get here.
       return 4

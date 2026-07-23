@@ -21,6 +21,7 @@ import time
 import urllib.parse
 
 from utils import tools
+
 tools.force_local_third_party()
 
 # third_party/
@@ -47,29 +48,29 @@ urllib3.disable_warnings()
 URL_OPEN_MAX_ATTEMPTS = 30
 
 # Default timeout when retrying.
-URL_OPEN_TIMEOUT = 6*60.
+URL_OPEN_TIMEOUT = 6 * 60.0
 
 # Default timeout when reading from open HTTP connection.
 URL_READ_TIMEOUT = 60
 
 # Content type for url encoded POST body.
-URL_ENCODED_FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded'
+URL_ENCODED_FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
 # Content type for JSON body.
-JSON_CONTENT_TYPE = 'application/json; charset=UTF-8'
+JSON_CONTENT_TYPE = "application/json; charset=UTF-8"
 # Default content type for POST body.
 DEFAULT_CONTENT_TYPE = URL_ENCODED_FORM_CONTENT_TYPE
 
 # Content type -> function that encodes a request body.
 CONTENT_ENCODERS = {
-    URL_ENCODED_FORM_CONTENT_TYPE:
-        urllib.parse.urlencode,
-    JSON_CONTENT_TYPE:
-        lambda x: json.dumps(x, sort_keys=True, separators=(',', ':')),
+  URL_ENCODED_FORM_CONTENT_TYPE: urllib.parse.urlencode,
+  JSON_CONTENT_TYPE: lambda x: json.dumps(
+    x, sort_keys=True, separators=(",", ":")
+  ),
 }
 
 
 # Google Storage URL regular expression.
-GS_STORAGE_HOST_URL_RE = re.compile(r'https://(.+\.)?storage\.googleapis\.com')
+GS_STORAGE_HOST_URL_RE = re.compile(r"https://(.+\.)?storage\.googleapis\.com")
 
 # Global (for now) map: server URL (http://example.com) -> HttpService instance.
 # Used by get_http_service to cache HttpService instances.
@@ -113,7 +114,8 @@ class HttpError(NetError):
   def __init__(self, response, inner_exc=None):
     assert isinstance(response, HttpResponse), response
     super(HttpError, self).__init__(
-        inner_exc or 'Server returned HTTP code %d' % response.code)
+      inner_exc or "Server returned HTTP code %d" % response.code
+    )
     self.response = response
     self._body_for_desc = None
 
@@ -132,39 +134,39 @@ class HttpError(NetError):
       try:
         self._body_for_desc = self.response.read().decode()
       except Exception as exc:
-        self._body_for_desc = '<failed to read the response body: %s>' % exc
+        self._body_for_desc = "<failed to read the response body: %s>" % exc
 
     desc = str(self)
 
     # If the body is JSON, assume it is Cloud Endpoints response and fish out an
     # error message from it.
-    if self.response.content_type.startswith('application/json'):
+    if self.response.content_type.startswith("application/json"):
       msg = _fish_out_error_message(self._body_for_desc)
       if msg:
-        desc += ' - ' + msg
+        desc += " - " + msg
 
     if not verbose:
       return desc
 
-    out = [desc, '----------']
+    out = [desc, "----------"]
     if self.response.headers:
       for header, value in sorted(self.response.headers.items()):
-        if not header.lower().startswith('x-'):
-          out.append('%s: %s' % (header.capitalize(), value))
-      out.append('')
-    out.append(self._body_for_desc or '<empty body>')
-    out.append('----------')
-    return '\n'.join(out)
+        if not header.lower().startswith("x-"):
+          out.append("%s: %s" % (header.capitalize(), value))
+      out.append("")
+    out.append(self._body_for_desc or "<empty body>")
+    out.append("----------")
+    return "\n".join(out)
 
 
 def _fish_out_error_message(maybe_json_blob):
   try:
     as_json = json.loads(maybe_json_blob)
-    err = as_json.get('error')
+    err = as_json.get("error")
     if isinstance(err, str):
       return err
     if isinstance(err, dict):
-      return str(err.get('message') or '<no error message>')
+      return str(err.get("message") or "<no error message>")
   except (ValueError, KeyError, TypeError):
     pass
   return None  # not a JSON we recognize
@@ -247,7 +249,7 @@ def url_retrieve(filepath, url, **kwargs):
   if not response:
     return False
   try:
-    with io.open(filepath, 'wb') as f:
+    with io.open(filepath, "wb") as f:
       for buf in response.iter_content(65536):
         f.write(buf)
     return True
@@ -262,25 +264,25 @@ def url_retrieve(filepath, url, **kwargs):
 def split_server_request_url(url):
   """Splits the url into scheme+netloc and path+params+query+fragment."""
   url_parts = list(urllib.parse.urlparse(url))
-  urlhost = '%s://%s' % (url_parts[0], url_parts[1])
-  urlpath = urllib.parse.urlunparse(['', ''] + url_parts[2:])
+  urlhost = "%s://%s" % (url_parts[0], url_parts[1])
+  urlpath = urllib.parse.urlunparse(["", ""] + url_parts[2:])
   return urlhost, urlpath
 
 
 def fix_url(url):
   """Fixes an url to https."""
-  parts = urllib.parse.urlparse(url, 'https')
+  parts = urllib.parse.urlparse(url, "https")
   if parts.query:
-    raise ValueError('doesn\'t support query parameter.')
+    raise ValueError("doesn't support query parameter.")
   if parts.fragment:
-    raise ValueError('doesn\'t support fragment in the url.')
+    raise ValueError("doesn't support fragment in the url.")
   # urllib.parse.urlparse('foo.com') will result in netloc='', path='foo.com',
   # which is not what is desired here.
   new = list(parts)
   if not new[1] and new[2]:
-    new[1] = new[2].rstrip('/')
-    new[2] = ''
-  new[2] = new[2].rstrip('/')
+    new[1] = new[2].rstrip("/")
+    new[2] = ""
+  new[2] = new[2].rstrip("/")
   return urllib.parse.urlunparse(new)
 
 
@@ -288,6 +290,7 @@ def get_http_service(urlhost, allow_cached=True):
   """Returns existing or creates new instance of HttpService that can send
   requests to given base urlhost.
   """
+
   def new_service():
     # Create separate authenticator only if engine is not providing
     # authentication already. Also we use signed URLs for Google Storage, no
@@ -298,16 +301,16 @@ def get_http_service(urlhost, allow_cached=True):
     conf = get_oauth_config()
     if not engine_cls.provides_auth and not is_gs and not conf.disabled:
       authenticator = (
-          authenticators.LuciContextAuthenticator()
-          if conf.use_luci_context_auth else
-          authenticators.OAuthAuthenticator(urlhost, conf))
+        authenticators.LuciContextAuthenticator()
+        if conf.use_luci_context_auth
+        else authenticators.OAuthAuthenticator(urlhost, conf)
+      )
     return HttpService(
-        urlhost,
-        engine=engine_cls(),
-        authenticator=authenticator)
+      urlhost, engine=engine_cls(), authenticator=authenticator
+    )
 
   # Ensure consistency in url naming.
-  urlhost = str(urlhost).lower().rstrip('/')
+  urlhost = str(urlhost).lower().rstrip("/")
 
   if not allow_cached:
     return new_service()
@@ -354,15 +357,15 @@ def get_case_insensitive_dict(original):
   """
   normalized = structures.CaseInsensitiveDict(original or {})
   if len(normalized) != len(original):
-    raise ValueError('Duplicate keys in: %s' % repr(original))
+    raise ValueError("Duplicate keys in: %s" % repr(original))
   return normalized
 
 
 class HttpService:
   """Base class for a class that provides an API to HTTP based service:
-    - Provides 'request' method.
-    - Supports automatic request retries.
-    - Thread safe.
+  - Provides 'request' method.
+  - Supports automatic request retries.
+  - Thread safe.
   """
 
   def __init__(self, urlhost, engine, authenticator=None):
@@ -382,8 +385,9 @@ class HttpService:
       # Transparently retry 404 IIF it is a CloudEndpoints API call *and* the
       # result is not JSON. This assumes that we only use JSON encoding. This
       # is workaround for known Cloud Endpoints bug.
-      return ('/api/' in suburl and
-              not resp.content_type.startswith('application/json'))
+      return "/api/" in suburl and not resp.content_type.startswith(
+        "application/json"
+      )
     # All other 4** errors are fatal. All 5** errors are transient.
     return resp.code >= 500
 
@@ -396,9 +400,9 @@ class HttpService:
     if isinstance(body, str):
       return body.encode()
     # Any body should have content type set.
-    assert content_type, 'Request has body, but no content type'
+    assert content_type, "Request has body, but no content type"
     encoder = CONTENT_ENCODERS.get(content_type)
-    assert encoder, ('Unknown content type %s' % content_type)
+    assert encoder, "Unknown content type %s" % content_type
     return encoder(body).encode()
 
   def login(self, allow_user_interaction):
@@ -426,18 +430,19 @@ class HttpService:
       self.authenticator.logout()
 
   def request(
-      self,
-      urlpath,
-      data=None,
-      content_type=None,
-      max_attempts=URL_OPEN_MAX_ATTEMPTS,
-      expected_error_codes=None,
-      timeout=URL_OPEN_TIMEOUT,
-      read_timeout=URL_READ_TIMEOUT,
-      stream=True,
-      method=None,
-      headers=None,
-      follow_redirects=True):
+    self,
+    urlpath,
+    data=None,
+    content_type=None,
+    max_attempts=URL_OPEN_MAX_ATTEMPTS,
+    expected_error_codes=None,
+    timeout=URL_OPEN_TIMEOUT,
+    read_timeout=URL_READ_TIMEOUT,
+    stream=True,
+    method=None,
+    headers=None,
+    follow_redirects=True,
+  ):
     """Attempts to open the given url multiple times.
 
     |urlpath| is relative to the server root, i.e. '/some/request?param=1'.
@@ -484,30 +489,30 @@ class HttpService:
 
     The returned value has a property |code| with the response code.
     """
-    assert urlpath and urlpath[0] == '/', urlpath
+    assert urlpath and urlpath[0] == "/", urlpath
 
     if data is not None:
-      assert method in (None, 'DELETE', 'POST', 'PUT')
-      method = method or 'POST'
+      assert method in (None, "DELETE", "POST", "PUT")
+      method = method or "POST"
       content_type = content_type or DEFAULT_CONTENT_TYPE
       body = self.encode_request_body(data, content_type)
     else:
-      assert method in (None, 'DELETE', 'GET')
-      method = method or 'GET'
+      assert method in (None, "DELETE", "GET")
+      method = method or "GET"
       body = None
-      assert not content_type, 'Can\'t use content_type on %s' % method
+      assert not content_type, "Can't use content_type on %s" % method
 
     # Prepare request info.
-    parsed = urllib.parse.urlparse('/' + urlpath.lstrip('/'))
+    parsed = urllib.parse.urlparse("/" + urlpath.lstrip("/"))
     resource_url = urllib.parse.urljoin(self.urlhost, parsed.path)
     query_params = urllib.parse.parse_qsl(parsed.query)
 
     # Prepare headers.
     headers = get_case_insensitive_dict(headers or {})
     if body is not None:
-      headers['Content-Length'] = str(len(body))
+      headers["Content-Length"] = str(len(body))
       if content_type:
-        headers['Content-Type'] = content_type
+        headers["Content-Type"] = content_type
 
     last_error = None
     auth_attempted = False
@@ -516,25 +521,38 @@ class HttpService:
       # Log non-first attempt.
       if attempt.attempt:
         logging.warning(
-            'Retrying request %s, attempt %d/%d...',
-            resource_url, attempt.attempt, max_attempts)
+          "Retrying request %s, attempt %d/%d...",
+          resource_url,
+          attempt.attempt,
+          max_attempts,
+        )
 
       try:
         # Prepare and send a new request.
         request = HttpRequest(
-            method, resource_url, query_params, body,
-            headers, read_timeout, stream, follow_redirects)
+          method,
+          resource_url,
+          query_params,
+          body,
+          headers,
+          read_timeout,
+          stream,
+          follow_redirects,
+        )
         if self.authenticator:
           self.authenticator.authorize(request)
         response = self.engine.perform_request(request)
-        logging.debug('Request %s succeeded', request.get_full_url())
+        logging.debug("Request %s succeeded", request.get_full_url())
         return response
 
       except (ConnectionError, TimeoutError) as e:
         last_error = e
         logging.warning(
-            'Unable to open url %s on attempt %d: %s',
-            request.get_full_url(), attempt.attempt, e)
+          "Unable to open url %s on attempt %d: %s",
+          request.get_full_url(),
+          attempt.attempt,
+          e,
+        )
         continue
 
       except HttpError as e:
@@ -543,16 +561,21 @@ class HttpService:
         # If it is one of the expected codes, we are done.
         if expected_error_codes and e.response.code in expected_error_codes:
           logging.debug(
-              'Request %s succeeded with one of the expected codes %d',
-              request.get_full_url(), e.response.code)
+            "Request %s succeeded with one of the expected codes %d",
+            request.get_full_url(),
+            e.response.code,
+          )
           return e.response
 
         # Access denied -> authenticate.
         if e.response.code in (401, 403):
           logging.warning(
-              'Got a reply with HTTP status code %d for %s on attempt %d: %s',
-              e.response.code, request.get_full_url(), attempt.attempt,
-              e.description())
+            "Got a reply with HTTP status code %d for %s on attempt %d: %s",
+            e.response.code,
+            request.get_full_url(),
+            attempt.attempt,
+            e.description(),
+          )
           # Try forcefully refresh the token. If it doesn't help, then server
           # does not support authentication or user doesn't have required
           # access.
@@ -564,12 +587,17 @@ class HttpService:
               continue
           # Authentication attempt was unsuccessful.
           logging.error(
-              'Request to %s failed with HTTP status code %d: %s',
-              request.get_full_url(), e.response.code, e.description())
+            "Request to %s failed with HTTP status code %d: %s",
+            request.get_full_url(),
+            e.response.code,
+            e.description(),
+          )
           if self.authenticator and self.authenticator.supports_login:
             logging.error(
-                'Use auth.py to login if haven\'t done so already:\n'
-                '    python auth.py login --service=%s', self.urlhost)
+              "Use auth.py to login if haven't done so already:\n"
+              "    python auth.py login --service=%s",
+              self.urlhost,
+            )
           return None
 
         # Hit a error that can not be retried -> stop retry loop.
@@ -578,18 +606,26 @@ class HttpService:
           # with the request, so don't retry. Dump entire reply to debug log and
           # only a friendly error message to error log.
           logging.debug(
-              'Request to %s failed with HTTP status code %d.\n%s',
-              request.get_full_url(), e.response.code,
-              e.description(verbose=True))
+            "Request to %s failed with HTTP status code %d.\n%s",
+            request.get_full_url(),
+            e.response.code,
+            e.description(verbose=True),
+          )
           logging.error(
-              'Request to %s failed with HTTP status code %d: %s',
-              request.get_full_url(), e.response.code, e.description())
+            "Request to %s failed with HTTP status code %d: %s",
+            request.get_full_url(),
+            e.response.code,
+            e.description(),
+          )
           return None
 
         # Retry all other errors.
         logging.warning(
-            'Server responded with error on %s on attempt %d: %s',
-            request.get_full_url(), attempt.attempt, e.description())
+          "Server responded with error on %s on attempt %d: %s",
+          request.get_full_url(),
+          attempt.attempt,
+          e.description(),
+        )
         continue
 
     if isinstance(last_error, HttpError):
@@ -597,8 +633,12 @@ class HttpService:
     else:
       error_msg = str(last_error)
     logging.error(
-        'Unable to open given url, %s, after %d attempts or %d timeout.\n%s',
-        request.get_full_url(), max_attempts, timeout, error_msg)
+      "Unable to open given url, %s, after %d attempts or %d timeout.\n%s",
+      request.get_full_url(),
+      max_attempts,
+      timeout,
+      error_msg,
+    )
 
     return None
 
@@ -616,7 +656,8 @@ class HttpService:
     """
     content_type = JSON_CONTENT_TYPE if data is not None else None
     response = self.request(
-        urlpath, content_type=content_type, data=data, stream=False, **kwargs)
+      urlpath, content_type=content_type, data=data, stream=False, **kwargs
+    )
     if not response:
       return None
     try:
@@ -628,8 +669,12 @@ class HttpService:
     try:
       return json.loads(text)
     except ValueError as e:
-      logging.error('Not a JSON response when calling %s: %s; full text: %s',
-                    urlpath, e, text)
+      logging.error(
+        "Not a JSON response when calling %s: %s; full text: %s",
+        urlpath,
+        e,
+        text,
+      )
       return None
 
 
@@ -637,17 +682,17 @@ class HttpRequest:
   """Request to HttpService."""
 
   def __init__(
-      self, method, url, params, body,
-      headers, timeout, stream, follow_redirects):
+    self, method, url, params, body, headers, timeout, stream, follow_redirects
+  ):
     """Arguments:
-      |method| - HTTP method to use
-      |url| - relative URL to the resource, without query parameters
-      |params| - list of (key, value) pairs to put into GET parameters
-      |body| - encoded body of the request (None or str)
-      |headers| - dict with request headers
-      |timeout| - socket read timeout (None to disable)
-      |stream| - True to stream response from socket
-      |follow_redirects| - True to follow HTTP redirects.
+    |method| - HTTP method to use
+    |url| - relative URL to the resource, without query parameters
+    |params| - list of (key, value) pairs to put into GET parameters
+    |body| - encoded body of the request (None or str)
+    |headers| - dict with request headers
+    |timeout| - socket read timeout (None to disable)
+    |stream| - True to stream response from socket
+    |follow_redirects| - True to follow HTTP redirects.
     """
     self.method = method
     self.url = url
@@ -670,7 +715,7 @@ class HttpRequest:
     """Resource URL with url-encoded GET parameters."""
     if not self.params:
       return self.url
-    return '%s?%s' % (self.url, urllib.parse.urlencode(self.params))
+    return "%s?%s" % (self.url, urllib.parse.urlencode(self.params))
 
 
 class HttpResponse:
@@ -697,7 +742,7 @@ class HttpResponse:
     assert all(issubclass(e, Exception) for e in self._timeout_exc_classes)
     try:
       read = 0
-      if hasattr(self._response, 'iter_content'):
+      if hasattr(self._response, "iter_content"):
         # request.Response.
         for buf in self._response.iter_content(chunk_size):
           read += len(buf)
@@ -711,8 +756,13 @@ class HttpResponse:
           read += len(buf)
           yield buf
     except self._timeout_exc_classes as e:
-      logging.error('Timeout while reading from %s, read %d of %s: %s',
-          self._url, read, self.get_header('Content-Length'), e)
+      logging.error(
+        "Timeout while reading from %s, read %d of %s: %s",
+        self._url,
+        read,
+        self.get_header("Content-Length"),
+        e,
+      )
       raise TimeoutError(e)
 
   def read(self):
@@ -722,14 +772,18 @@ class HttpResponse:
     """
     assert all(issubclass(e, Exception) for e in self._timeout_exc_classes)
     try:
-      if hasattr(self._response, 'content'):
+      if hasattr(self._response, "content"):
         # request.Response.
         return self._response.content
       # File-like object.
       return self._response.read()
     except self._timeout_exc_classes as e:
-      logging.error('Timeout while reading from %s, expected %s bytes: %s',
-          self._url, self.get_header('Content-Length'), e)
+      logging.error(
+        "Timeout while reading from %s, expected %s bytes: %s",
+        self._url,
+        self.get_header("Content-Length"),
+        e,
+      )
       raise TimeoutError(e)
 
   def get_header(self, header):
@@ -749,11 +803,10 @@ class HttpResponse:
   @property
   def content_type(self):
     """Response content type or empty string if not presented by the server."""
-    return self.get_header('Content-Type') or ''
+    return self.get_header("Content-Type") or ""
 
 
 class _UserAgentHolder:
-
   def __init__(self):
     # TODO(crbug/1084410): Consider guarding it with a RWLock
     self._user_agent = None
@@ -777,7 +830,7 @@ def maybe_inject_user_agent(func):
   def wrapped(engine, request, **kwargs):
     ua = _user_agent_holder.user_agent
     if ua is not None:
-      request.headers['User-Agent'] = ua
+      request.headers["User-Agent"] = ua
     return func(engine, request, **kwargs)
 
   return wrapped
@@ -799,11 +852,13 @@ class RequestsLibEngine:
   # Will be caught while reading a streaming response in HttpResponse.read and
   # transformed to TimeoutError.
   timeout_exception_classes = (
-      socket.timeout, ssl.SSLError,
-      requests.Timeout,
-      requests.ConnectionError,
-      urllib3.exceptions.ProtocolError,
-      urllib3.exceptions.TimeoutError)
+    socket.timeout,
+    ssl.SSLError,
+    requests.Timeout,
+    requests.ConnectionError,
+    urllib3.exceptions.ProtocolError,
+    urllib3.exceptions.TimeoutError,
+  )
 
   def __init__(self):
     super(RequestsLibEngine, self).__init__()
@@ -812,12 +867,13 @@ class RequestsLibEngine:
     self.session.trust_env = True
     self.session.verify = tools.get_cacerts_bundle()
     # Configure connection pools.
-    for protocol in ('https://', 'http://'):
-      self.session.mount(protocol, adapters.HTTPAdapter(
-          pool_connections=64,
-          pool_maxsize=64,
-          max_retries=0,
-          pool_block=False))
+    for protocol in ("https://", "http://"):
+      self.session.mount(
+        protocol,
+        adapters.HTTPAdapter(
+          pool_connections=64, pool_maxsize=64, max_retries=0, pool_block=False
+        ),
+      )
 
   @maybe_inject_user_agent
   def perform_request(self, request):
@@ -834,22 +890,24 @@ class RequestsLibEngine:
     try:
       # response is a requests.models.Response.
       response = self.session.request(
-          method=request.method,
-          url=request.url,
-          params=request.params,
-          data=request.body,
-          headers=request.headers,
-          cookies=request.cookies,
-          timeout=request.timeout,
-          stream=request.stream,
-          allow_redirects=request.follow_redirects)
+        method=request.method,
+        url=request.url,
+        params=request.params,
+        data=request.body,
+        headers=request.headers,
+        cookies=request.cookies,
+        timeout=request.timeout,
+        stream=request.stream,
+        allow_redirects=request.follow_redirects,
+      )
       # Convert it to HttpResponse (that doesn't depend on the engine).
       resp = HttpResponse(
-          response=response,
-          url=request.get_full_url(),
-          code=response.status_code,
-          headers=response.headers,
-          timeout_exc_classes=self.timeout_exception_classes)
+        response=response,
+        url=request.get_full_url(),
+        code=response.status_code,
+        headers=response.headers,
+        timeout_exc_classes=self.timeout_exception_classes,
+      )
       response.raise_for_status()
       return resp
     except requests.Timeout as e:
@@ -869,8 +927,8 @@ class RetryAttempt:
 
   def __init__(self, attempt, remaining):
     """Information about current attempt in retry loop:
-      |attempt| - zero based index of attempt.
-      |remaining| - how much time is left before retry loop finishes retries.
+    |attempt| - zero based index of attempt.
+    |remaining| - how much time is left before retry loop finishes retries.
     """
     self.attempt = attempt
     self.remaining = remaining
@@ -881,7 +939,7 @@ def calculate_sleep_before_retry(attempt, max_duration):
   """How long to sleep before retrying an attempt in retry_loop."""
   # Maximum sleeping time. We're hammering a cloud-distributed service, it'll
   # survive.
-  MAX_SLEEP = 10.
+  MAX_SLEEP = 10.0
   # random.random() returns [0.0, 1.0). Starts with relatively short waiting
   # time by starting with 1.5/2+1.5^-1 median offset.
   duration = (random.random() * 1.5) + math.pow(1.5, (attempt - 1))

@@ -21,8 +21,9 @@ from utils import logging_utils
 
 
 # PID YYYY-MM-DD HH:MM:SS.MMM
-_LOG_HEADER = r'^%d \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d' % os.getpid()
-_LOG_HEADER_PID = r'^\d+ \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d'
+_LOG_HEADER = r"^%d \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d" % os.getpid()
+_LOG_HEADER_PID = r"^\d+ \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d"
+
 
 class Test(unittest.TestCase):
   # This test fails when running via test runner
@@ -31,7 +32,7 @@ class Test(unittest.TestCase):
 
   def setUp(self):
     super(Test, self).setUp()
-    self.tmp = tempfile.mkdtemp(prefix='logging_utils')
+    self.tmp = tempfile.mkdtemp(prefix="logging_utils")
 
   def tearDown(self):
     try:
@@ -40,18 +41,18 @@ class Test(unittest.TestCase):
       super(Test, self).tearDown()
 
   def test_user_logs_function(self):
-    with mock.patch('sys.stdout', new=StringIO()) as fake_stdout:
+    with mock.patch("sys.stdout", new=StringIO()) as fake_stdout:
       logger = logging.Logger(name="relevance_logger")
       logging_utils.set_user_level_logging(logger)
 
-      with mock.patch('logging.root', new=logger):
+      with mock.patch("logging.root", new=logger):
         message = "I'm sorry %s"
         logging_utils.user_logs(message, "dave")
 
       self.assertTrue(fake_stdout.getvalue().endswith(message % "dave\n"))
 
   def test_user_logs_filter(self):
-    with mock.patch('sys.stdout', new=StringIO()) as fake_stdout:
+    with mock.patch("sys.stdout", new=StringIO()) as fake_stdout:
       logger = logging.Logger(name="relevance_logger")
       logging_utils.set_user_level_logging(logger)
 
@@ -70,27 +71,29 @@ class Test(unittest.TestCase):
 
   def test_capture(self):
     root = logging.RootLogger(logging.DEBUG)
-    with logging_utils.CaptureLogs('foo', root) as log:
-      root.debug('foo')
+    with logging_utils.CaptureLogs("foo", root) as log:
+      root.debug("foo")
       result = log.read()
-    expected = _LOG_HEADER + ': DEBUG foo\n$'
-    if sys.platform == 'win32':
-      expected = expected.replace('\n', '\r\n')
+    expected = _LOG_HEADER + ": DEBUG foo\n$"
+    if sys.platform == "win32":
+      expected = expected.replace("\n", "\r\n")
     self.assertTrue(
-        re.match(expected.encode('utf-8'), result), (expected, result))
+      re.match(expected.encode("utf-8"), result), (expected, result)
+    )
 
   def test_prepare_logging(self):
     root = logging.RootLogger(logging.DEBUG)
-    filepath = os.path.join(self.tmp, 'test.log')
+    filepath = os.path.join(self.tmp, "test.log")
     logging_utils.prepare_logging(filepath, root)
-    root.debug('foo')
-    with open(filepath, 'rb') as f:
+    root.debug("foo")
+    with open(filepath, "rb") as f:
       result = f.read()
     # It'd be nice to figure out a way to ensure it's properly in UTC but it's
     # tricky to do reliably.
-    expected = _LOG_HEADER + ' D: foo\n$'
+    expected = _LOG_HEADER + " D: foo\n$"
     self.assertTrue(
-        re.match(expected.encode('utf-8'), result), (expected, result))
+      re.match(expected.encode("utf-8"), result), (expected, result)
+    )
 
   def test_rotating(self):
     # Create a rotating log. Create a subprocess then delete the file. Make sure
@@ -98,23 +101,24 @@ class Test(unittest.TestCase):
     # Everything is done in a child process because the called functions mutate
     # the global state.
     r = subprocess.call(
-        [sys.executable, '-u', 'phase1.py', self.tmp],
-        cwd=os.path.join(test_env.TESTS_DIR, 'logging_utils'))
+      [sys.executable, "-u", "phase1.py", self.tmp],
+      cwd=os.path.join(test_env.TESTS_DIR, "logging_utils"),
+    )
     self.assertEqual(0, r)
-    self.assertEqual({'shared.1.log'}, set(os.listdir(self.tmp)))
-    with open(os.path.join(self.tmp, 'shared.1.log'), 'rb') as f:
+    self.assertEqual({"shared.1.log"}, set(os.listdir(self.tmp)))
+    with open(os.path.join(self.tmp, "shared.1.log"), "rb") as f:
       lines = f.read().splitlines()
     expected = [
-      r' I: Parent1',
-      r' I: Child1',
-      r' I: Child2',
-      r' I: Parent2',
+      r" I: Parent1",
+      r" I: Child1",
+      r" I: Child2",
+      r" I: Parent2",
     ]
     for e, l in zip(expected, lines):
-      ex = _LOG_HEADER_PID + e + '$'
-      self.assertTrue(re.match(ex.encode('utf-8'), l), (ex, l))
+      ex = _LOG_HEADER_PID + e + "$"
+      self.assertTrue(re.match(ex.encode("utf-8"), l), (ex, l))
     self.assertEqual(len(expected), len(lines))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   test_env.main()

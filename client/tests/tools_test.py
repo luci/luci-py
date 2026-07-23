@@ -36,20 +36,20 @@ class FindExecutableTest(auto_stub.TestCase):
   def setUp(self):
     super(FindExecutableTest, self).setUp()
     self.PATH = []
-    self.playground = os.path.realpath(tempfile.mkdtemp('tools_test-'))
+    self.playground = os.path.realpath(tempfile.mkdtemp("tools_test-"))
 
     self._orig_cwd = os.getcwd()
     os.chdir(self.playground)
 
-    if 'WIN' in self.id():
+    if "WIN" in self.id():
       self.mock(sys, "platform", "win32")
     else:
       self.mock(sys, "platform", "linux")
 
     # initial
-    self._touch_exe('SYSTEM', 'python')
-    self._touch_exe('SYSTEM', 'python.exe')
-    self._add_PATH_abs('SYSTEM')
+    self._touch_exe("SYSTEM", "python")
+    self._touch_exe("SYSTEM", "python.exe")
+    self._add_PATH_abs("SYSTEM")
 
   def tearDown(self):
     super(FindExecutableTest, self).tearDown()
@@ -71,8 +71,8 @@ class FindExecutableTest(auto_stub.TestCase):
     if not os.path.isdir(d):
       os.makedirs(d)
 
-    with open(full, 'w') as f:
-      f.write('hi')
+    with open(full, "w") as f:
+      f.write("hi")
 
     return full
 
@@ -83,53 +83,54 @@ class FindExecutableTest(auto_stub.TestCase):
     return full
 
   def _fe(self, cmd):
-    return tools.find_executable(cmd, env={'PATH': os.pathsep.join(self.PATH)})
+    return tools.find_executable(cmd, env={"PATH": os.pathsep.join(self.PATH)})
 
   def test_missing_passthrough(self):
-    cmd = ['not_a_real_path']
+    cmd = ["not_a_real_path"]
     self.assertEqual(cmd, self._fe(cmd))
 
   def test_missing_abs_passthrough(self):
-    cmd = [self._abs('not', 'real')]
+    cmd = [self._abs("not", "real")]
     self.assertEqual(cmd, self._fe(cmd))
 
-  @unittest.skipIf(sys.platform == 'win32', 'posix only')
+  @unittest.skipIf(sys.platform == "win32", "posix only")
   def test_bad_permissions(self):
-    cmd = ['config_file']
-    os.chmod(self._touch('something', 'dir', 'config_file'), 0)
-    os.chmod(self._abs('something', 'dir'), 0)
-    self._add_PATH_abs('something', 'dir')
+    cmd = ["config_file"]
+    os.chmod(self._touch("something", "dir", "config_file"), 0)
+    os.chmod(self._abs("something", "dir"), 0)
+    self._add_PATH_abs("something", "dir")
     self.assertEqual(cmd, self._fe(cmd))
 
   def test_WIN_implicit_extension(self):
-    self.assertEqual([self._touch_exe('SYSTEM', 'hello.bat')],
-                     self._fe(['hello']))
+    self.assertEqual(
+      [self._touch_exe("SYSTEM", "hello.bat")], self._fe(["hello"])
+    )
 
   def test_implicit_cwd(self):
-    self.assertEqual([self._touch_exe('python')], self._fe(['python']))
+    self.assertEqual([self._touch_exe("python")], self._fe(["python"]))
 
   def test_WIN_implicit_cwd(self):
-    self.assertEqual([self._touch_exe('python.bat')], self._fe(['python']))
+    self.assertEqual([self._touch_exe("python.bat")], self._fe(["python"]))
 
   def test_relative_PATH_entry(self):
-    self.PATH.insert(0, 'LOCAL')
-    self.assertEqual([self._touch_exe('LOCAL', 'thingy')], self._fe(['thingy']))
+    self.PATH.insert(0, "LOCAL")
+    self.assertEqual([self._touch_exe("LOCAL", "thingy")], self._fe(["thingy"]))
 
   def test_skip_empty(self):
-    self.PATH.insert(0, '')
-    self.assertEqual([self._abs('SYSTEM', 'python')], self._fe(['python']))
+    self.PATH.insert(0, "")
+    self.assertEqual([self._abs("SYSTEM", "python")], self._fe(["python"]))
 
   def test_explicit_relative(self):
-    self.assertEqual([self._touch_exe('python')], self._fe(['./python']))
+    self.assertEqual([self._touch_exe("python")], self._fe(["./python"]))
 
   def test_WIN_explicit_relative(self):
-    self.assertEqual([self._touch_exe('python.exe')], self._fe(['./python']))
+    self.assertEqual([self._touch_exe("python.exe")], self._fe(["./python"]))
 
   def test_explicit_relative_missing(self):
     # slash gets flipped on windows because this is not resolved to an absolute
     # path.
-    self.assertEqual([os.path.join('.', 'not_real')], self._fe(['./not_real']))
+    self.assertEqual([os.path.join(".", "not_real")], self._fe(["./not_real"]))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   test_env.main()

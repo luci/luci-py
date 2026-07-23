@@ -29,7 +29,7 @@ from utils import file_path
 # the file in the parent process, it fails with:
 #     WindowsError: [Error 32] The process cannot access the file because
 #     it is being used by another process
-if sys.platform == 'win32':
+if sys.platform == "win32":
   import ctypes
   import msvcrt  # pylint: disable=F0401
 
@@ -44,7 +44,6 @@ if sys.platform == 'win32':
   # TODO(maruel): Make it work in cygwin too if necessary. This would have to
   # use ctypes.cdll.kernel32 instead of msvcrt.
 
-
   def shared_open(path):
     """Opens a file with full sharing mode and without inheritance.
 
@@ -53,16 +52,16 @@ if sys.platform == 'win32':
     See https://bugs.python.org/issue15244 for inspiration.
     """
     handle = ctypes.windll.kernel32.CreateFileW(
-        path,
-        GENERIC_READ|GENERIC_WRITE,
-        FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
-        None,
-        OPEN_ALWAYS,
-        FILE_ATTRIBUTE_NORMAL,
-        None)
+      path,
+      GENERIC_READ | GENERIC_WRITE,
+      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+      None,
+      OPEN_ALWAYS,
+      FILE_ATTRIBUTE_NORMAL,
+      None,
+    )
     ctr_handle = msvcrt.open_osfhandle(handle, os.O_BINARY | os.O_NOINHERIT)
-    return os.fdopen(ctr_handle, 'r+b')
-
+    return os.fdopen(ctr_handle, "r+b")
 
   class NoInheritRotatingFileHandler(logging.handlers.RotatingFileHandler):
     def _open(self):
@@ -76,14 +75,13 @@ if sys.platform == 'win32':
         # codecs.open(self.baseFilename, self.mode, self.encoding)
         info = codecs.lookup(self.encoding)
         f = codecs.StreamReaderWriter(
-            f, info.streamreader, info.streamwriter, 'replace')
+          f, info.streamreader, info.streamwriter, "replace"
+        )
         f.encoding = self.encoding
       return f
 
 
 else:  # Not Windows.
-
-
   NoInheritRotatingFileHandler = logging.handlers.RotatingFileHandler
 
 # INFO has a priority of 20
@@ -95,13 +93,15 @@ LEVELS = [logging.ERROR, logging.INFO, logging.DEBUG]
 
 class CaptureLogs:
   """Captures all the logs in a context."""
+
   def __init__(self, prefix, root=None):
-    handle, self._path = tempfile.mkstemp(prefix=prefix, suffix='.log')
+    handle, self._path = tempfile.mkstemp(prefix=prefix, suffix=".log")
     os.close(handle)
-    self._handler = logging.FileHandler(self._path, 'w')
+    self._handler = logging.FileHandler(self._path, "w")
     self._handler.setLevel(logging.DEBUG)
     formatter = UTCFormatter(
-        '%(process)d %(asctime)s: %(levelname)-5s %(message)s')
+      "%(process)d %(asctime)s: %(levelname)-5s %(message)s"
+    )
     self._handler.setFormatter(formatter)
     self._root = root or logging.getLogger()
     self._root.addHandler(self._handler)
@@ -115,10 +115,10 @@ class CaptureLogs:
     self._disconnect()
     assert self._path
     try:
-      with open(self._path, 'rb') as f:
+      with open(self._path, "rb") as f:
         return f.read()
     except IOError as e:
-      return 'Failed to read %s: %s' % (self._path, e)
+      return "Failed to read %s: %s" % (self._path, e)
 
   def close(self):
     """Closes and delete the log."""
@@ -127,7 +127,7 @@ class CaptureLogs:
       try:
         os.remove(self._path)
       except OSError as e:
-        logging.error('Failed to delete log file %s: %s', self._path, e)
+        logging.error("Failed to delete log file %s: %s", self._path, e)
       self._path = None
 
   def __enter__(self):
@@ -170,19 +170,20 @@ class SeverityFilter(logging.Filter):
 def find_stderr(root=None):
   """Returns the logging.handler streaming to stderr, if any."""
   for log in (root or logging.getLogger()).handlers:
-    if getattr(log, 'stream', None) is sys.stderr:
+    if getattr(log, "stream", None) is sys.stderr:
       return log
 
 
 def new_rotating_file_handler(
-    filename,
-    utc_formatter=UTCFormatter(
-        '%(process)d %(asctime)s %(severity)s: %(message)s')):
+  filename,
+  utc_formatter=UTCFormatter(
+    "%(process)d %(asctime)s %(severity)s: %(message)s"
+  ),
+):
   file_path.ensure_tree(os.path.dirname(os.path.abspath(filename)))
-  rotating_file = NoInheritRotatingFileHandler(filename,
-                                               maxBytes=10 * 1024 * 1024,
-                                               backupCount=5,
-                                               encoding='utf-8')
+  rotating_file = NoInheritRotatingFileHandler(
+    filename, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+  )
   rotating_file.setLevel(logging.DEBUG)
   rotating_file.setFormatter(utc_formatter)
   rotating_file.addFilter(SeverityFilter())
@@ -201,12 +202,13 @@ def prepare_logging(filename, root=None):
   logger = root or logging.getLogger()
   if not logger:
     # Better print insanity than crash.
-    print('OMG NO ROOT', file=sys.stderr)
+    print("OMG NO ROOT", file=sys.stderr)
     return
   logger.setLevel(logging.DEBUG)
 
   utc_formatter = UTCFormatter(
-      '%(process)d %(asctime)s %(severity)s: %(message)s')
+    "%(process)d %(asctime)s %(severity)s: %(message)s"
+  )
 
   stderr = logging.StreamHandler()
   stderr.setFormatter(utc_formatter)
@@ -222,7 +224,7 @@ def prepare_logging(filename, root=None):
       logger.addHandler(new_rotating_file_handler(filename, utc_formatter))
     except Exception:
       # May happen on cygwin. Do not crash.
-      logging.exception('Failed to open %s', filename)
+      logging.exception("Failed to open %s", filename)
 
 
 def set_console_level(level, root=None):
@@ -230,7 +232,7 @@ def set_console_level(level, root=None):
   handler = find_stderr(root)
   if not handler:
     # Better print insanity than crash.
-    print('OMG NO STDERR', file=sys.stderr)
+    print("OMG NO STDERR", file=sys.stderr)
     return
   handler.setLevel(level)
 
@@ -268,7 +270,8 @@ def set_user_level_logging(logger=None):
 
   logging.addLevelName(USER_LOGS, "USER_LOGS")
   user_logs_formatter = UTCFormatter(
-      "swarming_bot_logs: %(asctime)s: %(message)s")
+    "swarming_bot_logs: %(asctime)s: %(message)s"
+  )
 
   stdout_handler = logging.StreamHandler(stream=sys.stdout)
   stdout_handler.setLevel(USER_LOGS)
@@ -292,22 +295,30 @@ class OptionParserWithLogging(optparse.OptionParser):
   logger_root = None
 
   def __init__(self, verbose=0, log_file=None, **kwargs):
-    kwargs.setdefault('description', sys.modules['__main__'].__doc__)
+    kwargs.setdefault("description", sys.modules["__main__"].__doc__)
     optparse.OptionParser.__init__(self, **kwargs)
-    self.group_logging = optparse.OptionGroup(self, 'Logging')
+    self.group_logging = optparse.OptionGroup(self, "Logging")
     self.group_logging.add_option(
-        '-v', '--verbose',
-        action='count',
-        default=verbose,
-        help='Use multiple times to increase verbosity')
+      "-v",
+      "--verbose",
+      action="count",
+      default=verbose,
+      help="Use multiple times to increase verbosity",
+    )
     if self.enable_log_file:
       self.group_logging.add_option(
-          '-l', '--log-file',
-          default=log_file,
-          help='The name of the file to store rotating log details')
+        "-l",
+        "--log-file",
+        default=log_file,
+        help="The name of the file to store rotating log details",
+      )
       self.group_logging.add_option(
-          '--no-log', action='store_const', const='', dest='log_file',
-          help='Disable log file')
+        "--no-log",
+        action="store_const",
+        const="",
+        dest="log_file",
+        help="Disable log file",
+      )
 
   def parse_args(self, *args, **kwargs):
     # Make sure this group is always the last one.
@@ -316,7 +327,8 @@ class OptionParserWithLogging(optparse.OptionParser):
     options, args = optparse.OptionParser.parse_args(self, *args, **kwargs)
     prepare_logging(self.enable_log_file and options.log_file, self.logger_root)
     set_console_level(
-        LEVELS[min(len(LEVELS) - 1, options.verbose)], self.logger_root)
+      LEVELS[min(len(LEVELS) - 1, options.verbose)], self.logger_root
+    )
 
     return options, args
 
@@ -328,27 +340,35 @@ class ArgumentParserWithLogging(argparse.ArgumentParser):
   enable_log_file = True
 
   def __init__(self, verbose=0, log_file=None, **kwargs):
-    kwargs.setdefault('description', sys.modules['__main__'].__doc__)
-    kwargs.setdefault('conflict_handler', 'resolve')
+    kwargs.setdefault("description", sys.modules["__main__"].__doc__)
+    kwargs.setdefault("conflict_handler", "resolve")
     self.__verbose = verbose
     self.__log_file = log_file
     super(ArgumentParserWithLogging, self).__init__(**kwargs)
 
   def _add_logging_group(self):
-    group = self.add_argument_group('Logging')
+    group = self.add_argument_group("Logging")
     group.add_argument(
-        '-v', '--verbose',
-        action='count',
-        default=self.__verbose,
-        help='Use multiple times to increase verbosity')
+      "-v",
+      "--verbose",
+      action="count",
+      default=self.__verbose,
+      help="Use multiple times to increase verbosity",
+    )
     if self.enable_log_file:
       group.add_argument(
-          '-l', '--log-file',
-          default=self.__log_file,
-          help='The name of the file to store rotating log details')
+        "-l",
+        "--log-file",
+        default=self.__log_file,
+        help="The name of the file to store rotating log details",
+      )
       group.add_argument(
-          '--no-log', action='store_const', const='', dest='log_file',
-          help='Disable log file')
+        "--no-log",
+        action="store_const",
+        const="",
+        dest="log_file",
+        help="Disable log file",
+      )
 
   def parse_args(self, *args, **kwargs):
     # Make sure this group is always the last one.
@@ -357,6 +377,7 @@ class ArgumentParserWithLogging(argparse.ArgumentParser):
     args = super(ArgumentParserWithLogging, self).parse_args(*args, **kwargs)
     prepare_logging(self.enable_log_file and args.log_file, self.logger_root)
     set_console_level(
-        LEVELS[min(len(LEVELS) - 1, args.verbose)], self.logger_root)
+      LEVELS[min(len(LEVELS) - 1, args.verbose)], self.logger_root
+    )
 
     return args

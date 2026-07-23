@@ -31,6 +31,7 @@ _caches_lock = threading.Lock()
 
 class Profiler:
   """Context manager that records time spend inside its body."""
+
   def __init__(self, name):
     self.name = name
     self.start_time = None
@@ -41,8 +42,9 @@ class Profiler:
 
   def __exit__(self, _exc_type, _exec_value, _traceback):
     time_taken = time.time() - self.start_time
-    logging.info('Profiling: Section %s took %3.3f seconds',
-                 self.name, time_taken)
+    logging.info(
+      "Profiling: Section %s took %3.3f seconds", self.name, time_taken
+    )
 
 
 class ProfileCounter:
@@ -61,21 +63,22 @@ class ProfileCounter:
 
   @staticmethod
   def summarize_all():
-    print('\nProfiling report:')
-    print('-' * 80)
+    print("\nProfiling report:")
+    print("-" * 80)
     print(
-        '{:<38}{:<10}{:<16}{:<16}'.format(
-            'Name', 'Count', 'Total ms', 'Average ms'))
-    print('-' * 80)
+      "{:<38}{:<10}{:<16}{:<16}".format(
+        "Name", "Count", "Total ms", "Average ms"
+      )
+    )
+    print("-" * 80)
     with ProfileCounter._instances_lock:
       for i in sorted(ProfileCounter._instances, key=lambda x: -x.total_time):
         print(
-            '{:<38}{:<10}{:<16.1f}{:<16.1f}'.format(
-                i.name,
-                i.call_count,
-                i.total_time * 1000,
-                i.average_time * 1000))
-    print('-' * 80)
+          "{:<38}{:<10}{:<16.1f}{:<16.1f}".format(
+            i.name, i.call_count, i.total_time * 1000, i.average_time * 1000
+          )
+        )
+    print("-" * 80)
 
   def __init__(self, name):
     self._lock = threading.Lock()
@@ -108,7 +111,7 @@ class ProfileCounter:
       return 0
 
   def __enter__(self):
-    recursion = getattr(self._active, 'recursion', 0)
+    recursion = getattr(self._active, "recursion", 0)
     if not recursion:
       self._active.started = time.time()
     self._active.recursion = recursion + 1
@@ -129,18 +132,21 @@ def profile(func):
   The final report is emitted to stdout at the process exit time.
   """
   # No performance impact whatsoever if SWARMING_PROFILE is not set.
-  if os.environ.get('SWARMING_PROFILE') != '1':
+  if os.environ.get("SWARMING_PROFILE") != "1":
     return func
   timer = ProfileCounter(func.__name__)
+
   @functools.wraps(func)
   def wrapper(*args, **kwargs):
     with timer:
       return func(*args, **kwargs)
+
   return wrapper
 
 
 def report_cache_stats_at_exit(func, cache):
   """Registers a hook that reports state of the cache on the process exit."""
+
   # Very dumb. Tries to account for object reuse though.
   def get_size(obj, seen):
     # Use id(...) to avoid triggering __hash__ and comparing by value instead.
@@ -152,14 +158,15 @@ def report_cache_stats_at_exit(func, cache):
       return size + sum(get_size(x, seen) for x in obj)
     if isinstance(obj, dict):
       return size + sum(
-          get_size(k, seen) + get_size(v, seen) for k, v in obj.items())
+        get_size(k, seen) + get_size(v, seen) for k, v in obj.items()
+      )
     return size
 
   def report_caches_state():
-    print('\nFunction cache report:')
-    print('-' * 80)
-    print('{:<40}{:<16}{:<26}'.format('Name', 'Items', 'Approx size, KB'))
-    print('-' * 80)
+    print("\nFunction cache report:")
+    print("-" * 80)
+    print("{:<40}{:<16}{:<26}".format("Name", "Items", "Approx size, KB"))
+    print("-" * 80)
     with _caches_lock:
       total = 0
       seen_objects = set()
@@ -167,10 +174,11 @@ def report_cache_stats_at_exit(func, cache):
         size = get_size(cache, seen_objects)
         total += size
         print(
-            '{:<40}{:<16}{:<26}'.format(func.__name__, len(cache), size / 1024))
-    print('-' * 80)
-    print('Total: %.1f MB' % (total / 1024 / 1024,))
-    print('-' * 80)
+          "{:<40}{:<16}{:<26}".format(func.__name__, len(cache), size / 1024)
+        )
+    print("-" * 80)
+    print("Total: %.1f MB" % (total / 1024 / 1024,))
+    print("-" * 80)
 
   with _caches_lock:
     _caches.append((func, cache))
@@ -179,6 +187,7 @@ def report_cache_stats_at_exit(func, cache):
 
 
 _CACHED_FUNCS = set()
+
 
 def clear_cache_all():
   for f in _CACHED_FUNCS:
@@ -201,7 +210,7 @@ def cached(func):
   empty = object()
   cache = {}
 
-  if os.environ.get('SWARMING_PROFILE') == '1':
+  if os.environ.get("SWARMING_PROFILE") == "1":
     report_cache_stats_at_exit(func, cache)
 
   @functools.wraps(func)
@@ -219,7 +228,7 @@ def cached(func):
 
 def clear_cache(func):
   """Clears all accumulated cached results of the given decorated function."""
-  if not hasattr(func, '__cache__'):
+  if not hasattr(func, "__cache__"):
     logging.debug("This function isn't decorated with @cached properly.")
     return
   func.__cache__.clear()
@@ -227,12 +236,13 @@ def clear_cache(func):
 
 class Unbuffered:
   """Disable buffering on a file object."""
+
   def __init__(self, stream):
     self.stream = stream
 
   def write(self, data):
     self.stream.write(data)
-    if '\n' in data:
+    if "\n" in data:
       self.stream.flush()
 
   def __getattr__(self, attr):
@@ -241,11 +251,11 @@ class Unbuffered:
 
 def disable_buffering():
   """Makes this process and child processes stdout unbuffered."""
-  if not os.environ.get('PYTHONUNBUFFERED'):
+  if not os.environ.get("PYTHONUNBUFFERED"):
     # Since sys.stdout is a C++ object, it's impossible to do
     # sys.stdout.write = lambda...
     sys.stdout = Unbuffered(sys.stdout)
-    os.environ['PYTHONUNBUFFERED'] = 'x'
+    os.environ["PYTHONUNBUFFERED"] = "x"
 
 
 def find_executable(cmd, env=None):
@@ -284,13 +294,13 @@ def find_executable(cmd, env=None):
     return os.path.isfile(candidate) and os.access(candidate, os.X_OK)
 
   # anti_sep is like os.path.altsep, but it's always defined
-  anti_sep = '/' if os.path.sep == '\\' else '\\'
+  anti_sep = "/" if os.path.sep == "\\" else "\\"
   cmd = [cmd[0].replace(anti_sep, os.path.sep)] + cmd[1:]
 
   # exts are the file extensions to try. If the command already has an extension
   # or we're not on windows, then we don't try any extensions.
   has_ext = bool(os.path.splitext(cmd[0])[1])
-  exts = ('',) if sys.platform != 'win32' or has_ext else ('.exe', '.bat')
+  exts = ("",) if sys.platform != "win32" or has_ext else (".exe", ".bat")
 
   def _resolve_extension(candidate):
     for ext in exts:
@@ -309,9 +319,9 @@ def find_executable(cmd, env=None):
     return cmd
 
   # We have a non-absolute, non-relative executable, so walk PATH.
-  paths = (os.environ if env is None else env).get('PATH', '').split(os.pathsep)
-  for path in ['.'] + paths:
-    if path == '':
+  paths = (os.environ if env is None else env).get("PATH", "").split(os.pathsep)
+  for path in ["."] + paths:
+    if path == "":
       continue
     resolved = _resolve_extension(os.path.join(os.path.abspath(path), cmd[0]))
     if resolved:
@@ -322,7 +332,7 @@ def find_executable(cmd, env=None):
 
 
 def read_json(filepath):
-  with open(filepath, 'r') as f:
+  with open(filepath, "r") as f:
     return json.load(f)
 
 
@@ -332,14 +342,14 @@ def write_json(filepath_or_handle, data, dense):
   If dense is True, the json is packed. Otherwise, it is human readable.
   """
   if dense:
-    kwargs = {'sort_keys': True, 'separators': (',', ':')}
+    kwargs = {"sort_keys": True, "separators": (",", ":")}
   else:
-    kwargs = {'sort_keys': True, 'indent': 2}
+    kwargs = {"sort_keys": True, "indent": 2}
 
-  if hasattr(filepath_or_handle, 'write'):
+  if hasattr(filepath_or_handle, "write"):
     json.dump(data, filepath_or_handle, **kwargs)
   else:
-    with open(filepath_or_handle, 'w') as f:
+    with open(filepath_or_handle, "w") as f:
       json.dump(data, f, **kwargs)
 
 
@@ -364,7 +374,7 @@ def get_bool_env_var(name):
 
   If environment variable is missing or is set to '0', returns False.
   """
-  return bool(int(os.environ.get(name, '0')))
+  return bool(int(os.environ.get(name, "0")))
 
 
 def is_headless():
@@ -372,7 +382,7 @@ def is_headless():
 
   Examines os.environ for presence of SWARMING_HEADLESS var.
   """
-  return get_bool_env_var('SWARMING_HEADLESS')
+  return get_bool_env_var("SWARMING_HEADLESS")
 
 
 def get_cacerts_bundle():
@@ -391,15 +401,14 @@ def get_cacerts_bundle():
       return _ca_certs
     # Some rogue process clears /tmp and causes cacert.pem to disappear. Extract
     # to current directory instead. We use our own bundled copy of cacert.pem.
-    _ca_certs = zip_package.extract_resource(utils, 'cacert.pem', temp_dir='.')
+    _ca_certs = zip_package.extract_resource(utils, "cacert.pem", temp_dir=".")
     return _ca_certs
 
 
 def get_os_cacerts_bundle():
-  """Returns paths to CA trust store location for different OS.
-  """
-  if sys.platform == 'linux':
-    return '/etc/ssl/certs/ca-certificates.crt'
+  """Returns paths to CA trust store location for different OS."""
+  if sys.platform == "linux":
+    return "/etc/ssl/certs/ca-certificates.crt"
   return None
 
 
@@ -440,7 +449,7 @@ def force_local_third_party(root=None):
       # interactive prompt. Make this case work since it's helpful during the
       # python3 transition, as it makes the edit-debug loop much faster.
       root = os.path.dirname(os.getcwd())
-      logging.warning('Falling back to current directory %s', root)
-  sys.path.insert(0, os.path.join(root, 'third_party', 'pyasn1'))
-  sys.path.insert(0, os.path.join(root, 'third_party', 'rsa'))
-  sys.path.insert(0, os.path.join(root, 'third_party'))
+      logging.warning("Falling back to current directory %s", root)
+  sys.path.insert(0, os.path.join(root, "third_party", "pyasn1"))
+  sys.path.insert(0, os.path.join(root, "third_party", "rsa"))
+  sys.path.insert(0, os.path.join(root, "third_party"))

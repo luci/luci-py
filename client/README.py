@@ -24,14 +24,14 @@ import sys
 
 def main():
   for i in sorted(os.listdir(os.path.dirname(os.path.abspath(__file__)))):
-    if not i.endswith('.py') or i == 'PRESUBMIT.py':
+    if not i.endswith(".py") or i == "PRESUBMIT.py":
       continue
     module = __import__(i[:-3])
-    if hasattr(module, '__doc__'):
+    if hasattr(module, "__doc__"):
       print(module.__name__)
-      print(''.join('  %s\n' % i for i in module.__doc__.splitlines()))
+      print("".join("  %s\n" % i for i in module.__doc__.splitlines()))
   return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   sys.exit(main())
