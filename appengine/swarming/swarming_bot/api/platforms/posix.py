@@ -20,16 +20,19 @@ def _run_df():
     4. used in percent
     5. mount point
   """
-  proc = subprocess.Popen(['/bin/df', '-k', '-P', '-l'],
-                          env={'LANG': 'C'},
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE)
+  proc = subprocess.Popen(
+    ["/bin/df", "-k", "-P", "-l"],
+    env={"LANG": "C"},
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+  )
   for l in proc.communicate()[0].splitlines():
-    l = l.decode('utf-8')
-    if l.startswith('/dev/'):
+    l = l.decode("utf-8")
+    if l.startswith("/dev/"):
       items = l.split()
-      if (sys.platform == 'darwin'
-          and items[5].startswith('/Volumes/firmwaresyncd.')):
+      if sys.platform == "darwin" and items[5].startswith(
+        "/Volumes/firmwaresyncd."
+      ):
         # There's an issue on OSX where sometimes a small volume is mounted
         # during boot time and may be caught here by accident. Just ignore it as
         # it could trigger the low free disk space check and cause an unexpected
@@ -55,13 +58,13 @@ def get_disks_info():
       # Sometimes df lists paths that cannot be stat'ed, ignore them.
       continue
     out[path] = {
-        # Do not use the value reported by 'df' since it includes all the free
-        # space, including the free space reserved by root. Since the Swarming
-        # bot is likely not running as root, it present an inflated value of
-        # what is usable.
-        # 'free_mb': round(float(items[3]) / 1024., 1),
-        'free_mb': round(float(f.f_bavail * f.f_frsize) / 1024. / 1024., 1),
-        'size_mb': round(float(block_size) / 1024., 1),
+      # Do not use the value reported by 'df' since it includes all the free
+      # space, including the free space reserved by root. Since the Swarming
+      # bot is likely not running as root, it present an inflated value of
+      # what is usable.
+      # 'free_mb': round(float(items[3]) / 1024., 1),
+      "free_mb": round(float(f.f_bavail * f.f_frsize) / 1024.0 / 1024.0, 1),
+      "size_mb": round(float(block_size) / 1024.0, 1),
     }
 
   return out

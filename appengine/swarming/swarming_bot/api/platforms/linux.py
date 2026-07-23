@@ -26,10 +26,11 @@ from api.platforms import gpu
 ## Private stuff.
 
 _RESOLUTION_REGEX = re.compile(
-    r' connected primary (?P<horizontal>\d+)x(?P<vertical>\d+)\+')
+  r" connected primary (?P<horizontal>\d+)x(?P<vertical>\d+)\+"
+)
 
 
-libc = ctypes.cdll.LoadLibrary(ctypes.util.find_library('c'))
+libc = ctypes.cdll.LoadLibrary(ctypes.util.find_library("c"))
 
 cpu_mask_t = ctypes.c_ulong
 
@@ -38,15 +39,16 @@ NCPUBITS = 8 * ctypes.sizeof(cpu_mask_t)
 
 pid_t = ctypes.c_uint64
 
+
 class cpu_set_t(ctypes.Structure):
-  _fields_ = [('__bits', cpu_mask_t * (CPU_SETSIZE // NCPUBITS))]
+  _fields_ = [("__bits", cpu_mask_t * (CPU_SETSIZE // NCPUBITS))]
 
   def get_cpus(self):
     """Convert bits in list len == CPU_SETSIZE
     Use 1 / 0 per cpu
     """
     cpus = []
-    for bitmask in getattr(self, '__bits'):
+    for bitmask in getattr(self, "__bits"):
       for i in range(NCPUBITS):
         if bitmask & 1:
           cpus.append(i)
@@ -64,9 +66,8 @@ def get_num_processors():
   # find out the number of usable processors instead.
   cpu_set = cpu_set_t()
   err = libc.sched_getaffinity(
-      pid_t(os.getpid()),
-      ctypes.sizeof(cpu_set_t),
-      ctypes.pointer(cpu_set))
+    pid_t(os.getpid()), ctypes.sizeof(cpu_set_t), ctypes.pointer(cpu_set)
+  )
   if err != 0:
     # This is not a big deal, fallback onto multiprocessing. This happens on
     # MIPS.
@@ -81,7 +82,8 @@ def _lspci():
   """
   try:
     lines = subprocess.check_output(
-        ['lspci', '-mm', '-nn'], stderr=subprocess.PIPE).splitlines()
+      ["lspci", "-mm", "-nn"], stderr=subprocess.PIPE
+    ).splitlines()
   except (OSError, subprocess.CalledProcessError):
     # It normally happens on Google Compute Engine as lspci is not installed by
     # default and on ARM since they do not have a PCI bus.
@@ -92,7 +94,7 @@ def _lspci():
 @tools.cached
 def _get_nvidia_version():
   try:
-    with open('/sys/module/nvidia/version') as f:
+    with open("/sys/module/nvidia/version") as f:
       # Looks like '367.27'.
       return f.read().strip()
   except (IOError, OSError):
@@ -105,10 +107,10 @@ def _get_mesa_version():
   GPU driver versions.
   """
   try:
-    out = subprocess.check_output(['dpkg', '-s', 'libgl1-mesa-dri']).decode()
+    out = subprocess.check_output(["dpkg", "-s", "libgl1-mesa-dri"]).decode()
     # Looks like 'Version: 17.2.8-0ubuntu0~17.10.1', and we need '17.2.8'.
     for line in out.splitlines():
-      match = re.match(r'^Version: (\d+.\d+.\d+)', line)
+      match = re.match(r"^Version: (\d+.\d+.\d+)", line)
       if match:
         return match.group(1)
     return None
@@ -118,20 +120,20 @@ def _get_mesa_version():
 
 def _read_cpuinfo():
   try:
-    with open('/proc/cpuinfo', 'r') as f:
+    with open("/proc/cpuinfo", "r") as f:
       return f.read()
   except (IOError, OSError):
-    return ''
+    return ""
 
 
 def _read_cgroup():
-  with open('/proc/self/cgroup', 'r') as f:
+  with open("/proc/self/cgroup", "r") as f:
     return f.read()
 
 
 def _read_dmi_file(filename):
   try:
-    with open('/sys/devices/virtual/dmi/id/' + filename, 'r') as f:
+    with open("/sys/devices/virtual/dmi/id/" + filename, "r") as f:
       return f.read().strip()
   except (IOError, OSError):
     return None
@@ -147,9 +149,9 @@ def get_os_version_number():
   Returns:
     - 12.04, 10.04, etc.
   """
-  if distro.id() == 'debian':
+  if distro.id() == "debian":
     # distro doesn't show minor version for debian.
-    with open('/etc/debian_version') as f:
+    with open("/etc/debian_version") as f:
       return f.read().strip()
   # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
   # like '7.6'.
@@ -164,12 +166,12 @@ def get_temperatures():
       (e.g. {'thermal_zone0': 43.0, 'thermal_zone1': 46.117})
   """
   temps = {}
-  path = '/sys/class/thermal'
+  path = "/sys/class/thermal"
   if os.path.isdir(path):
     for filename in os.listdir(path):
-      if re.match(r'^thermal_zone\d+', filename):
+      if re.match(r"^thermal_zone\d+", filename):
         try:
-          with open(os.path.join(path, filename, 'temp'), 'rb') as f:
+          with open(os.path.join(path, filename, "temp"), "rb") as f:
             # Convert from milli-C to Celsius
             temps[filename] = int(f.read()) / 1000.0
         except (IOError, OSError):
@@ -185,7 +187,7 @@ def get_audio():
     return None
   # Join columns 'Vendor' and 'Device'. 'man lspci' for more details.
   return [
-      ': '.join(l[2:4]) for l in pci_devices if l[1] == 'Audio device [0403]'
+    ": ".join(l[2:4]) for l in pci_devices if l[1] == "Audio device [0403]"
   ]
 
 
@@ -193,63 +195,64 @@ def get_audio():
 def get_cpuinfo():
   values = common._safe_parse(_read_cpuinfo())
   cpu_info = {}
-  if 'vendor_id' in values and 'flags' in values:
+  if "vendor_id" in values and "flags" in values:
     # Intel.
-    cpu_info['flags'] = values['flags']
-    cpu_info['model'] = [
-        int(values['cpu family']),
-        int(values['model']),
-        int(values['stepping']),
-        int(values['microcode'], 0),
+    cpu_info["flags"] = values["flags"]
+    cpu_info["model"] = [
+      int(values["cpu family"]),
+      int(values["model"]),
+      int(values["stepping"]),
+      int(values["microcode"], 0),
     ]
-    cpu_info['name'] = values['model name']
-    cpu_info['vendor'] = values['vendor_id']
-  elif 'mips' in values.get('isa', ''):
+    cpu_info["name"] = values["model name"]
+    cpu_info["vendor"] = values["vendor_id"]
+  elif "mips" in values.get("isa", ""):
     # MIPS.
-    cpu_info['flags'] = values['isa']
-    cpu_info['name'] = values['cpu model']
-  elif "POWER" in values.get('cpu', ''):
+    cpu_info["flags"] = values["isa"]
+    cpu_info["name"] = values["cpu model"]
+  elif "POWER" in values.get("cpu", ""):
     # ppc64/ppc64le
-    cpu_info['name'] = values.get('cpu', '').split(' ')[0]
-  elif "S390" in values.get('vendor_id', ''):
+    cpu_info["name"] = values.get("cpu", "").split(" ")[0]
+  elif "S390" in values.get("vendor_id", ""):
     # s390x
-    cpu_info['name'] = values.get('vendor_id', '').split('/')[1]
+    cpu_info["name"] = values.get("vendor_id", "").split("/")[1]
   elif values:
     # CPU implementer == 0x41 means ARM.
-    if 'Features' in values:
-      cpu_info['flags'] = values['Features']
-    if 'CPU variant' in values:
-      cpu_info['model'] = (
-          int(values['CPU variant'], 0),
-          int(values.get('CPU part', 0), 0),
-          int(values.get('CPU revision', 0)),
+    if "Features" in values:
+      cpu_info["flags"] = values["Features"]
+    if "CPU variant" in values:
+      cpu_info["model"] = (
+        int(values["CPU variant"], 0),
+        int(values.get("CPU part", 0), 0),
+        int(values.get("CPU revision", 0)),
       )
     # ARM CPUs have a serial number embedded. Intel did try on the Pentium III
     # but gave up after backlash;
     # http://www.wired.com/1999/01/intel-on-privacy-whoops/
     # http://www.theregister.co.uk/2000/05/04/intel_processor_serial_number_q/
     # It is very ironic that ARM based manufacturers are getting away with.
-    if 'Serial' in values:
-      cpu_info['serial'] = values['Serial'].lstrip('0')
-    if 'Revision' in values:
-      cpu_info['revision'] = values['Revision']
+    if "Serial" in values:
+      cpu_info["serial"] = values["Serial"].lstrip("0")
+    if "Revision" in values:
+      cpu_info["revision"] = values["Revision"]
 
     # 'Hardware' field has better content so use it instead of 'model name' /
     # 'Processor' field.
-    if 'Hardware' in values:
-      cpu_info['name'] = values['Hardware']
+    if "Hardware" in values:
+      cpu_info["name"] = values["Hardware"]
       # Samsung felt this was useful information. Strip that.
-      suffix = ' (Flattened Device Tree)'
-      if cpu_info['name'].endswith(suffix):
-        cpu_info['name'] = cpu_info['name'][:-len(suffix)]
+      suffix = " (Flattened Device Tree)"
+      if cpu_info["name"].endswith(suffix):
+        cpu_info["name"] = cpu_info["name"][: -len(suffix)]
     # SAMSUNG EXYNOS5 uses 'Processor' instead of 'model name' as the key for
     # its name <insert exasperation meme here>.
-    cpu_info['vendor'] = (values.get('model name') or values.get('Processor')
-                          or 'N/A')
+    cpu_info["vendor"] = (
+      values.get("model name") or values.get("Processor") or "N/A"
+    )
 
   # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
-  if 'flags' in cpu_info:
-    cpu_info['flags'] = sorted(i for i in cpu_info['flags'].split())
+  if "flags" in cpu_info:
+    cpu_info["flags"] = sorted(i for i in cpu_info["flags"].split())
   return cpu_info
 
 
@@ -267,14 +270,14 @@ def get_gpu():
 
   dimensions = set()
   state = set()
-  re_id = re.compile(r'^(.+?) \[([0-9a-f]{4})\]$')
+  re_id = re.compile(r"^(.+?) \[([0-9a-f]{4})\]$")
   for line in pci_devices:
     # Look for display class as noted at http://wiki.osdev.org/PCI
     m = re_id.match(line[1])
     if not m:
       continue
     dev_type = m.group(2)
-    if not dev_type or not dev_type.startswith('03'):
+    if not dev_type or not dev_type.startswith("03"):
       continue
     vendor = re_id.match(line[2])
     device = re_id.match(line[3])
@@ -285,7 +288,7 @@ def get_gpu():
     dev_name = device.group(1)
     dev_id = device.group(2)
 
-    version = ''
+    version = ""
     if ven_id == gpu.NVIDIA:
       version = _get_nvidia_version()
     elif ven_id in (gpu.INTEL, gpu.AMD):
@@ -293,12 +296,12 @@ def get_gpu():
     ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
 
     dimensions.add(ven_id)
-    dimensions.add('%s:%s' % (ven_id, dev_id))
+    dimensions.add("%s:%s" % (ven_id, dev_id))
     if version:
-      dimensions.add('%s:%s-%s' % (ven_id, dev_id, version))
-      state.add('%s %s %s' % (ven_name, dev_name, version))
+      dimensions.add("%s:%s-%s" % (ven_id, dev_id, version))
+      state.add("%s %s %s" % (ven_name, dev_name, version))
     else:
-      state.add('%s %s' % (ven_name, dev_name))
+      state.add("%s %s" % (ven_name, dev_name))
   return sorted(dimensions), sorted(state)
 
 
@@ -308,10 +311,10 @@ def get_uptime():
   Includes sleep time.
   """
   try:
-    with open('/proc/uptime', 'rb') as f:
+    with open("/proc/uptime", "rb") as f:
       return float(f.read().split()[0])
   except (IOError, OSError, ValueError):
-    return 0.
+    return 0.0
 
 
 def get_reboot_required():
@@ -320,7 +323,7 @@ def get_reboot_required():
   This only checks /var/run/reboot-required, which not all distros support and
   which is not set for all conditions requiring reboot.
   """
-  return os.path.exists('/var/run/reboot-required')
+  return os.path.exists("/var/run/reboot-required")
 
 
 def is_display_attached():
@@ -333,18 +336,19 @@ def is_display_attached():
   try:
     # Since this uses xrandr, an alternative method will need to be added
     # whenever Wayland is planned to be used for testing.
-    out = subprocess.check_output(['xrandr', '--display', ':0.0', '--query'],
-                                  universal_newlines=True)
+    out = subprocess.check_output(
+      ["xrandr", "--display", ":0.0", "--query"], universal_newlines=True
+    )
   except (OSError, subprocess.CalledProcessError) as e:
     # Could happen when the host is shutting down or lshw is not available
     # for some reason.
-    logging.error('is_display_attached(): %s', e)
+    logging.error("is_display_attached(): %s", e)
     return None
 
   # When a display is properly attached, there should be a monitor listed as
   # connected and set as primary.
   for line in out.splitlines():
-    if ' connected primary ' in line:
+    if " connected primary " in line:
       return True
   return False
 
@@ -361,12 +365,13 @@ def get_display_resolution():
   try:
     # Since this uses xrandr, an alternative method will need to be added
     # whenever Wayland is planned to be used for testing.
-    out = subprocess.check_output(['xrandr', '--display', ':0.0', '--query'],
-                                  universal_newlines=True)
+    out = subprocess.check_output(
+      ["xrandr", "--display", ":0.0", "--query"], universal_newlines=True
+    )
   except (OSError, subprocess.CalledProcessError) as e:
     # Could happen when the host is shutting down or xrandr is not available
     # for some reason.
-    logging.error('get_display_resolution(): %s', e)
+    logging.error("get_display_resolution(): %s", e)
     return None
 
   # When a display is properly attached, there should be a monitor listed as
@@ -376,7 +381,7 @@ def get_display_resolution():
     match = _RESOLUTION_REGEX.search(line)
     if not match:
       continue
-    return int(match.group('horizontal')), int(match.group('vertical'))
+    return int(match.group("horizontal")), int(match.group("vertical"))
 
   return None
 
@@ -385,16 +390,17 @@ def get_display_resolution():
 def get_ssd():
   """Returns a list of SSD disks."""
   try:
-    out = subprocess.check_output(['lsblk', '-d', '-o', 'name,rota'],
-                                  universal_newlines=True).splitlines()
+    out = subprocess.check_output(
+      ["lsblk", "-d", "-o", "name,rota"], universal_newlines=True
+    ).splitlines()
     ssd = []
     for line in out:
-      match = re.match(r'(\w+)\s+(0|1)', line)
-      if match and match.group(2) == '0':
+      match = re.match(r"(\w+)\s+(0|1)", line)
+      if match and match.group(2) == "0":
         ssd.append(match.group(1))
     return tuple(sorted(ssd))
   except (OSError, subprocess.CalledProcessError) as e:
-    logging.error('Failed to read disk info: %s', e)
+    logging.error("Failed to read disk info: %s", e)
     return ()
 
 
@@ -410,7 +416,7 @@ def get_kvm():
   # We only check the file existence, not whether we can access it. This avoids
   # the race condition between swarming_bot and udev which is responsible for
   # setting the correct ACL of /dev/kvm.
-  return os.path.exists('/dev/kvm')
+  return os.path.exists("/dev/kvm")
 
 
 @tools.cached
@@ -422,12 +428,12 @@ def get_inside_docker():
     - 'stock' if running in standard docker.
     - 'nvidia' if running in nvidia-docker.
   """
-  if ':/k8s.io' in _read_cgroup():
-    return 'stock'
-  if not os.path.isfile('/.docker_env') and not os.path.isfile('/.dockerenv'):
+  if ":/k8s.io" in _read_cgroup():
+    return "stock"
+  if not os.path.isfile("/.docker_env") and not os.path.isfile("/.dockerenv"):
     return None
   # TODO(maruel): Detect nvidia-docker.
-  return 'stock'
+  return "stock"
 
 
 @tools.cached
@@ -437,18 +443,18 @@ def get_device_tree_compatible():
   This is generally used on ARM based hardware.
   """
   try:
-    with open('/sys/firmware/devicetree/base/compatible', 'rb') as f:
-      items = f.read().strip().split(b',')
+    with open("/sys/firmware/devicetree/base/compatible", "rb") as f:
+      items = f.read().strip().split(b",")
   except IOError:
     return None
   # The data could contain nul byte or other invalid data, we've observed this
   # on ODROID-C2.
   for i, item in enumerate(items):
-    if b'\x00' in item:
+    if b"\x00" in item:
       items[i] = None
     else:
       try:
-        items[i] = item.decode('utf-8', 'replace')
+        items[i] = item.decode("utf-8", "replace")
       except UnicodeDecodeError:
         items[i] = None
   return sorted(i for i in items if i)
@@ -457,8 +463,8 @@ def get_device_tree_compatible():
 def get_cpu_scaling_governor(cpu_num):
   """Returns the current CPU scaling governor, if available."""
   files = [
-      '/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor' % cpu_num,
-      '/sys/devices/system/cpu/cpufreq/policy%d/scaling_governor' % cpu_num,
+    "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor" % cpu_num,
+    "/sys/devices/system/cpu/cpufreq/policy%d/scaling_governor" % cpu_num,
   ]
   for p in files:
     try:
@@ -579,9 +585,9 @@ esac
 
 exit 0
 """ % {
-      'cmd': ' '.join(shlex.quote(c) for c in command),
-      'cwd': shlex.quote(cwd),
-      'user': shlex.quote(user),
+    "cmd": " ".join(shlex.quote(c) for c in command),
+    "cwd": shlex.quote(cwd),
+    "user": shlex.quote(user),
   }
 
 
@@ -590,17 +596,19 @@ def generate_autostart_desktop(command, name):
 
   http://standards.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html
   """
-  return ('[Desktop Entry]\n'
-          'Type=Application\n'
-          'Name=%(name)s\n'
-          'Exec=%(cmd)s\n'
-          'Hidden=false\n'
-          'NoDisplay=false\n'
-          'Comment=Created by os_utilities.py in swarming_bot.zip\n'
-          'X-GNOME-Autostart-enabled=true\n') % {
-              'cmd': ' '.join(shlex.quote(c) for c in command),
-              'name': name,
-          }
+  return (
+    "[Desktop Entry]\n"
+    "Type=Application\n"
+    "Name=%(name)s\n"
+    "Exec=%(cmd)s\n"
+    "Hidden=false\n"
+    "NoDisplay=false\n"
+    "Comment=Created by os_utilities.py in swarming_bot.zip\n"
+    "X-GNOME-Autostart-enabled=true\n"
+  ) % {
+    "cmd": " ".join(shlex.quote(c) for c in command),
+    "name": name,
+  }
 
 
 @tools.cached
@@ -610,7 +618,8 @@ def get_computer_system_info():
   name, vendor, version, uuid
   """
   return common.ComputerSystemInfo(
-      name=_read_dmi_file('product_name'),
-      vendor=_read_dmi_file('sys_vendor'),
-      version=_read_dmi_file('product_version'),
-      serial=_read_dmi_file('product_serial'))
+    name=_read_dmi_file("product_name"),
+    vendor=_read_dmi_file("sys_vendor"),
+    version=_read_dmi_file("product_version"),
+    serial=_read_dmi_file("product_serial"),
+  )

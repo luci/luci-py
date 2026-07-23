@@ -23,7 +23,7 @@ from bot_code import singleton
 print(singleton.Singleton(%r).acquire())
 """ % (SWARMING_BOT_DIR, THIS_DIR)
 
-CMD_ACQUIRE = [sys.executable, '-u', '-c', PYCODE]
+CMD_ACQUIRE = [sys.executable, "-u", "-c", PYCODE]
 
 
 class Test(unittest.TestCase):
@@ -50,22 +50,24 @@ class Test(unittest.TestCase):
     finally:
       f.release()
 
-  @unittest.skipIf(sys.platform == 'win32',
-                   'TODO(crbug.com/1017545): fail subprocess')
+  @unittest.skipIf(
+    sys.platform == "win32", "TODO(crbug.com/1017545): fail subprocess"
+  )
   def test_singleton_child(self):
-    logging.info('using command:\n%s', ' '.join(CMD_ACQUIRE))
+    logging.info("using command:\n%s", " ".join(CMD_ACQUIRE))
     with singleton.singleton(THIS_DIR):
       pass
-    self.assertEqual(b'True\n', subprocess.check_output(CMD_ACQUIRE))
+    self.assertEqual(b"True\n", subprocess.check_output(CMD_ACQUIRE))
     with singleton.singleton(THIS_DIR):
-      self.assertEqual(b'False\n', subprocess.check_output(CMD_ACQUIRE))
-    self.assertEqual(b'True\n', subprocess.check_output(CMD_ACQUIRE))
+      self.assertEqual(b"False\n", subprocess.check_output(CMD_ACQUIRE))
+    self.assertEqual(b"True\n", subprocess.check_output(CMD_ACQUIRE))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   os.chdir(THIS_DIR)
-  if '-v' in sys.argv:
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
+    level=logging.DEBUG if "-v" in sys.argv else logging.CRITICAL
+  )
   unittest.main()

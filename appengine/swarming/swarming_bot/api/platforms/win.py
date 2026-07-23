@@ -23,24 +23,24 @@ from api.platforms import gpu
 
 
 _WIN32_CLIENT_NAMES = {
-    '5.0': '2000',
-    '5.1': 'XP',
-    '5.2': 'XP',
-    '6.0': 'Vista',
-    '6.1': '7',
-    '6.2': '8',
-    '6.3': '8.1',
-    '10.0': '10',
-    '11.0': '11',
+  "5.0": "2000",
+  "5.1": "XP",
+  "5.2": "XP",
+  "6.0": "Vista",
+  "6.1": "7",
+  "6.2": "8",
+  "6.3": "8.1",
+  "10.0": "10",
+  "11.0": "11",
 }
 
 _WIN32_SERVER_NAMES = {
-    '5.2': '2003Server',
-    '6.0': '2008Server',
-    '6.1': '2008ServerR2',
-    '6.2': '2012Server',
-    '6.3': '2012ServerR2',
-    '10.0': 'Server',
+  "5.2": "2003Server",
+  "6.0": "2008Server",
+  "6.1": "2008ServerR2",
+  "6.2": "2012Server",
+  "6.3": "2012ServerR2",
+  "10.0": "Server",
 }
 
 
@@ -52,8 +52,9 @@ def _get_mount_points():
   DRIVE_FIXED = 3
   # https://msdn.microsoft.com/library/windows/desktop/aa364939.aspx
   return [
-      '%s:\\' % letter for letter in string.ascii_lowercase
-      if ctypes.windll.kernel32.GetDriveTypeW(letter + ':\\') == DRIVE_FIXED
+    "%s:\\" % letter
+    for letter in string.ascii_lowercase
+    if ctypes.windll.kernel32.GetDriveTypeW(letter + ":\\") == DRIVE_FIXED
   ]
 
 
@@ -62,18 +63,21 @@ def _get_disk_info(mount_point):
   total_bytes = ctypes.c_ulonglong(0)
   free_bytes = ctypes.c_ulonglong(0)
   ctypes.windll.kernel32.GetDiskFreeSpaceExW(
-      ctypes.c_wchar_p(mount_point), None, ctypes.pointer(total_bytes),
-      ctypes.pointer(free_bytes))
+    ctypes.c_wchar_p(mount_point),
+    None,
+    ctypes.pointer(total_bytes),
+    ctypes.pointer(free_bytes),
+  )
   return {
-      'free_mb': round(free_bytes.value / 1024. / 1024., 1),
-      'size_mb': round(total_bytes.value / 1024. / 1024., 1),
+    "free_mb": round(free_bytes.value / 1024.0 / 1024.0, 1),
+    "size_mb": round(total_bytes.value / 1024.0 / 1024.0, 1),
   }
 
 
 # WMI namespaces we query, see
 # https://learn.microsoft.com/en-us/windows/win32/winrm/windows-remote-management-and-wmi
-_WMI_DEFAULT_NS = 'root\\cimv2'
-_WMI_STORAGE_NS = 'Root\\Microsoft\\Windows\\Storage'
+_WMI_DEFAULT_NS = "root\\cimv2"
+_WMI_STORAGE_NS = "Root\\Microsoft\\Windows\\Storage"
 
 
 class _WbemScriptingError(Exception):
@@ -101,6 +105,7 @@ def _get_win32com():
   try:
     import pythoncom
     from win32com import client  # pylint: disable=F0401
+
     return client, pythoncom
   except ImportError:
     # win32com is included in pywin32, which is an optional package that is
@@ -117,16 +122,17 @@ def _get_wmi_wbem(namespace=_WMI_DEFAULT_NS):
   if not client:
     return None
   try:
-    wmi_service = client.Dispatch('WbemScripting.SWbemLocator')
-    return _WbemScripting(wmi_service.ConnectServer('.', namespace), pythoncom)
+    wmi_service = client.Dispatch("WbemScripting.SWbemLocator")
+    return _WbemScripting(wmi_service.ConnectServer(".", namespace), pythoncom)
   except pythoncom.com_error as e:
     logging.error(
-        'Cannot construct WMI client for namespace %s: %s', namespace, e)
+      "Cannot construct WMI client for namespace %s: %s", namespace, e
+    )
     return None
 
 
 # Regexp for _get_os_numbers()
-_CMD_RE = r'\[version (\d+\.\d+)\.(\d+(?:\.\d+|))\]'
+_CMD_RE = r"\[version (\d+\.\d+)\.(\d+(?:\.\d+|))\]"
 
 
 @tools.cached
@@ -151,19 +157,19 @@ def _get_os_numbers():
   # - Win1709: Microsoft Windows [Version 10.0.16299.19]
   #
   # Some locale (like fr_CA) use a lower case 'version'.
-  out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip().decode()
+  out = subprocess.check_output(["cmd.exe", "/c", "ver"]).strip().decode()
   match = re.search(_CMD_RE, out, re.IGNORECASE)
   if not match:
     # Failed to start cmd.exe, that's really bad. Return a dummy value to not
     # crash.
-    logging.error('Failed to run cmd.exe /c ver:\n%s', out)
-    return '0.0', '0'
+    logging.error("Failed to run cmd.exe /c ver:\n%s", out)
+    return "0.0", "0"
 
   os_version = match.group(1)
   build_number = match.group(2)
-  major_build_number = build_number.split('.')[0]
-  if os_version == '10.0' and int(major_build_number) >= 22000:
-    os_version = '11.0'
+  major_build_number = build_number.split(".")[0]
+  if os_version == "10.0" and int(major_build_number) >= 22000:
+    os_version = "11.0"
 
   return os_version, build_number
 
@@ -172,8 +178,8 @@ def _is_topmost_window(hwnd):
   """Returns True if |hwnd| is a topmost window."""
   ctypes.windll.user32.GetWindowLongW.restype = ctypes.c_long  # LONG
   ctypes.windll.user32.GetWindowLongW.argtypes = [
-      ctypes.c_void_p,  # HWND
-      ctypes.c_int
+    ctypes.c_void_p,  # HWND
+    ctypes.c_int,
   ]
   # -20 is GWL_EXSTYLE
   ex_styles = ctypes.windll.user32.GetWindowLongW(hwnd, -20)
@@ -185,15 +191,16 @@ def _get_window_class(hwnd):
   """Returns the class name of |hwnd|."""
   ctypes.windll.user32.GetClassNameW.restype = ctypes.c_int
   ctypes.windll.user32.GetClassNameW.argtypes = [
-      ctypes.c_void_p,  # HWND
-      ctypes.c_wchar_p,
-      ctypes.c_int
+    ctypes.c_void_p,  # HWND
+    ctypes.c_wchar_p,
+    ctypes.c_int,
   ]
   name = ctypes.create_unicode_buffer(257)
   name_len = ctypes.windll.user32.GetClassNameW(hwnd, name, len(name))
   if name_len <= 0 or name_len >= len(name):
-    raise ctypes.WinError(descr='GetClassNameW failed; %s' %
-                          ctypes.FormatError())
+    raise ctypes.WinError(
+      descr="GetClassNameW failed; %s" % ctypes.FormatError()
+    )
   return name.value
 
 
@@ -202,25 +209,25 @@ def _get_window_class(hwnd):
 
 def from_cygwin_path(path):
   """Converts an absolute cygwin path to a standard Windows path."""
-  if not path.startswith('/cygdrive/'):
-    logging.error('%s is not a cygwin path', path)
+  if not path.startswith("/cygdrive/"):
+    logging.error("%s is not a cygwin path", path)
     return None
 
   # Remove the cygwin path identifier.
-  path = path[len('/cygdrive/'):]
+  path = path[len("/cygdrive/") :]
 
   # Add : after the drive letter.
-  path = path[:1] + ':' + path[1:]
-  return path.replace('/', '\\')
+  path = path[:1] + ":" + path[1:]
+  return path.replace("/", "\\")
 
 
 def to_cygwin_path(path):
   """Converts an absolute standard Windows path to a cygwin path."""
-  if len(path) < 2 or path[1] != ':':
+  if len(path) < 2 or path[1] != ":":
     # TODO(maruel): Accept \\?\ and \??\ if necessary.
-    logging.error('%s is not a win32 path', path)
+    logging.error("%s is not a win32 path", path)
     return None
-  return '/cygdrive/%s/%s' % (path[0].lower(), path[3:].replace('\\', '/'))
+  return "/cygdrive/%s/%s" % (path[0].lower(), path[3:].replace("\\", "/"))
 
 
 @tools.cached
@@ -274,19 +281,19 @@ def get_os_version_names():
   lookup = _WIN32_SERVER_NAMES if is_server else _WIN32_CLIENT_NAMES
   version_number, build_number = _get_os_numbers()
   marketing_name = lookup.get(version_number, version_number)
-  if version_number in ('10.0', '11.0'):
+  if version_number in ("10.0", "11.0"):
     rv = [marketing_name]
     # Windows 10 doesn't have service packs, the build number now is the
     # reference number. More discussion in
     # https://docs.google.com/document/d/1iF1tbc1oedCQ9J6aL7sHeuaayY3bs52fuvKxvLLZ0ig
-    if '.' in build_number:
-      major_version = build_number.split('.')[0]
-      rv.append('%s-%s' % (marketing_name, major_version))
-    rv.append('%s-%s' % (marketing_name, build_number))
+    if "." in build_number:
+      major_version = build_number.split(".")[0]
+      rv.append("%s-%s" % (marketing_name, major_version))
+    rv.append("%s-%s" % (marketing_name, build_number))
     rv.sort()
     return rv
-  service_pack = platform.win32_ver()[2] or 'SP0'
-  return [marketing_name, '%s-%s' % (marketing_name, service_pack)]
+  service_pack = platform.win32_ver()[2] or "SP0"
+  return [marketing_name, "%s-%s" % (marketing_name, service_pack)]
 
 
 def get_startup_dir():
@@ -298,17 +305,20 @@ def get_startup_dir():
   # CSIDL_STARTUP = 7
   # https://msdn.microsoft.com/library/windows/desktop/bb762180.aspx
   # shell.SHGetFolderLocation(NULL, CSIDL_STARTUP, NULL, NULL, string)
-  if get_os_version_number() == '5.1':
-    startup = 'Start Menu\\Programs\\Startup'
+  if get_os_version_number() == "5.1":
+    startup = "Start Menu\\Programs\\Startup"
   else:
     # Vista+
     startup = (
-        'AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup')
+      "AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup"
+    )
 
   # On cygwin 1.5, which is still used on some bots, '~' points inside
   # c:\\cygwin\\home so use USERPROFILE.
-  return '%s\\%s\\' % (
-    os.environ.get('USERPROFILE', 'DUMMY, ONLY USED IN TESTS'), startup)
+  return "%s\\%s\\" % (
+    os.environ.get("USERPROFILE", "DUMMY, ONLY USED IN TESTS"),
+    startup,
+  )
 
 
 def get_disks_info():
@@ -324,8 +334,9 @@ def get_audio():
     return None
   # https://msdn.microsoft.com/library/aa394463.aspx
   return [
-      device.Name for device in wbem.query('SELECT * FROM Win32_SoundDevice')
-      if device.Status == 'OK'
+    device.Name
+    for device in wbem.query("SELECT * FROM Win32_SoundDevice")
+    if device.Status == "OK"
   ]
 
 
@@ -343,8 +354,8 @@ def get_visual_studio_versions():
 
   try:
     k = winreg.OpenKey(
-        winreg.HKEY_LOCAL_MACHINE,
-        'SOFTWARE\\Wow6432Node\\Microsoft\\VSCommon')
+      winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Wow6432Node\\Microsoft\\VSCommon"
+    )
   # pylint: disable=undefined-variable
   except WindowsError:
     return None
@@ -353,7 +364,7 @@ def get_visual_studio_versions():
     versions = []
     for i in range(winreg.QueryInfoKey(k)[0]):
       sub_key = winreg.EnumKey(k, i)
-      if re.match(r'\d+\.\d+', sub_key):
+      if re.match(r"\d+\.\d+", sub_key):
         versions.append(sub_key)
     return sorted(versions, key=float, reverse=True)
   finally:
@@ -366,26 +377,28 @@ def get_cpuinfo():
   # Another option is IsProcessorFeaturePresent().
   # https://msdn.microsoft.com/en-us/library/windows/desktop/ms724482.aspx
   import winreg
+
   k = winreg.OpenKey(
-      winreg.HKEY_LOCAL_MACHINE,
-      'HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0')
+    winreg.HKEY_LOCAL_MACHINE,
+    "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+  )
   try:
-    identifier, _ = winreg.QueryValueEx(k, 'Identifier')
+    identifier, _ = winreg.QueryValueEx(k, "Identifier")
     match = re.match(
-        r'^.+\s+Family\s+(\d+)\s+Model\s+([0-9A-Fa-f]+)\s+(?:Stepping|Revision)\s+([0-9A-Fa-f]+)$',  # pylint: disable=line-too-long
-        identifier)
-    name, _ = winreg.QueryValueEx(k, 'ProcessorNameString')
-    vendor, _ = winreg.QueryValueEx(k, 'VendorIdentifier')
+      r"^.+\s+Family\s+(\d+)\s+Model\s+([0-9A-Fa-f]+)\s+(?:Stepping|Revision)\s+([0-9A-Fa-f]+)$",  # pylint: disable=line-too-long
+      identifier,
+    )
+    name, _ = winreg.QueryValueEx(k, "ProcessorNameString")
+    vendor, _ = winreg.QueryValueEx(k, "VendorIdentifier")
 
     return {
-        'model':
-        [int(match.group(1)),
-         int(match.group(2), 16),
-         int(match.group(3), 16)],
-        'name':
-        name,
-        'vendor':
-        vendor,
+      "model": [
+        int(match.group(1)),
+        int(match.group(2), 16),
+        int(match.group(3), 16),
+      ],
+      "name": name,
+      "vendor": vendor,
     }
   finally:
     k.Close()
@@ -406,23 +419,23 @@ def get_cpu_type_with_wmi():
   if not wbem:
     return None
 
-  q = 'SELECT Architecture, AddressWidth FROM Win32_Processor'
+  q = "SELECT Architecture, AddressWidth FROM Win32_Processor"
   for cpu in wbem.query(q):
     if cpu.Architecture == 12:  # PROCESSOR_ARCHITECTURE_ARM64
-      return 'arm64'
+      return "arm64"
     if cpu.Architecture == 10:  # PROCESSOR_ARCHITECTURE_IA32_ON_WIN64
-      return 'i686'
+      return "i686"
     if cpu.Architecture == 9:  # PROCESSOR_ARCHITECTURE_AMD64
       if cpu.AddressWidth == 32:
-        return 'i686'
-      return 'amd64'
+        return "i686"
+      return "amd64"
     if cpu.Architecture == 0:  # PROCESSOR_ARCHITECTURE_INTEL
       # PROCESSOR_ARCHITECTURE_INTEL indicates older Pentium (and pre Pentium)
       # Intel processors. They should all be 32-bit. Skip if something is wrong.
       # Note that we assume at least Pentium CPU.
       if cpu.AddressWidth == 32:
-        return 'i686'
-    logging.warning('Unknown CPU: %s', cpu)
+        return "i686"
+    logging.warning("Unknown CPU: %s", cpu)
 
   # Unknown.
   return None
@@ -442,35 +455,35 @@ def get_gpu():
 
   # https://msdn.microsoft.com/library/aa394512.aspx
   try:
-    for device in wbem.query('SELECT * FROM Win32_VideoController'):
+    for device in wbem.query("SELECT * FROM Win32_VideoController"):
       # The string looks like:
       #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
       pnp_string = device.PNPDeviceID
-      ven_id = 'UNKNOWN'
-      dev_id = 'UNKNOWN'
+      ven_id = "UNKNOWN"
+      dev_id = "UNKNOWN"
       # Qualcomm shows up as QCOM instead of a regular hex string, likely due
       # to the hardware being an integrated SoC instead of using PCI-e.
-      match = re.search(r'VEN_([0-9A-F]{4}|QCOM)', pnp_string)
+      match = re.search(r"VEN_([0-9A-F]{4}|QCOM)", pnp_string)
       if match:
         ven_id = match.group(1).lower()
-      match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
+      match = re.search(r"DEV_([0-9A-F]{4})", pnp_string)
       if match:
         dev_id = match.group(1).lower()
 
-      dev_name = device.VideoProcessor or ''
-      version = device.DriverVersion or ''
-      ven_name, dev_name = gpu.ids_to_names(ven_id, 'Unknown', dev_id, dev_name)
+      dev_name = device.VideoProcessor or ""
+      version = device.DriverVersion or ""
+      ven_name, dev_name = gpu.ids_to_names(ven_id, "Unknown", dev_id, dev_name)
 
       dimensions.add(ven_id)
-      dimensions.add('%s:%s' % (ven_id, dev_id))
+      dimensions.add("%s:%s" % (ven_id, dev_id))
       if version:
-        dimensions.add('%s:%s-%s' % (ven_id, dev_id, version))
-        state.add('%s %s %s' % (ven_name, dev_name, version))
+        dimensions.add("%s:%s-%s" % (ven_id, dev_id, version))
+        state.add("%s %s %s" % (ven_name, dev_name, version))
       else:
-        state.add('%s %s' % (ven_name, dev_name))
+        state.add("%s %s" % (ven_name, dev_name))
   except _WbemScriptingError as e:
     # This generally happens when this is called as the host is shutting down.
-    logging.error('get_gpu(): %s', e)
+    logging.error("get_gpu(): %s", e)
 
   return sorted(dimensions), sorted(state)
 
@@ -483,18 +496,18 @@ def get_integrity_level():
   ctypes.windll is unaccessible and it is not known to the author how to use
   stdcall convention through ctypes.cdll.
   """
-  if get_os_version_number() == '5.1':
+  if get_os_version_number() == "5.1":
     # Integrity level is Vista+.
     return None
 
   mapping = {
-      0x0000: 'untrusted',
-      0x1000: 'low',
-      0x2000: 'medium',
-      0x2100: 'medium high',
-      0x3000: 'high',
-      0x4000: 'system',
-      0x5000: 'protected process',
+    0x0000: "untrusted",
+    0x1000: "low",
+    0x2000: "medium",
+    0x2100: "medium high",
+    0x3000: "high",
+    0x4000: "system",
+    0x5000: "protected process",
   }
 
   # This was specifically written this way to work on cygwin except for the
@@ -506,13 +519,13 @@ def get_integrity_level():
 
   class SID_AND_ATTRIBUTES(ctypes.Structure):
     _fields_ = [
-        ('Sid', ctypes.c_void_p),
-        ('Attributes', DWORD),
+      ("Sid", ctypes.c_void_p),
+      ("Attributes", DWORD),
     ]
 
   class TOKEN_MANDATORY_LABEL(ctypes.Structure):
     _fields_ = [
-        ('Label', SID_AND_ATTRIBUTES),
+      ("Label", SID_AND_ATTRIBUTES),
     ]
 
   TOKEN_READ = DWORD(0x20008)
@@ -527,88 +540,110 @@ def get_integrity_level():
   ctypes.windll.kernel32.GetLastError.restype = DWORD
   ctypes.windll.kernel32.GetCurrentProcess.argtypes = ()
   ctypes.windll.kernel32.GetCurrentProcess.restype = ctypes.c_void_p
-  ctypes.windll.advapi32.OpenProcessToken.argtypes = (HANDLE, DWORD,
-                                                      ctypes.POINTER(HANDLE))
+  ctypes.windll.advapi32.OpenProcessToken.argtypes = (
+    HANDLE,
+    DWORD,
+    ctypes.POINTER(HANDLE),
+  )
   ctypes.windll.advapi32.OpenProcessToken.restype = BOOL
-  ctypes.windll.advapi32.GetTokenInformation.argtypes = (HANDLE, ctypes.c_long,
-                                                         ctypes.c_void_p, DWORD,
-                                                         ctypes.POINTER(DWORD))
+  ctypes.windll.advapi32.GetTokenInformation.argtypes = (
+    HANDLE,
+    ctypes.c_long,
+    ctypes.c_void_p,
+    DWORD,
+    ctypes.POINTER(DWORD),
+  )
   ctypes.windll.advapi32.GetTokenInformation.restype = BOOL
   ctypes.windll.advapi32.GetSidSubAuthorityCount.argtypes = [ctypes.c_void_p]
   ctypes.windll.advapi32.GetSidSubAuthorityCount.restype = ctypes.POINTER(
-      ctypes.c_ubyte)
+    ctypes.c_ubyte
+  )
   ctypes.windll.advapi32.GetSidSubAuthority.argtypes = (ctypes.c_void_p, DWORD)
   ctypes.windll.advapi32.GetSidSubAuthority.restype = ctypes.POINTER(DWORD)
 
   # First open the current process token, query it, then close everything.
   token = ctypes.c_void_p()
   proc_handle = ctypes.windll.kernel32.GetCurrentProcess()
-  if not ctypes.windll.advapi32.OpenProcessToken(proc_handle, TOKEN_READ,
-                                                 ctypes.byref(token)):
-    logging.error('Failed to get process\' token')
+  if not ctypes.windll.advapi32.OpenProcessToken(
+    proc_handle, TOKEN_READ, ctypes.byref(token)
+  ):
+    logging.error("Failed to get process' token")
     return None
   if token.value == 0:
-    logging.error('Got a NULL token')
+    logging.error("Got a NULL token")
     return None
   try:
     # The size of the structure is dynamic because the TOKEN_MANDATORY_LABEL
     # used will have the SID appened right after the TOKEN_MANDATORY_LABEL in
     # the heap allocated memory block, with .Label.Sid pointing to it.
     info_size = DWORD()
-    if ctypes.windll.advapi32.GetTokenInformation(token, TokenIntegrityLevel,
-                                                  ctypes.c_void_p(), info_size,
-                                                  ctypes.byref(info_size)):
-      logging.error('GetTokenInformation() failed expectation')
+    if ctypes.windll.advapi32.GetTokenInformation(
+      token,
+      TokenIntegrityLevel,
+      ctypes.c_void_p(),
+      info_size,
+      ctypes.byref(info_size),
+    ):
+      logging.error("GetTokenInformation() failed expectation")
       return None
     if info_size.value == 0:
-      logging.error('GetTokenInformation() returned size 0')
+      logging.error("GetTokenInformation() returned size 0")
       return None
     if ctypes.windll.kernel32.GetLastError() != ERROR_INSUFFICIENT_BUFFER:
-      logging.error('GetTokenInformation(): Unknown error: %d',
-                    ctypes.windll.kernel32.GetLastError())
+      logging.error(
+        "GetTokenInformation(): Unknown error: %d",
+        ctypes.windll.kernel32.GetLastError(),
+      )
       return None
     token_info = TOKEN_MANDATORY_LABEL()
     ctypes.resize(token_info, info_size.value)
     if not ctypes.windll.advapi32.GetTokenInformation(
-        token, TokenIntegrityLevel, ctypes.byref(token_info), info_size,
-        ctypes.byref(info_size)):
+      token,
+      TokenIntegrityLevel,
+      ctypes.byref(token_info),
+      info_size,
+      ctypes.byref(info_size),
+    ):
       logging.error(
-          'GetTokenInformation(): Unknown error with buffer size %d: %d',
-          info_size.value,
-          ctypes.windll.kernel32.GetLastError())
+        "GetTokenInformation(): Unknown error with buffer size %d: %d",
+        info_size.value,
+        ctypes.windll.kernel32.GetLastError(),
+      )
       return None
     p_sid_size = ctypes.windll.advapi32.GetSidSubAuthorityCount(
-        token_info.Label.Sid)
+      token_info.Label.Sid
+    )
     res = ctypes.windll.advapi32.GetSidSubAuthority(
-        token_info.Label.Sid, p_sid_size.contents.value - 1)
+      token_info.Label.Sid, p_sid_size.contents.value - 1
+    )
     value = res.contents.value
-    return mapping.get(value) or '0x%04x' % value
+    return mapping.get(value) or "0x%04x" % value
   finally:
     ctypes.windll.kernel32.CloseHandle(token)
 
 
 @tools.cached
 def get_physical_ram():
-  """Returns the amount of installed RAM in Mb, rounded to the nearest number.
-  """
+  """Returns the amount of installed RAM in Mb, rounded to the nearest number."""
 
   # https://msdn.microsoft.com/library/windows/desktop/aa366589.aspx
   class MemoryStatusEx(ctypes.Structure):
     _fields_ = [
-        ('dwLength', ctypes.c_ulong),
-        ('dwMemoryLoad', ctypes.c_ulong),
-        ('dwTotalPhys', ctypes.c_ulonglong),
-        ('dwAvailPhys', ctypes.c_ulonglong),
-        ('dwTotalPageFile', ctypes.c_ulonglong),
-        ('dwAvailPageFile', ctypes.c_ulonglong),
-        ('dwTotalVirtual', ctypes.c_ulonglong),
-        ('dwAvailVirtual', ctypes.c_ulonglong),
-        ('dwAvailExtendedVirtual', ctypes.c_ulonglong),
+      ("dwLength", ctypes.c_ulong),
+      ("dwMemoryLoad", ctypes.c_ulong),
+      ("dwTotalPhys", ctypes.c_ulonglong),
+      ("dwAvailPhys", ctypes.c_ulonglong),
+      ("dwTotalPageFile", ctypes.c_ulonglong),
+      ("dwAvailPageFile", ctypes.c_ulonglong),
+      ("dwTotalVirtual", ctypes.c_ulonglong),
+      ("dwAvailVirtual", ctypes.c_ulonglong),
+      ("dwAvailExtendedVirtual", ctypes.c_ulonglong),
     ]
+
   stat = MemoryStatusEx()
   stat.dwLength = ctypes.sizeof(MemoryStatusEx)  # pylint: disable=W0201
   ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
-  return int(round(stat.dwTotalPhys / 1024. / 1024.))
+  return int(round(stat.dwTotalPhys / 1024.0 / 1024.0))
 
 
 def get_uptime():
@@ -618,8 +653,8 @@ def get_uptime():
   """
   val = ctypes.c_ulonglong(0)
   if ctypes.windll.kernel32.QueryUnbiasedInterruptTime(ctypes.byref(val)) != 0:
-    return val.value / 10000000.
-  return 0.
+    return val.value / 10000000.0
+  return 0.0
 
 
 def get_reboot_required():
@@ -630,11 +665,13 @@ def get_reboot_required():
   # Based on https://stackoverflow.com/a/45717438
   k = None
   import winreg
+
   try:
     k = winreg.OpenKey(
-        winreg.HKEY_LOCAL_MACHINE,
-        'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\'
-        'Auto Update\\RebootRequired')
+      winreg.HKEY_LOCAL_MACHINE,
+      "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WindowsUpdate\\"
+      "Auto Update\\RebootRequired",
+    )
     _, num_values, _ = winreg.QueryInfoKey(k)
     return num_values > 0
   except WindowsError:  # pylint: disable=undefined-variable
@@ -656,13 +693,15 @@ def _query_video_controller_resolution():
   wbem = _get_wmi_wbem()
   if not wbem:
     return None
-  query = ('SELECT CurrentHorizontalResolution, CurrentVerticalResolution '
-           'FROM Win32_VideoController')
+  query = (
+    "SELECT CurrentHorizontalResolution, CurrentVerticalResolution "
+    "FROM Win32_VideoController"
+  )
   try:
     return wbem.query(query)
   except _WbemScriptingError as e:
     # This generally happens when this is called as the host is shutting down.
-    logging.error('_query_video_controller_resolution: %s', e)
+    logging.error("_query_video_controller_resolution: %s", e)
     return None
 
 
@@ -707,10 +746,12 @@ def get_screen_scaling_percent():
 
   try:
     desktop_handle = win32gui.GetDC(0)
-    logical_screen_height = win32ui.GetDeviceCaps(desktop_handle,
-                                                  win32con.VERTRES)
-    physical_screen_height = win32ui.GetDeviceCaps(desktop_handle,
-                                                   win32con.DESKTOPVERTRES)
+    logical_screen_height = win32ui.GetDeviceCaps(
+      desktop_handle, win32con.VERTRES
+    )
+    physical_screen_height = win32ui.GetDeviceCaps(
+      desktop_handle, win32con.DESKTOPVERTRES
+    )
   finally:
     win32gui.ReleaseDC(0, desktop_handle)
   # Should never happen in practice, but avoid division by 0 to be safe.
@@ -735,8 +776,10 @@ def get_display_resolution():
     return None
   for ctl in query_results:
     if ctl.CurrentHorizontalResolution and ctl.CurrentVerticalResolution:
-      return (int(ctl.CurrentHorizontalResolution),
-              int(ctl.CurrentVerticalResolution))
+      return (
+        int(ctl.CurrentHorizontalResolution),
+        int(ctl.CurrentVerticalResolution),
+      )
   return None
 
 
@@ -753,12 +796,13 @@ def get_active_displays():
   if not wbem:
     return None
 
-  query = ('SELECT * FROM Win32_PnPEntity '
-           'WHERE PNPClass = "Monitor" AND Status = "OK"')
+  query = (
+    'SELECT * FROM Win32_PnPEntity WHERE PNPClass = "Monitor" AND Status = "OK"'
+  )
   try:
     query_results = wbem.query(query)
   except _WbemScriptingError as e:
-    logging.error('get_active_displays: %s', e)
+    logging.error("get_active_displays: %s", e)
     return None
 
   active_displays = []
@@ -777,8 +821,10 @@ def get_ssd():
   # https://learn.microsoft.com/en-us/windows-hardware/drivers/storage/msft-physicaldisk
   try:
     return sorted(
-        d.DeviceId for d in wbem.query('SELECT * FROM MSFT_PhysicalDisk')
-        if d.MediaType == 4 or d.Model in ['nvme_card', 'nvme_card-pd'])
+      d.DeviceId
+      for d in wbem.query("SELECT * FROM MSFT_PhysicalDisk")
+      if d.MediaType == 4 or d.Model in ["nvme_card", "nvme_card-pd"]
+    )
   except AttributeError:
     return ()
 
@@ -790,15 +836,16 @@ def list_top_windows():
   """
   # The function prototype of EnumWindowsProc.
   window_enum_proc_prototype = ctypes.WINFUNCTYPE(
-      ctypes.c_long,  # BOOL
-      ctypes.c_void_p,  # HWND
-      ctypes.c_void_p)  # LPARAM
+    ctypes.c_long,  # BOOL
+    ctypes.c_void_p,  # HWND
+    ctypes.c_void_p,
+  )  # LPARAM
 
   # Set up various user32 functions that are needed.
   ctypes.windll.user32.EnumWindows.restype = ctypes.c_long  # BOOL
   ctypes.windll.user32.EnumWindows.argtypes = [
-      window_enum_proc_prototype,
-      ctypes.py_object
+    window_enum_proc_prototype,
+    ctypes.py_object,
   ]
   ctypes.windll.user32.IsWindowVisible.restype = ctypes.c_long  # BOOL
   ctypes.windll.user32.IsWindowVisible.argtypes = [ctypes.c_void_p]  # HWND
@@ -814,14 +861,18 @@ def list_top_windows():
     collection of topmost window class names to return.
     """
     # Dig deeper into visible, non-iconified, topmost windows.
-    if (ctypes.windll.user32.IsWindowVisible(hwnd) and
-        not ctypes.windll.user32.IsIconic(hwnd) and
-        _is_topmost_window(hwnd)):
+    if (
+      ctypes.windll.user32.IsWindowVisible(hwnd)
+      and not ctypes.windll.user32.IsIconic(hwnd)
+      and _is_topmost_window(hwnd)
+    ):
       # Fetch the class name and make sure it's not owned by the Windows shell.
       class_name = _get_window_class(hwnd)
-      if (class_name and
-          class_name not in ['Button', 'Shell_TrayWnd',
-                             'Shell_SecondaryTrayWnd']):
+      if class_name and class_name not in [
+        "Button",
+        "Shell_TrayWnd",
+        "Shell_SecondaryTrayWnd",
+      ]:
         out.append(class_name)
     return 1
 
@@ -842,10 +893,11 @@ def get_computer_system_info():
 
   info = None
   # https://msdn.microsoft.com/en-us/library/aa394105
-  for device in wbem.query('SELECT * FROM Win32_ComputerSystemProduct'):
+  for device in wbem.query("SELECT * FROM Win32_ComputerSystemProduct"):
     info = common.ComputerSystemInfo(
-        name=device.Name,
-        vendor=device.Vendor,
-        version=device.Version,
-        serial=device.IdentifyingNumber)
+      name=device.Name,
+      vendor=device.Vendor,
+      version=device.Version,
+      serial=device.IdentifyingNumber,
+    )
   return info

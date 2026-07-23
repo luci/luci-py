@@ -18,7 +18,6 @@ but could also (potentially) be extended to declare ownership of other
 subdirectories in the task (e.g. in the isolated).
 """
 
-
 import collections
 
 
@@ -39,9 +38,10 @@ class Checker(object):
   directories. Similarly, multiple caches cannot be mapped to the same
   directory.
   """
-  def __init__(self, full_path=''):
+
+  def __init__(self, full_path=""):
     self._full_path = full_path
-    self._owner_notes = collections.defaultdict(set) # owner -> set(notes)
+    self._owner_notes = collections.defaultdict(set)  # owner -> set(notes)
     self._subdirs = {}
 
   def add(self, path, owner, note):
@@ -52,10 +52,12 @@ class Checker(object):
       owner (str) - The owning entity for this path
       note (str) - A brief description of why `owner` lays claim to `path`.
     """
-    tokens = path.split('/')
+    tokens = path.split("/")
     node = self
     for i, subdir in enumerate(tokens):
-      node = node._subdirs.setdefault(subdir, Checker('/'.join(tokens[:i+1])))
+      node = node._subdirs.setdefault(
+        subdir, Checker("/".join(tokens[: i + 1]))
+      )
     node._owner_notes[owner].add(note)
 
   def conflicts(self, ctx):
@@ -91,8 +93,11 @@ class Checker(object):
     # multiple owners tried to claim this directory. In this case there's no
     # discernable owner for subdirectories, so return True immediately.
     if len(my_owners) > 1:
-      ctx.error('%r: directory has conflicting owners: %s', self._full_path,
-                ' and '.join(self._descriptions()))
+      ctx.error(
+        "%r: directory has conflicting owners: %s",
+        self._full_path,
+        " and ".join(self._descriptions()),
+      )
       return True
 
     # something (singluar) claimed this directory
@@ -104,10 +109,13 @@ class Checker(object):
         if my_owner != parent_owned_node._owner():
           # We found a conflict; there's no discernible owner for
           # subdirectories, so return True immediately.
-          ctx.error('%s uses %r, which conflicts with %s using %r',
-                    self._describe_one(), self._full_path,
-                    parent_owned_node._describe_one(),
-                    parent_owned_node._full_path)
+          ctx.error(
+            "%s uses %r, which conflicts with %s using %r",
+            self._describe_one(),
+            self._full_path,
+            parent_owned_node._describe_one(),
+            parent_owned_node._full_path,
+          )
           return True
       else:
         # we're the first owner down this leg of the tree, so parent_owned_node
@@ -127,7 +135,7 @@ class Checker(object):
       notes = filter(bool, notes)
       if notes:
         # 'owner[note, note, note]'
-        ret.append('%s%r' % (owner, sorted(notes)))
+        ret.append("%s%r" % (owner, sorted(notes)))
       else:
         ret.append(owner)
     return ret

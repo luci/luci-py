@@ -36,34 +36,34 @@ import handlers_exceptions
 from handlers_task_backend import TaskBackendAPIService
 
 _SORT_MAP = {
-    swarming_pb2.QUERY_CREATED_TS: 'created_ts',
-    swarming_pb2.QUERY_COMPLETED_TS: 'completed_ts',
-    swarming_pb2.QUERY_ABANDONED_TS: 'abandoned_ts',
-    swarming_pb2.QUERY_STARTED_TS: 'started_ts',
+  swarming_pb2.QUERY_CREATED_TS: "created_ts",
+  swarming_pb2.QUERY_COMPLETED_TS: "completed_ts",
+  swarming_pb2.QUERY_ABANDONED_TS: "abandoned_ts",
+  swarming_pb2.QUERY_STARTED_TS: "started_ts",
 }
 
 _STATE_MAP = {
-    swarming_pb2.QUERY_PENDING: 'pending',
-    swarming_pb2.QUERY_RUNNING: 'running',
-    swarming_pb2.QUERY_PENDING_RUNNING: 'pending_running',
-    swarming_pb2.QUERY_COMPLETED: 'completed',
-    swarming_pb2.QUERY_COMPLETED_SUCCESS: 'completed_success',
-    swarming_pb2.QUERY_COMPLETED_FAILURE: 'completed_failure',
-    swarming_pb2.QUERY_EXPIRED: 'expired',
-    swarming_pb2.QUERY_TIMED_OUT: 'timed_out',
-    swarming_pb2.QUERY_BOT_DIED: 'bot_died',
-    swarming_pb2.QUERY_CANCELED: 'canceled',
-    swarming_pb2.QUERY_ALL: 'all',
-    swarming_pb2.QUERY_DEDUPED: 'deduped',
-    swarming_pb2.QUERY_KILLED: 'killed',
-    swarming_pb2.QUERY_NO_RESOURCE: 'no_resource',
-    swarming_pb2.QUERY_CLIENT_ERROR: 'client_error',
+  swarming_pb2.QUERY_PENDING: "pending",
+  swarming_pb2.QUERY_RUNNING: "running",
+  swarming_pb2.QUERY_PENDING_RUNNING: "pending_running",
+  swarming_pb2.QUERY_COMPLETED: "completed",
+  swarming_pb2.QUERY_COMPLETED_SUCCESS: "completed_success",
+  swarming_pb2.QUERY_COMPLETED_FAILURE: "completed_failure",
+  swarming_pb2.QUERY_EXPIRED: "expired",
+  swarming_pb2.QUERY_TIMED_OUT: "timed_out",
+  swarming_pb2.QUERY_BOT_DIED: "bot_died",
+  swarming_pb2.QUERY_CANCELED: "canceled",
+  swarming_pb2.QUERY_ALL: "all",
+  swarming_pb2.QUERY_DEDUPED: "deduped",
+  swarming_pb2.QUERY_KILLED: "killed",
+  swarming_pb2.QUERY_NO_RESOURCE: "no_resource",
+  swarming_pb2.QUERY_CLIENT_ERROR: "client_error",
 }
 
 _NULLABLE_BOOL_MAP = {
-    swarming_pb2.TRUE: True,
-    swarming_pb2.FALSE: False,
-    swarming_pb2.NULL: None,
+  swarming_pb2.TRUE: True,
+  swarming_pb2.FALSE: False,
+  swarming_pb2.NULL: None,
 }
 
 
@@ -91,8 +91,8 @@ def _get_sort_and_state(request):
 
 
 class BotsService(object):
-  """Module implements the Bots service defined in proto/api_v2/swarming.proto
-  """
+  """Module implements the Bots service defined in proto/api_v2/swarming.proto"""
+
   DESCRIPTION = swarming_prpc_pb2.BotsServiceDescription
 
   @prpc_helpers.method
@@ -114,8 +114,9 @@ class BotsService(object):
   def ListBotEvents(self, request, _context):
     bot_id = request.bot_id
     start, end = _get_start_and_end_dates(request)
-    items, cursor = api_common.get_bot_events(bot_id, start, end, request.limit,
-                                              request.cursor)
+    items, cursor = api_common.get_bot_events(
+      bot_id, start, end, request.limit, request.cursor
+    )
     return message_conversion_prpc.bot_events_response(items, cursor)
 
   @prpc_helpers.method
@@ -133,14 +134,15 @@ class BotsService(object):
     start, end = _get_start_and_end_dates(request)
     sort, state = _get_sort_and_state(request)
     filters = api_common.TaskFilters(
-        sort=sort,
-        state=state,
-        start=start,
-        end=end,
-        tags=[],
+      sort=sort,
+      state=state,
+      start=start,
+      end=end,
+      tags=[],
     )
-    items, cursor = api_common.list_bot_tasks(bot_id, filters, request.limit,
-                                              request.cursor)
+    items, cursor = api_common.list_bot_tasks(
+      bot_id, filters, request.limit, request.cursor
+    )
     return message_conversion_prpc.task_list_response(items, cursor)
 
   @prpc_helpers.method
@@ -157,63 +159,66 @@ class BotsService(object):
     is_dead = _NULLABLE_BOOL_MAP.get(request.is_dead)
     is_busy = _NULLABLE_BOOL_MAP.get(request.is_busy)
     dimensions = [
-        "%s:%s" % (pair.key, pair.value) for pair in request.dimensions
+      "%s:%s" % (pair.key, pair.value) for pair in request.dimensions
     ]
     bf = api_common.BotFilters(
-        dimensions=dimensions,
-        quarantined=quarantined,
-        in_maintenance=in_maintenance,
-        is_dead=is_dead,
-        is_busy=is_busy,
+      dimensions=dimensions,
+      quarantined=quarantined,
+      in_maintenance=in_maintenance,
+      is_dead=is_dead,
+      is_busy=is_busy,
     )
     bots, cursor = api_common.list_bots(bf, request.limit, request.cursor)
     return message_conversion_prpc.bots_response(
-        bots,
-        config.settings().bot_death_timeout_secs, cursor)
+      bots, config.settings().bot_death_timeout_secs, cursor
+    )
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
   def CountBots(self, request, _context):
     dimensions = [
-        "%s:%s" % (pair.key, pair.value) for pair in request.dimensions
+      "%s:%s" % (pair.key, pair.value) for pair in request.dimensions
     ]
     bc = api_common.count_bots(dimensions)
     out = swarming_pb2.BotsCount(
-        count=bc.count,
-        quarantined=bc.quarantined,
-        maintenance=bc.maintenance,
-        dead=bc.dead,
-        busy=bc.busy,
+      count=bc.count,
+      quarantined=bc.quarantined,
+      maintenance=bc.maintenance,
+      dead=bc.dead,
+      busy=bc.busy,
     )
     out.now.GetCurrentTime()
     return out
 
 
 class TasksService(object):
-  """Module implements the Tasks service defined in proto/api_v2/swarming.proto
-  """
+  """Module implements the Tasks service defined in proto/api_v2/swarming.proto"""
+
   DESCRIPTION = swarming_prpc_pb2.TasksServiceDescription
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
   def GetResult(self, request, _context):
-    _, result = api_common.get_request_and_result(request.task_id,
-                                                  api_common.VIEW)
+    _, result = api_common.get_request_and_result(
+      request.task_id, api_common.VIEW
+    )
     return message_conversion_prpc.task_result_response(
-        result, request.include_performance_stats)
+      result, request.include_performance_stats
+    )
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
   def BatchGetResult(self, request, _context):
     if not request.task_ids:
-      raise handlers_exceptions.BadRequestException('Task IDs list is empty')
+      raise handlers_exceptions.BadRequestException("Task IDs list is empty")
 
     # Must have no dups.
     seen = set()
     for task_id in request.task_ids:
       if task_id in seen:
         raise handlers_exceptions.BadRequestException(
-            'Duplicate ID in the task IDs list: %s' % task_id)
+          "Duplicate ID in the task IDs list: %s" % task_id
+        )
       seen.add(task_id)
 
     # The response being assembled. Each item is ResultOrError or None.
@@ -223,22 +228,23 @@ class TasksService(object):
     def error(idx, code, message):
       assert results[idx] is None
       results[idx] = swarming_pb2.BatchGetResultResponse.ResultOrError(
-          task_id=request.task_ids[idx],
-          error=status_pb2.Status(
-              code=code.value,
-              message=message,
-          ),
+        task_id=request.task_ids[idx],
+        error=status_pb2.Status(
+          code=code.value,
+          message=message,
+        ),
       )
 
     # Writes ResultOrError that carries a task result.
     def result(idx, summary):
       assert results[idx] is None
       result_pb = message_conversion_prpc.task_result_response(
-          summary, request.include_performance_stats)
+        summary, request.include_performance_stats
+      )
       assert result_pb.task_id == request.task_ids[idx]
       results[idx] = swarming_pb2.BatchGetResultResponse.ResultOrError(
-          task_id=request.task_ids[idx],
-          result=result_pb)
+        task_id=request.task_ids[idx], result=result_pb
+      )
 
     # Get TaskResultSummary keys of all recognized task IDs.
     keys = []
@@ -249,8 +255,10 @@ class TasksService(object):
         indx.append(idx)
       except ValueError as exc:
         error(
-            idx, codes.StatusCode.INVALID_ARGUMENT,
-            'Bad task ID "%s": %s' % (task_id, exc))
+          idx,
+          codes.StatusCode.INVALID_ARGUMENT,
+          'Bad task ID "%s": %s' % (task_id, exc),
+        )
 
     # ACL check predicate. Returns (<check_performed>, <outcome>).
     if acl.can_view_all_tasks():
@@ -283,15 +291,21 @@ class TasksService(object):
     summaries = task_result.fetch_task_result_summaries(keys)
     for idx, summary in zip(indx, summaries):
       if not summary:
-        error(idx, codes.StatusCode.NOT_FOUND, 'No such task')
+        error(idx, codes.StatusCode.NOT_FOUND, "No such task")
       else:
         checked, visible = check_visible(summary)
         if not checked:
-          error(idx, codes.StatusCode.FAILED_PRECONDITION,
-                'The task is too old and has no required fields')
+          error(
+            idx,
+            codes.StatusCode.FAILED_PRECONDITION,
+            "The task is too old and has no required fields",
+          )
         elif not visible:
-          error(idx, codes.StatusCode.PERMISSION_DENIED,
-                'No access to see the status of this task')
+          error(
+            idx,
+            codes.StatusCode.PERMISSION_DENIED,
+            "No access to see the status of this task",
+          )
         else:
           result(idx, summary)
 
@@ -302,55 +316,74 @@ class TasksService(object):
   def GetRequest(self, request, _context):
     request_key, _ = api_common.to_keys(request.task_id)
     request_obj = api_common.get_task_request_async(
-        request.task_id, request_key, api_common.VIEW).get_result()
+      request.task_id, request_key, api_common.VIEW
+    ).get_result()
     return message_conversion_prpc.task_request_response(request_obj)
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
   def CancelTask(self, request, _context):
-    canceled, was_running = api_common.cancel_task(request.task_id,
-                                                   request.kill_running)
-    return swarming_pb2.CancelResponse(canceled=canceled,
-                                       was_running=was_running)
+    canceled, was_running = api_common.cancel_task(
+      request.task_id, request.kill_running
+    )
+    return swarming_pb2.CancelResponse(
+      canceled=canceled, was_running=was_running
+    )
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
   def GetStdout(self, request, _context):
-    output, state = api_common.get_output(request.task_id, request.offset,
-                                          request.length)
+    output, state = api_common.get_output(
+      request.task_id, request.offset, request.length
+    )
     return swarming_pb2.TaskOutputResponse(output=output, state=state)
 
   @prpc_helpers.method
-  @auth.require(acl.can_create_task,
-                'User cannot create tasks.',
-                log_identity=True)
+  @auth.require(
+    acl.can_create_task, "User cannot create tasks.", log_identity=True
+  )
   def NewTask(self, request, _context):
     try:
       request_obj, secret_bytes, template_apply = (
-          message_conversion_prpc.new_task_request_from_rpc(request))
+        message_conversion_prpc.new_task_request_from_rpc(request)
+      )
     except (datastore_errors.BadValueError, ValueError) as e:
       raise handlers_exceptions.BadRequestException(str(e))
 
-    ntr = api_common.new_task(request_obj, secret_bytes, template_apply,
-                              request.evaluate_only, request.request_uuid)
+    ntr = api_common.new_task(
+      request_obj,
+      secret_bytes,
+      template_apply,
+      request.evaluate_only,
+      request.request_uuid,
+    )
 
     return swarming_pb2.TaskRequestMetadataResponse(
-        request=message_conversion_prpc.task_request_response(ntr.request),
-        task_id=ntr.task_id,
-        task_result=message_conversion_prpc.task_result_response(
-            ntr.task_result, False) if ntr.task_result else None,
+      request=message_conversion_prpc.task_request_response(ntr.request),
+      task_id=ntr.task_id,
+      task_result=message_conversion_prpc.task_result_response(
+        ntr.task_result, False
+      )
+      if ntr.task_result
+      else None,
     )
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
   def CancelTasks(self, request, _context):
     start, end = _get_start_and_end_dates(request)
-    tcr = api_common.cancel_tasks(request.tags, start, end, request.limit,
-                                  request.cursor, request.kill_running)
+    tcr = api_common.cancel_tasks(
+      request.tags,
+      start,
+      end,
+      request.limit,
+      request.cursor,
+      request.kill_running,
+    )
     now = message_conversion_prpc.date(tcr.now)
-    return swarming_pb2.TasksCancelResponse(cursor=tcr.cursor,
-                                            matched=tcr.matched,
-                                            now=now)
+    return swarming_pb2.TasksCancelResponse(
+      cursor=tcr.cursor, matched=tcr.matched, now=now
+    )
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
@@ -358,16 +391,18 @@ class TasksService(object):
     start, end = _get_start_and_end_dates(request)
     sort, state = _get_sort_and_state(request)
     rsf = api_common.TaskFilters(
-        start=start,
-        end=end,
-        sort=sort,
-        state=state,
-        tags=list(request.tags),
+      start=start,
+      end=end,
+      sort=sort,
+      state=state,
+      tags=list(request.tags),
     )
-    items, cursor = api_common.list_task_results(rsf, request.limit,
-                                                 request.cursor)
+    items, cursor = api_common.list_task_results(
+      rsf, request.limit, request.cursor
+    )
     return message_conversion_prpc.task_list_response(
-        items, cursor, request.include_performance_stats)
+      items, cursor, request.include_performance_stats
+    )
 
   @prpc_helpers.method
   @auth.require(acl.can_access, log_identity=True)
@@ -375,18 +410,18 @@ class TasksService(object):
     now = utils.utcnow()
     start, end = _get_start_and_end_dates(request)
     state = _STATE_MAP.get(request.state)
-    sort = 'created_ts'
+    sort = "created_ts"
     trf = api_common.TaskFilters(
-        start=start,
-        end=end,
-        state=state,
-        sort=sort,
-        tags=request.tags,
+      start=start,
+      end=end,
+      state=state,
+      sort=sort,
+      tags=request.tags,
     )
     count = api_common.count_tasks(trf, now)
     return swarming_pb2.TasksCount(
-        count=count,
-        now=message_conversion_prpc.date(now),
+      count=count,
+      now=message_conversion_prpc.date(now),
     )
 
   @prpc_helpers.method
@@ -395,14 +430,15 @@ class TasksService(object):
     start, end = _get_start_and_end_dates(request)
     sort, state = _get_sort_and_state(request)
     trf = api_common.TaskFilters(
-        start=start,
-        end=end,
-        state=state,
-        sort=sort,
-        tags=list(request.tags),
+      start=start,
+      end=end,
+      state=state,
+      sort=sort,
+      tags=list(request.tags),
     )
     items, cursor = api_common.list_task_requests_no_realm_check(
-        trf, request.limit, request.cursor)
+      trf, request.limit, request.cursor
+    )
     return message_conversion_prpc.task_request_list_response(items, cursor)
 
   @prpc_helpers.method
@@ -422,19 +458,20 @@ class InternalsService(object):
   # this map and we'll use generic EXPIRED for them + report the error via
   # the ereporter (to make it show up in aggregated error reports).
   REASON_TO_TASK_STATE = {
-      rbe_pb2.ExpireSliceRequest.NO_RESOURCE: task_result.State.NO_RESOURCE,
-      rbe_pb2.ExpireSliceRequest.BOT_INTERNAL_ERROR: task_result.State.BOT_DIED,
-      rbe_pb2.ExpireSliceRequest.EXPIRED: task_result.State.EXPIRED,
+    rbe_pb2.ExpireSliceRequest.NO_RESOURCE: task_result.State.NO_RESOURCE,
+    rbe_pb2.ExpireSliceRequest.BOT_INTERNAL_ERROR: task_result.State.BOT_DIED,
+    rbe_pb2.ExpireSliceRequest.EXPIRED: task_result.State.EXPIRED,
   }
 
   @prpc_helpers.method
   @auth.require(acl.is_swarming_itself, log_identity=True)
   def ExpireSlice(self, request, _context):
-    logging.info('%s', request)
+    logging.info("%s", request)
 
     task_request_key, _ = api_common.to_keys(request.task_id)
     to_run_key = task_to_run.task_to_run_key_from_parts(
-        task_request_key, request.task_to_run_shard, request.task_to_run_id)
+      task_request_key, request.task_to_run_shard, request.task_to_run_id
+    )
 
     if request.reason in self.REASON_TO_TASK_STATE:
       terminal_state = self.REASON_TO_TASK_STATE[request.reason]
@@ -444,20 +481,21 @@ class InternalsService(object):
       report_to_log = True
 
     reason_name = rbe_pb2.ExpireSliceRequest.Reason.Name(request.reason)
-    task_scheduler.expire_slice(to_run_key, terminal_state,
-                                request.culprit_bot_id, reason_name)
+    task_scheduler.expire_slice(
+      to_run_key, terminal_state, request.culprit_bot_id, reason_name
+    )
 
     # Submit the report only after expiring the slice, in case this is slow.
     if report_to_log:
-      ereporter2.log(source='rbe',
-                     category=reason_name,
-                     message=request.details,
-                     params={
-                         'task_id':
-                         request.task_id,
-                         'slice_index':
-                         task_to_run.task_to_run_key_slice_index(to_run_key),
-                     })
+      ereporter2.log(
+        source="rbe",
+        category=reason_name,
+        message=request.details,
+        params={
+          "task_id": request.task_id,
+          "slice_index": task_to_run.task_to_run_key_slice_index(to_run_key),
+        },
+      )
 
     return empty_pb2.Empty()
 
@@ -470,34 +508,37 @@ class SwarmingService(object):
   def GetDetails(self, _request, _context):
     details = api_common.get_server_details()
     return swarming_pb2.ServerDetails(
-        bot_version=details.bot_version,
-        server_version=details.server_version,
-        display_server_url_template=details.display_server_url_template,
-        cas_viewer_server=details.cas_viewer_server,
+      bot_version=details.bot_version,
+      server_version=details.server_version,
+      display_server_url_template=details.display_server_url_template,
+      cas_viewer_server=details.cas_viewer_server,
     )
 
   @prpc_helpers.method
   @auth.require(acl.can_create_bot, log_identity=True)
   def GetToken(self, _request, _context):
     return swarming_pb2.BootstrapToken(
-        bootstrap_token=bot_code.generate_bootstrap_token())
+      bootstrap_token=bot_code.generate_bootstrap_token()
+    )
 
   @prpc_helpers.method
   @auth.public
   def GetPermissions(self, request, _context):
-    perms = api_common.get_permissions(request.bot_id, request.task_id,
-                                       request.tags)
+    perms = api_common.get_permissions(
+      request.bot_id, request.task_id, request.tags
+    )
     return swarming_pb2.ClientPermissions(
-        delete_bot=perms.delete_bot,
-        delete_bots=perms.delete_bots,
-        terminate_bot=perms.terminate_bot,
-        get_configs=False,  # deprecated
-        put_configs=False,  # deprecated
-        cancel_task=perms.cancel_task,
-        cancel_tasks=perms.cancel_tasks,
-        get_bootstrap_token=perms.get_bootstrap_token,
-        list_bots=perms.list_bots,
-        list_tasks=perms.list_tasks)
+      delete_bot=perms.delete_bot,
+      delete_bots=perms.delete_bots,
+      terminate_bot=perms.terminate_bot,
+      get_configs=False,  # deprecated
+      put_configs=False,  # deprecated
+      cancel_task=perms.cancel_task,
+      cancel_tasks=perms.cancel_tasks,
+      get_bootstrap_token=perms.get_bootstrap_token,
+      list_bots=perms.list_bots,
+      list_tasks=perms.list_tasks,
+    )
 
 
 def get_routes(debug=False):
@@ -508,4 +549,4 @@ def get_routes(debug=False):
   s.add_service(InternalsService())
   s.add_service(SwarmingService())
   s.add_interceptor(auth.prpc_interceptor)
-  return s.get_routes() + s.get_routes(prefix='/python')
+  return s.get_routes() + s.get_routes(prefix="/python")

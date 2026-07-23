@@ -33,17 +33,21 @@ class ExternalSchedulerException(Exception):
 def _get_client(address):
   """Get a prpc client instance for given address."""
   return client.Client(
-      address,
-      plugin_prpc_pb2.ExternalSchedulerServiceDescription,
-      insecure=utils.is_local_dev_server(),
-      timeout=20,
-      max_attempts=2)
+    address,
+    plugin_prpc_pb2.ExternalSchedulerServiceDescription,
+    insecure=utils.is_local_dev_server(),
+    timeout=20,
+    max_attempts=2,
+  )
 
 
 def _creds():
   """Get the correct credentials argument for this environment."""
-  return (None if utils.is_local_dev_server() else
-          client.service_account_credentials())
+  return (
+    None
+    if utils.is_local_dev_server()
+    else client.service_account_credentials()
+  )
 
 
 def _bot_pool_cfg(bot_dimensions):
@@ -56,15 +60,17 @@ def _bot_pool_cfg(bot_dimensions):
   Returns:
     PoolConfig for the bot if it exists, or None otherwise.
   """
-  pools = bot_dimensions.get(u'pool')
+  pools = bot_dimensions.get("pool")
   if not pools:
     return None
   if len(pools) == 1:
     return pools_config.get_pool_config(pools[0])
 
   logging.warning(
-      'Bot with dimensions %s was found to be in multiple '
-      'pools. Unable to determine pool config.', bot_dimensions)
+    "Bot with dimensions %s was found to be in multiple "
+    "pools. Unable to determine pool config.",
+    bot_dimensions,
+  )
 
 
 def _config_for_dimensions(pool_cfg, dimensions_flat):
@@ -123,11 +129,13 @@ def config_for_task(request):
 
   # Determine the dimension intersection across all task slices.
   common_dimensions = set(
-      task_queues.bot_dimensions_to_flat(s0.properties.dimensions))
+    task_queues.bot_dimensions_to_flat(s0.properties.dimensions)
+  )
   for i in range(1, request.num_task_slices):
     s = request.task_slice(i)
     common_dimensions.intersection_update(
-        task_queues.bot_dimensions_to_flat(s.properties.dimensions))
+      task_queues.bot_dimensions_to_flat(s.properties.dimensions)
+    )
 
   return _config_for_dimensions(pool_cfg, common_dimensions)
 
@@ -143,9 +151,13 @@ def assign_task(es_cfg, bot_dimensions):
     (Task id string, slice number) tuple or (None, None) if no task
     to assign.
   """
-  bot_id = bot_dimensions[u'id'][0]
-  logging.debug('Using external scheduler address: %s id: %s for bot %s',
-                es_cfg.address, es_cfg.id, bot_id)
+  bot_id = bot_dimensions["id"][0]
+  logging.debug(
+    "Using external scheduler address: %s id: %s for bot %s",
+    es_cfg.address,
+    es_cfg.id,
+    bot_id,
+  )
 
   req = plugin_pb2.AssignTasksRequest()
 
@@ -193,9 +205,15 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
   Returns: Nothing.
   """
   logging.debug(
-      'notify_requests(es_cfg=(%s,%s), requests=%s, use_tq=%s, '
-      'is_callback=%s, batch_mode=%s)', es_cfg.address, es_cfg.id,
-      [r.task_id for r, _ in requests], use_tq, is_callback, batch_mode)
+    "notify_requests(es_cfg=(%s,%s), requests=%s, use_tq=%s, "
+    "is_callback=%s, batch_mode=%s)",
+    es_cfg.address,
+    es_cfg.id,
+    [r.task_id for r, _ in requests],
+    use_tq,
+    is_callback,
+    batch_mode,
+  )
 
   req = plugin_pb2.NotifyTasksRequest()
   req.is_callback = is_callback
@@ -211,7 +229,8 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
     for i in range(request.num_task_slices):
       s = request.task_slice(i)
       flat_dimensions = task_queues.bot_dimensions_to_flat(
-          s.properties.dimensions)
+        s.properties.dimensions
+      )
       s_pb = item.task.slices.add()
       s_pb.dimensions.extend(flat_dimensions)
 
@@ -233,32 +252,32 @@ def notify_requests(es_cfg, requests, use_tq, is_callback, batch_mode=False):
   # If enable_batch_es_notifications is true, the notifications will be sent in
   # a batched mode along with others, to reduce traffic to external scheduler.
   if batch_mode and config.settings().enable_batch_es_notifications:
-    payload = {'es_host': es_cfg.address, 'request_json': request_json}
-    req = taskqueue.Task(payload=json.dumps(payload), method='PULL')
+    payload = {"es_host": es_cfg.address, "request_json": request_json}
+    req = taskqueue.Task(payload=json.dumps(payload), method="PULL")
     if not req.add(
-        queue_name='es-notify-tasks-batch', transactional=ndb.in_transaction()):
-      raise datastore_utils.CommitError('Failed to enqueue task')
-    stats = taskqueue.QueueStatistics.fetch('es-notify-kick')
+      queue_name="es-notify-tasks-batch", transactional=ndb.in_transaction()
+    ):
+      raise datastore_utils.CommitError("Failed to enqueue task")
+    stats = taskqueue.QueueStatistics.fetch("es-notify-kick")
     # Add a kicker task if there are fewer than 10 minutes worth.
     if stats.tasks < 600:
       job_enqueued = utils.enqueue_task(
-          '/internal/taskqueue/important/external_scheduler/notify-kick',
-          'es-notify-kick',
-          transactional=ndb.in_transaction())
+        "/internal/taskqueue/important/external_scheduler/notify-kick",
+        "es-notify-kick",
+        transactional=ndb.in_transaction(),
+      )
       if not job_enqueued:
-        logging.info('Failed to add a notify-kick for request.')
+        logging.info("Failed to add a notify-kick for request.")
     return
 
   enqueued = utils.enqueue_task(
-      '/internal/taskqueue/important/external_scheduler/notify-tasks',
-      'es-notify-tasks',
-      params={
-          'es_host': es_cfg.address,
-          'request_json': request_json
-      },
-      transactional=ndb.in_transaction())
+    "/internal/taskqueue/important/external_scheduler/notify-tasks",
+    "es-notify-tasks",
+    params={"es_host": es_cfg.address, "request_json": request_json},
+    transactional=ndb.in_transaction(),
+  )
   if not enqueued:
-    raise datastore_utils.CommitError('Failed to enqueue task')
+    raise datastore_utils.CommitError("Failed to enqueue task")
 
 
 def notify_request_now(es_host, proto):
@@ -280,7 +299,7 @@ def task_batch_handle_notifications():
   LEASE_SEC = 60
   # The maximum number of tasks to lease from the pull queue.
   MAX_TASKS = 1000
-  queue = taskqueue.Queue('es-notify-tasks-batch')
+  queue = taskqueue.Queue("es-notify-tasks-batch")
   tasks = queue.lease_tasks(LEASE_SEC, MAX_TASKS)
   if not tasks:
     return
@@ -289,8 +308,8 @@ def task_batch_handle_notifications():
   for task in tasks:
     proto = plugin_pb2.NotifyTasksRequest()
     payload = json.loads(task.payload)
-    json_format.Parse(payload['request_json'], proto)
-    s_tuple = (proto.scheduler_id, payload['es_host'])
+    json_format.Parse(payload["request_json"], proto)
+    s_tuple = (proto.scheduler_id, payload["es_host"])
     tasks_per_scheduler[s_tuple].append(task)
     if s_tuple not in requests:
       requests[s_tuple] = proto
@@ -301,12 +320,13 @@ def task_batch_handle_notifications():
   for s_id, address in requests.keys():
     request_json = json_format.MessageToJson(requests[s_id, address])
     enqueued = utils.enqueue_task(
-        '/internal/taskqueue/important/external_scheduler/notify-tasks',
-        'es-notify-tasks',
-        params={'es_host': address, 'request_json': request_json},
-        transactional=ndb.in_transaction())
+      "/internal/taskqueue/important/external_scheduler/notify-tasks",
+      "es-notify-tasks",
+      params={"es_host": address, "request_json": request_json},
+      transactional=ndb.in_transaction(),
+    )
     if not enqueued:
-      logging.warning('Failed to enqueue external scheduler task, skipping')
+      logging.warning("Failed to enqueue external scheduler task, skipping")
       continue
     queue.delete_tasks(tasks_per_scheduler[s_id, address])
 

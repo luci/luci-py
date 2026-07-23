@@ -72,6 +72,7 @@ class TaskDimensionsSets(ndb.Model):
   improves caching efficiency of direct ndb.get_multi fetches of
   TaskDimensionsSets in assert_bot(...).
   """
+
   # Disable useless in-process per-request cache to save some RAM.
   _use_cache = False
 
@@ -100,7 +101,7 @@ class TaskDimensionsSets(ndb.Model):
     Arguments:
       task_dimensions_flat: a sorted list of `k:v` pairs with task dimensions.
     """
-    return any(task_dimensions_flat == s['dimensions'] for s in self.sets)
+    return any(task_dimensions_flat == s["dimensions"] for s in self.sets)
 
   def matches_bot_dimensions(self, bot_dimensions_set):
     """True if any of stored `sets` matches given bot dimensions.
@@ -109,7 +110,8 @@ class TaskDimensionsSets(ndb.Model):
       bot_dimensions_set: a set of `k:v` pairs with bot dimensions.
     """
     return any(
-        bot_dimensions_set.issuperset(s['dimensions']) for s in self.sets)
+      bot_dimensions_set.issuperset(s["dimensions"]) for s in self.sets
+    )
 
   @staticmethod
   def dimensions_to_id(dimensions):
@@ -121,22 +123,22 @@ class TaskDimensionsSets(ndb.Model):
     # Both `id` and `pool` are guaranteed to have at most 1 item. If a task
     # targets a specific bot via `id`, use `bot:` key prefix to allow this bot
     # to find the task faster, otherwise use `pool:`.
-    if u'id' in dimensions:
-      kind = 'bot'
-      pfx = dimensions[u'id'][0]
+    if "id" in dimensions:
+      kind = "bot"
+      pfx = dimensions["id"][0]
     else:
-      kind = 'pool'
-      pfx = dimensions[u'pool'][0]
+      kind = "pool"
+      pfx = dimensions["pool"][0]
     dimensions_hash = hash_dimensions(dimensions)
-    return '%s:%d' % (TaskDimensionsSets.id_prefix(kind, pfx), dimensions_hash)
+    return "%s:%d" % (TaskDimensionsSets.id_prefix(kind, pfx), dimensions_hash)
 
   @staticmethod
   def id_prefix(kind, pfx):
     """Returns either `bot:<url-encoded-id>` or `pool:<url-encoded-id>`."""
-    assert kind in ('bot', 'pool'), kind
+    assert kind in ("bot", "pool"), kind
     if isinstance(pfx, unicode):
-      pfx = pfx.encode('utf-8')
-    return '%s:%s' % (kind, urllib.quote_plus(pfx))
+      pfx = pfx.encode("utf-8")
+    return "%s:%s" % (kind, urllib.quote_plus(pfx))
 
   @staticmethod
   def split_id(sets_id):
@@ -148,16 +150,16 @@ class TaskDimensionsSets(ndb.Model):
     Returns:
       Tuple with kind, ID and number, e.g. `('bot', 'some-bot', 1234)`.
     """
-    chunks = sets_id.split(':')
+    chunks = sets_id.split(":")
     if len(chunks) != 3:
-      raise ValueError('Invalid TaskDimensionsSets ID %r' % sets_id)
+      raise ValueError("Invalid TaskDimensionsSets ID %r" % sets_id)
     kind, pfx, num = chunks
-    if kind not in ('bot', 'pool'):
-      raise ValueError('Invalid TaskDimensionsSets ID %r' % sets_id)
+    if kind not in ("bot", "pool"):
+      raise ValueError("Invalid TaskDimensionsSets ID %r" % sets_id)
     try:
       return (kind, urllib.unquote(pfx), int(num))
     except ValueError:
-      raise ValueError('Invalid TaskDimensionsSets ID %r' % sets_id)
+      raise ValueError("Invalid TaskDimensionsSets ID %r" % sets_id)
 
   @staticmethod
   def ids_to_queue_numbers(sets_ids):
@@ -169,7 +171,7 @@ class TaskDimensionsSets(ndb.Model):
     Returns:
       A sorted list with queue numbers aka dimensions hashes.
     """
-    sets_id_to_int = lambda x: int(x[x.rfind(':') + 1:])
+    sets_id_to_int = lambda x: int(x[x.rfind(":") + 1 :])
     return sorted(sets_id_to_int(sets_id) for sets_id in sets_ids)
 
 
@@ -188,6 +190,7 @@ class TaskDimensionsInfo(ndb.Model):
   infrequently. Changes to the expiry time of existing entries (which happen
   frequently) do not touch TaskDimensionsSets entity at all.
   """
+
   # Disable useless in-process per-request cache to save some RAM.
   _use_cache = False
 
@@ -240,6 +243,7 @@ class BotDimensionsMatches(ndb.Model):
   expected to stop consuming tasks (e.g. it is deleted, quarantined, detected as
   dead, etc.) in cleanup_after_bot(...).
   """
+
   # Disable useless in-process per-request cache to save some RAM.
   _use_cache = False
 
@@ -305,16 +309,16 @@ class BotDimensionsMatches(ndb.Model):
 
 # Exceptions that can be raised by transaction_async(...).
 _TXN_EXCEPTIONS = (
-    # Deadline starting or landing the transaction.
-    apiproxy_errors.DeadlineExceededError,
-    # Transaction handle has expired.
-    datastore_errors.BadRequestError,
-    # Internal error of unknown origin.
-    datastore_errors.InternalError,
-    # Datastore-specific timeout.
-    datastore_errors.Timeout,
-    # Transaction collisions or internal errors.
-    datastore_utils.CommitError,
+  # Deadline starting or landing the transaction.
+  apiproxy_errors.DeadlineExceededError,
+  # Transaction handle has expired.
+  datastore_errors.BadRequestError,
+  # Internal error of unknown origin.
+  datastore_errors.InternalError,
+  # Datastore-specific timeout.
+  datastore_errors.Timeout,
+  # Transaction collisions or internal errors.
+  datastore_utils.CommitError,
 )
 
 
@@ -342,8 +346,8 @@ def _sets_to_expiry_map(sets):
     A dict {tuple(task dimensions list) => expiry datetime.datetime}
   """
   return {
-      tuple(s['dimensions']): utils.timestamp_to_datetime(s['expiry'] * 1e6)
-      for s in sets
+    tuple(s["dimensions"]): utils.timestamp_to_datetime(s["expiry"] * 1e6)
+    for s in sets
   }
 
 
@@ -362,9 +366,9 @@ def _expiry_map_to_sets(expiry_map, with_expiry=True):
   """
   sets = []
   for dims, exp in sorted(expiry_map.items()):
-    d = {'dimensions': dims}
+    d = {"dimensions": dims}
     if with_expiry:
-      d['expiry'] = int(utils.datetime_to_timestamp(exp) / 1e6)
+      d["expiry"] = int(utils.datetime_to_timestamp(exp) / 1e6)
     sets.append(d)
   return sets
 
@@ -389,16 +393,18 @@ def _put_task_dimensions_sets_async(sets_id, expiry_map):
   # to not perfectly synchronized clocks.
   next_cleanup_ts = min(expiry_map.values()) + datetime.timedelta(minutes=5)
 
-  return ndb.put_multi_async([
-      TaskDimensionsSets(key=sets_key,
-                         sets=_expiry_map_to_sets(expiry_map,
-                                                  with_expiry=False)),
-      TaskDimensionsInfo(
-          key=info_key,
-          sets=_expiry_map_to_sets(expiry_map, with_expiry=True),
-          next_cleanup_ts=next_cleanup_ts,
+  return ndb.put_multi_async(
+    [
+      TaskDimensionsSets(
+        key=sets_key, sets=_expiry_map_to_sets(expiry_map, with_expiry=False)
       ),
-  ])
+      TaskDimensionsInfo(
+        key=info_key,
+        sets=_expiry_map_to_sets(expiry_map, with_expiry=True),
+        next_cleanup_ts=next_cleanup_ts,
+      ),
+    ]
+  )
 
 
 def _delete_task_dimensions_sets_async(sets_id):
@@ -427,7 +433,8 @@ def _check_matches_async(bot_dimensions_set, sets_ids):
     set(alive and still matching sets IDs), set(stale sets IDs).
   """
   sets_ents = yield ndb.get_multi_async(
-      [ndb.Key(TaskDimensionsSets, sets_id) for sets_id in sets_ids])
+    [ndb.Key(TaskDimensionsSets, sets_id) for sets_id in sets_ids]
+  )
 
   alive = set()
   stale = set()
@@ -457,7 +464,7 @@ def _assert_task_dimensions_async(task_dimensions, exp_ts):
   sets_key = ndb.Key(TaskDimensionsSets, sets_id)
   info_key = ndb.Key(TaskDimensionsInfo, 1, parent=sets_key)
 
-  log = _Logger('assert_task(%s)', sets_id)
+  log = _Logger("assert_task(%s)", sets_id)
 
   # Load expiration of known dimensions sets to see if they need to be updated.
   info = yield info_key.get_async()
@@ -512,24 +519,24 @@ def _assert_task_dimensions_async(task_dimensions, exp_ts):
     for dims in expanded:
       cur_expiry = expiry_map.get(dims)
       if not cur_expiry:
-        log.info('adding %s, expiry %s', dims, extended_ts)
+        log.info("adding %s, expiry %s", dims, extended_ts)
         expiry_map[dims] = extended_ts
         created.append(dims)
       elif cur_expiry < extended_ts:
-        log.info('expiry of %s: %s => %s', dims, cur_expiry, extended_ts)
+        log.info("expiry of %s: %s => %s", dims, cur_expiry, extended_ts)
         expiry_map[dims] = extended_ts
         updated.append(dims)
 
     # It is possible the entity was already updated by another transaction.
     if not created and not updated:
-      log.info('nothing to commit, already updated by another txn')
+      log.info("nothing to commit, already updated by another txn")
       raise ndb.Return(None)
 
     # Kick out old sets since we are going to commit the mutation anyway.
     now = utils.utcnow()
     for dims, expiry in expiry_map.items():
       if expiry < now:
-        log.info('dropping %s, expired at %s', dims, expiry)
+        log.info("dropping %s, expired at %s", dims, expiry)
         expiry_map.pop(dims)
 
     # Some sets must survive, since we just added/updated fresh sets.
@@ -542,24 +549,26 @@ def _assert_task_dimensions_async(task_dimensions, exp_ts):
     # are just updating the expiration time. The assignments of tasks to bots
     # were already done at that point.
     if created:
-      log.info('enqueuing a task to find matches for %s', created)
+      log.info("enqueuing a task to find matches for %s", created)
       ok = yield utils.enqueue_task_async(
-          '/internal/taskqueue/important/task_queues/update-bot-matches',
-          'update-bot-matches',
-          payload=utils.encode_to_json({
-              'task_sets_id': sets_id,
-              'dimensions': created,
-              'enqueued_ts': now,
-          }),
-          transactional=True,
+        "/internal/taskqueue/important/task_queues/update-bot-matches",
+        "update-bot-matches",
+        payload=utils.encode_to_json(
+          {
+            "task_sets_id": sets_id,
+            "dimensions": created,
+            "enqueued_ts": now,
+          }
+        ),
+        transactional=True,
       )
       if not ok:
-        raise datastore_utils.CommitError('Failed to enqueue a TQ task')
+        raise datastore_utils.CommitError("Failed to enqueue a TQ task")
 
   # Do it!
-  log.info('launching txn')
+  log.info("launching txn")
   yield datastore_utils.transaction_async(txn, retries=3)
-  log.info('txn completed')
+  log.info("txn completed")
 
 
 @ndb.tasklet
@@ -580,15 +589,15 @@ def _tq_update_bot_matches_async(task_sets_id, task_sets_dims, enqueued_ts):
   Returns:
     True if succeeded, False if the TQ task needs to be retried.
   """
-  assert task_sets_id.startswith(('bot:', 'pool:')), task_sets_id
+  assert task_sets_id.startswith(("bot:", "pool:")), task_sets_id
   assert all(isinstance(dims, list) for dims in task_sets_dims), task_sets_dims
 
-  log = _Logger('tq_update_matches(%s)', task_sets_id)
+  log = _Logger("tq_update_matches(%s)", task_sets_id)
 
   # Verify this TQ task is still necessary by checking the entity exists.
   task_sets = yield ndb.Key(TaskDimensionsSets, task_sets_id).get_async()
   if not task_sets:
-    log.warning('the entity is already gone, retiring the task')
+    log.warning("the entity is already gone, retiring the task")
     raise ndb.Return(True)
 
   # Ignore sets no longer mentioned in the entity (i.e. if there were cleaned up
@@ -598,9 +607,9 @@ def _tq_update_bot_matches_async(task_sets_id, task_sets_dims, enqueued_ts):
     if task_sets.contains_task_dimensions_set(dims):
       actual_task_dims.append(dims)
     else:
-      log.warning('the set is no longer actual: %s', dims)
+      log.warning("the set is no longer actual: %s", dims)
   if not actual_task_dims:
-    log.warning('all sets are no longer actual, retiring the task')
+    log.warning("all sets are no longer actual, retiring the task")
     raise ndb.Return(True)
 
   # Set of bot IDs that were visited by `_maybe_add_match_async` already.
@@ -612,10 +621,16 @@ def _tq_update_bot_matches_async(task_sets_id, task_sets_dims, enqueued_ts):
 
   # Bind all unchanging arguments for _maybe_add_match_async.
   maybe_add_match_async = lambda bot_matches_ent: _maybe_add_match_async(
-      bot_matches_ent, task_sets_id, actual_task_dims, enqueued_ts, log,
-      bots_visited, bots_updated)
+    bot_matches_ent,
+    task_sets_id,
+    actual_task_dims,
+    enqueued_ts,
+    log,
+    bots_visited,
+    bots_updated,
+  )
 
-  if task_sets_id.startswith('bot:'):
+  if task_sets_id.startswith("bot:"):
     # When the task targets a specific bot, we can find BotDimensionsMatches
     # fast. There's at most one potentially matching entity, no need to run
     # queries.
@@ -631,21 +646,28 @@ def _tq_update_bot_matches_async(task_sets_id, task_sets_dims, enqueued_ts):
       q = BotDimensionsMatches.query()
       for kv in task_dims:
         q = q.filter(BotDimensionsMatches.dimensions == kv)
-      queries.append((q, log.derive('query #%d', idx)))
+      queries.append((q, log.derive("query #%d", idx)))
     ok = yield _map_async(queries, maybe_add_match_async)
 
   # Retry the whole thing if something failed or the query timed out. Hopefully
   # there will be less things to process on a retry and eventually the task
   # succeeds.
-  log.info('visited %d bots, updated %d', len(bots_visited), len(bots_updated))
+  log.info("visited %d bots, updated %d", len(bots_visited), len(bots_updated))
   if not ok:
-    log.error('need a retry')
+    log.error("need a retry")
   raise ndb.Return(ok)
 
 
 @ndb.tasklet
-def _maybe_add_match_async(bot_matches_ent, task_sets_id, task_sets_dims,
-                           enqueued_ts, log, bots_visited, bots_updated):
+def _maybe_add_match_async(
+  bot_matches_ent,
+  task_sets_id,
+  task_sets_dims,
+  enqueued_ts,
+  log,
+  bots_visited,
+  bots_updated,
+):
   """Adds ID of a matching set to BotDimensionsMatches if still necessary.
 
   Implementation detail of _tq_update_bot_matches_async.
@@ -704,11 +726,11 @@ def _maybe_add_match_async(bot_matches_ent, task_sets_id, task_sets_dims,
   try:
     updated = yield datastore_utils.transaction_async(txn, retries=5)
     if updated:
-      log.info('updated %s, delay %s', bot_id, utils.utcnow() - enqueued_ts)
+      log.info("updated %s, delay %s", bot_id, utils.utcnow() - enqueued_ts)
       bots_updated.append(bot_id)
     raise ndb.Return(True)
   except _TXN_EXCEPTIONS:
-    log.warning('error updating %s', bot_id)
+    log.warning("error updating %s", bot_id)
     raise ndb.Return(False)
 
 
@@ -744,7 +766,7 @@ def _cleanup_task_dimensions_async(dims_info, log):
     changed = False
     for dims, expiry in expiry_map.items():
       if expiry < now:
-        log.info('%s: dropping %s, expired at %s', sets_id, dims, expiry)
+        log.info("%s: dropping %s, expired at %s", sets_id, dims, expiry)
         expiry_map.pop(dims)
         changed = True
 
@@ -773,22 +795,22 @@ def _assert_bot_dimensions_async(bot_dimensions):
   Returns:
     A set of string IDs of TaskDimensionsSets that match the bot.
   """
-  bot_id = bot_dimensions[u'id'][0]
+  bot_id = bot_dimensions["id"][0]
   bot_dimensions_flat = bot_dimensions_to_flat(bot_dimensions)
   bot_dimensions_set = set(bot_dimensions_flat)
 
-  log = _Logger('assert_bot(%s)', bot_id)
+  log = _Logger("assert_bot(%s)", bot_id)
 
   # Load queue numbers assigned to the bot.
-  log.info('loading bot dimensions matches')
+  log.info("loading bot dimensions matches")
   matches = yield BotDimensionsMatches.get_or_default_async(bot_id)
 
   # Load associated dimension sets to check the bot still matches them. This is
   # the hottest spot that heavily relies on ndb memcache.
-  log.info('checking %d dimensions sets', len(matches.matches))
+  log.info("checking %d dimensions sets", len(matches.matches))
   alive, stale = yield _check_matches_async(bot_dimensions_set, matches.matches)
   if stale:
-    log.info('will unmatch: %s', ' '.join(stale))
+    log.info("will unmatch: %s", " ".join(stale))
 
   # We need to trigger a rescan of all potentially matching TaskDimensionsSets
   # when bot dimensions change and also periodically (to workaround eventual
@@ -797,7 +819,7 @@ def _assert_bot_dimensions_async(bot_dimensions):
   if matches.dimensions != bot_dimensions_flat:
     rescan_reason = _diff_bot_dims(matches.dimensions, bot_dimensions_flat)
   elif matches.next_rescan_ts and utils.utcnow() > matches.next_rescan_ts:
-    rescan_reason = 'periodic'
+    rescan_reason = "periodic"
 
   if rescan_reason is not None:
 
@@ -808,7 +830,7 @@ def _assert_bot_dimensions_async(bot_dimensions):
       if txn_ent.next_rescan_ts != matches.next_rescan_ts:
         # This can theoretically happen if a bot is calling /bot/poll in
         # parallel, which it should not be doing.
-        log.warning('aborting txn, the entity state changed')
+        log.warning("aborting txn, the entity state changed")
         raise ndb.Return(None)
       txn_ent.dimensions = bot_dimensions_flat
       txn_ent.matches = [x for x in txn_ent.matches if x not in stale]
@@ -818,19 +840,22 @@ def _assert_bot_dimensions_async(bot_dimensions):
       txn_ent.last_cleanup_ts = now
       # This eventually calls _tq_rescan_matching_task_sets_async.
       ok = yield utils.enqueue_task_async(
-          '/internal/taskqueue/important/task_queues/rescan-matching-task-sets',
-          'rescan-matching-task-sets',
-          payload=utils.encode_to_json({
-              'bot_id': bot_id,
-              'rescan_counter': txn_ent.rescan_counter,
-              'rescan_reason': rescan_reason,
-          }),
-          transactional=True)
+        "/internal/taskqueue/important/task_queues/rescan-matching-task-sets",
+        "rescan-matching-task-sets",
+        payload=utils.encode_to_json(
+          {
+            "bot_id": bot_id,
+            "rescan_counter": txn_ent.rescan_counter,
+            "rescan_reason": rescan_reason,
+          }
+        ),
+        transactional=True,
+      )
       if not ok:
-        raise datastore_utils.CommitError('Failed to enqueue TQ task')
+        raise datastore_utils.CommitError("Failed to enqueue TQ task")
       yield txn_ent.put_async()
 
-    log.info('triggering rescan: %s', rescan_reason)
+    log.info("triggering rescan: %s", rescan_reason)
     yield datastore_utils.transaction_async(enqueue_rescan_txn, retries=5)
   elif stale:
     # If the rescan is not needed, but we have stale matches, clean them up now
@@ -841,7 +866,7 @@ def _assert_bot_dimensions_async(bot_dimensions):
     def unmatch_txn():
       txn_ent = yield BotDimensionsMatches.get_or_default_async(bot_id)
       if txn_ent.dimensions != bot_dimensions_flat:
-        log.warning('aborting txn, the entity state changed')
+        log.warning("aborting txn, the entity state changed")
         raise ndb.Return(None)
       before = len(txn_ent.matches)
       txn_ent.matches = [x for x in txn_ent.matches if x not in stale]
@@ -852,11 +877,11 @@ def _assert_bot_dimensions_async(bot_dimensions):
     try:
       yield datastore_utils.transaction_async(unmatch_txn, retries=5)
     except _TXN_EXCEPTIONS:
-      log.warning('error when cleaning matches, ignoring')
+      log.warning("error when cleaning matches, ignoring")
 
   # Log integer IDs of all matching queues.
   queue_numbers = TaskDimensionsSets.ids_to_queue_numbers(alive)
-  log.info('queues (%d): %s', len(queue_numbers), queue_numbers)
+  log.info("queues (%d): %s", len(queue_numbers), queue_numbers)
 
   raise ndb.Return(alive)
 
@@ -874,42 +899,45 @@ def _tq_rescan_matching_task_sets_async(bot_id, rescan_counter, rescan_reason):
   Returns:
     True if succeeded, False if the TQ task needs to be retried.
   """
-  log = _Logger('tq_rescan_matches(%s)', bot_id)
-  log.info('rescan: %s', rescan_reason)
+  log = _Logger("tq_rescan_matches(%s)", bot_id)
+  log.info("rescan: %s", rescan_reason)
 
   # Verify the task is still fresh and load dimensions to match on.
   matches = yield BotDimensionsMatches.get_or_default_async(bot_id)
   if matches.rescan_counter != rescan_counter:
-    log.info('skipping, rescan counter %d != %s', matches.rescan_counter,
-             rescan_counter)
+    log.info(
+      "skipping, rescan counter %d != %s",
+      matches.rescan_counter,
+      rescan_counter,
+    )
     raise ndb.Return(True)
-  log.info('enqueued %s ago', utils.utcnow() - matches.last_rescan_enqueued_ts)
+  log.info("enqueued %s ago", utils.utcnow() - matches.last_rescan_enqueued_ts)
 
   bot_dimensions_flat = matches.dimensions
   bot_dimensions_set = set(bot_dimensions_flat)
 
   def scan_prefix_query(set_kind, pfx):
     pfx = TaskDimensionsSets.id_prefix(set_kind, pfx)
-    start = '%s:%s' % (pfx, chr(ord('0') - 1))
-    end = '%s:%s' % (pfx, chr(ord('9') + 1))
+    start = "%s:%s" % (pfx, chr(ord("0") - 1))
+    end = "%s:%s" % (pfx, chr(ord("9") + 1))
     query = ndb.Query(
-        kind='TaskDimensionsSets',
-        filters=ndb.ConjunctionNode(
-            ndb.FilterNode('__key__', '>', ndb.Key(TaskDimensionsSets, start)),
-            ndb.FilterNode('__key__', '<', ndb.Key(TaskDimensionsSets, end)),
-        ),
+      kind="TaskDimensionsSets",
+      filters=ndb.ConjunctionNode(
+        ndb.FilterNode("__key__", ">", ndb.Key(TaskDimensionsSets, start)),
+        ndb.FilterNode("__key__", "<", ndb.Key(TaskDimensionsSets, end)),
+      ),
     )
-    return query, log.derive('%s', pfx)
+    return query, log.derive("%s", pfx)
 
   # Construct queries that scan for potentially matching TaskDimensionsSets.
   #
   # TODO(vadimsh): Each query can be sharded to parallelize the scan even more
   # if necessary.
-  queries = [scan_prefix_query('bot', bot_id)]
+  queries = [scan_prefix_query("bot", bot_id)]
   for kv in bot_dimensions_flat:
-    k, v = kv.split(':', 1)
-    if k == 'pool':
-      queries.append(scan_prefix_query('pool', v))
+    k, v = kv.split(":", 1)
+    if k == "pool":
+      queries.append(scan_prefix_query("pool", v))
 
   # A set of matching TaskDimensionsSets IDs discovered by the scans.
   alive = set()
@@ -923,7 +951,7 @@ def _tq_rescan_matching_task_sets_async(bot_id, rescan_counter, rescan_reason):
 
   # Find all TaskDimensionsSets matching the bot dimensions.
   visited_all = yield _map_async(queries, visit_task_dimensions_set)
-  log.info('visited %d entities, found %d matches', visited[0], len(alive))
+  log.info("visited %d entities, found %d matches", visited[0], len(alive))
 
   # Double check any currently matched sets that were not discovered by the scan
   # are indeed dead and should be unmatched. This is particularly important if
@@ -931,7 +959,8 @@ def _tq_rescan_matching_task_sets_async(bot_id, rescan_counter, rescan_reason):
   # matters if the query is "eventually consistent" and omits some very recent
   # entities. We don't want to delete active matches.
   _, stale = yield _check_matches_async(
-      bot_dimensions_set, [sid for sid in matches.matches if sid not in alive])
+    bot_dimensions_set, [sid for sid in matches.matches if sid not in alive]
+  )
 
   # Store new matches in the entity if the entity still has dimensions we
   # scanned for. This returns `last_rescan_enqueued_ts` if the entity was
@@ -941,35 +970,35 @@ def _tq_rescan_matching_task_sets_async(bot_id, rescan_counter, rescan_reason):
     now = utils.utcnow()
     txn_ent = yield BotDimensionsMatches.get_or_default_async(bot_id)
     if txn_ent.dimensions != bot_dimensions_flat:
-      log.warning('dimensions changed while we were scanning, aborting')
+      log.warning("dimensions changed while we were scanning, aborting")
       raise ndb.Return(None)
     # Carefully merge `alive` and `stale` into `matches` to avoid stomping over
     # matches that may have been added concurrently by _maybe_add_match_async.
     cur = set(txn_ent.matches)
     new = (cur | alive) - stale
     if cur == new:
-      log.info('no changes to the matched set')
+      log.info("no changes to the matched set")
     for x in cur - new:
-      log.info('unmatched %s', x)
+      log.info("unmatched %s", x)
     for x in new - cur:
-      log.info('matched %s', x)
+      log.info("matched %s", x)
     txn_ent.matches = sorted(new)
     txn_ent.last_rescan_finished_ts = now
     txn_ent.last_cleanup_ts = now
     yield txn_ent.put_async()
     raise ndb.Return(txn_ent.last_rescan_enqueued_ts)
 
-  log.info('storing changes')
+  log.info("storing changes")
   rescan_enqueued_ts = yield datastore_utils.transaction_async(txn, retries=5)
   if rescan_enqueued_ts:
-    log.info('rescan delay: %s', utils.utcnow() - rescan_enqueued_ts)
+    log.info("rescan delay: %s", utils.utcnow() - rescan_enqueued_ts)
 
   # Retire the TQ task if the entity is already stale or we successfully
   # scanned and updated everything.
   if not rescan_enqueued_ts:
-    log.warning('this task queue task is stale, retiring it')
+    log.warning("this task queue task is stale, retiring it")
   elif not visited_all:
-    log.error('some scans did not complete, need a retry')
+    log.error("some scans did not complete, need a retry")
   raise ndb.Return(stale or visited_all)
 
 
@@ -983,10 +1012,9 @@ def _freshen_up_queues_memcache(queues):
   """
   # TODO(vadimsh): Stop hammering memcache. These entries here easily end up
   # getting 2k-3k QPS each.
-  memcache.set_multi({str(d): True
-                      for d in queues},
-                     time=61,
-                     namespace='task_queues_tasks')
+  memcache.set_multi(
+    {str(d): True for d in queues}, time=61, namespace="task_queues_tasks"
+  )
 
 
 ### Some generic helpers.
@@ -1001,13 +1029,13 @@ class _Logger(object):
 
   def derive(self, sfx, *args):
     """Derives a new logger with prefix extended by the given message."""
-    logger = _Logger('%s: %s', self._pfx, sfx % args)
+    logger = _Logger("%s: %s", self._pfx, sfx % args)
     logger._ts = self._ts
     return logger
 
   def _log(self, lvl, msg, args):
-    lvl('[%.2fs] %s: %s', time.time() - self._ts, self._pfx, msg % args)
-    #print '[%.2fs] %s: %s' % (time.time() - self._ts, self._pfx, msg % args)
+    lvl("[%.2fs] %s: %s", time.time() - self._ts, self._pfx, msg % args)
+    # print '[%.2fs] %s: %s' % (time.time() - self._ts, self._pfx, msg % args)
 
   def info(self, msg, *args):
     self._log(logging.info, msg, args)
@@ -1032,15 +1060,15 @@ def _diff_bot_dims(old, new):
   old_set = set(old)
   new_set = set(new)
 
-  add = ' '.join(dim for dim in new if dim not in old_set)
-  rem = ' '.join(dim for dim in old if dim not in new_set)
+  add = " ".join(dim for dim in new if dim not in old_set)
+  rem = " ".join(dim for dim in old if dim not in new_set)
 
   parts = []
   if add:
-    parts.append('dims added [%s]' % add)
+    parts.append("dims added [%s]" % add)
   if rem:
-    parts.append('dims removed [%s]' % rem)
-  return ', '.join(parts)
+    parts.append("dims removed [%s]" % rem)
+  return ", ".join(parts)
 
 
 def _random_timedelta_mins(a, b):
@@ -1143,13 +1171,15 @@ class _AsyncWorkQueue(object):
 
 
 @ndb.tasklet
-def _map_async(queries,
-               cb,
-               max_concurrency=200,
-               page_size=1000,
-               timeout=300,
-               max_pages=None,
-               keys_only=False):
+def _map_async(
+  queries,
+  cb,
+  max_concurrency=200,
+  page_size=1000,
+  timeout=300,
+  max_pages=None,
+  keys_only=False,
+):
   """Applies a callback to results of a bunch of queries.
 
   This is roughly similar to ndb.Query.map_async, except it tries to make
@@ -1184,7 +1214,7 @@ def _map_async(queries,
     # of 60s regardless of query options. This is not enough for busy servers.
     # Instead we'll use an explicitly paginated query.
     try:
-      logger.info('scanning')
+      logger.info("scanning")
       deadline = utils.time_time() + timeout
       count = 0
       pages = 0
@@ -1195,10 +1225,12 @@ def _map_async(queries,
         if rpc_deadline < 0 or (max_pages and pages >= max_pages):
           raise ndb.Return(False)
         try:
-          page, cursor, more = yield q.fetch_page_async(page_size,
-                                                        start_cursor=cursor,
-                                                        deadline=rpc_deadline,
-                                                        keys_only=keys_only)
+          page, cursor, more = yield q.fetch_page_async(
+            page_size,
+            start_cursor=cursor,
+            deadline=rpc_deadline,
+            keys_only=keys_only,
+          )
           # Avoid favoring items that appear earlier in the page. It is
           # important when _map_async is retried, e.g. as a part of TQ task
           # retry. Gives some opportunity for tail items to be processed. Mostly
@@ -1208,9 +1240,9 @@ def _map_async(queries,
           count += len(page)
           pages += 1
         except (datastore_errors.BadRequestError, datastore_errors.Timeout):
-          logger.error('scan timed out, visited %d items', count)
+          logger.error("scan timed out, visited %d items", count)
           raise ndb.Return(False)
-      logger.info('scan completed, visited %d items', count)
+      logger.info("scan completed, visited %d items", count)
       raise ndb.Return(True)
     finally:
       queue.done()
@@ -1269,9 +1301,12 @@ def expand_dimensions_to_flats(dimensions, is_bot_dim=False):
   for i, (k, v) in enumerate(dimensions_kv):
     if isinstance(v, (str, unicode)):
       assert is_bot_dim, (k, v)
-      dimensions_kv[i] = (k, [
+      dimensions_kv[i] = (
+        k,
+        [
           v,
-      ])
+        ],
+      )
   cur_dimensions_flat = []
   result = []
   cutoff = config.DIMENSION_KEY_LENGTH + 1 + config.DIMENSION_VALUE_LENGTH
@@ -1289,13 +1324,13 @@ def expand_dimensions_to_flats(dimensions, is_bot_dim=False):
       return
 
     for v in values[vi].split(OR_DIM_SEP):
-      flat = u'%s:%s' % (key, v)
+      flat = "%s:%s" % (key, v)
       if len(flat) > cutoff:
         assert is_bot_dim, flat
         # An ellipsis is codepoint U+2026 which is encoded with 3 bytes in
         # UTF-8. We're still well below the 1500 bytes limit. Datastore uses
         # UTF-8.
-        flat = flat[:cutoff] + u'…'
+        flat = flat[:cutoff] + "…"
 
       cur_dimensions_flat.append(flat)
       gen(ki, vi + 1)
@@ -1311,8 +1346,9 @@ def bot_dimensions_to_flat(dimensions):
     expanded = expand_dimensions_to_flats(dimensions, is_bot_dim=True)
   except AttributeError as e:
     logging.exception(
-        "crbug.com/1133117: failed to call expand_dimensions_to_flats for %s",
-        dimensions)
+      "crbug.com/1133117: failed to call expand_dimensions_to_flats for %s",
+      dimensions,
+    )
     raise e
   assert len(expanded) == 1, dimensions
   return expanded[0]
@@ -1333,18 +1369,18 @@ def hash_dimensions(dimensions):
   # This horrible code is the product of micro benchmarks.
   # TODO(maruel): This is incorrect, as it can confuse keys and values. But
   # changing the algo is non-trivial.
-  data = ''
+  data = ""
   for k, values in sorted(dimensions.items()):
-    data += k.encode('utf8')
-    data += '\000'
+    data += k.encode("utf8")
+    data += "\000"
     assert isinstance(values, (list, tuple)), values
     for v in values:
-      data += v.encode('utf8')
-      data += '\000'
+      data += v.encode("utf8")
+      data += "\000"
   digest = hashlib.md5(data).digest()
   # Note that 'L' means C++ unsigned long which is (usually) 32 bits and
   # python's int is 64 bits.
-  return int(struct.unpack('<L', digest[:4])[0]) or 1
+  return int(struct.unpack("<L", digest[:4])[0]) or 1
 
 
 def assert_bot(bot_dimensions):
@@ -1383,8 +1419,9 @@ def freshen_up_queues(bot_id):
     A list of queues consumed by the bot.
   """
   matches = ndb.Key(BotDimensionsMatches, bot_id).get()
-  queues = TaskDimensionsSets.ids_to_queue_numbers(
-      matches.matches) if matches else []
+  queues = (
+    TaskDimensionsSets.ids_to_queue_numbers(matches.matches) if matches else []
+  )
   _freshen_up_queues_memcache(queues)
   return queues
 
@@ -1420,7 +1457,8 @@ def assert_task_async(request):
     t = request.task_slice(i)
     exp_ts += datetime.timedelta(seconds=t.expiration_secs)
     futures.append(
-        _assert_task_dimensions_async(t.properties.dimensions, exp_ts))
+      _assert_task_dimensions_async(t.properties.dimensions, exp_ts)
+    )
   yield futures
 
 
@@ -1441,7 +1479,7 @@ def probably_has_capacity(dimensions):
   # - memcache could have been cleared manually or could be malfunctioning.
   # - in the case where a single bot can service the dimensions, the bot may not
   #   have been polling for N+1 seconds.
-  return memcache.get(dimensions_hash, namespace='task_queues_tasks')
+  return memcache.get(dimensions_hash, namespace="task_queues_tasks")
 
 
 def set_has_capacity(dimensions, seconds):
@@ -1452,7 +1490,8 @@ def set_has_capacity(dimensions, seconds):
   """
   dimensions_hash = str(hash_dimensions(dimensions))
   memcache.set(
-      dimensions_hash, True, time=seconds, namespace='task_queues_tasks')
+    dimensions_hash, True, time=seconds, namespace="task_queues_tasks"
+  )
 
 
 def update_bot_matches_async(payload):
@@ -1460,20 +1499,22 @@ def update_bot_matches_async(payload):
 
   Task queue task handler, part of assert_task_async(...) implementation.
   """
-  logging.info('TQ task payload:\n%s', payload)
+  logging.info("TQ task payload:\n%s", payload)
   payload = json.loads(payload)
   return _tq_update_bot_matches_async(
-      payload['task_sets_id'], payload['dimensions'],
-      utils.parse_datetime(payload['enqueued_ts']))
+    payload["task_sets_id"],
+    payload["dimensions"],
+    utils.parse_datetime(payload["enqueued_ts"]),
+  )
 
 
 def rescan_matching_task_sets_async(payload):
   """A task queue task that finds all matching TaskDimensionsSets for a bot."""
-  logging.info('TQ task payload:\n%s', payload)
+  logging.info("TQ task payload:\n%s", payload)
   payload = json.loads(payload)
-  return _tq_rescan_matching_task_sets_async(payload['bot_id'],
-                                             payload['rescan_counter'],
-                                             payload['rescan_reason'])
+  return _tq_rescan_matching_task_sets_async(
+    payload["bot_id"], payload["rescan_counter"], payload["rescan_reason"]
+  )
 
 
 @ndb.tasklet
@@ -1483,7 +1524,7 @@ def tidy_task_dimension_sets_async():
   Returns:
     True if cleaned up everything, False if something failed.
   """
-  log = _Logger('tidy_task_dims')
+  log = _Logger("tidy_task_dims")
 
   updated = []
 
@@ -1496,19 +1537,20 @@ def tidy_task_dimension_sets_async():
         updated.append(sets_id)
       raise ndb.Return(True)
     except _TXN_EXCEPTIONS:
-      log.warning('error cleaning %s', sets_id)
+      log.warning("error cleaning %s", sets_id)
       raise ndb.Return(False)
 
   q = TaskDimensionsInfo.query(
-      TaskDimensionsInfo.next_cleanup_ts < utils.utcnow())
+    TaskDimensionsInfo.next_cleanup_ts < utils.utcnow()
+  )
   ok = yield _map_async([(q, log)], cleanup_async)
-  log.info('cleaned %d', len(updated))
+  log.info("cleaned %d", len(updated))
 
   # Retry the whole thing if something failed or the query timed out. This is
   # faster than waiting for the next cron tick. Will also give some monitoring
   # signal.
   if not ok:
-    log.error('need a retry')
+    log.error("need a retry")
   raise ndb.Return(ok)
 
 
@@ -1523,7 +1565,7 @@ def tidy_bot_dimensions_matches_async(bot_alive_cb):
   Returns:
     True if cleaned up everything, False if something failed.
   """
-  log = _Logger('tidy_bot_matches')
+  log = _Logger("tidy_bot_matches")
 
   cleaned = []
 
@@ -1533,18 +1575,18 @@ def tidy_bot_dimensions_matches_async(bot_alive_cb):
     try:
       alive = yield bot_alive_cb(bot_id)
       if not alive:
-        log.info('cleaning %s', bot_id)
+        log.info("cleaning %s", bot_id)
         yield entity_key.delete_async()
         cleaned.append(bot_id)
       raise ndb.Return(True)
     except _TXN_EXCEPTIONS:
-      log.warning('error cleaning %s', bot_id)
+      log.warning("error cleaning %s", bot_id)
       raise ndb.Return(False)
 
   q = BotDimensionsMatches.query()
   ok = yield _map_async([(q, log)], cleanup_async, keys_only=True)
-  log.info('cleaned %d', len(cleaned))
+  log.info("cleaned %d", len(cleaned))
 
   if not ok:
-    log.error('need a retry')
+    log.error("need a retry")
   raise ndb.Return(ok)

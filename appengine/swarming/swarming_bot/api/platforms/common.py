@@ -7,7 +7,7 @@
 from collections import namedtuple
 
 
-def _safe_parse(content, split=': '):
+def _safe_parse(content, split=": "):
   """Safely parse a 'key: value' list of strings from a command."""
   values = {}
   for l in content.splitlines():
@@ -20,5 +20,6 @@ def _safe_parse(content, split=': '):
   return values
 
 
-ComputerSystemInfo = namedtuple('ComputerSystemInfo',
-                                ['name', 'vendor', 'version', 'serial'])
+ComputerSystemInfo = namedtuple(
+  "ComputerSystemInfo", ["name", "vendor", "version", "serial"]
+)

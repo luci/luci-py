@@ -43,7 +43,8 @@ class FileReaderThread(object):
     assert self._thread is None
     self._read()  # initial read
     self._thread = threading.Thread(
-        target=self._run, name='FileReaderThread %s' % self._path)
+      target=self._run, name="FileReaderThread %s" % self._path
+    )
     self._thread.daemon = True
     self._thread.start()
 
@@ -54,7 +55,7 @@ class FileReaderThread(object):
     self._signal.put(None)
     self._thread.join(60)  # don't wait forever
     if self._thread.is_alive():
-      logging.error('FileReaderThread failed to terminate in time')
+      logging.error("FileReaderThread failed to terminate in time")
 
   @property
   def last_value(self):
@@ -71,15 +72,15 @@ class FileReaderThread(object):
     attempts = self._max_attempts
     while True:
       try:
-        with open(self._path, 'rb') as f:
+        with open(self._path, "rb") as f:
           body = json.load(f)
         with self._lock:
           if self._last_value != body:
-            logging.info('Read %s', self._path)
+            logging.info("Read %s", self._path)
             self._last_value = body
         return True  # success!
       except (IOError, OSError, ValueError) as e:
-        last_error = 'Failed to read auth headers from %s: %s' % (self._path, e)
+        last_error = "Failed to read auth headers from %s: %s" % (self._path, e)
       attempts -= 1
       if not attempts:
         raise FatalReadError(last_error)
@@ -106,4 +107,4 @@ class FileReaderThread(object):
       except FatalReadError as e:
         # Log the error and simply keep last read value as it was. 'start'
         # makes sure to read it at least once.
-        logging.error('Can\'t reread the file: %s', e)
+        logging.error("Can't reread the file: %s", e)

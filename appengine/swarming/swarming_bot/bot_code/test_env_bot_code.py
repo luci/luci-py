@@ -8,11 +8,13 @@ import sys
 
 # swarming_bot/
 BOT_DIR = os.path.dirname(
-    os.path.dirname(os.path.realpath(os.path.abspath(__file__))))
+  os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+)
 
 
 def setup_test_env():
   """Sets up the environment for bot tests."""
   sys.path.insert(0, BOT_DIR)
   import test_env_bot
+
   test_env_bot.setup_test_env()

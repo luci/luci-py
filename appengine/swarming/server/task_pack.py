@@ -21,53 +21,54 @@ TASK_REQUEST_KEY_ID_MASK = int(2**63 - 1)
 
 def request_key_to_result_summary_key(request_key):
   """Returns the TaskResultSummary ndb.Key for this TaskRequest.key."""
-  assert request_key.kind() == 'TaskRequest', request_key
+  assert request_key.kind() == "TaskRequest", request_key
   assert request_key.integer_id(), request_key
-  return ndb.Key('TaskResultSummary', 1, parent=request_key)
+  return ndb.Key("TaskResultSummary", 1, parent=request_key)
 
 
 def request_key_to_secret_bytes_key(request_key):
   """Returns the SecretBytes ndb.Key for this TaskRequest.key."""
-  assert request_key.kind() == 'TaskRequest', request_key
+  assert request_key.kind() == "TaskRequest", request_key
   assert request_key.integer_id(), request_key
-  return ndb.Key('SecretBytes', 1, parent=request_key)
+  return ndb.Key("SecretBytes", 1, parent=request_key)
 
 
 def request_key_to_build_task_key(request_key):
   """Returns the BuildTask ndb.Key for this TaskRequest.key."""
-  assert request_key.kind() == 'TaskRequest', request_key
+  assert request_key.kind() == "TaskRequest", request_key
   assert request_key.integer_id(), request_key
-  return ndb.Key('BuildTask', 1, parent=request_key)
+  return ndb.Key("BuildTask", 1, parent=request_key)
 
 
 def request_key_to_run_result_key(request_key):
   """Returns the TaskRunResult ndb.Key for this TaskRequest.key."""
   return result_summary_key_to_run_result_key(
-      request_key_to_result_summary_key(request_key))
+    request_key_to_result_summary_key(request_key)
+  )
 
 
 def result_summary_key_to_request_key(result_summary_key):
   """Returns the TaskRequest ndb.Key for this TaskResultSummmary key."""
-  assert result_summary_key.kind() == 'TaskResultSummary', result_summary_key
+  assert result_summary_key.kind() == "TaskResultSummary", result_summary_key
   return result_summary_key.parent()
 
 
 def result_summary_key_to_run_result_key(result_summary_key):
   """Returns the TaskRunResult ndb.Key for this TaskResultSummary.key."""
-  assert result_summary_key.kind() == 'TaskResultSummary', result_summary_key
-  return ndb.Key('TaskRunResult', 1, parent=result_summary_key)
+  assert result_summary_key.kind() == "TaskResultSummary", result_summary_key
+  return ndb.Key("TaskRunResult", 1, parent=result_summary_key)
 
 
 def run_result_key_to_result_summary_key(run_result_key):
   """Returns the TaskResultSummary ndb.Key for this TaskRunResult.key."""
-  assert run_result_key.kind() == 'TaskRunResult', run_result_key
+  assert run_result_key.kind() == "TaskRunResult", run_result_key
   return run_result_key.parent()
 
 
 def run_result_key_to_performance_stats_key(run_result_key):
   """Returns the PerformanceStats ndb.Key for this TaskRunResult.key."""
-  assert run_result_key.kind() == 'TaskRunResult', run_result_key
-  return ndb.Key('PerformanceStats', 1, parent=run_result_key)
+  assert run_result_key.kind() == "TaskRunResult", run_result_key
+  return ndb.Key("PerformanceStats", 1, parent=run_result_key)
 
 
 ### Packing and unpacking.
@@ -89,7 +90,8 @@ def get_request_and_result_keys(task_id):
   except ValueError:
     key = unpack_run_result_key(task_id)
     request_key = result_summary_key_to_request_key(
-        run_result_key_to_result_summary_key(key))
+      run_result_key_to_result_summary_key(key)
+    )
   return request_key, key
 
 
@@ -98,27 +100,26 @@ def pack_request_key(request_key):
   key_id = request_key.integer_id()
   # It's 0xE instead of 0x1 in the DB because of the XOR.
   if (key_id & 0xF) != 0xE:
-    raise ValueError('Invalid request key')
-  return '%x' % (key_id ^ TASK_REQUEST_KEY_ID_MASK)
+    raise ValueError("Invalid request key")
+  return "%x" % (key_id ^ TASK_REQUEST_KEY_ID_MASK)
 
 
 def pack_result_summary_key(result_summary_key):
-  """Returns TaskResultSummary ndb.Key encoded, safe to use in HTTP requests.
-  """
-  assert result_summary_key.kind() == 'TaskResultSummary'
+  """Returns TaskResultSummary ndb.Key encoded, safe to use in HTTP requests."""
+  assert result_summary_key.kind() == "TaskResultSummary"
   request_key = result_summary_key_to_request_key(result_summary_key)
-  return pack_request_key(request_key) + '0'
+  return pack_request_key(request_key) + "0"
 
 
 def pack_run_result_key(run_result_key):
-  """Returns TaskRunResult ndb.Key encoded, safe to use in HTTP requests.
-  """
-  assert run_result_key.kind() == 'TaskRunResult'
+  """Returns TaskRunResult ndb.Key encoded, safe to use in HTTP requests."""
+  assert run_result_key.kind() == "TaskRunResult"
   request_key = result_summary_key_to_request_key(
-      run_result_key_to_result_summary_key(run_result_key))
+    run_result_key_to_result_summary_key(run_result_key)
+  )
   try_id = run_result_key.integer_id()
   assert 1 <= try_id <= 15, try_id
-  return pack_request_key(request_key) + '%x' % try_id
+  return pack_request_key(request_key) + "%x" % try_id
 
 
 def unpack_request_key(request_id):
@@ -135,14 +136,14 @@ def unpack_request_key(request_id):
   """
   assert isinstance(request_id, basestring)
   if not request_id:
-    raise ValueError('Invalid null key')
-  if request_id[-1] != '1':
-    raise ValueError('Invalid key %r' % request_id)
+    raise ValueError("Invalid null key")
+  if request_id[-1] != "1":
+    raise ValueError("Invalid key %r" % request_id)
   # The key id is the reverse of the value.
   task_id_int = int(request_id, 16)
   if task_id_int < 0:
-    raise ValueError('Invalid task id (overflowed)')
-  return ndb.Key('TaskRequest', task_id_int ^ TASK_REQUEST_KEY_ID_MASK)
+    raise ValueError("Invalid task id (overflowed)")
+  return ndb.Key("TaskRequest", task_id_int ^ TASK_REQUEST_KEY_ID_MASK)
 
 
 def unpack_result_summary_key(packed_key):
@@ -152,8 +153,8 @@ def unpack_result_summary_key(packed_key):
   """
   request_key = unpack_request_key(packed_key[:-1])
   run_id = int(packed_key[-1], 16)
-  if run_id & 0xff:
-    raise ValueError('Can\'t reference to a specific try result.')
+  if run_id & 0xFF:
+    raise ValueError("Can't reference to a specific try result.")
   return request_key_to_result_summary_key(request_key)
 
 

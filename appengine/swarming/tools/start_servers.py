@@ -19,18 +19,20 @@ import time
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LUCI_DIR = os.path.dirname(os.path.dirname(APP_DIR))
-CLIENT_DIR = os.path.join(LUCI_DIR, 'client')
+CLIENT_DIR = os.path.join(LUCI_DIR, "client")
 sys.path.insert(0, APP_DIR)
-sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
-sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
+sys.path.insert(0, os.path.join(CLIENT_DIR, "tests"))
+sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party"))
 
-EXECUTABLE_SUFFIX = '.exe' if sys.platform == 'win32' else ''
-FAKECAS_BIN = os.path.join(LUCI_DIR, 'luci-go', 'fakecas' + EXECUTABLE_SUFFIX)
+EXECUTABLE_SUFFIX = ".exe" if sys.platform == "win32" else ""
+FAKECAS_BIN = os.path.join(LUCI_DIR, "luci-go", "fakecas" + EXECUTABLE_SUFFIX)
 
 from depot_tools import fix_encoding
+
 sys.path.pop(0)
 
 import swarming_test_env
+
 swarming_test_env.setup_test_env()
 
 import cas_util
@@ -61,16 +63,18 @@ class LocalServers(object):
 
   def start(self):
     """Starts both the Swarming and CAS and CAS servers."""
-    self._cas = cas_util.LocalCAS(os.path.join(self._root, 'cas-local'))
+    self._cas = cas_util.LocalCAS(os.path.join(self._root, "cas-local"))
     self._cas.start()
     self._swarming_server = local_app.LocalApplication(
-        APP_DIR, 9050, self._listen_all, self._root, 'swarming-local')
+      APP_DIR, 9050, self._listen_all, self._root, "swarming-local"
+    )
     self._swarming_server.start()
     self._swarming_server.ensure_serving()
 
-    self.http_client.login_as_admin('smoke-test@example.com')
+    self.http_client.login_as_admin("smoke-test@example.com")
     self.http_client.url_opener.addheaders.append(
-        ('X-XSRF-Token', self._swarming_server.client.xsrf_token))
+      ("X-XSRF-Token", self._swarming_server.client.xsrf_token)
+    )
 
   def stop(self):
     """Stops the local Swarming and CAS servers.
@@ -99,23 +103,27 @@ def main():
   fix_encoding.fix_encoding()
   parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
   parser.add_argument(
-      '-a', '--all', action='store_true', help='allow non local connection')
+    "-a", "--all", action="store_true", help="allow non local connection"
+  )
   parser.add_argument(
-      '-l', '--leak', action='store_true',
-      help='leak logs instead of deleting on shutdown')
+    "-l",
+    "--leak",
+    action="store_true",
+    help="leak logs instead of deleting on shutdown",
+  )
   args = parser.parse_args()
-  root = tempfile.mkdtemp(prefix='start_servers')
+  root = tempfile.mkdtemp(prefix="start_servers")
   try:
     servers = LocalServers(args.all, root)
     dump_log = True
     try:
       servers.start()
-      print('Logs    : %s' % root)
-      print('Swarming: %s' % servers.swarming_server.url)
-      print('CAS     : %s' % servers.cas_server.address)
+      print("Logs    : %s" % root)
+      print("Swarming: %s" % servers.swarming_server.url)
+      print("CAS     : %s" % servers.cas_server.address)
       servers.wait()
     except KeyboardInterrupt:
-      print('<Ctrl-C> received; stopping servers', file=sys.stderr)
+      print("<Ctrl-C> received; stopping servers", file=sys.stderr)
       dump_log = False
     finally:
       exit_code = servers.stop()
@@ -127,5 +135,5 @@ def main():
   return exit_code
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   sys.exit(main())

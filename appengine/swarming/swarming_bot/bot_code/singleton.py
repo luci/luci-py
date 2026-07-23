@@ -10,7 +10,7 @@ import os
 import sys
 
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
   import ctypes
 else:
   import fcntl
@@ -22,14 +22,15 @@ class Singleton(object):
 
   On Windows, uses a global Mutex. On others, use a flock'ed file.
   """
+
   def __init__(self, rootdir):
     rootdir = os.path.realpath(rootdir)
     self.handle = None
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
       # Use the directory name without '\\'. Enforce lowercase.
-      self.key = 'Global\\' + rootdir.replace('\\', '_').lower()
+      self.key = "Global\\" + rootdir.replace("\\", "_").lower()
     else:
-      self.key = os.path.join(rootdir, 'swarming.lck')
+      self.key = os.path.join(rootdir, "swarming.lck")
 
   def acquire(self):
     """Tries to acquire the singleton.
@@ -38,37 +39,41 @@ class Singleton(object):
       True if there was no previous process, False if this process is a
       duplicate and should exit.
     """
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
       # Create a global mutex. Make the mutex so that it disapear automatically
       # when the process dies. The handle is not inherited so task_runner
       # doesn't get to keep it alive.
       # pylint: disable=undefined-variable
       self.handle = ctypes.windll.kernel32.CreateMutexW(
-          ctypes.c_int(0), ctypes.c_int(-1),
-          ctypes.create_unicode_buffer(self.key))
+        ctypes.c_int(0),
+        ctypes.c_int(-1),
+        ctypes.create_unicode_buffer(self.key),
+      )
       last_error = ctypes.GetLastError()
-      logging.info('[singleton] acquire: %s = %s ; %s', self.key, self.handle,
-                   last_error)
+      logging.info(
+        "[singleton] acquire: %s = %s ; %s", self.key, self.handle, last_error
+      )
       if not self.handle:
         return False
       # ERROR_ALREADY_EXISTS
       if last_error == 183:
         self.release()
       return bool(self.handle)
-    self.handle = open(self.key, 'a+b')
+    self.handle = open(self.key, "a+b")
     try:
       fcntl.flock(self.handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except IOError:
       # There's a small race condition where it could report a previous pid.
-      logging.exception('Singleton "%s" is held by "%s"', self.key,
-                        self.handle.read())
+      logging.exception(
+        'Singleton "%s" is held by "%s"', self.key, self.handle.read()
+      )
       self.handle.close()
       self.handle = None
       return False
-    logging.info('[singleton] acquire: %s = %s', self.key, self.handle)
+    logging.info("[singleton] acquire: %s = %s", self.key, self.handle)
     self.handle.seek(0, os.SEEK_SET)
     self.handle.truncate(0)
-    self.handle.write(str(os.getpid()).encode('utf-8'))
+    self.handle.write(str(os.getpid()).encode("utf-8"))
     self.handle.flush()
     return True
 
@@ -76,7 +81,7 @@ class Singleton(object):
     """Release the singleton."""
     if not self.handle:
       return
-    if sys.platform == 'win32':
+    if sys.platform == "win32":
       # pylint: disable=undefined-variable
       ctypes.windll.kernel32.CloseHandle(self.handle)
     else:

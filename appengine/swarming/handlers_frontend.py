@@ -31,7 +31,7 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # Helper class for displaying the sort options in html templates.
-SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
+SortOptions = collections.namedtuple("SortOptions", ["key", "name"])
 
 
 ### is_admin pages.
@@ -42,8 +42,9 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
   @auth.require(acl.can_view_config)
   def get(self):
     # Template parameters schema matches settings_info() return value.
-    self.response.write(template.render(
-        'swarming/restricted_config.html', config.settings_info()))
+    self.response.write(
+      template.render("swarming/restricted_config.html", config.settings_info())
+    )
 
 
 ### Redirectors.
@@ -54,16 +55,16 @@ class BotsListHandler(auth.AuthenticatingHandler):
 
   @auth.public
   def get(self):
-    limit = int(self.request.get('limit', 100))
+    limit = int(self.request.get("limit", 100))
 
     dimensions = (
-      l.strip() for l in self.request.get('dimensions', '').splitlines()
+      l.strip() for l in self.request.get("dimensions", "").splitlines()
     )
     dimensions = [i for i in dimensions if i]
 
-    new_ui_link = '/botlist?l=%d' % limit
+    new_ui_link = "/botlist?l=%d" % limit
     if dimensions:
-      new_ui_link += '&f=' + '&f='.join(dimensions)
+      new_ui_link += "&f=" + "&f=".join(dimensions)
 
     self.redirect(new_ui_link)
 
@@ -73,7 +74,7 @@ class BotHandler(auth.AuthenticatingHandler):
 
   @auth.public
   def get(self, bot_id):
-    self.redirect('/bot?id=%s' % bot_id)
+    self.redirect("/bot?id=%s" % bot_id)
 
 
 class TasksHandler(auth.AuthenticatingHandler):
@@ -81,14 +82,14 @@ class TasksHandler(auth.AuthenticatingHandler):
 
   @auth.public
   def get(self):
-    limit = int(self.request.get('limit', 100))
+    limit = int(self.request.get("limit", 100))
     task_tags = [
-      line for line in self.request.get('task_tag', '').splitlines() if line
+      line for line in self.request.get("task_tag", "").splitlines() if line
     ]
 
-    new_ui_link = '/tasklist?l=%d' % limit
+    new_ui_link = "/tasklist?l=%d" % limit
     if task_tags:
-      new_ui_link += '&f=' + '&f='.join(task_tags)
+      new_ui_link += "&f=" + "&f=".join(task_tags)
 
     self.redirect(new_ui_link)
 
@@ -98,7 +99,7 @@ class TaskHandler(auth.AuthenticatingHandler):
 
   @auth.public
   def get(self, task_id):
-    self.redirect('/task?id=%s' % task_id)
+    self.redirect("/task?id=%s" % task_id)
 
 
 ### Public pages.
@@ -110,12 +111,13 @@ class UIHandler(auth.AuthenticatingHandler):
   This landing page is stamped with the OAuth 2.0 client id from the
   configuration.
   """
+
   @auth.public
   def get(self, page):
-    page = page or 'swarming'
+    page = page or "swarming"
 
     params = {
-      'client_id': config.settings().ui_client_id,
+      "client_id": config.settings().ui_client_id,
     }
     # Can cache for 1 week, because the only thing that would change in this
     # template is the oauth client id, which changes very infrequently.
@@ -123,28 +125,29 @@ class UIHandler(auth.AuthenticatingHandler):
     self.response.cache_control.public = True
     self.response.cache_control.max_age = 604800
     try:
-      self.response.write(template.render(
-        'wcui/public_%s_index.html' % page, params))
+      self.response.write(
+        template.render("wcui/public_%s_index.html" % page, params)
+      )
     except template.TemplateNotFound:
-      self.abort(404, 'Page %s not found.', page)
+      self.abort(404, "Page %s not found.", page)
 
   def get_content_security_policy(self):
     # We use iframes to display pages at display_server_url_template. Need to
     # allow it in CSP.
     csp = super(UIHandler, self).get_content_security_policy()
-    csp['frame-src'].append("'self'")
+    csp["frame-src"].append("'self'")
     tmpl = config.settings().display_server_url_template
     if tmpl:
-      if not tmpl.startswith('/'):
+      if not tmpl.startswith("/"):
         # We assume the template specifies '%s' in its last path component.
         # We strip it to get a "parent" path that we can put into CSP. Note that
         # allowing an entire display server domain is unnecessary wide.
-        csp['frame-src'].append(tmpl[:tmpl.rfind('/')+1])
+        csp["frame-src"].append(tmpl[: tmpl.rfind("/") + 1])
     extra = config.settings().extra_child_src_csp_url
     # Note that frame-src was once child-src, which was deprecated and support
     # was dropped by some browsers. See
     # https://bugs.chromium.org/p/chromium/issues/detail?id=839909
-    csp['frame-src'].extend(extra)
+    csp["frame-src"].extend(extra)
     return csp
 
 
@@ -154,50 +157,49 @@ class WarmupHandler(webapp2.RequestHandler):
     bot_groups_config.warmup()
     hmac_secret.warmup()
     utils.get_module_version_list(None, None)
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.write('ok')
+    self.response.headers["Content-Type"] = "text/plain; charset=utf-8"
+    self.response.write("ok")
 
 
 class EmailHandler(webapp2.RequestHandler):
   """Blackhole any email sent."""
+
   def post(self, to):
     pass
 
 
 class TempTQPlaceholderHandler(webapp2.RequestHandler):
   def post(self, title):
-    logging.info('Task %s:\n%r', title, json.loads(self.request.body))
+    logging.info("Task %s:\n%r", title, json.loads(self.request.body))
 
 
 def get_routes():
   routes = [
-      ('/_ah/mail/<to:.+>', EmailHandler),
-      ('/_ah/warmup', WarmupHandler),
-
-      # TODO(vadimsh): This is temporary until there's a Go handler.
-      ('/internal/tasks/t/rbe-enqueue/<title:.+>', TempTQPlaceholderHandler),
+    ("/_ah/mail/<to:.+>", EmailHandler),
+    ("/_ah/warmup", WarmupHandler),
+    # TODO(vadimsh): This is temporary until there's a Go handler.
+    ("/internal/tasks/t/rbe-enqueue/<title:.+>", TempTQPlaceholderHandler),
   ]
 
   if not utils.should_disable_ui_routes():
-    routes.extend([
+    routes.extend(
+      [
         # Frontend pages. They return HTML.
         # Public pages.
-        ('/<page:(botlist|tasklist|task|bot|)>', UIHandler),
-
+        ("/<page:(botlist|tasklist|task|bot|)>", UIHandler),
         # This is for https://aip.dev/122#resource-uris
-        ('/tasks/<task_id:[0-9a-fA-F]+>', TaskHandler),
-
+        ("/tasks/<task_id:[0-9a-fA-F]+>", TaskHandler),
         # These were the very old (pre-2016) links, so this redirects
         # them to the modern url style.
-        ('/user/tasks', TasksHandler),
-        ('/user/task/<task_id:[0-9a-fA-F]+>', TaskHandler),
-        ('/restricted/bots', BotsListHandler),
-        ('/restricted/bot/<bot_id:[^/]+>', BotHandler),
-
+        ("/user/tasks", TasksHandler),
+        ("/user/task/<task_id:[0-9a-fA-F]+>", TaskHandler),
+        ("/restricted/bots", BotsListHandler),
+        ("/restricted/bot/<bot_id:[^/]+>", BotHandler),
         # Admin pages.
         # TODO(maruel): Get rid of them.
-        ('/restricted/config', RestrictedConfigHandler),
-    ])
+        ("/restricted/config", RestrictedConfigHandler),
+      ]
+    )
 
   return [webapp2.Route(*i) for i in routes]
 

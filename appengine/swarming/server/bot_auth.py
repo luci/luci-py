@@ -44,21 +44,21 @@ def authenticate_bot(bot_id):
     (BotGroupConfig with bot config, BotAuth with auth method used).
   """
   if not bot_id:
-    raise auth.AuthorizationError('Bot ID is not specified')
+    raise auth.AuthorizationError("Bot ID is not specified")
 
   # Look up this bot in the bots.cfg to know what authentication credentials
   # it should be sending.
   cfg = bot_groups_config.get_bot_group_config(bot_id)
   if not cfg:
     logging.error(
-        'bot_auth: unknown bot_id, not in the config\n'
-        'bot_id: "%s"', bot_id)
-    raise auth.AuthorizationError('Unknown bot ID, not in config')
+      'bot_auth: unknown bot_id, not in the config\nbot_id: "%s"', bot_id
+    )
+    raise auth.AuthorizationError("Unknown bot ID, not in config")
 
   # This should not really happen for validated configs.
   if not cfg.auth:
-    logging.error('bot_auth: no auth configured in bots.cfg')
-    raise auth.AuthorizationError('No auth configured in bots.cfg')
+    logging.error("bot_auth: no auth configured in bots.cfg")
+    raise auth.AuthorizationError("No auth configured in bots.cfg")
 
   ip = auth.get_peer_ip()
   peer_ident = auth.get_peer_identity()
@@ -79,29 +79,30 @@ def authenticate_bot(bot_id):
   for bot_auth in cfg.auth:
     err, details = _check_bot_auth(bot_auth, host_bot_id, peer_ident, ip)
     if not err:
-      logging.debug('Using auth method: %s', bot_auth)
+      logging.debug("Using auth method: %s", bot_auth)
       return cfg, bot_auth
     auth_errs.append(err)
     if bot_auth.log_if_failed:
-      logging.error('Preferred auth method failed: %s', err)
-      logging.error('Failed auth method: %s', bot_auth)
+      logging.error("Preferred auth method failed: %s", err)
+      logging.error("Failed auth method: %s", bot_auth)
       for msg in details:
-        logging.error('%s', msg)
+        logging.error("%s", msg)
     else:
-      delayed_logs.append('Auth method failed: %s' % (err,))
-      delayed_logs.append('Failed auth method: %s' % (bot_auth,))
+      delayed_logs.append("Auth method failed: %s" % (err,))
+      delayed_logs.append("Failed auth method: %s" % (bot_auth,))
       delayed_logs.extend(details)
 
   # All fallback methods failed. Need their logs to investigate.
   for msg in delayed_logs:
-    logging.error('%s', msg)
+    logging.error("%s", msg)
 
   # In most cases there's only one auth method used, so we can simplify the
   # error message to be less confusing.
   if len(auth_errs) == 1:
     raise auth.AuthorizationError(auth_errs[0])
   raise auth.AuthorizationError(
-      'All auth methods failed: %s' % '; '.join(auth_errs))
+    "All auth methods failed: %s" % "; ".join(auth_errs)
+  )
 
 
 def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
@@ -118,6 +119,7 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
     (Public error message, list of internal error messages) on failure.
   """
   errors = []
+
   def error(msg, *args):
     errors.append(msg % args)
 
@@ -127,21 +129,26 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
     if bot_auth.ip_whitelist:
       if not auth.is_in_ip_whitelist(bot_auth.ip_whitelist, ip):
         error(
-            'bot_auth: bot IP is not in the allowlist\n'
-            'bot_id: "%s", peer_ip: "%s", ip_whitelist: "%s"', bot_id,
-            ipaddr.ip_to_string(ip), bot_auth.ip_whitelist)
-        return 'IP not allowed', errors
+          "bot_auth: bot IP is not in the allowlist\n"
+          'bot_id: "%s", peer_ip: "%s", ip_whitelist: "%s"',
+          bot_id,
+          ipaddr.ip_to_string(ip),
+          bot_auth.ip_whitelist,
+        )
+        return "IP not allowed", errors
     ts_mon_metrics.on_bot_auth_success(auth_method, condition)
     return None, []
 
   if bot_auth.require_luci_machine_token:
     if not _is_valid_ident_for_bot(peer_ident, bot_id):
       error(
-          'bot_auth: bot ID doesn\'t match the machine token used\n'
-          'bot_id: "%s", peer_ident: "%s"',
-          bot_id, peer_ident.to_bytes())
-      return 'Bot ID doesn\'t match the token used', errors
-    return check_ip_and_finish('luci_token', '-')
+        "bot_auth: bot ID doesn't match the machine token used\n"
+        'bot_id: "%s", peer_ident: "%s"',
+        bot_id,
+        peer_ident.to_bytes(),
+      )
+      return "Bot ID doesn't match the token used", errors
+    return check_ip_and_finish("luci_token", "-")
 
   if bot_auth.require_service_account:
     expected_ids = [
@@ -150,15 +157,19 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
     ]
     if peer_ident not in expected_ids:
       error(
-          'bot_auth: bot is not using expected service account\n'
-          'bot_id: "%s", expected_id: %s, peer_ident: "%s"',
-          bot_id, [i.to_bytes() for i in expected_ids], peer_ident.to_bytes())
+        "bot_auth: bot is not using expected service account\n"
+        'bot_id: "%s", expected_id: %s, peer_ident: "%s"',
+        bot_id,
+        [i.to_bytes() for i in expected_ids],
+        peer_ident.to_bytes(),
+      )
       if peer_ident.is_anonymous:
         error(
-            'Bot is identifying as anonymous. Is the "userinfo" scope enabled '
-            'for this instance?')
-      return 'Bot is not using expected service account', errors
-    return check_ip_and_finish('service_account', peer_ident.name)
+          'Bot is identifying as anonymous. Is the "userinfo" scope enabled '
+          "for this instance?"
+        )
+      return "Bot is not using expected service account", errors
+    return check_ip_and_finish("service_account", peer_ident.name)
 
   if bot_auth.require_gce_vm_token:
     expected_proj = bot_auth.require_gce_vm_token.project
@@ -169,34 +180,44 @@ def _check_bot_auth(bot_auth, bot_id, peer_ident, ip):
 
     if not bot_vm_proj:
       error(
-          'bot_auth: bot is not using X-Luci-Gce-Vm-Token auth\n'
-          'bot_id: "%s", peer_ident: "%s", expected_proj: "%s"',
-          bot_id, peer_ident.to_bytes(), expected_proj)
-      return 'Bot is expected to send X-Luci-Gce-Vm-Token, it didn\'t', errors
+        "bot_auth: bot is not using X-Luci-Gce-Vm-Token auth\n"
+        'bot_id: "%s", peer_ident: "%s", expected_proj: "%s"',
+        bot_id,
+        peer_ident.to_bytes(),
+        expected_proj,
+      )
+      return "Bot is expected to send X-Luci-Gce-Vm-Token, it didn't", errors
     if bot_vm_proj != expected_proj:
       error(
-          'bot_auth: got GCE VM token from unexpected project\n'
-          'bot_id: "%s", peer_ident: "%s", expected_proj: "%s"',
-          bot_id, peer_ident.to_bytes(), expected_proj)
-      return 'Unexpected GCE project %s in the auth token' % bot_vm_proj, errors
+        "bot_auth: got GCE VM token from unexpected project\n"
+        'bot_id: "%s", peer_ident: "%s", expected_proj: "%s"',
+        bot_id,
+        peer_ident.to_bytes(),
+        expected_proj,
+      )
+      return "Unexpected GCE project %s in the auth token" % bot_vm_proj, errors
     if bot_vm_inst != bot_id:
       error(
-          'bot_auth: bot ID and GCE instance name do not match\n'
-          'bot_id: "%s", peer_ident: "%s"', bot_id, peer_ident.to_bytes())
-      return (
-          'Bot ID %s doesn\'t match GCE instance ID %s' % (bot_id, bot_vm_proj),
-          errors
+        "bot_auth: bot ID and GCE instance name do not match\n"
+        'bot_id: "%s", peer_ident: "%s"',
+        bot_id,
+        peer_ident.to_bytes(),
       )
-    return check_ip_and_finish('gce_vm_token', expected_proj)
+      return (
+        "Bot ID %s doesn't match GCE instance ID %s" % (bot_id, bot_vm_proj),
+        errors,
+      )
+    return check_ip_and_finish("gce_vm_token", expected_proj)
 
   if bot_auth.ip_whitelist:
-    return check_ip_and_finish('ip_whitelist', bot_auth.ip_whitelist)
+    return check_ip_and_finish("ip_whitelist", bot_auth.ip_whitelist)
 
   # This branch should not be hit for validated configs.
   error(
-      'bot_auth: invalid bot group config, no auth method defined\n'
-      'bot_id: "%s"', bot_id)
-  return 'Invalid bot group config', errors
+    'bot_auth: invalid bot group config, no auth method defined\nbot_id: "%s"',
+    bot_id,
+  )
+  return "Invalid bot group config", errors
 
 
 def _is_valid_ident_for_bot(ident, bot_id):
@@ -211,6 +232,7 @@ def _is_valid_ident_for_bot(ident, bot_id):
   # TODO(vadimsh): Should bots.cfg also contain a list of allowed domain names,
   # so this check is stricter?
   return (
-      ident.kind == auth.IDENTITY_BOT and
-      ident != auth.IP_WHITELISTED_BOT_ID and
-      ident.name.startswith(bot_id + '.'))
+    ident.kind == auth.IDENTITY_BOT
+    and ident != auth.IP_WHITELISTED_BOT_ID
+    and ident.name.startswith(bot_id + ".")
+  )

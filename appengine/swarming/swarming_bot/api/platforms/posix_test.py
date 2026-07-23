@@ -8,28 +8,29 @@ import sys
 import unittest
 
 import test_env_platforms
+
 test_env_platforms.setup_test_env()
 
 from api import platforms
 
 
-@unittest.skipIf(sys.platform == 'win32', 'Tests only run under posix platform')
+@unittest.skipIf(sys.platform == "win32", "Tests only run under posix platform")
 class TestPosix(unittest.TestCase):
-
   def test_get_disk_info(self):
     disks = platforms.posix.get_disks_info()
     self.assertGreater(len(disks), 0)
     for path, info in disks.items():
-      if path.startswith('/snap/'):
+      if path.startswith("/snap/"):
         # Ignore filesystem managed by snappy.
         continue
-      self.assertGreater(info['free_mb'], 0)
-      self.assertGreater(info['size_mb'], 0)
+      self.assertGreater(info["free_mb"], 0)
+      self.assertGreater(info["size_mb"], 0)
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
+    level=logging.DEBUG if "-v" in sys.argv else logging.CRITICAL
+  )
   unittest.main()

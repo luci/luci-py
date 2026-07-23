@@ -12,6 +12,7 @@ import time
 import unittest
 
 import test_env_bot_code
+
 test_env_bot_code.setup_test_env()
 
 from depot_tools import auto_stub
@@ -23,28 +24,27 @@ import file_refresher
 
 
 class TestFileReaderThread(auto_stub.TestCase):
-
   def setUp(self):
     super(TestFileReaderThread, self).setUp()
-    self.root_dir = tempfile.mkdtemp(prefix='file_reader')
-    self.path = os.path.join(self.root_dir, 'target_file')
+    self.root_dir = tempfile.mkdtemp(prefix="file_reader")
+    self.path = os.path.join(self.root_dir, "target_file")
 
   def tearDown(self):
     file_path.rmtree(self.root_dir)
     super(TestFileReaderThread, self).tearDown()
 
   def test_works(self):
-    with open(self.path, 'w') as f:
-      json.dump({'A': 'a'}, f)
+    with open(self.path, "w") as f:
+      json.dump({"A": "a"}, f)
 
     r = file_reader.FileReaderThread(self.path, 0.1)
     r.start()
     try:
-      self.assertEqual(r.last_value, {'A': 'a'})
+      self.assertEqual(r.last_value, {"A": "a"})
 
       # Change the file. Expect possible conflict on Windows.
       attempt = 0
-      bytes_json = json.dumps({'B': 'b'}).encode('utf-8')
+      bytes_json = json.dumps({"B": "b"}).encode("utf-8")
       while True:
         try:
           file_path.atomic_replace(self.path, bytes_json)
@@ -52,7 +52,7 @@ class TestFileReaderThread(auto_stub.TestCase):
         except OSError:
           attempt += 1
           if attempt == 20:
-            self.fail('Cannot replace the file, giving up')
+            self.fail("Cannot replace the file, giving up")
           time.sleep(0.05)
 
       # Give some reasonable time for the reader thread to pick up the change.
@@ -60,26 +60,27 @@ class TestFileReaderThread(auto_stub.TestCase):
       # lagging for more than 2 seconds.
       time.sleep(2)
 
-      self.assertEqual(r.last_value, {'B': 'b'})
+      self.assertEqual(r.last_value, {"B": "b"})
     finally:
       r.stop()
 
   def test_start_throws_on_error(self):
     r = file_reader.FileReaderThread(
-        self.path + "_no_such_file", max_attempts=2)
+      self.path + "_no_such_file", max_attempts=2
+    )
     with self.assertRaises(file_reader.FatalReadError):
       r.start()
 
   def test_works_with_file_refresher(self):
     val = 0
 
-    w = file_refresher.FileRefresherThread(self.path, lambda: {'val': val}, 0.1)
+    w = file_refresher.FileRefresherThread(self.path, lambda: {"val": val}, 0.1)
     r = file_reader.FileReaderThread(self.path, 0.1)
 
     try:
       w.start()
       r.start()
-      self.assertEqual(r.last_value, {'val': 0})
+      self.assertEqual(r.last_value, {"val": 0})
 
       val = 123
 
@@ -88,15 +89,16 @@ class TestFileReaderThread(auto_stub.TestCase):
       # lagging for more than 2 seconds.
       time.sleep(2)
 
-      self.assertEqual(r.last_value, {'val': 123})
+      self.assertEqual(r.last_value, {"val": 123})
 
     finally:
       w.stop()
       r.stop()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   fix_encoding.fix_encoding()
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
+    level=logging.DEBUG if "-v" in sys.argv else logging.CRITICAL
+  )
   unittest.main()

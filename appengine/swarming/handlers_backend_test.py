@@ -35,93 +35,120 @@ class BackendTest(test_env_handlers.AppTestBase):
   def _GetRoutes(self, prefix):
     """Returns the list of all routes handled."""
     return [
-        r for r in self.app.app.router.match_routes
-        if r.template.startswith(prefix)
+      r
+      for r in self.app.app.router.match_routes
+      if r.template.startswith(prefix)
     ]
 
   def setUp(self):
     super(BackendTest, self).setUp()
     # By default requests in tests are coming from bot with fake IP.
     self.app = webtest.TestApp(
-        handlers_backend.create_application(True),
-        extra_environ={
-          'REMOTE_ADDR': self.source_ip,
-          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
-        })
+      handlers_backend.create_application(True),
+      extra_environ={
+        "REMOTE_ADDR": self.source_ip,
+        "SERVER_SOFTWARE": os.environ["SERVER_SOFTWARE"],
+      },
+    )
     self.mock_tq_tasks()
 
   def test_crons(self):
     # Tests all the cron tasks are securely handled.
-    prefix = '/internal/cron/'
+    prefix = "/internal/cron/"
     cron_job_urls = [r.template for r in self._GetRoutes(prefix)]
     self.assertTrue(cron_job_urls)
 
     for cron_job_url in cron_job_urls:
-      rest = cron_job_url[len(prefix):]
-      section = rest.split('/', 2)[0]
-      self.assertIn(section, ('cleanup', 'monitoring', 'important'), rest)
+      rest = cron_job_url[len(prefix) :]
+      section = rest.split("/", 2)[0]
+      self.assertIn(section, ("cleanup", "monitoring", "important"), rest)
       self.app.get(
-          cron_job_url, headers={'X-AppEngine-Cron': 'true'}, status=200)
+        cron_job_url, headers={"X-AppEngine-Cron": "true"}, status=200
+      )
 
       # Only cron job requests can be gets for this handler.
       response = self.app.get(cron_job_url, status=403)
       self.assertEqual(
-          '403 Forbidden\n\nAccess was denied to this resource.\n\n '
-          'Only internal cron jobs can do this  ',
-          response.body)
+        "403 Forbidden\n\nAccess was denied to this resource.\n\n "
+        "Only internal cron jobs can do this  ",
+        response.body,
+      )
     # The actual number doesn't matter, just make sure they are unqueued.
     self.execute_tasks()
 
   def test_taskqueues(self):
     # Tests all the task queue tasks are securely handled.
     task_queue_routes = sorted(
-        self._GetRoutes('/internal/taskqueue/'), key=lambda x: x.template)
+      self._GetRoutes("/internal/taskqueue/"), key=lambda x: x.template
+    )
     # This help to keep queue.yaml and handlers_backend.py up to date.
     # Format: (<queue-name>, <base-url>, <argument>).
-    expected_task_queues = sorted([
-        ('cancel-task-on-bot',
-         '/internal/taskqueue/important/tasks/cancel-task-on-bot'),
-        ('cancel-tasks', '/internal/taskqueue/important/tasks/cancel'),
-        ('cancel-children-tasks',
-         '/internal/taskqueue/important/tasks/cancel-children-tasks'),
-        ('task-expire', '/internal/taskqueue/important/tasks/expire'),
-        ('es-notify-tasks',
-         '/internal/taskqueue/important/external_scheduler/notify-tasks'),
-        ('es-notify-kick',
-         '/internal/taskqueue/important/external_scheduler/notify-kick'),
-        ('pubsub',
-         '/internal/taskqueue/important/pubsub/notify-task/abcabcabc'),
-        ('buildbucket-notify',
-         '/internal/taskqueue/important/buildbucket/notify-task/abcabcabc'),
-        ('update-bot-matches',
-         '/internal/taskqueue/important/task_queues/update-bot-matches'),
-        ('rescan-matching-task-sets',
-         '/internal/taskqueue/important/task_queues/rescan-matching-task-sets'),
-        ('named-cache-task',
-         '/internal/taskqueue/important/named_cache/update-pool'),
-    ],
-                                  key=lambda x: x[1])
+    expected_task_queues = sorted(
+      [
+        (
+          "cancel-task-on-bot",
+          "/internal/taskqueue/important/tasks/cancel-task-on-bot",
+        ),
+        ("cancel-tasks", "/internal/taskqueue/important/tasks/cancel"),
+        (
+          "cancel-children-tasks",
+          "/internal/taskqueue/important/tasks/cancel-children-tasks",
+        ),
+        ("task-expire", "/internal/taskqueue/important/tasks/expire"),
+        (
+          "es-notify-tasks",
+          "/internal/taskqueue/important/external_scheduler/notify-tasks",
+        ),
+        (
+          "es-notify-kick",
+          "/internal/taskqueue/important/external_scheduler/notify-kick",
+        ),
+        (
+          "pubsub",
+          "/internal/taskqueue/important/pubsub/notify-task/abcabcabc",
+        ),
+        (
+          "buildbucket-notify",
+          "/internal/taskqueue/important/buildbucket/notify-task/abcabcabc",
+        ),
+        (
+          "update-bot-matches",
+          "/internal/taskqueue/important/task_queues/update-bot-matches",
+        ),
+        (
+          "rescan-matching-task-sets",
+          "/internal/taskqueue/important/task_queues/rescan-matching-task-sets",
+        ),
+        (
+          "named-cache-task",
+          "/internal/taskqueue/important/named_cache/update-pool",
+        ),
+      ],
+      key=lambda x: x[1],
+    )
     self.assertEqual(len(expected_task_queues), len(task_queue_routes))
 
     for i, route in enumerate(task_queue_routes):
       expected_url = expected_task_queues[i][1]
       request = webapp2.Request.blank(expected_url)
       if not route.match(request):
-        self.fail('Failed to route url %s with %r.' % (expected_url, route))
+        self.fail("Failed to route url %s with %r." % (expected_url, route))
 
     # A request with wrong queue name should fail with 403
     for _, url in expected_task_queues:
       try:
         self.app.post(
-            url, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
+          url, headers={"X-AppEngine-QueueName": "bogus name"}, status=403
+        )
       except Exception as e:
-        self.fail('%s: %s' % (url, e))
+        self.fail("%s: %s" % (url, e))
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL,
-      format='%(levelname)-7s %(filename)s:%(lineno)3d %(message)s')
+    level=logging.DEBUG if "-v" in sys.argv else logging.CRITICAL,
+    format="%(levelname)-7s %(filename)s:%(lineno)3d %(message)s",
+  )
   unittest.main()

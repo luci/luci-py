@@ -44,7 +44,7 @@ from bot_code.remote_client_errors import RBEServerError
 # than the minimum expiration time of headers produced by bot_config's
 # get_authentication_headers hook (otherwise we'll be calling this hook all the
 # time). On GCE machines it is usually 10 min.
-AUTH_HEADERS_EXPIRATION_SEC = 9*60+30
+AUTH_HEADERS_EXPIRATION_SEC = 9 * 60 + 30
 
 
 # How long to wait for a response from the server. Must not be greater than
@@ -83,9 +83,9 @@ def make_appengine_id(bot_id, work_dir):
   Returns:
     An integer in the range [0, 999].
   """
-  s = '%s-%s:%s' % (utcnow().strftime('%Y-%m-%d'), bot_id, work_dir)
-  googappuid = int(hashlib.sha1(s.encode('utf-8')).hexdigest(), 16) % 1000
-  logging.debug('GOOGAPPUID = sha1(%s) %% 1000 = %d', s, googappuid)
+  s = "%s-%s:%s" % (utcnow().strftime("%Y-%m-%d"), bot_id, work_dir)
+  googappuid = int(hashlib.sha1(s.encode("utf-8")).hexdigest(), 16) % 1000
+  logging.debug("GOOGAPPUID = sha1(%s) %% 1000 = %d", s, googappuid)
   return googappuid
 
 
@@ -148,13 +148,13 @@ class RemoteClientNative(object):
     attempts = 30
     while not quit_bit or not quit_bit.is_set():
       try:
-        logging.info('Fetching initial auth headers')
+        logging.info("Fetching initial auth headers")
         headers = self._get_headers_or_throw()
-        logging.info('Got auth headers: %s', headers.keys() or 'none')
+        logging.info("Got auth headers: %s", headers.keys() or "none")
         return
       except Exception as e:
-        last_error = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-        logging.exception('Failed to grab initial auth headers')
+        last_error = "%s\n%s" % (e, traceback.format_exc()[-2048:])
+        logging.exception("Failed to grab initial auth headers")
       attempts -= 1
       if not attempts:
         raise InitializationError(last_error)
@@ -179,10 +179,9 @@ class RemoteClientNative(object):
       A dict of HTTP headers.
     """
     headers = {
-        'Cookie':
-        'GOOGAPPUID=%d' % make_appengine_id(self._bot_id, self._bot_work_dir),
-        'X-Luci-Swarming-Bot-ID':
-        self._bot_id,
+      "Cookie": "GOOGAPPUID=%d"
+      % make_appengine_id(self._bot_id, self._bot_work_dir),
+      "X-Luci-Swarming-Bot-ID": self._bot_id,
     }
     if include_auth:
       headers.update(self.get_authentication_headers())
@@ -197,7 +196,7 @@ class RemoteClientNative(object):
     try:
       return self._get_headers_or_throw()
     except Exception:
-      logging.exception('Failed to refresh auth headers, using cached ones')
+      logging.exception("Failed to refresh auth headers, using cached ones")
       return self._headers or {}
 
   @property
@@ -212,51 +211,58 @@ class RemoteClientNative(object):
     if self._disabled:
       return {}
     with self._lock:
-      if (not self._exp_ts or
-          self._exp_ts - time.time() < AUTH_HEADERS_EXPIRATION_SEC):
+      if (
+        not self._exp_ts
+        or self._exp_ts - time.time() < AUTH_HEADERS_EXPIRATION_SEC
+      ):
         self._headers, self._exp_ts = self._auth_headers_callback()
         if self._exp_ts is None:
-          logging.info('Headers callback returned None, disabling auth')
+          logging.info("Headers callback returned None, disabling auth")
           self._disabled = True
           self._headers = {}
         elif self._exp_ts:
           next_check = max(
-              0, self._exp_ts - AUTH_HEADERS_EXPIRATION_SEC - time.time())
+            0, self._exp_ts - AUTH_HEADERS_EXPIRATION_SEC - time.time()
+          )
           if self._headers:
             logging.info(
-                'Fetched auth headers (%s), they expire in %d sec. '
-                'Next check in %d sec.', self._headers.keys(),
-                self._exp_ts - time.time(), next_check)
+              "Fetched auth headers (%s), they expire in %d sec. "
+              "Next check in %d sec.",
+              self._headers.keys(),
+              self._exp_ts - time.time(),
+              next_check,
+            )
           else:
             logging.info(
-                'No headers available yet, next check in %d sec.', next_check)
+              "No headers available yet, next check in %d sec.", next_check
+            )
         else:
-          logging.info('Using auth headers (%s).', self._headers.keys())
+          logging.info("Using auth headers (%s).", self._headers.keys())
       return self._headers or {}
 
-  def _url_read_json(self,
-                     url_path,
-                     data=None,
-                     expected_error_codes=None,
-                     retry_transient=True):
+  def _url_read_json(
+    self, url_path, data=None, expected_error_codes=None, retry_transient=True
+  ):
     """Does POST (if data is not None) or GET request to a JSON endpoint."""
-    logging.info('Calling %s', url_path)
+    logging.info("Calling %s", url_path)
     return net.url_read_json(
-        self._server + url_path,
-        data=data,
-        headers=self.get_headers(include_auth=True),
-        timeout=NET_CONNECTION_TIMEOUT_SEC,
-        follow_redirects=False,
-        expected_error_codes=expected_error_codes,
-        max_attempts=NET_MAX_ATTEMPTS if retry_transient else 1)
+      self._server + url_path,
+      data=data,
+      headers=self.get_headers(include_auth=True),
+      timeout=NET_CONNECTION_TIMEOUT_SEC,
+      follow_redirects=False,
+      expected_error_codes=expected_error_codes,
+      max_attempts=NET_MAX_ATTEMPTS if retry_transient else 1,
+    )
 
   def _url_retrieve(self, filepath, url_path):
     """Fetches the file from the given URL path on the server."""
     return net.url_retrieve(
-        filepath,
-        self._server + url_path,
-        headers=self.get_headers(include_auth=True),
-        timeout=NET_CONNECTION_TIMEOUT_SEC)
+      filepath,
+      self._server + url_path,
+      headers=self.get_headers(include_auth=True),
+      timeout=NET_CONNECTION_TIMEOUT_SEC,
+    )
 
   def _maybe_update_session_token(self, resp):
     """Extracts a session token from the response if present.
@@ -264,25 +270,23 @@ class RemoteClientNative(object):
     Replaces it with "<redacted>" to avoid logging the token.
     """
     if resp and isinstance(resp, dict):
-      fresher = resp.get('session', None)
+      fresher = resp.get("session", None)
       if fresher:
         self._session_token = fresher
-        resp['session'] = '<redacted>'
+        resp["session"] = "<redacted>"
 
   def post_bot_event(self, event_type, message, attributes):
     """Logs bot-specific info to the server."""
     data = attributes.copy()
-    data['event'] = event_type
-    data['message'] = message
-    data['session'] = self._session_token
-    resp = self._url_read_json('/swarming/api/v1/bot/event', data=data)
+    data["event"] = event_type
+    data["message"] = message
+    data["session"] = self._session_token
+    resp = self._url_read_json("/swarming/api/v1/bot/event", data=data)
     self._maybe_update_session_token(resp)
 
-  def post_task_update(self,
-                       task_id,
-                       params,
-                       stdout_and_chunk=None,
-                       exit_code=None):
+  def post_task_update(
+    self, task_id, params, stdout_and_chunk=None, exit_code=None
+  ):
     """Posts task update to task_update.
 
     Arguments:
@@ -301,57 +305,57 @@ class RemoteClientNative(object):
       server replies with an error.
     """
     data = {
-        'id': self._bot_id,
-        'task_id': task_id,
+      "id": self._bot_id,
+      "task_id": task_id,
     }
     data.update(params)
     # Preserving prior behaviour: empty stdout is not transmitted
     if stdout_and_chunk and stdout_and_chunk[0]:
-      data['output'] = base64.b64encode(stdout_and_chunk[0]).decode()
-      data['output_chunk_start'] = stdout_and_chunk[1]
+      data["output"] = base64.b64encode(stdout_and_chunk[0]).decode()
+      data["output_chunk_start"] = stdout_and_chunk[1]
     if exit_code != None:
-      data['exit_code'] = exit_code
-    data['session'] = self._session_token
+      data["exit_code"] = exit_code
+    data["session"] = self._session_token
 
     resp = self._url_read_json(
-        '/swarming/api/v1/bot/task_update/%s' % task_id, data)
+      "/swarming/api/v1/bot/task_update/%s" % task_id, data
+    )
     self._maybe_update_session_token(resp)
-    logging.debug('post_task_update() = %s', resp)
-    if not resp or resp.get('error'):
+    logging.debug("post_task_update() = %s", resp)
+    if not resp or resp.get("error"):
       raise InternalError(
-          resp.get('error') if resp else 'Failed to contact server')
-    if resp.get('must_stop', False) and resp.get('stop_reason', '') != '':
-      logging.warning('Server induced stop; reason: %s', resp['stop_reason'])
-    return not resp.get('must_stop', False)
+        resp.get("error") if resp else "Failed to contact server"
+      )
+    if resp.get("must_stop", False) and resp.get("stop_reason", "") != "":
+      logging.warning("Server induced stop; reason: %s", resp["stop_reason"])
+    return not resp.get("must_stop", False)
 
-  def post_task_error(self,
-                      task_id,
-                      message,
-                      missing_cas=None,
-                      missing_cipd=None):
+  def post_task_error(
+    self, task_id, message, missing_cas=None, missing_cipd=None
+  ):
     """Logs task-specific info to the server"""
     data = {
-        'id': self._bot_id,
-        'session': self._session_token,
-        'message': message,
-        'task_id': task_id,
-        'client_error': {
-            'missing_cas': missing_cas or [],
-            'missing_cipd': missing_cipd or [],
-        },
+      "id": self._bot_id,
+      "session": self._session_token,
+      "message": message,
+      "task_id": task_id,
+      "client_error": {
+        "missing_cas": missing_cas or [],
+        "missing_cipd": missing_cipd or [],
+      },
     }
 
     resp = self._url_read_json(
-        '/swarming/api/v1/bot/task_error/%s' % task_id,
-        data=data)
+      "/swarming/api/v1/bot/task_error/%s" % task_id, data=data
+    )
     self._maybe_update_session_token(resp)
-    return resp and resp['resp'] == 1
+    return resp and resp["resp"] == 1
 
   def do_handshake(self, attributes, session_id):
     """Performs the initial handshake, initializes the session token."""
     data = attributes.copy()
-    data['session_id'] = session_id
-    resp = self._url_read_json('/swarming/api/v1/bot/handshake', data=data)
+    data["session_id"] = session_id
+    resp = self._url_read_json("/swarming/api/v1/bot/handshake", data=data)
     self._maybe_update_session_token(resp)
     return resp
 
@@ -380,52 +384,52 @@ class RemoteClientNative(object):
       the returned dict does not have the correct values set.
     """
     data = attributes.copy()
-    data['session'] = self._session_token
+    data["session"] = self._session_token
     if force:
-      data['force'] = True
+      data["force"] = True
 
     # This makes retry requests idempotent. See also crbug.com/1214700. Reuse
     # the UUID until we get a successful response.
     if not self._poll_request_uuid:
       self._poll_request_uuid = str(uuid.uuid4())
-    data['request_uuid'] = self._poll_request_uuid
+    data["request_uuid"] = self._poll_request_uuid
 
-    resp = self._url_read_json('/swarming/api/v1/bot/poll',
-                               data=data,
-                               retry_transient=False)
+    resp = self._url_read_json(
+      "/swarming/api/v1/bot/poll", data=data, retry_transient=False
+    )
     self._maybe_update_session_token(resp)
-    if not resp or resp.get('error'):
-      raise PollError(
-          resp.get('error') if resp else 'Failed to contact server')
+    if not resp or resp.get("error"):
+      raise PollError(resp.get("error") if resp else "Failed to contact server")
 
     # Successfully polled. Use a new UUID next time.
     self._poll_request_uuid = None
 
-    cmd = '<unknown>'
+    cmd = "<unknown>"
     try:
-      cmd = resp['cmd']
-      if cmd == 'sleep':
-        return (cmd, resp['duration'])
-      if cmd == 'rbe':
-        return (cmd, resp['rbe'])
-      if cmd == 'terminate':
-        return (cmd, resp['task_id'])
-      if cmd == 'run':
-        return (cmd, (resp['manifest'], resp.get('rbe')))
-      if cmd == 'update':
-        return (cmd, resp['version'])
-      if cmd in ('restart', 'host_reboot'):
-        return (cmd, resp['message'])
-      if cmd == 'bot_restart':
-        return (cmd, resp['message'])
-      raise PollError('Unexpected command: %s\n%s' % (cmd, resp))
+      cmd = resp["cmd"]
+      if cmd == "sleep":
+        return (cmd, resp["duration"])
+      if cmd == "rbe":
+        return (cmd, resp["rbe"])
+      if cmd == "terminate":
+        return (cmd, resp["task_id"])
+      if cmd == "run":
+        return (cmd, (resp["manifest"], resp.get("rbe")))
+      if cmd == "update":
+        return (cmd, resp["version"])
+      if cmd in ("restart", "host_reboot"):
+        return (cmd, resp["message"])
+      if cmd == "bot_restart":
+        return (cmd, resp["message"])
+      raise PollError("Unexpected command: %s\n%s" % (cmd, resp))
     except KeyError as e:
       raise PollError(
-          'Unexpected response format for command %s: missing key %s' %
-          (cmd, e))
+        "Unexpected response format for command %s: missing key %s" % (cmd, e)
+      )
 
-  def claim(self, attributes, claim_id, task_id, task_to_run_shard,
-            task_to_run_id):
+  def claim(
+    self, attributes, claim_id, task_id, task_to_run_shard, task_to_run_id
+  ):
     """Attempts to mark a pending task slice as being worked on by this bot.
 
     This is used by bots in RBE mode to transactionally claim tasks they receive
@@ -448,39 +452,40 @@ class RemoteClientNative(object):
       or the returned dict does not have the correct values set.
     """
     data = attributes.copy()
-    data['session'] = self._session_token
-    data['claim_id'] = claim_id
-    data['task_id'] = task_id
-    data['task_to_run_shard'] = task_to_run_shard
-    data['task_to_run_id'] = task_to_run_id
+    data["session"] = self._session_token
+    data["claim_id"] = claim_id
+    data["task_id"] = task_id
+    data["task_to_run_shard"] = task_to_run_shard
+    data["task_to_run_id"] = task_to_run_id
 
-    resp = self._url_read_json('/swarming/api/v1/bot/claim', data=data)
+    resp = self._url_read_json("/swarming/api/v1/bot/claim", data=data)
     self._maybe_update_session_token(resp)
-    if not resp or resp.get('error'):
+    if not resp or resp.get("error"):
       raise ClaimError(
-          resp.get('error') if resp else 'Failed to contact server')
+        resp.get("error") if resp else "Failed to contact server"
+      )
 
-    cmd = '<unknown>'
+    cmd = "<unknown>"
     try:
-      cmd = resp['cmd']
-      if cmd == 'skip':
-        return (cmd, resp['reason'])
-      if cmd == 'terminate':
-        return (cmd, resp['task_id'])
-      if cmd == 'run':
-        return (cmd, resp['manifest'])
-      raise ClaimError('Unexpected outcome: %s\n%s' % (cmd, resp))
+      cmd = resp["cmd"]
+      if cmd == "skip":
+        return (cmd, resp["reason"])
+      if cmd == "terminate":
+        return (cmd, resp["task_id"])
+      if cmd == "run":
+        return (cmd, resp["manifest"])
+      raise ClaimError("Unexpected outcome: %s\n%s" % (cmd, resp))
     except KeyError as e:
       raise ClaimError(
-          'Unexpected response format for outcome %s: missing key %s' %
-          (cmd, e))
+        "Unexpected response format for outcome %s: missing key %s" % (cmd, e)
+      )
 
   def get_bot_code(self, new_zip_path, bot_version):
     """Downloads code into the file specified by new_zip_fn (a string).
 
     Throws BotCodeError on error.
     """
-    url_path = '/swarming/api/v1/bot/bot_code/%s' % bot_version
+    url_path = "/swarming/api/v1/bot/bot_code/%s" % bot_version
     if not self._url_retrieve(new_zip_path, url_path):
       raise BotCodeError(new_zip_path, self._server + url_path, bot_version)
 
@@ -509,21 +514,24 @@ class RemoteClientNative(object):
 
       MintTokenError on fatal errors.
     """
-    resp = self._url_read_json('/swarming/api/v1/bot/oauth_token',
-                               data={
-                                   'account_id': account_id,
-                                   'id': self._bot_id,
-                                   'scopes': scopes,
-                                   'task_id': task_id,
-                                   'session': self._session_token,
-                               },
-                               expected_error_codes=(400, ))
+    resp = self._url_read_json(
+      "/swarming/api/v1/bot/oauth_token",
+      data={
+        "account_id": account_id,
+        "id": self._bot_id,
+        "scopes": scopes,
+        "task_id": task_id,
+        "session": self._session_token,
+      },
+      expected_error_codes=(400,),
+    )
     self._maybe_update_session_token(resp)
     if not resp:
       raise InternalError(
-          'Error when minting access token for account_id: %s' % account_id)
-    if resp.get('error'):
-      raise MintTokenError(resp['error'])
+        "Error when minting access token for account_id: %s" % account_id
+      )
+    if resp.get("error"):
+      raise MintTokenError(resp["error"])
     return resp
 
   def mint_id_token(self, task_id, account_id, audience):
@@ -549,27 +557,29 @@ class RemoteClientNative(object):
 
       MintTokenError on fatal errors.
     """
-    resp = self._url_read_json('/swarming/api/v1/bot/id_token',
-                               data={
-                                   'account_id': account_id,
-                                   'id': self._bot_id,
-                                   'audience': audience,
-                                   'task_id': task_id,
-                                   'session': self._session_token,
-                               },
-                               expected_error_codes=(400, ))
+    resp = self._url_read_json(
+      "/swarming/api/v1/bot/id_token",
+      data={
+        "account_id": account_id,
+        "id": self._bot_id,
+        "audience": audience,
+        "task_id": task_id,
+        "session": self._session_token,
+      },
+      expected_error_codes=(400,),
+    )
     self._maybe_update_session_token(resp)
     if not resp:
       raise InternalError(
-          'Error when minting ID token for account_id: %s' % account_id)
-    if resp.get('error'):
-      raise MintTokenError(resp['error'])
+        "Error when minting ID token for account_id: %s" % account_id
+      )
+    if resp.get("error"):
+      raise MintTokenError(resp["error"])
     return resp
 
-  def rbe_create_session(self,
-                         bot_version,
-                         worker_properties,
-                         retry_transient=False):
+  def rbe_create_session(
+    self, bot_version, worker_properties, retry_transient=False
+  ):
     """Creates a new RBE session via Swarming RBE backend.
 
     The RBE session will use the same dimensions and RBE instance as associated
@@ -589,36 +599,40 @@ class RemoteClientNative(object):
     Raises:
       RBEServerError if the RPC fails for whatever reason.
     """
-    data = {'session': self._session_token}
+    data = {"session": self._session_token}
     if bot_version:
-      data['bot_version'] = bot_version
+      data["bot_version"] = bot_version
     if worker_properties:
       assert isinstance(worker_properties, WorkerProperties), worker_properties
-      data['worker_properties'] = worker_properties.to_dict()
-    resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/create',
-                               data=data,
-                               retry_transient=retry_transient)
+      data["worker_properties"] = worker_properties.to_dict()
+    resp = self._url_read_json(
+      "/swarming/api/v1/bot/rbe/session/create",
+      data=data,
+      retry_transient=retry_transient,
+    )
     self._maybe_update_session_token(resp)
     if not resp:
-      raise RBEServerError('Failed to create RBE session, see bot logs')
+      raise RBEServerError("Failed to create RBE session, see bot logs")
     if not isinstance(resp, dict):
-      raise RBEServerError('Unexpected response: %s' % (resp, ))
+      raise RBEServerError("Unexpected response: %s" % (resp,))
 
     def get_str(key):
       val = resp.get(key)
       if not isinstance(val, str) or not val:
-        raise RBEServerError('Missing or incorrect `%s` in %s' % (key, resp))
+        raise RBEServerError("Missing or incorrect `%s` in %s" % (key, resp))
       return val
 
-    return RBECreateSessionResponse(session_id=get_str('session_id'))
+    return RBECreateSessionResponse(session_id=get_str("session_id"))
 
-  def rbe_update_session(self,
-                         status,
-                         bot_version,
-                         worker_properties,
-                         lease=None,
-                         blocking=True,
-                         retry_transient=False):
+  def rbe_update_session(
+    self,
+    status,
+    bot_version,
+    worker_properties,
+    lease=None,
+    blocking=True,
+    retry_transient=False,
+  ):
     """Updates the state of an RBE session.
 
     Arguments:
@@ -639,48 +653,50 @@ class RemoteClientNative(object):
     """
     assert status in RBESessionStatus, status
     data = {
-        'session': self._session_token,
-        'status': status.name,
+      "session": self._session_token,
+      "status": status.name,
     }
     if bot_version:
-      data['bot_version'] = bot_version
+      data["bot_version"] = bot_version
     if worker_properties:
       assert isinstance(worker_properties, WorkerProperties), worker_properties
-      data['worker_properties'] = worker_properties.to_dict()
+      data["worker_properties"] = worker_properties.to_dict()
     if lease:
       assert isinstance(lease, RBELease), lease
-      data['lease'] = lease.to_dict(omit_payload=True)
+      data["lease"] = lease.to_dict(omit_payload=True)
     if not blocking:
-      data['nonblocking'] = True
+      data["nonblocking"] = True
 
-    resp = self._url_read_json('/swarming/api/v1/bot/rbe/session/update',
-                               data=data,
-                               retry_transient=retry_transient)
+    resp = self._url_read_json(
+      "/swarming/api/v1/bot/rbe/session/update",
+      data=data,
+      retry_transient=retry_transient,
+    )
     self._maybe_update_session_token(resp)
     if not resp:
-      raise RBEServerError('Failed to update RBE session, see bot logs')
+      raise RBEServerError("Failed to update RBE session, see bot logs")
     if not isinstance(resp, dict):
-      raise RBEServerError('Unexpected response: %s' % (resp, ))
+      raise RBEServerError("Unexpected response: %s" % (resp,))
 
     def get_str(key, optional=False):
       val = resp.get(key)
       if val is None and optional:
         return None
       if not isinstance(val, str) or not val:
-        raise RBEServerError('Missing or incorrect `%s` in %s' % (key, resp))
+        raise RBEServerError("Missing or incorrect `%s` in %s" % (key, resp))
       return val
 
     try:
-      status = RBESessionStatus[get_str('status')]
+      status = RBESessionStatus[get_str("status")]
     except KeyError as e:
-      raise RBEServerError('Unrecognized status in response: %s' % e)
+      raise RBEServerError("Unrecognized status in response: %s" % e)
 
     lease = None
-    if 'lease' in resp:
+    if "lease" in resp:
       try:
-        lease = RBELease.from_dict(resp['lease'])
+        lease = RBELease.from_dict(resp["lease"])
       except (ValueError, TypeError):
-        raise RBEServerError('Invalid `lease` in %s' % (resp, ))
+        raise RBEServerError("Invalid `lease` in %s" % (resp,))
 
     return RBEUpdateSessionResponse(status=status, lease=lease)
 
@@ -695,6 +711,7 @@ class RBESessionException(Exception):
 
 class RBESessionStatus(enum.Enum):
   """RBE bot session statuses matching remoteworkers.BotStatus protobuf enum."""
+
   OK = 1
   UNHEALTHY = 2
   HOST_REBOOTING = 3
@@ -705,6 +722,7 @@ class RBESessionStatus(enum.Enum):
 
 class RBELeaseState(enum.Enum):
   """RBE lease state matching remoteworkers.LeaseState protobuf enum."""
+
   PENDING = 1
   ACTIVE = 2
   COMPLETED = 3
@@ -713,28 +731,29 @@ class RBELeaseState(enum.Enum):
 
 # Returned by rbe_create_session(...)
 RBECreateSessionResponse = collections.namedtuple(
-    'RBECreateSessionResponse',
-    [
-        # An RBE bot session ID as encoded in the session token.
-        #
-        # Primarily for the bot debug log. It is not used directly by anything.
-        'session_id',
-    ])
+  "RBECreateSessionResponse",
+  [
+    # An RBE bot session ID as encoded in the session token.
+    #
+    # Primarily for the bot debug log. It is not used directly by anything.
+    "session_id",
+  ],
+)
 
 # Returned by rbe_update_session(...).
 RBEUpdateSessionResponse = collections.namedtuple(
-    'RBEUpdateSessionResponse',
-    [
-        # The bot session status as the RBE backend sees it.
-        #
-        # It is one of RBESessionStatus enum variants. In particular, a non-OK
-        # status means the session is no longer alive and the bot should stop
-        # using it.
-        'status',
-
-        # An optional lease assigned to the bot session, as RBELease instance.
-        'lease',
-    ])
+  "RBEUpdateSessionResponse",
+  [
+    # The bot session status as the RBE backend sees it.
+    #
+    # It is one of RBESessionStatus enum variants. In particular, a non-OK
+    # status means the session is no longer alive and the bot should stop
+    # using it.
+    "status",
+    # An optional lease assigned to the bot session, as RBELease instance.
+    "lease",
+  ],
+)
 
 
 class RBELease:
@@ -756,13 +775,21 @@ class RBELease:
     self.result = result
 
   def __eq__(self, other):
-    return (self.id == other.id and self.state == other.state
-            and self.payload == other.payload and self.result == other.result)
+    return (
+      self.id == other.id
+      and self.state == other.state
+      and self.payload == other.payload
+      and self.result == other.result
+    )
 
   def clone(self):
     """Returns a copy of this object."""
-    return RBELease(self.id, self.state, copy.deepcopy(self.payload),
-                    copy.deepcopy(self.result))
+    return RBELease(
+      self.id,
+      self.state,
+      copy.deepcopy(self.payload),
+      copy.deepcopy(self.result),
+    )
 
   @staticmethod
   def from_dict(d):
@@ -773,14 +800,14 @@ class RBELease:
       TypeError if types are wrong.
     """
     if not isinstance(d, dict):
-      raise TypeError('Not a dict')
+      raise TypeError("Not a dict")
 
     def get_str(key):
-      val = d.get(key, '')
+      val = d.get(key, "")
       if not isinstance(val, str):
-        raise TypeError('Invalid %s' % key)
+        raise TypeError("Invalid %s" % key)
       if not val:
-        raise ValueError('Missing %s' % key)
+        raise ValueError("Missing %s" % key)
       return val
 
     def get_optional_dict(key):
@@ -788,16 +815,20 @@ class RBELease:
       if val is None:
         return None
       if not isinstance(val, dict):
-        raise TypeError('Invalid %s' % key)
+        raise TypeError("Invalid %s" % key)
       return val
 
     try:
-      state = RBELeaseState[get_str('state')]
+      state = RBELeaseState[get_str("state")]
     except KeyError as e:
-      raise ValueError('Invalid state %s' % e)
+      raise ValueError("Invalid state %s" % e)
 
-    return RBELease(get_str('id'), state, get_optional_dict('payload'),
-                    get_optional_dict('result'))
+    return RBELease(
+      get_str("id"),
+      state,
+      get_optional_dict("payload"),
+      get_optional_dict("result"),
+    )
 
   def to_dict(self, omit_payload=False):
     """Converts RBELease to a dict representation.
@@ -805,11 +836,11 @@ class RBELease:
     Arguments:
       omit_payload: if True, omit `payload` key.
     """
-    d = {'id': self.id, 'state': self.state.name}
+    d = {"id": self.id, "state": self.state.name}
     if not omit_payload and self.payload is not None:
-      d['payload'] = self.payload
+      d["payload"] = self.payload
     if self.result is not None:
-      d['result'] = self.result
+      d["result"] = self.result
     return d
 
 
@@ -821,8 +852,9 @@ class WorkerProperties:
     self.pool_version = pool_version
 
   def __eq__(self, other):
-    return (self.pool_id == other.pool_id
-            and self.pool_version == other.pool_version)
+    return (
+      self.pool_id == other.pool_id and self.pool_version == other.pool_version
+    )
 
   @staticmethod
   def from_dict(d):
@@ -832,23 +864,23 @@ class WorkerProperties:
       TypeError if types are wrong.
     """
     if not isinstance(d, dict):
-      raise TypeError('Not a dict')
+      raise TypeError("Not a dict")
 
     def get_str(key):
-      val = d.get(key, '')
+      val = d.get(key, "")
       if not isinstance(val, str):
-        raise TypeError('Invalid %s' % key)
+        raise TypeError("Invalid %s" % key)
       return val
 
-    return WorkerProperties(get_str('pool_id'), get_str('pool_version'))
+    return WorkerProperties(get_str("pool_id"), get_str("pool_version"))
 
   def to_dict(self):
     """Converts WorkerProperties to a dict representation."""
     d = {}
     if self.pool_id:
-      d['pool_id'] = self.pool_id
+      d["pool_id"] = self.pool_id
     if self.pool_version:
-      d['pool_version'] = self.pool_version
+      d["pool_version"] = self.pool_version
     return d
 
 
@@ -859,12 +891,9 @@ class RBESession:
   recreate(). A recreated session has a different ID.
   """
 
-  def __init__(self,
-               remote,
-               instance,
-               bot_version,
-               worker_properties,
-               session_id=None):
+  def __init__(
+    self, remote, instance, bot_version, worker_properties, session_id=None
+  ):
     """Creates a new RBE session via Swarming RBE backend.
 
     Arguments:
@@ -893,22 +922,20 @@ class RBESession:
   def to_dict(self):
     """Returns the state of the session as a dict."""
     return {
-        'instance':
-        self._instance,
-        'bot_version':
-        self._bot_version,
-        'worker_properties':
-        self._worker_properties.to_dict() if self._worker_properties else None,
-        'session_id':
-        self._session_id,
-        'last_acked_status':
-        self._last_acked_status.name,
-        'active_lease':
-        self._active_lease.to_dict() if self._active_lease else None,
-        'finished_lease':
-        self._finished_lease.to_dict() if self._finished_lease else None,
-        'terminated':
-        self._terminated,
+      "instance": self._instance,
+      "bot_version": self._bot_version,
+      "worker_properties": self._worker_properties.to_dict()
+      if self._worker_properties
+      else None,
+      "session_id": self._session_id,
+      "last_acked_status": self._last_acked_status.name,
+      "active_lease": self._active_lease.to_dict()
+      if self._active_lease
+      else None,
+      "finished_lease": self._finished_lease.to_dict()
+      if self._finished_lease
+      else None,
+      "terminated": self._terminated,
     }
 
   @staticmethod
@@ -920,26 +947,31 @@ class RBESession:
     """
     worker_properties = None
     try:
-      wp = dump.get('worker_properties')
+      wp = dump.get("worker_properties")
       if wp:
         worker_properties = WorkerProperties.from_dict(wp)
     except TypeError as e:
-      raise ValueError('Invalid worker_properties dict: %s' % e)
+      raise ValueError("Invalid worker_properties dict: %s" % e)
 
     try:
-      session = RBESession(remote, dump['instance'], dump['bot_version'],
-                           worker_properties, dump['session_id'])
-      last_acked_status = dump['last_acked_status']
-      active_lease = dump['active_lease']
-      finished_lease = dump['finished_lease']
-      session._terminated = dump['terminated']
+      session = RBESession(
+        remote,
+        dump["instance"],
+        dump["bot_version"],
+        worker_properties,
+        dump["session_id"],
+      )
+      last_acked_status = dump["last_acked_status"]
+      active_lease = dump["active_lease"]
+      finished_lease = dump["finished_lease"]
+      session._terminated = dump["terminated"]
     except KeyError as e:
-      raise ValueError('Missing key %s' % e)
+      raise ValueError("Missing key %s" % e)
 
     try:
       session._last_acked_status = RBESessionStatus[last_acked_status]
     except KeyError as e:
-      raise ValueError('Invalid RBESessionStatus: %s' % e)
+      raise ValueError("Invalid RBESessionStatus: %s" % e)
 
     try:
       if active_lease:
@@ -947,7 +979,7 @@ class RBESession:
       if finished_lease:
         session._finished_lease = RBELease.from_dict(finished_lease)
     except TypeError:
-      raise ValueError('Invalid lease dict')
+      raise ValueError("Invalid lease dict")
 
     return session
 
@@ -981,18 +1013,18 @@ class RBESession:
   def alive(self):
     """True if this session is open, but possibly terminating."""
     return not self._terminated and self._last_acked_status in (
-        RBESessionStatus.OK,
-        RBESessionStatus.MAINTENANCE,
-        RBESessionStatus.HOST_REBOOTING,
-        RBESessionStatus.BOT_TERMINATING,
+      RBESessionStatus.OK,
+      RBESessionStatus.MAINTENANCE,
+      RBESessionStatus.HOST_REBOOTING,
+      RBESessionStatus.BOT_TERMINATING,
     )
 
   @property
   def terminating(self):
     """True if this session is being closed (in particular by the server)."""
     return self._last_acked_status in (
-        RBESessionStatus.HOST_REBOOTING,
-        RBESessionStatus.BOT_TERMINATING,
+      RBESessionStatus.HOST_REBOOTING,
+      RBESessionStatus.BOT_TERMINATING,
     )
 
   @property
@@ -1029,31 +1061,32 @@ class RBESession:
       RBEServerError if the RPC fails for whatever reason.
     """
     if not self.alive:
-      raise RBESessionException('Calling update(...) with dead session')
+      raise RBESessionException("Calling update(...) with dead session")
     if self.active_lease:
-      raise RBESessionException('Calling update(...) with an active lease')
+      raise RBESessionException("Calling update(...) with an active lease")
 
     # Report the result of the finished lease (if any), and get a new lease.
-    assert (not self._finished_lease
-            or self._finished_lease.state == RBELeaseState.COMPLETED
-            ), self._finished_lease
-    lease = self._update(status=status,
-                         lease=self._finished_lease,
-                         blocking=blocking)
+    assert (
+      not self._finished_lease
+      or self._finished_lease.state == RBELeaseState.COMPLETED
+    ), self._finished_lease
+    lease = self._update(
+      status=status, lease=self._finished_lease, blocking=blocking
+    )
     self._finished_lease = None  # flushed the result successfully
 
     # A dead session should not be producing new leases.
     if not self.alive:
       if lease:
-        logging.error('Ignoring a lease from dead session: %s', lease.id)
+        logging.error("Ignoring a lease from dead session: %s", lease.id)
       return None
 
     # A new lease should be in PENDING state and have a payload.
     if lease:
       if lease.state != RBELeaseState.PENDING:
-        logging.error('Got a non-PENDING lease: %s', lease.id)
+        logging.error("Got a non-PENDING lease: %s", lease.id)
       if lease.payload is None:
-        logging.error('Got a lease without payload: %s', lease.id)
+        logging.error("Got a lease without payload: %s", lease.id)
 
     self._active_lease = lease
     return lease
@@ -1092,9 +1125,9 @@ class RBESession:
       RBEServerError if the RPC fails for whatever reason.
     """
     if not self.active_lease:
-      raise RBESessionException('ping_active_lease(...) without a lease')
+      raise RBESessionException("ping_active_lease(...) without a lease")
     if not self.alive:
-      logging.warning('The session is already gone')
+      logging.warning("The session is already gone")
       return False
 
     # Report the lease as ACTIVE. Do not use a poll token, it might have expired
@@ -1106,25 +1139,28 @@ class RBESession:
 
     # If the session is gone, the lease is lost.
     if not self.alive:
-      logging.error('The session was lost')
+      logging.error("The session was lost")
       self.abandon()
       return False
 
     # No lease in the response means the active lease was lost.
     if not lease:
-      logging.error('Lost active lease %s', self._active_lease.id)
+      logging.error("Lost active lease %s", self._active_lease.id)
       self._active_lease = None
       return False
 
     # This must not be happening either, but also treat it as a lost lease.
     if lease.id != self._active_lease.id:
-      logging.error('Got unexpected lease ID: want %s, got %s',
-                    self._active_lease.id, lease.id)
+      logging.error(
+        "Got unexpected lease ID: want %s, got %s",
+        self._active_lease.id,
+        lease.id,
+      )
       self._active_lease = None
       return False
 
     # Keep working on the lease if the server tells it is still ACTIVE.
-    logging.info('The lease %s is %s', lease.id, lease.state)
+    logging.info("The lease %s is %s", lease.id, lease.state)
     return lease.state == RBELeaseState.ACTIVE
 
   def finish_active_lease(self, result, flush=False):
@@ -1154,7 +1190,7 @@ class RBESession:
       RBEServerError if `flush` is True and the RPC fails for whatever reason.
     """
     if not self.active_lease:
-      raise RBESessionException('finish_active_lease(...) without a lease')
+      raise RBESessionException("finish_active_lease(...) without a lease")
 
     lease, self._active_lease = self._active_lease, None
     lease.state = RBELeaseState.COMPLETED
@@ -1167,17 +1203,19 @@ class RBESession:
       return
 
     if not self.alive:
-      logging.error('Losing results of %s', self._finished_lease.id)
+      logging.error("Losing results of %s", self._finished_lease.id)
       self._finished_lease = None
       return
 
-    lease = self._update(status=RBESessionStatus.MAINTENANCE,
-                         lease=self._finished_lease,
-                         blocking=False,
-                         retry_transient=True)
+    lease = self._update(
+      status=RBESessionStatus.MAINTENANCE,
+      lease=self._finished_lease,
+      blocking=False,
+      retry_transient=True,
+    )
     self._finished_lease = None  # flushed the result successfully
     if lease:
-      logging.error('Ignoring unexpected lease in MAINTENANCE: %s', lease.id)
+      logging.error("Ignoring unexpected lease in MAINTENANCE: %s", lease.id)
 
   def terminate(self, status=RBESessionStatus.BOT_TERMINATING):
     """Terminates this RBE session.
@@ -1193,27 +1231,27 @@ class RBESession:
     time left to retry forever.
     """
     assert status in (
-        RBESessionStatus.BOT_TERMINATING,
-        RBESessionStatus.HOST_REBOOTING,
+      RBESessionStatus.BOT_TERMINATING,
+      RBESessionStatus.HOST_REBOOTING,
     ), status
 
     if self._active_lease:
-      logging.error('Ignoring active lease %s', self._active_lease.id)
+      logging.error("Ignoring active lease %s", self._active_lease.id)
 
     if not self.alive:
       if self._finished_lease:
-        logging.error('Losing results of %s', self._finished_lease.id)
+        logging.error("Losing results of %s", self._finished_lease.id)
       return
 
     try:
-      lease = self._update(status=status,
-                           lease=self._finished_lease,
-                           retry_transient=True)
+      lease = self._update(
+        status=status, lease=self._finished_lease, retry_transient=True
+      )
       if lease:
-        logging.error('Ignoring a lease from terminated session: %s', lease.id)
+        logging.error("Ignoring a lease from terminated session: %s", lease.id)
       self._finished_lease = None  # flushed the result
     except RBEServerError as e:
-      logging.error('Error terminating RBE session: %s', e)
+      logging.error("Error terminating RBE session: %s", e)
 
   def recreate(self):
     """Opens a new session that replaces the current one.
@@ -1228,7 +1266,7 @@ class RBESession:
       RBEServerError if the RPC fails for whatever reason.
     """
     if self.alive:
-      raise RBESessionException('recreate(...) with a living session')
+      raise RBESessionException("recreate(...) with a living session")
 
     # The previous session is gone. Log any abandoned leases.
     self.abandon()
@@ -1236,8 +1274,9 @@ class RBESession:
     # Try to create a replacement session using the same parameters. We need to
     # pass the previous session token to grab server-signed parameters from it
     # in case the poll token is already stale.
-    resp = self._remote.rbe_create_session(self._bot_version,
-                                           self._worker_properties)
+    resp = self._remote.rbe_create_session(
+      self._bot_version, self._worker_properties
+    )
     self._session_id = resp.session_id
     self._last_acked_status = RBESessionStatus.OK
     self._terminated = False
@@ -1254,12 +1293,12 @@ class RBESession:
       RBESessionException if the local session is in a wrong state.
     """
     if self.alive and not self.terminating:
-      raise RBESessionException('abandon() with a living session')
+      raise RBESessionException("abandon() with a living session")
     if self._active_lease:
-      logging.error('Lost active lease %s', self._active_lease.id)
+      logging.error("Lost active lease %s", self._active_lease.id)
       self._active_lease = None
     if self._finished_lease:
-      logging.error('Lost results of %s', self._finished_lease.id)
+      logging.error("Lost results of %s", self._finished_lease.id)
       self._finished_lease = None
 
   def _update(self, status, lease=None, blocking=True, retry_transient=False):
@@ -1285,15 +1324,15 @@ class RBESession:
     # Update the session on the backend side, flush the finished lease result,
     # pick up a new lease.
     resp = self._remote.rbe_update_session(
-        status,
-        self._bot_version,
-        self._worker_properties,
-        lease,
-        blocking,
-        retry_transient,
+      status,
+      self._bot_version,
+      self._worker_properties,
+      lease,
+      blocking,
+      retry_transient,
     )
 
-    logging.debug('RBE %s: %s => %s', self._session_id, status, resp.status)
+    logging.debug("RBE %s: %s => %s", self._session_id, status, resp.status)
     if resp.status != RBESessionStatus.OK:
       # The server told us the session is pending termination or already gone.
       self._last_acked_status = resp.status
@@ -1303,13 +1342,13 @@ class RBESession:
 
     # If we asked the server to terminate the session and the server ACKed this,
     # the session is considered gracefully terminated.
-    self._terminated = (status in (
-        RBESessionStatus.HOST_REBOOTING,
-        RBESessionStatus.BOT_TERMINATING,
+    self._terminated = status in (
+      RBESessionStatus.HOST_REBOOTING,
+      RBESessionStatus.BOT_TERMINATING,
     ) and self._last_acked_status in (
-        RBESessionStatus.HOST_REBOOTING,
-        RBESessionStatus.BOT_TERMINATING,
-    ))
+      RBESessionStatus.HOST_REBOOTING,
+      RBESessionStatus.BOT_TERMINATING,
+    )
 
     return resp.lease
 
@@ -1339,13 +1378,15 @@ class SessionState:
     Raises:
       OSError if can't open or write the file.
     """
-    with open(path, 'w') as f:
+    with open(path, "w") as f:
       json.dump(
-          {
-              'session_id': self.session_id,
-              'session_token': self.session_token,
-              'rbe_session': self.rbe_session,
-          }, f)
+        {
+          "session_id": self.session_id,
+          "session_token": self.session_token,
+          "rbe_session": self.rbe_session,
+        },
+        f,
+      )
 
   @staticmethod
   def load(path):
@@ -1355,13 +1396,14 @@ class SessionState:
       OSError if can't open or read the file.
       ValueError if the dump doesn't appear to be valid.
     """
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
       try:
         dump = json.load(f)
       except ValueError as e:
-        raise ValueError('Not a valid JSON: %s' % e)
+        raise ValueError("Not a valid JSON: %s" % e)
     try:
-      return SessionState(dump['session_id'], dump['session_token'],
-                          dump['rbe_session'])
+      return SessionState(
+        dump["session_id"], dump["session_token"], dump["rbe_session"]
+      )
     except KeyError as e:
-      raise ValueError('Missing required key %s' % e)
+      raise ValueError("Missing required key %s" % e)

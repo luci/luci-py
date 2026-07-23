@@ -15,6 +15,7 @@ import sys
 import webapp2
 
 from components import utils
+
 utils.import_third_party()
 
 from google.appengine.ext import ndb
@@ -38,7 +39,7 @@ from server import pools_config
 def create_application():
   ereporter2.register_formatter()
   # Task queues must be sent to the backend.
-  utils.set_task_queue_module('backend')
+  utils.set_task_queue_module("backend")
   template.bootstrap()
 
   # Zap out the ndb in-process cache by default.
@@ -62,17 +63,19 @@ def create_application():
   frontend_app = handlers_frontend.create_application(False)
   gae_ts_mon.initialize_prod(frontend_app, is_enabled_fn=is_enabled_callback)
 
-  endpoints_api = endpoints_webapp2.api_server([
-    handlers_endpoints.SwarmingServerService,
-    handlers_endpoints.SwarmingTaskService,
-    handlers_endpoints.SwarmingTasksService,
-    handlers_endpoints.SwarmingQueuesService,
-    handlers_endpoints.SwarmingBotService,
-    handlers_endpoints.SwarmingBotsService,
-    # components.config endpoints for validation and configuring of luci-config
-    # service URL.
-    config.ConfigApi,
-  ])
+  endpoints_api = endpoints_webapp2.api_server(
+    [
+      handlers_endpoints.SwarmingServerService,
+      handlers_endpoints.SwarmingTaskService,
+      handlers_endpoints.SwarmingTasksService,
+      handlers_endpoints.SwarmingQueuesService,
+      handlers_endpoints.SwarmingBotService,
+      handlers_endpoints.SwarmingBotsService,
+      # components.config endpoints for validation and configuring of luci-config
+      # service URL.
+      config.ConfigApi,
+    ]
+  )
   gae_ts_mon.instrument_wsgi_application(endpoints_api)
 
   prpc_api = webapp2.WSGIApplication(handlers_prpc.get_routes())

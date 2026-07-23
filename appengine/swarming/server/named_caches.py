@@ -56,6 +56,7 @@ class NamedCache(ndb.Model):
   This entity is not stored in a transaction, as we want it to be hot in
   memcache, even if the hint is not exactly right.
   """
+
   ts = ndb.DateTimeProperty()
   os = ndb.StringProperty()
   name = ndb.StringProperty()
@@ -70,7 +71,7 @@ def _named_cache_key(pool, os, name):
   assert isinstance(pool, basestring), repr(pool)
   assert isinstance(os, basestring), repr(os)
   assert isinstance(name, basestring), repr(name)
-  return ndb.Key(NamedCacheRoot, pool, NamedCache, os + ':' + name)
+  return ndb.Key(NamedCacheRoot, pool, NamedCache, os + ":" + name)
 
 
 def _update_named_cache(pool, os, name, hint):
@@ -95,7 +96,7 @@ def _update_named_cache(pool, os, name, hint):
   now = utils.utcnow().replace(microsecond=0)
   e = key.get()
   exp = now - datetime.timedelta(hours=24)
-  if not e or e.hint <= hint*0.9 or e.ts < exp:
+  if not e or e.hint <= hint * 0.9 or e.ts < exp:
     e = NamedCache(key=key, ts=now, os=os, name=name, hint=hint)
     e.put()
     return True
@@ -106,17 +107,17 @@ def _reduce_oses(oses):
   """Returns a single OS key."""
   assert isinstance(oses, list), repr(oses)
   if not oses:
-    return 'unknown'
+    return "unknown"
 
   # TODO(maruel): It's a bit adhoc. Revisit if it's not good enough.
-  if 'Windows' in oses:
-    return 'Windows'
-  if 'Mac' in oses:
-    return 'Mac'
-  if 'Android' in oses:
-    return 'Android'
-  if 'Linux' in oses:
-    return 'Linux'
+  if "Windows" in oses:
+    return "Windows"
+  if "Mac" in oses:
+    return "Mac"
+  if "Android" in oses:
+    return "Android"
+  if "Linux" in oses:
+    return "Linux"
 
   return min(oses)
 
@@ -167,38 +168,42 @@ def task_update_pool(pool):
   found = {}
   bots = 0
   exp = utils.utcnow().replace(microsecond=0) - datetime.timedelta(hours=4)
-  for bot in bot_management.filter_dimensions(q, [u'pool:'+pool]):
+  for bot in bot_management.filter_dimensions(q, ["pool:" + pool]):
     if bot.last_seen_ts < exp:
       # Very dead bot; it hasn't pinged for 4 hours.
       continue
     bots += 1
     # Some bots do not have 'os' correctly specified. They fall into the
     # 'unknown' OS bucket.
-    os = _reduce_oses(bot.dimensions.get('os') or [])
+    os = _reduce_oses(bot.dimensions.get("os") or [])
     state = bot.state
     if not state or not isinstance(state, dict):
-      logging.debug('%s has no state', bot.id)
+      logging.debug("%s has no state", bot.id)
       continue
     # TODO(maruel): Use structured data instead of adhoc json.
-    c = state.get('named_caches')
+    c = state.get("named_caches")
     if not isinstance(c, dict):
       continue
     d = found.setdefault(os, {})
     for key, value in sorted(c.items()):
       if not value or not isinstance(value, list) or len(value) != 2:
-        logging.error('%s has bad cache (A): %s', bot.id, value)
+        logging.error("%s has bad cache (A): %s", bot.id, value)
         continue
       if not value[0] or not isinstance(value[0], list) or len(value[0]) != 2:
-        logging.error('%s has bad cache (B): %s', bot.id, value)
+        logging.error("%s has bad cache (B): %s", bot.id, value)
         continue
       if not value[0][1] or not isinstance(value[0][1], (int, long)):
-        logging.error('%s has bad cache (C): %s', bot.id, value)
+        logging.error("%s has bad cache (C): %s", bot.id, value)
         continue
       s = value[0][1]
       d.setdefault(key, []).append(s)
   logging.info(
-      'Found %d bots, %d caches in %d distinct OSes in pool %r',
-      bots, sum(len(f) for f in found.values()), len(found), pool)
+    "Found %d bots, %d caches in %d distinct OSes in pool %r",
+    bots,
+    sum(len(f) for f in found.values()),
+    len(found),
+    pool,
+  )
 
   # TODO(maruel): Parallelise.
   for os, d in sorted(found.items()):
@@ -207,16 +212,16 @@ def task_update_pool(pool):
       sizes.sort()
       hint = sizes[int(float(len(sizes)) * 0.95)]
       if _update_named_cache(pool, os, name, hint):
-        logging.debug('Pool %r  OS %r  Cache %r  hint=%d', pool, os, name, hint)
+        logging.debug("Pool %r  OS %r  Cache %r  hint=%d", pool, os, name, hint)
 
   # Delete the old ones.
   exp = utils.utcnow().replace(microsecond=0) - datetime.timedelta(days=8)
   ancestor = ndb.Key(NamedCacheRoot, pool)
-  logging.info('Exp: %s', exp)
+  logging.info("Exp: %s", exp)
   q = NamedCache.query(NamedCache.ts < exp, ancestor=ancestor)
   keys = q.fetch(keys_only=True)
   if keys:
-    logging.info('Deleting %d stale entities', len(keys))
+    logging.info("Deleting %d stale entities", len(keys))
     ndb.delete_multi(keys)
   return True
 
@@ -226,14 +231,12 @@ def cron_update_named_caches():
   total = 0
   for pool in pools_config.known():
     if not utils.enqueue_task(
-        '/internal/taskqueue/important/named_cache/update-pool',
-        'named-cache-task',
-        payload=json.dumps({
-            'pool': pool
-        }),
+      "/internal/taskqueue/important/named_cache/update-pool",
+      "named-cache-task",
+      payload=json.dumps({"pool": pool}),
     ):
-      logging.error('Failed to enqueue task for pool %s', pool)
+      logging.error("Failed to enqueue task for pool %s", pool)
     else:
-      logging.debug('Enqueued task for pool %s', pool)
+      logging.debug("Enqueued task for pool %s", pool)
       total += 1
   return total

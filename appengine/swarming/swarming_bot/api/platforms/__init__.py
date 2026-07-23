@@ -9,32 +9,33 @@
 import sys
 import os
 
-if os.name == 'posix':
+if os.name == "posix":
   from api.platforms import posix
 
-if os.name != 'darwin':  # As of writing, macOS can't run on GCE.
+if os.name != "darwin":  # As of writing, macOS can't run on GCE.
   is_gce = lambda: gce.is_gce()  # to reuse gce.is_gce mock, if any
   from api.platforms import gce
 
-if sys.platform == 'aix':
+if sys.platform == "aix":
   from api.platforms import aix
 
-if sys.platform == 'cygwin':
+if sys.platform == "cygwin":
   from api.platforms import win
 
-if sys.platform == 'darwin':
+if sys.platform == "darwin":
   from api.platforms import osx
+
   is_gce = lambda: False
 
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
   from api.platforms import win
 
 
-if sys.platform == 'linux':
+if sys.platform == "linux":
   try:
     from api.platforms import android
   except OSError:
-    logging.warning('failed to import android', exc_info=True)
+    logging.warning("failed to import android", exc_info=True)
     android = None
   from api.platforms import linux

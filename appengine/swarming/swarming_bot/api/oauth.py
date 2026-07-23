@@ -5,7 +5,6 @@
 
 """OAuth2 utilities for Swarming bots."""
 
-
 import json
 import logging
 import time
@@ -24,9 +23,11 @@ def oauth2_access_token_from_url(url, headers):
   """
   try:
     resp = json.load(
-        urllib.request.urlopen(
-            urllib.request.Request(url, headers=headers), timeout=20))
+      urllib.request.urlopen(
+        urllib.request.Request(url, headers=headers), timeout=20
+      )
+    )
   except IOError as e:
-    logging.error('Failed to grab OAuth2 access token: %s', e)
+    logging.error("Failed to grab OAuth2 access token: %s", e)
     raise
-  return resp['access_token'], time.time() + resp['expires_in']
+  return resp["access_token"], time.time() + resp["expires_in"]

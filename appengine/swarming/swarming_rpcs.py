@@ -23,6 +23,7 @@ class TaskStateQuery(messages.Enum):
   Do not confuse TaskStateQuery and TaskState. TaskStateQuery is to query tasks
   via the API. TaskState is the current task state.
   """
+
   # Query for all tasks currently TaskState.PENDING.
   PENDING = 0
   # Query for all tasks currently TaskState.RUNNING. This includes tasks
@@ -82,6 +83,7 @@ class TaskState(messages.Enum):
   constants look like a bitmask. This is because of historical reasons and this
   is effectively an enum, not a bitmask.
   """
+
   # Invalid state, do not use.
   INVALID = 0x00
 
@@ -144,10 +146,11 @@ class TaskState(messages.Enum):
 
 class TaskSort(messages.Enum):
   """Flag to sort returned tasks. The natural sort is CREATED_TS."""
+
   CREATED_TS = 0
   COMPLETED_TS = 2
   ABANDONED_TS = 3
-  STARTED_TS =  4
+  STARTED_TS = 4
 
 
 class PoolTaskTemplateField(messages.Enum):
@@ -156,6 +159,7 @@ class PoolTaskTemplateField(messages.Enum):
 
   The non-endpoints counterpart is in task_request.
   """
+
   AUTO = 0
   CANARY_PREFER = 1
   CANARY_NEVER = 2
@@ -167,12 +171,14 @@ class PoolTaskTemplateField(messages.Enum):
 
 class StringPair(messages.Message):
   """Represents a mapping of string to string."""
+
   key = messages.StringField(1)
   value = messages.StringField(2)
 
 
 class StringListPair(messages.Message):
   """Represents a mapping of string to list of strings."""
+
   key = messages.StringField(1)
   value = messages.StringField(2, repeated=True)
 
@@ -197,6 +203,7 @@ def to_bool(three_state):
 
 class ServerDetails(messages.Message):
   """Reports details about the server."""
+
   server_version = messages.StringField(1)
   bot_version = messages.StringField(2)
   machine_provider_template = messages.StringField(3)
@@ -207,11 +214,13 @@ class ServerDetails(messages.Message):
 
 class BootstrapToken(messages.Message):
   """Returns a token to bootstrap a new bot."""
+
   bootstrap_token = messages.StringField(1)
 
 
 class ClientPermissions(messages.Message):
   """Reports the client's permissions."""
+
   delete_bot = messages.BooleanField(1)
   delete_bots = messages.BooleanField(10)
   terminate_bot = messages.BooleanField(2)
@@ -228,6 +237,7 @@ class ClientPermissions(messages.Message):
 
 class FileContent(messages.Message):
   """Content of a file."""
+
   content = messages.StringField(1)
   version = messages.StringField(2)
   who = messages.StringField(3)
@@ -256,6 +266,7 @@ class CASReference(messages.Message):
 
 class CipdPackage(messages.Message):
   """A CIPD package to install in the run dir before task execution."""
+
   # A template of a full CIPD package name, e.g.
   # "infra/tools/authutil/${platform}"
   # See also cipd.ALL_PARAMS.
@@ -271,6 +282,7 @@ class CipdPackage(messages.Message):
 
 class CipdInput(messages.Message):
   """Defines CIPD packages to install in task run directory."""
+
   # URL of the CIPD server. Must start with "https://" or "http://".
   # This field or its subfields are optional if default cipd client is defined
   # in the server config.
@@ -320,6 +332,7 @@ class CacheEntry(messages.Message):
 
 class ContainmentType(messages.Enum):
   """See proto/api/swarming.proto for description."""
+
   NOT_SPECIFIED = 0
   NONE = 1
   AUTO = 2
@@ -328,12 +341,14 @@ class ContainmentType(messages.Enum):
 
 class Containment(messages.Message):
   """See proto/api/swarming.proto for description."""
+
   containment_type = messages.EnumField(ContainmentType, 2)
   # Deprecated: lower_priority, limit_processes, limit_total_committed_memory
 
 
 class TaskProperties(messages.Message):
   """Important metadata about a particular task."""
+
   # Specifies named caches to map into the working directory. These caches
   # outlives the task, which can then be reused by tasks later used on this bot
   # that request the same named cache.
@@ -413,6 +428,7 @@ class TaskSlice(messages.Message):
 
   This is one of the possible fallback on a task request.
   """
+
   # The property of the task to try to run.
   #
   # If there is no bot that can serve this properties.dimensions when this task
@@ -458,6 +474,7 @@ class NewTaskRequest(messages.Message):
 
   This message is used to create a new task.
   """
+
   # DEPRECATED. Use task_slices[0].expiration_secs.
   expiration_secs = messages.IntegerField(1)
   # Task name for display purpose.
@@ -520,7 +537,8 @@ class NewTaskRequest(messages.Message):
   # application of canary templates, as well as skipping the template
   # altogether.
   pool_task_template = messages.EnumField(
-      PoolTaskTemplateField, 14, default='AUTO')
+    PoolTaskTemplateField, 14, default="AUTO"
+  )
 
   # Maximum delay between bot pings before the bot is considered dead
   # while running a task.
@@ -539,6 +557,7 @@ class NewTaskRequest(messages.Message):
   # See api/swarming.proto for more details.
   realm = messages.StringField(18)
 
+
 class TaskRequest(messages.Message):
   """Description of a task request as registered by the server.
 
@@ -546,6 +565,7 @@ class TaskRequest(messages.Message):
 
   See NewTaskRequest for more details.
   """
+
   expiration_secs = messages.IntegerField(1)
   name = messages.StringField(2)
   task_id = messages.StringField(15)
@@ -578,11 +598,13 @@ class TaskRequest(messages.Message):
 
 class TaskCancelRequest(messages.Message):
   """Request to cancel one task."""
+
   kill_running = messages.BooleanField(1)
 
 
 class TasksCancelRequest(messages.Message):
   """Request to cancel some subset of pending/running tasks."""
+
   tags = messages.StringField(1, repeated=True)
   cursor = messages.StringField(2)
   limit = messages.IntegerField(3, default=100)
@@ -620,6 +642,7 @@ class PerformanceStats(messages.Message):
 
   See task_result.PerformanceStats for details.
   """
+
   bot_overhead = messages.FloatField(1)
   isolated_download = messages.MessageField(CASOperationStats, 2)
   isolated_upload = messages.MessageField(CASOperationStats, 3)
@@ -632,13 +655,14 @@ class PerformanceStats(messages.Message):
 
 class CancelResponse(messages.Message):
   """Result of a request to cancel a task."""
+
   ok = messages.BooleanField(1)
   was_running = messages.BooleanField(2)
 
 
 class TasksCancelResponse(messages.Message):
-  """Result of canceling some subset of pending tasks.
-  """
+  """Result of canceling some subset of pending tasks."""
+
   cursor = messages.StringField(1)
   now = message_types.DateTimeField(2)
   matched = messages.IntegerField(3)
@@ -646,6 +670,7 @@ class TasksCancelResponse(messages.Message):
 
 class TaskOutput(messages.Message):
   """A task's output as a string."""
+
   output = messages.StringField(1)
   # Current state of the task (e.g. PENDING, RUNNING, COMPLETED, EXPIRED, etc).
   state = messages.EnumField(TaskState, 2)
@@ -653,6 +678,7 @@ class TaskOutput(messages.Message):
 
 class ResultDBInfo(messages.Message):
   """ResultDB related properties."""
+
   # ResultDB hostname, e.g. "results.api.cr.dev"
   hostname = messages.StringField(1)
 
@@ -665,6 +691,7 @@ class ResultDBInfo(messages.Message):
 
 class TaskResult(messages.Message):
   """Representation of the TaskResultSummary or TaskRunResult ndb model."""
+
   # Time when the task was abandoned instead of normal completion (e.g.
   # EXPIRED, BOT_DIED, KILLED).
   #
@@ -756,11 +783,13 @@ class TaskResult(messages.Message):
 
 class TaskStates(messages.Message):
   """Only holds states. Used in the 'get_states' RPC."""
+
   states = messages.EnumField(TaskState, 1, repeated=True)
 
 
 class TaskList(messages.Message):
   """Wraps a list of TaskResult."""
+
   # TODO(maruel): Rename to TaskResults.
   cursor = messages.StringField(1)
   items = messages.MessageField(TaskResult, 2, repeated=True)
@@ -769,6 +798,7 @@ class TaskList(messages.Message):
 
 class TaskRequests(messages.Message):
   """Wraps a list of TaskRequest."""
+
   cursor = messages.StringField(1)
   items = messages.MessageField(TaskRequest, 2, repeated=True)
   now = message_types.DateTimeField(3)
@@ -776,12 +806,14 @@ class TaskRequests(messages.Message):
 
 class TasksCount(messages.Message):
   """Returns the count, as requested."""
+
   count = messages.IntegerField(1)
   now = message_types.DateTimeField(2)
 
 
 class TaskRequestMetadata(messages.Message):
   """Provides the ID of the requested TaskRequest."""
+
   request = messages.MessageField(TaskRequest, 1)
   task_id = messages.StringField(2)
   # Set to finished task result in case task was deduplicated.
@@ -814,6 +846,7 @@ class TaskQueueList(messages.Message):
 
 class BotInfo(messages.Message):
   """Representation of the BotInfo ndb model."""
+
   bot_id = messages.StringField(1)
   dimensions = messages.MessageField(StringListPair, 2, repeated=True)
   external_ip = messages.StringField(3)
@@ -840,6 +873,7 @@ class BotInfo(messages.Message):
 
 class BotList(messages.Message):
   """Wraps a list of BotInfo."""
+
   cursor = messages.StringField(1)
   items = messages.MessageField(BotInfo, 2, repeated=True)
   now = message_types.DateTimeField(3)
@@ -848,6 +882,7 @@ class BotList(messages.Message):
 
 class BotsCount(messages.Message):
   """Returns the count, as requested."""
+
   now = message_types.DateTimeField(1)
   count = messages.IntegerField(2)
   quarantined = messages.IntegerField(3)
@@ -858,6 +893,7 @@ class BotsCount(messages.Message):
 
 class BotsDimensions(messages.Message):
   """Returns all the dimensions and dimension possibilities in the fleet."""
+
   bots_dimensions = messages.MessageField(StringListPair, 1, repeated=True)
   # Time at which this summary was calculated.
   ts = message_types.DateTimeField(2)
@@ -902,9 +938,11 @@ class BotTasks(messages.Message):
 
 class DeletedResponse(messages.Message):
   """Indicates whether a bot was deleted."""
+
   deleted = messages.BooleanField(1)
 
 
 class TerminateResponse(messages.Message):
   """Returns the pseudo taskid to wait for the bot to shut down."""
+
   task_id = messages.StringField(1)

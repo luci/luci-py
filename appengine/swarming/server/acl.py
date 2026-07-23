@@ -94,14 +94,15 @@ def is_ip_whitelisted_machine():
   peer_ip = auth.get_peer_ip()
   yes = auth.is_in_ip_whitelist(auth.bots_ip_whitelist(), peer_ip, False)
   if yes and peer_ip:
-    logging.warning('is_ip_whitelisted_machine: %s', auth.ip_to_string(peer_ip))
+    logging.warning("is_ip_whitelisted_machine: %s", auth.ip_to_string(peer_ip))
   return yes
 
 
 def can_access():
   """Minimally authenticated user."""
-  return (_is_user() or _is_view_all_bots() or _is_view_all_tasks() or
-          _is_project())
+  return (
+    _is_user() or _is_view_all_bots() or _is_view_all_tasks() or _is_project()
+  )
 
 
 #### Config
@@ -190,8 +191,9 @@ def can_use_task_backend():
 
 def is_swarming_itself():
   """True if the call is made by Swarming backend itself (for internal RPCs)."""
-  return (auth.get_current_identity() ==
-          auth.Identity(auth.IDENTITY_USER, utils.get_service_account_name()))
+  return auth.get_current_identity() == auth.Identity(
+    auth.IDENTITY_USER, utils.get_service_account_name()
+  )
 
 
 def bootstrap_dev_server_acls():
@@ -207,16 +209,17 @@ def bootstrap_dev_server_acls():
   users_group = auth_settings.users_group
   bot_bootstrap_group = auth_settings.bot_bootstrap_group
 
-  auth.bootstrap_group(users_group, bots, 'Swarming users')
-  auth.bootstrap_group(bot_bootstrap_group, bots, 'Bot bootstrap')
+  auth.bootstrap_group(users_group, bots, "Swarming users")
+  auth.bootstrap_group(bot_bootstrap_group, bots, "Bot bootstrap")
 
   # Add a swarming admin. smoke-test@example.com is used in
   # server_smoke_test.py
-  admin = auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com')
-  auth.bootstrap_group(admins_group, [admin], 'Swarming administrators')
+  admin = auth.Identity(auth.IDENTITY_USER, "smoke-test@example.com")
+  auth.bootstrap_group(admins_group, [admin], "Swarming administrators")
 
   # Add an instance admin (for easier manual testing when running dev server).
   auth.bootstrap_group(
-      auth.ADMIN_GROUP,
-      [auth.Identity(auth.IDENTITY_USER, 'test@example.com')],
-      'Users that can manage groups')
+    auth.ADMIN_GROUP,
+    [auth.Identity(auth.IDENTITY_USER, "test@example.com")],
+    "Users that can manage groups",
+  )

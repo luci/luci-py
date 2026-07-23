@@ -7,6 +7,7 @@ import threading
 import unittest
 
 import test_env_bot_code
+
 test_env_bot_code.setup_test_env()
 
 import clock
@@ -154,5 +155,5 @@ class TestClockUnmocked(unittest.TestCase):
     self.assertLess(t1_ticks, 1 / 0.05 + 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   unittest.main()

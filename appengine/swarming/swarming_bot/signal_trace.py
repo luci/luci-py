@@ -17,20 +17,20 @@ import traceback
 def _dump(_sig, frame):
   """Dumps the stack trace of all threads."""
   buf = io.StringIO()
-  buf.write('** SIGUSR1 received **\n')
+  buf.write("** SIGUSR1 received **\n")
   for t in sorted(threading.enumerate(), key=lambda x: x.name):
-    buf.write('%s:\n' % t.name)
+    buf.write("%s:\n" % t.name)
     f = sys._current_frames()[t.ident]
     if t == threading.current_thread():
       # Use 'frame' for the current thread to remove this very function from the
       # stack.
       f = frame
     traceback.print_stack(f, file=buf)
-  buf.write('** SIGUSR1 end **')
+  buf.write("** SIGUSR1 end **")
   # Logging as error so that it'll be printed even if logging.basicConfig() is
   # used. Use logging instead of sys.stderr.write() because stderr could be
   # sink-holed and logging redirected to a file.
-  logging.error('\n%s', buf.getvalue())
+  logging.error("\n%s", buf.getvalue())
 
   # python2 exits process by SIGUSR1 signal, but not in python3.
   sys.exit()
@@ -38,7 +38,7 @@ def _dump(_sig, frame):
 
 def _debug(_sig, frame):
   """Starts an interactive prompt in the main thread."""
-  d = {'_frame': frame}
+  d = {"_frame": frame}
   d.update(frame.f_globals)
   d.update(frame.f_locals)
   try:
@@ -47,10 +47,11 @@ def _debug(_sig, frame):
     import readline
   except ImportError:
     pass
-  msg = 'Signal received : entering python shell.\nTraceback:\n%s' % (''.join(
-      traceback.format_stack(frame)))
+  msg = "Signal received : entering python shell.\nTraceback:\n%s" % (
+    "".join(traceback.format_stack(frame))
+  )
   symbols = set(list(frame.f_locals.keys()) + list(frame.f_globals.keys()))
-  msg += 'Symbols:\n%s' % '\n'.join('  ' + x for x in sorted(symbols))
+  msg += "Symbols:\n%s" % "\n".join("  " + x for x in sorted(symbols))
   code.InteractiveConsole(d).interact(msg)
 
   # python2 exits process by SIGUSR2 signal, but not in python3.
@@ -59,6 +60,6 @@ def _debug(_sig, frame):
 
 def register():
   """Registers an handler to catch SIGUSR1 and print a stack trace."""
-  if sys.platform not in ('cygwin', 'win32'):
+  if sys.platform not in ("cygwin", "win32"):
     signal.signal(signal.SIGUSR1, _dump)
     signal.signal(signal.SIGUSR2, _debug)

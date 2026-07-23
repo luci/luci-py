@@ -10,14 +10,12 @@ import struct
 
 
 class StringPair(object):
-
   def __init__(self, key, value):
     self.key = key
     self.value = value
 
 
 class StringPairsSerializer(object):
-
   def __init__(self):
     self.current = ""
     self.pairs = []
@@ -163,8 +161,9 @@ class StringPairsSerializer(object):
     self.write_int("containment_type", containment.containment_type)
     self.write_bool("lower_priority", containment.lower_priority)
     self.write_int("limit_processes", containment.limit_processes)
-    self.write_int("limit_total_committed_memory",
-                   containment.limit_total_committed_memory)
+    self.write_int(
+      "limit_total_committed_memory", containment.limit_total_committed_memory
+    )
     self.exit()
 
   def write_task_properties(self, props):
@@ -201,7 +200,7 @@ class StringPairsSerializer(object):
     buf = []
     for pair in self.pairs:
       buf.append(struct.pack("<i", len(pair.key)))
-      buf.append(pair.key.encode('utf-8'))
+      buf.append(pair.key.encode("utf-8"))
       buf.append(struct.pack("<i", len(pair.value)))
-      buf.append(pair.value.encode('utf-8'))
+      buf.append(pair.value.encode("utf-8"))
     return "".join(buf)

@@ -45,15 +45,17 @@ def process_task_request(tr, template_apply):
   for tag in itertools.chain(tr.manual_tags, tr.tags):
     if task_request.is_reserved_tag(tag):
       raise handlers_exceptions.BadRequestException(
-          'Tag %s is reserved for internal use and can\'t be assigned manually'
-          % tag)
+        "Tag %s is reserved for internal use and can't be assigned manually"
+        % tag
+      )
 
   try:
-    task_request.init_new_request(tr, acl.can_schedule_high_priority_tasks(),
-                                  template_apply)
+    task_request.init_new_request(
+      tr, acl.can_schedule_high_priority_tasks(), template_apply
+    )
 
   except (datastore_errors.BadValueError, TypeError, ValueError) as e:
-    logging.warning('Incorrect new task request', exc_info=True)
+    logging.warning("Incorrect new task request", exc_info=True)
     raise handlers_exceptions.BadRequestException(e.message)
 
   # Retrieve pool_cfg, and check the existence.
@@ -61,7 +63,8 @@ def process_task_request(tr, template_apply):
   if not pool_cfg:
     logging.warning('Pool "%s" is not in pools.cfg', tr.pool)
     raise handlers_exceptions.PermissionException(
-        'No such pool or no permission to use it: %s' % tr.pool)
+      "No such pool or no permission to use it: %s" % tr.pool
+    )
 
   # Use the scheduling algorithm configured for the pool.
   assert pool_cfg.scheduling_algorithm is not None
@@ -73,30 +76,32 @@ def process_task_request(tr, template_apply):
       for dim in s.properties.dimensions:
         if re.match(pattern, dim):
           raise handlers_exceptions.BadRequestException(
-            'Dimension %s is informational, cannot use it for task creation'
-            % dim)
+            "Dimension %s is informational, cannot use it for task creation"
+            % dim
+          )
 
   # Check effective bot ID.
-  if (pool_cfg.rbe_migration
-      and pool_cfg.rbe_migration.effective_bot_id_dimension):
+  if (
+    pool_cfg.rbe_migration and pool_cfg.rbe_migration.effective_bot_id_dimension
+  ):
     for s in tr.task_slices:
       for dim, values in s.properties.dimensions.items():
         if dim == pool_cfg.rbe_migration.effective_bot_id_dimension:
           if len(values) > 1 or task_request.OR_DIM_SEP in values[0]:
             raise handlers_exceptions.BadRequestException(
-                'Dimension %s cannot be specified more than once' % dim)
-
+              "Dimension %s cannot be specified more than once" % dim
+            )
 
   # Decide if the task should use the RBE Scheduler.
   tr.rbe_instance = rbe.get_rbe_instance_for_task(tr.tags, pool_cfg)
   if tr.rbe_instance:
-    logging.info('RBE: scheduling through %s', tr.rbe_instance)
+    logging.info("RBE: scheduling through %s", tr.rbe_instance)
 
   # For tasks in pools that have the RBE config, add an extra tag useful to see
   # what tasks are *actually* scheduled through RBE. Note that init_new_request
   # sorted tags already.
   if pool_cfg.rbe_migration and pool_cfg.rbe_migration.rbe_instance:
-    bisect.insort(tr.tags, u'rbe:%s' % (tr.rbe_instance or 'none'))
+    bisect.insort(tr.tags, "rbe:%s" % (tr.rbe_instance or "none"))
 
   # TODO(crbug.com/1109378): Check ACLs before calling init_new_request to
   # avoid leaking information about pool templates to unauthorized callers.
@@ -109,26 +114,29 @@ def process_task_request(tr, template_apply):
   # Enforce realm acls.
   enforce_realms_acl = False
   if tr.realm:
-    logging.info('Using task realm %r', tr.realm)
+    logging.info("Using task realm %r", tr.realm)
     enforce_realms_acl = True
   elif pool_cfg.default_task_realm:
-    logging.info('Using default_task_realm %r', pool_cfg.default_task_realm)
+    logging.info("Using default_task_realm %r", pool_cfg.default_task_realm)
     tr.realm = pool_cfg.default_task_realm
   else:
-    logging.info('Not using realms')
+    logging.info("Not using realms")
 
   # Warn if the pool has realms configured, but the task is using old ACLs.
   if pool_cfg.realm and not tr.realm:
-    logging.warning('crbug.com/1066839: %s: %r is not using realms', tr.pool,
-                    tr.name)
+    logging.warning(
+      "crbug.com/1066839: %s: %r is not using realms", tr.pool, tr.name
+    )
 
   # Realm permission 'swarming.pools.createInRealm' checks if the
   # caller is allowed to create a task in the task realm.
   tr.realms_enabled = realms.check_tasks_create_in_realm(
-      tr.realm, pool_cfg, enforce_realms_acl)
+    tr.realm, pool_cfg, enforce_realms_acl
+  )
   if tr.resultdb and tr.resultdb.enable and not tr.realms_enabled:
     raise handlers_exceptions.BadRequestException(
-        'ResultDB is enabled, but realm is not')
+      "ResultDB is enabled, but realm is not"
+    )
 
   # Realm permission 'swarming.pools.create' checks if the caller is allowed
   # to create a task in the pool.
@@ -139,14 +147,16 @@ def process_task_request(tr, template_apply):
   if service_accounts_utils.is_service_account(tr.service_account):
     if not service_accounts.has_token_server():
       raise handlers_exceptions.BadRequestException(
-          'This Swarming server doesn\'t support task service accounts '
-          'because Token Server URL is not configured')
+        "This Swarming server doesn't support task service accounts "
+        "because Token Server URL is not configured"
+      )
 
     # Service accounts are supported only in realms mode.
     if not tr.realms_enabled:
       raise handlers_exceptions.BadRequestException(
-          'Task service accounts are supported only if the task is associated '
-          'with a realm')
+        "Task service accounts are supported only if the task is associated "
+        "with a realm"
+      )
 
     # Realm permission 'swarming.tasks.actAs' checks if the service account is
     # allowed to run in the task realm.
@@ -163,13 +173,18 @@ def cache_request(namespace, request_uuid, func):
   request_idempotency_key = None
   if request_uuid:
     if not re.match(
-        r'^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-'
-        r'[\da-fA-F]{12}$', request_uuid):
+      r"^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-"
+      r"[\da-fA-F]{12}$",
+      request_uuid,
+    ):
       raise handlers_exceptions.BadRequestException(
-          'invalid uuid is given as request_uuid')
+        "invalid uuid is given as request_uuid"
+      )
 
-    request_idempotency_key = 'request_id/%s/%s' % (
-        request_uuid, auth.get_current_identity().to_bytes())
+    request_idempotency_key = "request_id/%s/%s" % (
+      request_uuid,
+      auth.get_current_identity().to_bytes(),
+    )
 
     result_cache = memcache.get(request_idempotency_key, namespace=namespace)
     if result_cache is not None:
@@ -178,7 +193,8 @@ def cache_request(namespace, request_uuid, func):
   result = func()
   if request_idempotency_key:
     memcache.add(
-        request_idempotency_key, result, namespace=namespace, time=10 * 60)
+      request_idempotency_key, result, namespace=namespace, time=10 * 60
+    )
   return result, False
 
 
@@ -222,43 +238,47 @@ def validate_backend_configs(configs, full_validation=False):
 
     try:
       if cfg.bot_ping_tolerance or full_validation:
-        task_request.validate_ping_tolerance('bot_ping_tolerance',
-                                             cfg.bot_ping_tolerance)
+        task_request.validate_ping_tolerance(
+          "bot_ping_tolerance", cfg.bot_ping_tolerance
+        )
     except datastore_errors.BadValueError as e:
       errors.append((i, e.message))
 
     if cfg.parent_run_id:  # Optional value.
       try:
-        task_request.validate_task_run_id('parent_run_id', cfg.parent_run_id)
+        task_request.validate_task_run_id("parent_run_id", cfg.parent_run_id)
       except (ValueError, TypeError) as e:
         errors.append((i, e.message))
 
     if cfg.service_account:
       try:
         task_request.validate_service_account(
-            'service_account', cfg.service_account)
+          "service_account", cfg.service_account
+        )
       except datastore_errors.BadValueError as e:
         errors.append((i, e.message))
 
     try:
       if cfg.agent_binary_cipd_pkg or full_validation:
-        task_request.validate_package_name_template('agent_binary_cipd_pkg',
-                                                    cfg.agent_binary_cipd_pkg)
+        task_request.validate_package_name_template(
+          "agent_binary_cipd_pkg", cfg.agent_binary_cipd_pkg
+        )
     except datastore_errors.BadValueError as e:
       errors.append((i, e.message))
 
     try:
       if cfg.agent_binary_cipd_vers or full_validation:
-        task_request.validate_package_version('agent_binary_cipd_vers',
-                                              cfg.agent_binary_cipd_vers)
+        task_request.validate_package_version(
+          "agent_binary_cipd_vers", cfg.agent_binary_cipd_vers
+        )
     except datastore_errors.BadValueError as e:
       errors.append((i, e.message))
 
     if full_validation and not cfg.agent_binary_cipd_filename:
-      errors.append((i, 'missing `agent_binary_cipd_filename`'))
+      errors.append((i, "missing `agent_binary_cipd_filename`"))
 
     for tag in cfg.tags:
-      if ':' not in tag:
-        errors.append((i, 'tag must be in key:value form, not {}'.format(tag)))
+      if ":" not in tag:
+        errors.append((i, "tag must be in key:value form, not {}".format(tag)))
 
   return errors

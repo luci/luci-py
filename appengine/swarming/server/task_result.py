@@ -84,20 +84,20 @@ from server.constants import OR_DIM_SEP
 
 # These are the fields which we are allowed to sort TaskRunResult by.
 # They are the only states which have a composite index with bot_id field.
-_BOT_TASK_ALLOWED_SORTS = {'created_ts', 'started_ts', 'completed_ts'}
+_BOT_TASK_ALLOWED_SORTS = {"created_ts", "started_ts", "completed_ts"}
 # These states are not allowed to be used to filter TaskRunResult.
 # - pending is an invalid state for a task_run_result. See _validate_not_pending
 # - pending_running is either the pending state (invalid) or running.
 # - deduped relies on try_number which is not part of `task_run_result`.
-_BOT_TASK_DISALLOWED_STATES = {'pending', 'pending_running', 'deduped'}
+_BOT_TASK_DISALLOWED_STATES = {"pending", "pending_running", "deduped"}
 
 _ZLIB_COMPRESSION_MARKERS = (
-    # As produced by zlib. Indicates compressed byte sequence using DEFLATE at
-    # default compression level, with a 32K window size.
-    # From https://github.com/madler/zlib/blob/master/doc/rfc1950.txt
-    b"x\x9c",
-    # Other compression levels produce the following marker.
-    b"x^",
+  # As produced by zlib. Indicates compressed byte sequence using DEFLATE at
+  # default compression level, with a 32K window size.
+  # From https://github.com/madler/zlib/blob/master/doc/rfc1950.txt
+  b"x\x9c",
+  # Other compression levels produce the following marker.
+  b"x^",
 )
 
 
@@ -110,6 +110,7 @@ class State(object):
 
   It's in fact an enum.
   """
+
   RUNNING = 0x10  # 16
   PENDING = 0x20  # 32
   EXPIRED = 0x30  # 48
@@ -121,48 +122,66 @@ class State(object):
   NO_RESOURCE = 0x100  # 256
   CLIENT_ERROR = 0x200  # 512
 
-  STATES = (RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED,
-            KILLED, NO_RESOURCE, CLIENT_ERROR)
+  STATES = (
+    RUNNING,
+    PENDING,
+    EXPIRED,
+    TIMED_OUT,
+    BOT_DIED,
+    CANCELED,
+    COMPLETED,
+    KILLED,
+    NO_RESOURCE,
+    CLIENT_ERROR,
+  )
   # State will mutate again. Anything else means not queued, not running.
   STATES_RUNNING = (RUNNING, PENDING)
   # Abnormal termination.
-  STATES_EXCEPTIONAL = (EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, KILLED,
-                        NO_RESOURCE, CLIENT_ERROR)
+  STATES_EXCEPTIONAL = (
+    EXPIRED,
+    TIMED_OUT,
+    BOT_DIED,
+    CANCELED,
+    KILLED,
+    NO_RESOURCE,
+    CLIENT_ERROR,
+  )
   # Task ran and is done running.
   STATES_DONE = (TIMED_OUT, COMPLETED, KILLED, CLIENT_ERROR)
   # Task didn't run (except for BOT_DIED, which may or may not have run).
   STATES_ABANDONED = (EXPIRED, BOT_DIED, CANCELED, NO_RESOURCE)
 
   _NAMES = {
-      RUNNING: 'Running',
-      PENDING: 'Pending',
-      EXPIRED: 'Expired',
-      TIMED_OUT: 'Execution timed out',
-      BOT_DIED: 'Bot died',
-      CANCELED: 'User canceled',
-      COMPLETED: 'Completed',
-      KILLED: 'Killed',
-      NO_RESOURCE: 'No resource available',
-      CLIENT_ERROR: 'Client error',
+    RUNNING: "Running",
+    PENDING: "Pending",
+    EXPIRED: "Expired",
+    TIMED_OUT: "Execution timed out",
+    BOT_DIED: "Bot died",
+    CANCELED: "User canceled",
+    COMPLETED: "Completed",
+    KILLED: "Killed",
+    NO_RESOURCE: "No resource available",
+    CLIENT_ERROR: "Client error",
   }
 
   @classmethod
   def to_string(cls, state):
     """Returns a user-readable string representing a State."""
     if state not in cls._NAMES:
-      raise ValueError('Invalid state %s' % state)
+      raise ValueError("Invalid state %s" % state)
     return cls._NAMES[state]
 
 
 class StateProperty(ndb.IntegerProperty):
   """State of a single task as a model property."""
+
   def __init__(self, **kwargs):
     super(StateProperty, self).__init__(choices=State.STATES, **kwargs)
 
 
 def _validate_not_pending(prop, value):
   if value == State.PENDING:
-    raise datastore_errors.BadValueError('%s cannot be PENDING' % prop._name)
+    raise datastore_errors.BadValueError("%s cannot be PENDING" % prop._name)
 
 
 def _validate_task_summary_id(_prop, value):
@@ -178,7 +197,8 @@ class LargeIntegerArray(ndb.BlobProperty):
 
   def __init__(self, **kwargs):
     super(LargeIntegerArray, self).__init__(
-        indexed=False, compressed=False, **kwargs)
+      indexed=False, compressed=False, **kwargs
+    )
 
   def _do_validate(self, value):
     return super(LargeIntegerArray, self)._do_validate(value) or None
@@ -187,8 +207,7 @@ class LargeIntegerArray(ndb.BlobProperty):
 def _calculate_failure(result_common):
   # When the task command times out, there may not be any exit code, it is still
   # a user process failure mode, not an infrastructure failure mode.
-  return (bool(result_common.exit_code) or
-          result_common.state == State.TIMED_OUT)
+  return bool(result_common.exit_code) or result_common.state == State.TIMED_OUT
 
 
 class TaskOutput(ndb.Model):
@@ -201,12 +220,13 @@ class TaskOutput(ndb.Model):
   This entity doesn't actually exist in the DB. It only exists to make
   categories.
   """
+
   # The maximum size for each TaskOutputChunk.chunk. The rationale is that
   # appending data to an entity requires reading it first, so it must not be too
   # big. On the other hand, having thousands of small entities is pure overhead.
   # TODO(maruel): This value should be stored in the entity for future-proofing.
   # It can't be changed until then.
-  CHUNK_SIZE = 100*1024
+  CHUNK_SIZE = 100 * 1024
 
   # Maximum number of chunks.
   PUT_MAX_CHUNKS = 1024
@@ -226,7 +246,8 @@ class TaskOutputChunk(ndb.Model):
   Each entity except the last one must have exactly
   len(self.chunk) == self.CHUNK_SIZE.
   """
-  chunk = ndb.BlobProperty(default='', compressed=True)
+
+  chunk = ndb.BlobProperty(default="", compressed=True)
   # gaps is a series of 2 integer pairs, which specifies the part that are
   # invalid. Normally it should be empty. All values are relative to the start
   # of this chunk offset.
@@ -243,6 +264,7 @@ class TaskOutputChunk(ndb.Model):
 
     return zlib.decompress(self.chunk)
 
+
 class OperationStats(ndb.Model):
   """Statistics for an operation.
 
@@ -250,6 +272,7 @@ class OperationStats(ndb.Model):
 
   It is immutable.
   """
+
   # Duration of the isolation operation in seconds.
   duration = ndb.FloatProperty(indexed=False)
 
@@ -261,8 +284,8 @@ class OperationStats(ndb.Model):
 
 
 class CASOperationStats(OperationStats):
-  """Statistics for an CAS downloads/uploads operation.
-  """
+  """Statistics for an CAS downloads/uploads operation."""
+
   # Initial cache size, if applicable.
   initial_number_items = ndb.IntegerProperty(indexed=False)
   initial_size = ndb.IntegerProperty(indexed=False)
@@ -308,10 +331,10 @@ class CASOperationStats(OperationStats):
 
   def to_dict(self):
     out = super(OperationStats, self).to_dict()
-    out['num_items_cold'] = self.num_items_cold
-    out['total_bytes_items_cold'] = self.total_bytes_items_cold
-    out['num_items_hot'] = self.num_items_hot
-    out['total_bytes_items_hot'] = self.total_bytes_items_hot
+    out["num_items_cold"] = self.num_items_cold
+    out["total_bytes_items_cold"] = self.total_bytes_items_cold
+    out["num_items_hot"] = self.num_items_hot
+    out["total_bytes_items_hot"] = self.total_bytes_items_hot
     return out
 
   def to_proto(self, out):
@@ -354,6 +377,7 @@ class PerformanceStats(ndb.Model):
   This entity only exist for isolated tasks. For "raw command task", this entity
   is not stored, since there's nothing to note.
   """
+
   # Total overhead in seconds, including the overheads from
   # package_installation.duration, isolated_download.duration and
   # isolated_upload.duration and others.
@@ -380,22 +404,24 @@ class PerformanceStats(ndb.Model):
   def to_dict(self):
     # to_dict() doesn't correctly call overriden to_dict() on
     # LocalStructuredProperty.
-    out = super(PerformanceStats, self).to_dict(exclude=[
-        'cache_trim',
-        'package_installation',
-        'named_caches_install',
-        'named_caches_uninstall',
-        'isolated_download',
-        'isolated_upload',
-        'cleanup',
-    ])
-    out['cache_trim'] = self.cache_trim.to_dict()
-    out['package_installation'] = self.package_installation.to_dict()
-    out['named_caches_install'] = self.named_caches_install.to_dict()
-    out['named_caches_uninstall'] = self.named_caches_uninstall.to_dict()
-    out['isolated_download'] = self.isolated_download.to_dict()
-    out['isolated_upload'] = self.isolated_upload.to_dict()
-    out['cleanup'] = self.cleanup.to_dict()
+    out = super(PerformanceStats, self).to_dict(
+      exclude=[
+        "cache_trim",
+        "package_installation",
+        "named_caches_install",
+        "named_caches_uninstall",
+        "isolated_download",
+        "isolated_upload",
+        "cleanup",
+      ]
+    )
+    out["cache_trim"] = self.cache_trim.to_dict()
+    out["package_installation"] = self.package_installation.to_dict()
+    out["named_caches_install"] = self.named_caches_install.to_dict()
+    out["named_caches_uninstall"] = self.named_caches_uninstall.to_dict()
+    out["isolated_download"] = self.isolated_download.to_dict()
+    out["isolated_upload"] = self.isolated_upload.to_dict()
+    out["cleanup"] = self.cleanup.to_dict()
     return out
 
   def to_proto(self, out):
@@ -406,7 +432,8 @@ class PerformanceStats(ndb.Model):
 
     # Total overhead.
     out.total_overhead.FromTimedelta(
-        datetime.timedelta(seconds=self.bot_overhead))
+      datetime.timedelta(seconds=self.bot_overhead)
+    )
 
     # Setup overheads.
     setup_dur = 0
@@ -427,7 +454,8 @@ class PerformanceStats(ndb.Model):
     if setup_dur:
       out.setup.duration.FromTimedelta(datetime.timedelta(seconds=setup_dur))
       out.setup_overhead.duration.FromTimedelta(
-          datetime.timedelta(seconds=setup_dur))
+        datetime.timedelta(seconds=setup_dur)
+      )
 
     # Teardown overheads.
     teardown_dur = 0
@@ -444,9 +472,11 @@ class PerformanceStats(ndb.Model):
       teardown_dur += self.cleanup.duration
     if teardown_dur:
       out.teardown.duration.FromTimedelta(
-          datetime.timedelta(seconds=teardown_dur))
+        datetime.timedelta(seconds=teardown_dur)
+      )
       out.teardown_overhead.duration.FromTimedelta(
-          datetime.timedelta(seconds=teardown_dur))
+        datetime.timedelta(seconds=teardown_dur)
+      )
 
     # Other overheads.
     other_overhead = self.bot_overhead - setup_dur - teardown_dur
@@ -455,11 +485,13 @@ class PerformanceStats(ndb.Model):
   def _pre_put_hook(self):
     if self.bot_overhead is None:
       raise datastore_errors.BadValueError(
-          'PerformanceStats.bot_overhead is required')
+        "PerformanceStats.bot_overhead is required"
+      )
 
 
 class ResultDBInfo(ndb.Model):
   """ResultDB related properties."""
+
   # ResultDB hostname, e.g. "results.api.cr.dev"
   hostname = ndb.StringProperty()
 
@@ -482,14 +514,16 @@ class CipdPins(ndb.Model):
 
   A part of _TaskResultCommon.
   """
+
   # CIPD package of CIPD client used.
   # client_package.package_name and version are provided.
   # client_package.path will be None.
   client_package = ndb.LocalStructuredProperty(task_request.CipdPackage)
 
   # List of packages that were installed.
-  packages = ndb.LocalStructuredProperty(task_request.CipdPackage,
-                                         repeated=True)
+  packages = ndb.LocalStructuredProperty(
+    task_request.CipdPackage, repeated=True
+  )
 
 
 class _TaskResultCommon(ndb.Model):
@@ -501,6 +535,7 @@ class _TaskResultCommon(ndb.Model):
   TODO(maruel): Overhaul this entity:
   - Get rid of TaskOutput as it is not needed anymore (?)
   """
+
   # Bot version (as a hash) of the code running the task.
   bot_version = ndb.StringProperty(indexed=False)
 
@@ -541,11 +576,11 @@ class _TaskResultCommon(ndb.Model):
 
   # Process exit code. May be missing when task_runner dies and bot_main tries
   # to recover the task and in some cases with state TIMED_OUT.
-  exit_code = ndb.IntegerProperty(indexed=False, name='exit_codes')
+  exit_code = ndb.IntegerProperty(indexed=False, name="exit_codes")
 
   # Task duration in seconds as seen by the process who started the child task,
   # excluding all overheads.
-  duration = ndb.FloatProperty(indexed=False, name='durations')
+  duration = ndb.FloatProperty(indexed=False, name="durations")
 
   # Time when a bot reaped this task.
   #
@@ -581,12 +616,14 @@ class _TaskResultCommon(ndb.Model):
   cipd_pins = ndb.LocalStructuredProperty(CipdPins)
 
   # Reported missing CIPD packages on CLIENT_ERROR state
-  missing_cipd = ndb.LocalStructuredProperty(task_request.CipdPackage,
-                                             repeated=True)
+  missing_cipd = ndb.LocalStructuredProperty(
+    task_request.CipdPackage, repeated=True
+  )
 
   # Reported missing CAS packages on CLIENT_ERROR state
-  missing_cas = ndb.LocalStructuredProperty(task_request.CASReference,
-                                            repeated=True)
+  missing_cas = ndb.LocalStructuredProperty(
+    task_request.CASReference, repeated=True
+  )
 
   # Index in the TaskRequest.task_slices that this entity is current waiting on,
   # running or ran.
@@ -652,17 +689,20 @@ class _TaskResultCommon(ndb.Model):
     Returns an empty instance if none is available.
     """
     # Keeps a cache. It's still paying the full latency cost of a DB fetch.
-    if not hasattr(self, '_performance_stats_cache'):
+    if not hasattr(self, "_performance_stats_cache"):
       key = None if self.deduped_from else self.performance_stats_key
       # pylint: disable=attribute-defined-outside-init
       stats = (key.get() if key else None) or PerformanceStats()
       stats.cache_trim = stats.cache_trim or OperationStats()
       stats.named_caches_install = (
-          stats.named_caches_install or OperationStats())
+        stats.named_caches_install or OperationStats()
+      )
       stats.named_caches_uninstall = (
-          stats.named_caches_uninstall or OperationStats())
+        stats.named_caches_uninstall or OperationStats()
+      )
       stats.package_installation = (
-          stats.package_installation or OperationStats())
+        stats.package_installation or OperationStats()
+      )
       stats.isolated_download = stats.isolated_download or CASOperationStats()
       stats.isolated_upload = stats.isolated_upload or CASOperationStats()
       stats.cleanup = stats.cleanup or OperationStats()
@@ -714,16 +754,19 @@ class _TaskResultCommon(ndb.Model):
 
     diff = current - self.created_ts
     if diff < datetime.timedelta(0):
-      logging.warning("Pending time %ds (%s - %s) should not be negative",
-                      diff.total_seconds(), current.utcnow(),
-                      self.created_ts.utcnow())
+      logging.warning(
+        "Pending time %ds (%s - %s) should not be negative",
+        diff.total_seconds(),
+        current.utcnow(),
+        self.created_ts.utcnow(),
+      )
     return max(datetime.timedelta(0), diff)
 
   @property
   def request(self):
     """Returns the TaskRequest that is related to this entity."""
     # Keeps a cache. It's still paying the full latency cost of a DB fetch.
-    if not hasattr(self, '_request_cache'):
+    if not hasattr(self, "_request_cache"):
       # pylint: disable=attribute-defined-outside-init
       self._request_cache = self.request_key.get()
     return self._request_cache
@@ -778,10 +821,10 @@ class _TaskResultCommon(ndb.Model):
   def to_dict(self, **kwargs):
     out = super(_TaskResultCommon, self).to_dict(**kwargs)
     # TODO(crbug.com/1255535): deprecated.
-    out.pop('outputs_ref')
+    out.pop("outputs_ref")
     # stdout_chunks is an implementation detail.
-    out.pop('stdout_chunks')
-    out['id'] = self.task_id
+    out.pop("stdout_chunks")
+    out["id"] = self.task_id
     return out
 
   def to_proto(self, out, append_root_ids=False):
@@ -816,9 +859,9 @@ class _TaskResultCommon(ndb.Model):
         dst = out.bot.dimensions.add()
         dst.key = key
         dst.values.extend(values)
-        if key == u'id':
+        if key == "id":
           out.bot.bot_id = values[0]
-        elif key == u'pool':
+        elif key == "pool":
           out.bot.pools.extend(values)
     out.server_versions.extend(self.server_versions)
     if self.deduped_from:
@@ -880,13 +923,13 @@ class _TaskResultCommon(ndb.Model):
     # Determine which chunks to fetch.
     first_chunk = offset / chunk_size
     end = offset + length
-    last_chunk = min((end + chunk_size-1) / chunk_size, self.stdout_chunks)
+    last_chunk = min((end + chunk_size - 1) / chunk_size, self.stdout_chunks)
 
     # Retrieve the subset of TaskOutputChunk needed.
     output_key = _run_result_key_to_output_key(run_result_key)
     keys = [
-        _output_key_to_output_chunk_key(output_key, i)
-        for i in range(first_chunk, last_chunk)
+      _output_key_to_output_chunk_key(output_key, i)
+      for i in range(first_chunk, last_chunk)
     ]
     void = None
     parts = []
@@ -895,13 +938,13 @@ class _TaskResultCommon(ndb.Model):
         parts.append(e.chunk_content)
       else:
         if not void:
-          void = '\x00' * TaskOutput.CHUNK_SIZE
+          void = "\x00" * TaskOutput.CHUNK_SIZE
         parts.append(void)
 
     # Process the output.
     start_offset = offset % chunk_size
     end_offset = end - (first_chunk * chunk_size)
-    return ''.join(parts)[start_offset:end_offset]
+    return "".join(parts)[start_offset:end_offset]
 
   def _pre_put_hook(self):
     """Use extra validation that cannot be validated throught 'validator'."""
@@ -909,60 +952,66 @@ class _TaskResultCommon(ndb.Model):
     if self.state == State.EXPIRED:
       if self.failure or self.exit_code is not None:
         raise datastore_errors.BadValueError(
-            'Unexpected State, a task can\'t fail if it hasn\'t started yet')
+          "Unexpected State, a task can't fail if it hasn't started yet"
+        )
 
     if self.state == State.TIMED_OUT and not self.failure:
-      raise datastore_errors.BadValueError('Timeout implies task failure')
+      raise datastore_errors.BadValueError("Timeout implies task failure")
 
     if not self.modified_ts:
-      raise datastore_errors.BadValueError('Must update .modified_ts')
+      raise datastore_errors.BadValueError("Must update .modified_ts")
 
     if self.state in State.STATES_DONE:
       if self.duration is None:
         raise datastore_errors.BadValueError(
-            'duration must be set with state %s' %
-            State.to_string(self.state))
+          "duration must be set with state %s" % State.to_string(self.state)
+        )
       # Allow exit_code to be missing for TIMED_OUT.
       if self.state != State.TIMED_OUT:
         if self.exit_code is None:
           raise datastore_errors.BadValueError(
-              'exit_code must be set with state %s' %
-              State.to_string(self.state))
+            "exit_code must be set with state %s" % State.to_string(self.state)
+          )
     elif self.state != State.BOT_DIED and self.state != State.CLIENT_ERROR:
       # Allow duration and exit_code to be either missing or set for BOT_DIED,
       # but they should be not present for any running/pending states.
       if self.duration is not None:
         raise datastore_errors.BadValueError(
-            'duration must not be set with state %s' % State.to_string(
-                self.state))
+          "duration must not be set with state %s" % State.to_string(self.state)
+        )
       if self.exit_code is not None:
         raise datastore_errors.BadValueError(
-            'exit_code must not be set with state %s' %
-            State.to_string(self.state))
+          "exit_code must not be set with state %s"
+          % State.to_string(self.state)
+        )
 
     if self.state not in State.STATES_RUNNING:
       if self.completed_ts is None:
         raise datastore_errors.BadValueError(
-            'completed_ts must be set with state %s' %
-            State.to_string(self.state))
+          "completed_ts must be set with state %s" % State.to_string(self.state)
+        )
       # When a task is deduped, its creation time is after the completed time,
       # because original timestamps are used.
       if not self.deduped_from and self.completed_ts < self.created_ts:
         raise datastore_errors.BadValueError(
-            'completed_ts must be equal or after created_ts')
+          "completed_ts must be equal or after created_ts"
+        )
     if self.abandoned_ts:
       if self.abandoned_ts < self.created_ts:
         raise datastore_errors.BadValueError(
-            'abandoned_ts must be equal or after created_ts')
+          "abandoned_ts must be equal or after created_ts"
+        )
 
     if self.deduped_from:
       if self.state != State.COMPLETED:
         raise datastore_errors.BadValueError(
-            'state(%d) must be COMPLETED on deduped task %s' %
-            (self.state, self.deduped_from))
+          "state(%d) must be COMPLETED on deduped task %s"
+          % (self.state, self.deduped_from)
+        )
       if self.failure:
         raise datastore_errors.BadValueError(
-            'failure can\'t be True on deduped task %s' % self.deduped_from)
+          "failure can't be True on deduped task %s" % self.deduped_from
+        )
 
   @classmethod
   def _properties_fixed(cls):
@@ -970,7 +1019,8 @@ class _TaskResultCommon(ndb.Model):
     properties.
     """
     return [
-      prop._code_name for prop in cls._properties.values()
+      prop._code_name
+      for prop in cls._properties.values()
       if not isinstance(prop, ndb.ComputedProperty)
     ]
 
@@ -987,6 +1037,7 @@ class TaskRunResult(_TaskResultCommon):
   Existence of this entity means a bot requested a task and started executing
   it. Everything beside created_ts and bot_id can be modified.
   """
+
   # Bot that ran this task.
   #
   # The index is used in task listing queries to filter by a specific bot.
@@ -998,7 +1049,7 @@ class TaskRunResult(_TaskResultCommon):
   state = StateProperty(default=State.RUNNING, validator=_validate_not_pending)
 
   # Effective cost of this task.
-  cost_usd = ndb.FloatProperty(indexed=False, default=0.)
+  cost_usd = ndb.FloatProperty(indexed=False, default=0.0)
 
   # A user requested for the task to be canceled while running, which leads to
   # KILLED. It is set to true only for the time between the user request and
@@ -1076,32 +1127,35 @@ class TaskRunResult(_TaskResultCommon):
     Returns the entities to save.
     """
     entities, self.stdout_chunks = _output_append(
-        _run_result_key_to_output_key(self.key),
-        self.stdout_chunks,
-        output,
-        output_chunk_start)
+      _run_result_key_to_output_key(self.key),
+      self.stdout_chunks,
+      output,
+      output_chunk_start,
+    )
     assert self.stdout_chunks <= TaskOutput.PUT_MAX_CHUNKS
     return entities
 
   def to_dict(self, **kwargs):
-    out = super(TaskRunResult, self).to_dict(exclude=[
-        'request_created',
-        'request_tags',
-        'request_name',
-        'request_user',
-    ])
-    out['try_number'] = self.try_number
+    out = super(TaskRunResult, self).to_dict(
+      exclude=[
+        "request_created",
+        "request_tags",
+        "request_name",
+        "request_user",
+      ]
+    )
+    out["try_number"] = self.try_number
     return out
 
   def _pre_put_hook(self):
     super(TaskRunResult, self)._pre_put_hook()
     if not self.started_ts:
-      raise datastore_errors.BadValueError('Must update .started_ts')
+      raise datastore_errors.BadValueError("Must update .started_ts")
     if self.dead_after_ts:
       if self.state != State.RUNNING:
-        raise datastore_errors.BadValueError('.dead_after_ts should be None')
+        raise datastore_errors.BadValueError(".dead_after_ts should be None")
     elif self.state == State.RUNNING:
-      raise datastore_errors.BadValueError('Must update .dead_after_ts')
+      raise datastore_errors.BadValueError("Must update .dead_after_ts")
 
 
 class TaskResultSummary(_TaskResultCommon):
@@ -1115,6 +1169,7 @@ class TaskResultSummary(_TaskResultCommon):
   It's primary purpose is for status pages listing all the active tasks or
   recently completed tasks.
   """
+
   # When the task was submitted.
   created_ts = ndb.DateTimeProperty(indexed=False, required=True)
 
@@ -1204,7 +1259,7 @@ class TaskResultSummary(_TaskResultCommon):
   @property
   def cost_usd(self):
     """Returns the sum of the cost of each try."""
-    return sum(self.costs_usd) if self.costs_usd else 0.
+    return sum(self.costs_usd) if self.costs_usd else 0.0
 
   @property
   def performance_stats_key(self):
@@ -1272,10 +1327,12 @@ class TaskResultSummary(_TaskResultCommon):
 
     if self.request.resultdb_update_token:
       run_id = task_pack.pack_run_result_key(
-          task_pack.result_summary_key_to_run_result_key(self.key))
+        task_pack.result_summary_key_to_run_result_key(self.key)
+      )
       # TODO(crbug.com/1065139): remove get_result() if ndb.toplevel works fine.
       resultdb.finalize_invocation_async(
-          run_id, self.request.resultdb_update_token).get_result()
+        run_id, self.request.resultdb_update_token
+      ).get_result()
 
   def _send_job_completed_metric(self):
     """Sends metric 'job/completed'"""
@@ -1289,10 +1346,14 @@ class TaskResultSummary(_TaskResultCommon):
     if self._prev_state:
       prev_state = State.to_string(self._prev_state)
     logging.debug(
-        '_send_job_completed_metric: '
-        'Task completed. prev_state:"%s", current_state:"%s".\n'
-        'Sending metric...', prev_state, State.to_string(self.state))
+      "_send_job_completed_metric: "
+      'Task completed. prev_state:"%s", current_state:"%s".\n'
+      "Sending metric...",
+      prev_state,
+      State.to_string(self.state),
+    )
     import ts_mon_metrics  # pylint: disable=cyclic-import
+
     ts_mon_metrics.on_task_completed(self)
 
   def reset_to_pending(self):
@@ -1330,22 +1391,24 @@ class TaskResultSummary(_TaskResultCommon):
 
     # try_number == 0 implies dedup so set cost to 0.
     if run_result.try_number == 0:
-      self.costs_usd = [0.]
+      self.costs_usd = [0.0]
     else:
       self.costs_usd = [run_result.cost_usd]
 
     t = request.task_slice(run_result.current_task_slice or 0)
-    if (self.state == State.COMPLETED and
-        not self.failure and
-        not self.internal_failure and
-        t.properties.idempotent and
-        not self.deduped_from):
+    if (
+      self.state == State.COMPLETED
+      and not self.failure
+      and not self.internal_failure
+      and t.properties.idempotent
+      and not self.deduped_from
+    ):
       # Signal the results are valid and can be reused. If the request has a
       # SecretBytes, it is GET, which is a performance concern.
       self.properties_hash = t.get_properties_hash(request)
 
   def to_dict(self, **kwargs):
-    return super(TaskResultSummary, self).to_dict(exclude=['properties_hash'])
+    return super(TaskResultSummary, self).to_dict(exclude=["properties_hash"])
 
 
 ### Private stuff.
@@ -1353,7 +1416,7 @@ class TaskResultSummary(_TaskResultCommon):
 
 def _run_result_key_to_output_key(run_result_key):
   """Returns a ndb.key to a TaskOutput."""
-  assert run_result_key.kind() == 'TaskRunResult', run_result_key
+  assert run_result_key.kind() == "TaskRunResult", run_result_key
   return ndb.Key(TaskOutput, 1, parent=run_result_key)
 
 
@@ -1362,9 +1425,9 @@ def _output_key_to_output_chunk_key(output_key, chunk_number):
 
   Is chunk_number zero-indexed.
   """
-  assert output_key.kind() == 'TaskOutput', output_key
+  assert output_key.kind() == "TaskOutput", output_key
   assert chunk_number >= 0, chunk_number
-  return ndb.Key(TaskOutputChunk, chunk_number+1, parent=output_key)
+  return ndb.Key(TaskOutputChunk, chunk_number + 1, parent=output_key)
 
 
 def _output_append(output_key, number_chunks, output, output_chunk_start):
@@ -1390,7 +1453,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
     the number of TaskOutputChunk instances for this output.
   """
   assert output and isinstance(output, str), output
-  assert output_key.kind() == 'TaskOutput', output_key
+  assert output_key.kind() == "TaskOutput", output_key
 
   # Split everything in small bits.
   chunks = []
@@ -1398,7 +1461,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
     chunk_number = output_chunk_start / TaskOutput.CHUNK_SIZE
     if chunk_number >= TaskOutput.PUT_MAX_CHUNKS:
       # TODO(maruel): Log into TaskOutput that data was dropped.
-      logging.warning('Dropping output\n%d bytes were lost', len(output))
+      logging.warning("Dropping output\n%d bytes were lost", len(output))
       break
     key = _output_key_to_output_chunk_key(output_key, chunk_number)
     start = output_chunk_start % TaskOutput.CHUNK_SIZE
@@ -1406,7 +1469,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
     chunks.append((key, start, output[:next_start]))
     output = output[next_start:]
     number_chunks = max(number_chunks, chunk_number + 1)
-    output_chunk_start = (chunk_number+1)*TaskOutput.CHUNK_SIZE
+    output_chunk_start = (chunk_number + 1) * TaskOutput.CHUNK_SIZE
 
   if not chunks:
     return [], number_chunks
@@ -1432,7 +1495,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
     if len(chunk_content) < start:
       # Insert blank data automatically.
       chunk.gaps.extend((len(chunk_content), start))
-      chunk_content = chunk_content + '\x00' * (start - len(chunk_content))
+      chunk_content = chunk_content + "\x00" * (start - len(chunk_content))
 
     # Strip gaps that are being written to.
     new_gaps = []
@@ -1478,13 +1541,15 @@ def _outputchunk_key_to_request(output_chunk_key):
 
 def _sort_property(sort):
   """Returns a datastore_query.PropertyOrder based on 'sort'."""
-  if sort not in ('created_ts', 'completed_ts', 'abandoned_ts', 'started_ts'):
-    raise ValueError('Unexpected sort %r' % sort)
-  if sort == 'created_ts':
+  if sort not in ("created_ts", "completed_ts", "abandoned_ts", "started_ts"):
+    raise ValueError("Unexpected sort %r" % sort)
+  if sort == "created_ts":
     return datastore_query.PropertyOrder(
-        '__key__', datastore_query.PropertyOrder.ASCENDING)
+      "__key__", datastore_query.PropertyOrder.ASCENDING
+    )
   return datastore_query.PropertyOrder(
-      sort, datastore_query.PropertyOrder.DESCENDING)
+    sort, datastore_query.PropertyOrder.DESCENDING
+  )
 
 
 def _datetime_to_key(date):
@@ -1510,75 +1575,74 @@ def filter_query(cls, q, start, end, sort, state):
     q = q.filter(TaskRunResult.key >= end_key)
   q = q.order(_sort_property(sort))
 
-  if sort != 'created_ts' and (start or end):
-    raise ValueError('Cannot both sort and use timestamp filtering')
+  if sort != "created_ts" and (start or end):
+    raise ValueError("Cannot both sort and use timestamp filtering")
 
-  if state == 'all':
+  if state == "all":
     return q
 
-  if state == 'pending':
+  if state == "pending":
     return q.filter(cls.state == State.PENDING)
 
-  if state == 'running':
+  if state == "running":
     return q.filter(cls.state == State.RUNNING)
 
-  if state == 'pending_running':
+  if state == "pending_running":
     # cls.state <= State.PENDING would work.
     return q.filter(
-        ndb.OR(
-            cls.state == State.PENDING,
-            cls.state == State.RUNNING))
+      ndb.OR(cls.state == State.PENDING, cls.state == State.RUNNING)
+    )
 
-  if state == 'completed':
+  if state == "completed":
     return q.filter(cls.state == State.COMPLETED)
 
-  if state == 'completed_success':
+  if state == "completed_success":
     q = q.filter(cls.state == State.COMPLETED)
     # pylint: disable=singleton-comparison
     return q.filter(cls.failure == False)
 
-  if state == 'completed_failure':
+  if state == "completed_failure":
     q = q.filter(cls.state == State.COMPLETED)
     # pylint: disable=singleton-comparison
     return q.filter(cls.failure == True)
 
-  if state == 'deduped':
+  if state == "deduped":
     q = q.filter(cls.state == State.COMPLETED)
     return q.filter(cls.try_number == 0)
 
-  if state == 'expired':
+  if state == "expired":
     return q.filter(cls.state == State.EXPIRED)
 
-  if state == 'timed_out':
+  if state == "timed_out":
     return q.filter(cls.state == State.TIMED_OUT)
 
-  if state == 'bot_died':
+  if state == "bot_died":
     return q.filter(cls.state == State.BOT_DIED)
 
-  if state == 'client_error':
+  if state == "client_error":
     return q.filter(cls.state == State.CLIENT_ERROR)
 
-  if state == 'canceled':
+  if state == "canceled":
     return q.filter(cls.state == State.CANCELED)
 
-  if state == 'killed':
+  if state == "killed":
     return q.filter(cls.state == State.KILLED)
 
-  if state == 'no_resource':
+  if state == "no_resource":
     return q.filter(cls.state == State.NO_RESOURCE)
 
-  raise ValueError('Invalid state %s' % state)
+  raise ValueError("Invalid state %s" % state)
 
 
 def state_to_string(state_obj):
   """Returns a user-readable string representing a State."""
   if state_obj.deduped_from:
-    return 'Deduped'
+    return "Deduped"
   out = State.to_string(state_obj.state)
   if state_obj.failure:
-    out += ' (failed)'
+    out += " (failed)"
   if state_obj.internal_failure:
-    out += ' (internal failure)'
+    out += " (internal failure)"
   return out
 
 
@@ -1588,21 +1652,24 @@ def new_result_summary(request):
   The caller must save it in the DB.
   """
   key = task_pack.request_key_to_result_summary_key(request.key)
-  return TaskResultSummary(key=key,
-                           created_ts=request.created_ts,
-                           name=request.name,
-                           server_versions=[utils.get_app_version()],
-                           user=request.user,
-                           tags=request.tags,
-                           priority=request.priority,
-                           request_authenticated=request.authenticated,
-                           request_realm=request.realm,
-                           request_pool=request.pool,
-                           request_bot_id=request.bot_id)
+  return TaskResultSummary(
+    key=key,
+    created_ts=request.created_ts,
+    name=request.name,
+    server_versions=[utils.get_app_version()],
+    user=request.user,
+    tags=request.tags,
+    priority=request.priority,
+    request_authenticated=request.authenticated,
+    request_realm=request.realm,
+    request_pool=request.pool,
+    request_bot_id=request.bot_id,
+  )
 
 
-def new_run_result(request, to_run, bot_id, bot_details, bot_dimensions,
-                   resultdb_info):
+def new_run_result(
+  request, to_run, bot_id, bot_details, bot_dimensions, resultdb_info
+):
   """Returns a new TaskRunResult for a TaskRequest.
 
   Initializes only the immutable parts.
@@ -1612,26 +1679,28 @@ def new_run_result(request, to_run, bot_id, bot_details, bot_dimensions,
   assert isinstance(request, task_request.TaskRequest)
   summary_key = task_pack.request_key_to_result_summary_key(request.key)
   return TaskRunResult(
-      key=task_pack.result_summary_key_to_run_result_key(summary_key),
-      bot_dimensions=bot_dimensions,
-      bot_id=bot_id,
-      bot_version=bot_details.bot_version,
-      bot_logs_cloud_project=bot_details.logs_cloud_project,
-      resultdb_info=resultdb_info,
-      request_created=request.created_ts,
-      request_tags=request.tags,
-      request_name=request.name,
-      request_user=request.user,
-      current_task_slice=to_run.task_slice_index,
-      server_versions=[utils.get_app_version()])
+    key=task_pack.result_summary_key_to_run_result_key(summary_key),
+    bot_dimensions=bot_dimensions,
+    bot_id=bot_id,
+    bot_version=bot_details.bot_version,
+    bot_logs_cloud_project=bot_details.logs_cloud_project,
+    resultdb_info=resultdb_info,
+    request_created=request.created_ts,
+    request_tags=request.tags,
+    request_name=request.name,
+    request_user=request.user,
+    current_task_slice=to_run.task_slice_index,
+    server_versions=[utils.get_app_version()],
+  )
 
 
 def yield_result_summary_by_parent_task_id(parent_task_id):
   """Yields child TaskResultSummary entities by parent task id."""
   q = task_request.yield_request_keys_by_parent_task_id(parent_task_id)
   for request_key in q:
-    result_summary_key = (
-        task_pack.request_key_to_result_summary_key(request_key))
+    result_summary_key = task_pack.request_key_to_result_summary_key(
+      request_key
+    )
     yield result_summary_key.get(use_cache=False, use_memcache=False)
 
 
@@ -1650,11 +1719,11 @@ def get_run_results_query(start, end, sort, state, bot_id):
     ValueError: If the sort or state filter is not valid.
   """
   if not bot_id:
-    raise ValueError('bot_id is required')
+    raise ValueError("bot_id is required")
   # Check is required since there is only a composite
   # index for bot_id for created_ts, started_ts and completed_ts
   if sort not in _BOT_TASK_ALLOWED_SORTS:
-    raise ValueError('invalid sort %s' % sort)
+    raise ValueError("invalid sort %s" % sort)
 
   # TODO(jonahhooper) improve proto docs for this specific route.
   if state in _BOT_TASK_DISALLOWED_STATES:
@@ -1664,8 +1733,9 @@ def get_run_results_query(start, end, sort, state, bot_id):
   # there's no chance this specific instance will need these again, therefore
   # this leads to 'Exceeded soft memory limit' AppEngine errors.
   q = TaskRunResult.query(
-      TaskRunResult.bot_id == bot_id,
-      default_options=ndb.QueryOptions(use_cache=False))
+    TaskRunResult.bot_id == bot_id,
+    default_options=ndb.QueryOptions(use_cache=False),
+  )
   return filter_query(TaskRunResult, q, start, end, sort, state)
 
 
@@ -1684,22 +1754,22 @@ def get_result_summaries_query(start, end, sort, state, tags):
   # a thousand entities loaded in memory, and this is a pure memory leak, as
   # there's no chance this specific instance will need these again, therefore
   # this leads to 'Exceeded soft memory limit' AppEngine errors.
-  q = TaskResultSummary.query(
-      default_options=ndb.QueryOptions(use_cache=False))
+  q = TaskResultSummary.query(default_options=ndb.QueryOptions(use_cache=False))
   # Filter by one or more tags.
   if tags:
     # Add TaskResultSummary indexes if desired.
-    if sort != 'created_ts':
+    if sort != "created_ts":
       raise ValueError(
-          'Add needed indexes for sort:%s and tags if desired' % sort)
+        "Add needed indexes for sort:%s and tags if desired" % sort
+      )
     for tag in tags:
-      parts = tag.split(':', 1)
+      parts = tag.split(":", 1)
       if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
-        raise ValueError('Invalid tags')
+        raise ValueError("Invalid tags")
       values = parts[1].split(OR_DIM_SEP)
       if len(values) > 1:
-        logging.info('OR_TAG_QUERY: %s', tag)
-      separated_tags = ['%s:%s' % (parts[0], v) for v in values]
+        logging.info("OR_TAG_QUERY: %s", tag)
+      separated_tags = ["%s:%s" % (parts[0], v) for v in values]
       q = q.filter(TaskResultSummary.tags.IN(separated_tags))
 
   return filter_query(TaskResultSummary, q, start, end, sort, state)
@@ -1711,9 +1781,9 @@ def fetch_task_results(task_ids):
   Raises:
     ValueError if any task_id is in an unexpected format.
   """
-  return fetch_task_result_summaries([
-      task_pack.get_request_and_result_keys(task_id)[1] for task_id in task_ids
-  ])
+  return fetch_task_result_summaries(
+    [task_pack.get_request_and_result_keys(task_id)[1] for task_id in task_ids]
+  )
 
 
 def fetch_task_result_summaries(keys):

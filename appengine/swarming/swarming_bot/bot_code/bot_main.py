@@ -85,7 +85,7 @@ THIS_DIR = os.path.dirname(THIS_FILE)
 SINGLETON = singleton.Singleton(THIS_DIR)
 
 # Dirname of kvs cache used to store small files from cas.
-_CAS_KVS_CACHE_DB = 'cas_kvs_cache_db'
+_CAS_KVS_CACHE_DB = "cas_kvs_cache_db"
 
 # Allowlist files that can be present in the bot's directory. Anything else
 # will be forcibly deleted on startup! Note that 'w' (work) is not in this list,
@@ -94,45 +94,45 @@ _CAS_KVS_CACHE_DB = 'cas_kvs_cache_db'
 # https://chromium.googlesource.com/infra/luci/luci-py.git/+/main/appengine/swarming/doc/Bot.md
 # for more details.
 PASSLIST = (
-    '*-cacert.pem',
-    '.vpython3',
-    'README',
-    'README.md',
-    'c',
-    'cas_cache',
-    'cipd_cache',
-    'logs',
-    'swarming.lck',
-    'swarming_bot.1.zip',
-    'swarming_bot.2.zip',
-    'swarming_bot.zip',
-    'tmp',
-    _CAS_KVS_CACHE_DB,
+  "*-cacert.pem",
+  ".vpython3",
+  "README",
+  "README.md",
+  "c",
+  "cas_cache",
+  "cipd_cache",
+  "logs",
+  "swarming.lck",
+  "swarming_bot.1.zip",
+  "swarming_bot.2.zip",
+  "swarming_bot.zip",
+  "tmp",
+  _CAS_KVS_CACHE_DB,
 )
 
 
 # These settings are documented in ../config/bot_config.py.
 # Keep in sync with ../config/bot_config.py. This is enforced by a unit test.
 DEFAULT_SETTINGS = {
-    'free_partition': {
-        'root': {
-            'size': 1 * 1024 * 1024 * 1024,
-            'max_percent': 10.,
-            'min_percent': 6.,
-        },
-        'bot': {
-            'size': 4 * 1024 * 1024 * 1024,
-            'max_percent': 15.,
-            'min_percent': 7.,
-            'wiggle': 250 * 1024 * 1024,
-        },
+  "free_partition": {
+    "root": {
+      "size": 1 * 1024 * 1024 * 1024,
+      "max_percent": 10.0,
+      "min_percent": 6.0,
     },
-    'caches': {
-        'isolated': {
-            'size': 50 * 1024 * 1024 * 1024,
-            'items': 50 * 1024,
-        },
+    "bot": {
+      "size": 4 * 1024 * 1024 * 1024,
+      "max_percent": 15.0,
+      "min_percent": 7.0,
+      "wiggle": 250 * 1024 * 1024,
     },
+  },
+  "caches": {
+    "isolated": {
+      "size": 50 * 1024 * 1024 * 1024,
+      "items": 50 * 1024,
+    },
+  },
 }
 
 # Flag to decide if bot is running in test mode. This is mostly used by smoke
@@ -146,13 +146,15 @@ _IN_TEST_MODE = False
 
 def _monitor_call(func):
   """Decorates a functions and reports the runtime into logs."""
+
   def hook(chained, botobj, name, *args, **kwargs):
     start = time.time()
     try:
       return func(chained, botobj, name, *args, **kwargs)
     finally:
       duration = max(0, (time.time() - start) * 1000)
-      logging.info('%s(): %gs', name, round(duration/1000., 3))
+      logging.info("%s(): %gs", name, round(duration / 1000.0, 3))
+
   return hook
 
 
@@ -174,7 +176,7 @@ _QUARANTINED = None
 
 def _set_quarantined_until_restart(reason):
   """Sets the Super Sticky Quarantine string."""
-  logging.error('_set_quarantined_until_restart(%s)', reason)
+  logging.error("_set_quarantined_until_restart(%s)", reason)
   global _QUARANTINED
   _QUARANTINED = _QUARANTINED or reason
 
@@ -199,15 +201,16 @@ def _register_extra_bot_config(content, rev, script):
   if isinstance(content, str):
     # compile will throw if there's a '# coding: utf-8' line and the string is
     # in unicode. <3 python.
-    content = content.encode('utf-8')
+    content = content.encode("utf-8")
   try:
-    compiled = compile(content, 'injected.py', 'exec')
-    _EXTRA_BOT_CONFIG = types.ModuleType('injected')
+    compiled = compile(content, "injected.py", "exec")
+    _EXTRA_BOT_CONFIG = types.ModuleType("injected")
     exec(compiled, _EXTRA_BOT_CONFIG.__dict__)
-    logging.debug('extra bot_config %s at rev %s was injected.', script, rev)
+    logging.debug("extra bot_config %s at rev %s was injected.", script, rev)
   except (SyntaxError, TypeError) as e:
     _set_quarantined_until_restart(
-        'handshake returned invalid injected bot_config.py: %s' % e)
+      "handshake returned invalid injected bot_config.py: %s" % e
+    )
 
 
 @_monitor_call
@@ -252,10 +255,10 @@ def _call_hook_safe(chained, botobj, name, *args):
   try:
     return _call_hook(chained, botobj, name, *args)
   except Exception as e:
-    logging.exception('%s() threw', name)
-    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+    logging.exception("%s() threw", name)
+    msg = "%s\n%s" % (e, traceback.format_exc()[-2048:])
     if botobj:
-      botobj.post_error('Failed to call hook %s(): %s' % (name, msg))
+      botobj.post_error("Failed to call hook %s(): %s" % (name, msg))
     return None
 
 
@@ -267,21 +270,23 @@ def _get_dimensions(botobj):
     (Current dimensions dict, error message string) on errors.
   """
   try:
-    dims = _call_hook(False, botobj, 'get_dimensions')
+    dims = _call_hook(False, botobj, "get_dimensions")
     dim_err = _validate_dimensions(dims)
     if dim_err:
-      logging.error('Bad dimensions: %s:\n%s', dim_err, dims)
+      logging.error("Bad dimensions: %s:\n%s", dim_err, dims)
       return botobj.dimensions, dim_err
-    proposed_id = dims.get('id', ['unknown'])
+    proposed_id = dims.get("id", ["unknown"])
     if proposed_id != [botobj.id]:
       dim_err = '"id" dimension cannot be changed dynamically from %s to %s' % (
-          [botobj.id], proposed_id)
-      logging.error('Bad dimensions: %s:\n%s', dim_err, dims)
+        [botobj.id],
+        proposed_id,
+      )
+      logging.error("Bad dimensions: %s:\n%s", dim_err, dims)
       return botobj.dimensions, dim_err
     return dims, None
   except Exception as e:
-    logging.exception('get_dimensions() hook exception')
-    msg = 'got exception: %s\n%s' % (e, traceback.format_exc()[-2048:])
+    logging.exception("get_dimensions() hook exception")
+    msg = "got exception: %s\n%s" % (e, traceback.format_exc()[-2048:])
     return botobj.dimensions, msg
 
 
@@ -297,12 +302,12 @@ def _get_settings(botobj):
   it will make typos silently fail. CHECK FOR TYPOS in get_settings() in your
   bot_config.py.
   """
-  settings = _call_hook_safe(False, botobj, 'get_settings')
+  settings = _call_hook_safe(False, botobj, "get_settings")
   try:
     if isinstance(settings, dict):
       return _dict_deep_merge(DEFAULT_SETTINGS, settings)
   except (KeyError, TypeError, ValueError):
-    logging.exception('get_settings() failed')
+    logging.exception("get_settings() failed")
   return DEFAULT_SETTINGS
 
 
@@ -311,9 +316,9 @@ def _get_rbe_worker_properties():
   md = platforms.gce.get_metadata()
   if not md:
     return None
-  attrs = md.get('instance', {}).get('attributes', {})
-  pool_id = attrs.get('pool_id', '')
-  pool_version = attrs.get('pool_version', '')
+  attrs = md.get("instance", {}).get("attributes", {})
+  pool_id = attrs.get("pool_id", "")
+  pool_version = attrs.get("pool_version", "")
   if pool_id or pool_version:
     return remote_client.WorkerProperties(pool_id, pool_version)
   return None
@@ -325,34 +330,34 @@ def _get_state(botobj, sleep_streak, dims_error):
   Traps exceptions, quarantining the bot if they happen.
   """
   try:
-    state = _call_hook(False, botobj, 'get_state')
+    state = _call_hook(False, botobj, "get_state")
     if not _is_jsonish_dict(state):
-      state = {'quarantined': 'get_state(): expected a dict, got %r' % state}
+      state = {"quarantined": "get_state(): expected a dict, got %r" % state}
   except Exception as e:
-    logging.exception('get_state() exception')
-    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-    state = {'quarantined': 'get_state() exception: %s' % msg}
+    logging.exception("get_state() exception")
+    msg = "%s\n%s" % (e, traceback.format_exc()[-2048:])
+    state = {"quarantined": "get_state() exception: %s" % msg}
 
-  if not state.get('quarantined') and _QUARANTINED:
-    state['quarantined'] = _QUARANTINED
-  if not state.get('quarantined') and dims_error:
-    state['quarantined'] = 'get_dimensions() error: %s' % dims_error
+  if not state.get("quarantined") and _QUARANTINED:
+    state["quarantined"] = _QUARANTINED
+  if not state.get("quarantined") and dims_error:
+    state["quarantined"] = "get_dimensions() error: %s" % dims_error
 
-  if not state.get('quarantined'):
+  if not state.get("quarantined"):
     try:
       # Reuse the data from 'state/disks'.
-      disks = state.get('disks', {})
+      disks = state.get("disks", {})
       err = _get_disks_quarantine(botobj, disks)
       if err:
-        state['quarantined'] = err
+        state["quarantined"] = err
         # TODO: Do this somewhere else, not in a _get_state that is purely for
         # collecting the state of the bot.
         _cleanup_purgeable_space(botobj)
     except Exception as e:
-      logging.exception('checking free or purgeable space failed')
-      state['quarantined'] = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+      logging.exception("checking free or purgeable space failed")
+      state["quarantined"] = "%s\n%s" % (e, traceback.format_exc()[-2048:])
 
-  state['sleep_streak'] = sleep_streak
+  state["sleep_streak"] = sleep_streak
   return state
 
 
@@ -362,29 +367,30 @@ def _get_disks_quarantine(botobj, disks):
   It looks at both root partition and the current partition the bot is running
   in.
   """
-  settings = _get_settings(botobj)['free_partition']
+  settings = _get_settings(botobj)["free_partition"]
   # On Windows, drive letters are always lower case.
-  root = 'c:\\' if sys.platform == 'win32' else '/'
+  root = "c:\\" if sys.platform == "win32" else "/"
 
   errors = []
 
   def _check_for_quarantine(r, i, key):
     min_free = _min_free_disk(i, settings[key])
-    if int(i['free_mb']*1024*1024) < min_free:
+    if int(i["free_mb"] * 1024 * 1024) < min_free:
       errors.append(
-          'Not enough free disk space on %s. %.1fmib < %.1fmib' %
-          (r, i['free_mb'], round(min_free / 1024. / 1024., 1)))
+        "Not enough free disk space on %s. %.1fmib < %.1fmib"
+        % (r, i["free_mb"], round(min_free / 1024.0 / 1024.0, 1))
+      )
 
   # root may be missing in the case of netbooted devices.
   if root in disks:
-    _check_for_quarantine(root, disks[root], 'root')
+    _check_for_quarantine(root, disks[root], "root")
 
   # Try again with the bot's base directory. It is frequent to run the bot
   # from a secondary partition, to reduce the risk of OS failure due to full
   # root partition.
   # This code is similar to os_utilities.get_disk_size().
   path = botobj.base_dir
-  case_insensitive = sys.platform in ('darwin', 'win32')
+  case_insensitive = sys.platform in ("darwin", "win32")
   if case_insensitive:
     path = path.lower()
   for mount, infos in sorted(disks.items(), key=lambda x: -len(x[0])):
@@ -392,10 +398,10 @@ def _get_disks_quarantine(botobj, disks):
       # Apply 'bot' check if bot is on its own partition, or it's on
       # root partition and there are no errors reported yet.
       if mount != root or not errors:
-        _check_for_quarantine(mount, infos, 'bot')
+        _check_for_quarantine(mount, infos, "bot")
       break
   if errors:
-    return '\n'.join(errors)
+    return "\n".join(errors)
 
 
 def _update_bot_attributes(botobj, sleep_streak):
@@ -405,8 +411,8 @@ def _update_bot_attributes(botobj, sleep_streak):
   """
   attrs = get_attributes(botobj, sleep_streak)
   with botobj.mutate_internals() as mut:
-    mut.update_dimensions(attrs['dimensions'])
-    mut.update_state(attrs['state'])
+    mut.update_dimensions(attrs["dimensions"])
+    mut.update_state(attrs["state"])
 
 
 def _cleanup_purgeable_space(botobj):
@@ -418,31 +424,34 @@ def _cleanup_purgeable_space(botobj):
   recognize purgeable space.
   """
   # Skip if it's not ARM MMac.
-  mac_model = botobj.dimensions.get('mac_model')
-  if not mac_model or mac_model[0] != 'Macmini9,1':
+  mac_model = botobj.dimensions.get("mac_model")
+  if not mac_model or mac_model[0] != "Macmini9,1":
     return
 
   start = time.time()
-  logging.info('_cleanup_purgeable_space: creating large files.')
+  logging.info("_cleanup_purgeable_space: creating large files.")
 
-  tempdir = os.path.join(botobj.base_dir, 'largefiles')
+  tempdir = os.path.join(botobj.base_dir, "largefiles")
   fs.mkdir(tempdir)
 
   for cnt in range(3):
     # create a largefile until it stops with 'No space left on device'.
-    fname = os.path.join(tempdir, 'largefile%d' % cnt)
-    cmd = ['dd', 'if=/dev/zero', 'of=%s' % fname, 'bs=32m']
+    fname = os.path.join(tempdir, "largefile%d" % cnt)
+    cmd = ["dd", "if=/dev/zero", "of=%s" % fname, "bs=32m"]
     output, _ = _Popen(botobj, cmd).communicate(None)
     logging.info(
-        '_cleanup_purgeable_space: created a large file. cnt=%d. output=%s',
-        cnt, output)
+      "_cleanup_purgeable_space: created a large file. cnt=%d. output=%s",
+      cnt,
+      output,
+    )
 
   # remove created all files and the temp directory.
   file_path.rmtree(tempdir)
 
   logging.info(
-      '_cleanup_purgeable_space: removed the created files. %s sec elapsed.',
-      time.time() - start)
+    "_cleanup_purgeable_space: removed the created files. %s sec elapsed.",
+    time.time() - start,
+  )
 
 
 def _get_authentication_headers(botobj):
@@ -453,7 +462,7 @@ def _get_authentication_headers(botobj):
 
   Doesn't catch exceptions. RemoteClient knows how to deal with them.
   """
-  return _call_hook(False, botobj, 'get_authentication_headers') or (None, None)
+  return _call_hook(False, botobj, "get_authentication_headers") or (None, None)
 
 
 def _min_free_disk(infos, settings):
@@ -461,13 +470,13 @@ def _min_free_disk(infos, settings):
 
   See _get_settings() in ../config/bot_config.py for an explanation.
   """
-  size = int(infos['size_mb']*1024*1024)
-  x1 = settings['size'] or 0
-  x2 = int(round(size * float(settings['max_percent'] or 0) * 0.01))
+  size = int(infos["size_mb"] * 1024 * 1024)
+  x1 = settings["size"] or 0
+  x2 = int(round(size * float(settings["max_percent"] or 0) * 0.01))
   # Select the lowest non-zero value.
   x = min(x1, x2) if (x1 and x2) else (x1 or x2)
   # Select the maximum value.
-  return max(x, int(round(size * float(settings['min_percent'] or 0) * 0.01)))
+  return max(x, int(round(size * float(settings["min_percent"] or 0) * 0.01)))
 
 
 def _dict_deep_merge(x, y):
@@ -493,7 +502,7 @@ def _dict_deep_merge(x, y):
 
 def _is_base_dir_ok(botobj):
   """Returns False if the bot must be quarantined at all cost."""
-  return botobj.base_dir != os.path.expanduser('~')
+  return botobj.base_dir != os.path.expanduser("~")
 
 
 def _is_jsonish_dict(d):
@@ -515,15 +524,15 @@ def _validate_dimensions(dims):
   server will do the rest of the validation.
   """
   if not isinstance(dims, dict):
-    return 'not a dict'
+    return "not a dict"
   for k, v in dims.items():
     if not isinstance(k, str):
-      return 'bad dimension key %r: not a string' % (k, )
+      return "bad dimension key %r: not a string" % (k,)
     if not isinstance(v, (list, tuple)):
-      return 'bad value for key %r (not a list or a tuple): %r' % (k, v)
+      return "bad value for key %r (not a list or a tuple): %r" % (k, v)
     for val in v:
       if not isinstance(val, str):
-        return 'bad value for key %r (not a string): %r' % (k, val)
+        return "bad value for key %r (not a string): %r" % (k, val)
   return None
 
 
@@ -540,16 +549,16 @@ def setup_bot(botobj, skip_reboot):
   case bot's autostart configuration is managed elsewhere, and we don't want
   the bot itself to interfere.
   """
-  if os.environ.get('SWARMING_EXTERNAL_BOT_SETUP') == '1':
-    logging.info('Skipping setup_bot, SWARMING_EXTERNAL_BOT_SETUP is set')
+  if os.environ.get("SWARMING_EXTERNAL_BOT_SETUP") == "1":
+    logging.info("Skipping setup_bot, SWARMING_EXTERNAL_BOT_SETUP is set")
     return
 
   botobj = botobj or get_bot(get_config())
   try:
     from config import bot_config
   except Exception as e:
-    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-    botobj.post_error('bot_config.py is bad: %s' % msg)
+    msg = "%s\n%s" % (e, traceback.format_exc()[-2048:])
+    botobj.post_error("bot_config.py is bad: %s" % msg)
     return
 
   # TODO(maruel): Convert the should_continue return value to the hook calling
@@ -557,12 +566,12 @@ def setup_bot(botobj, skip_reboot):
   try:
     should_continue = bot_config.setup_bot(botobj)
   except Exception as e:
-    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-    botobj.post_error('bot_config.setup_bot() threw: %s' % msg)
+    msg = "%s\n%s" % (e, traceback.format_exc()[-2048:])
+    botobj.post_error("bot_config.setup_bot() threw: %s" % msg)
     return
 
   if not should_continue and not skip_reboot:
-    botobj.host_reboot('Starting new swarming bot: %s' % THIS_FILE)
+    botobj.host_reboot("Starting new swarming bot: %s" % THIS_FILE)
 
 
 @tools.cached
@@ -571,7 +580,7 @@ def generate_version():
   try:
     return zip_package.generate_version()
   except Exception as e:
-    return 'Error: %s' % e
+    return "Error: %s" % e
 
 
 def get_attributes(botobj, sleep_streak=0):
@@ -582,12 +591,12 @@ def get_attributes(botobj, sleep_streak=0):
   """
   dims, dims_error = _get_dimensions(botobj)
   state = _get_state(botobj, sleep_streak, dims_error)
-  logging.debug('Dimensions %s', dims)
-  logging.debug('State %s', state)
+  logging.debug("Dimensions %s", dims)
+  logging.debug("State %s", state)
   return {
-      'dimensions': dims,
-      'state': state,
-      'version': generate_version(),
+    "dimensions": dims,
+    "state": state,
+    "version": generate_version(),
   }
 
 
@@ -600,54 +609,68 @@ def get_bot(config):
   It can be called by ../__main__.py, something to keep in mind.
   """
   bot_id = os_utilities.get_bot_id()
-  logging.info('Running the bot with ID %s', bot_id)
+  logging.info("Running the bot with ID %s", bot_id)
 
   # This environment variable is accessible to the tasks executed by this bot.
   # Hooks can also theoretically examine it, so set it relatively early.
-  os.environ['SWARMING_BOT_ID'] = bot_id
+  os.environ["SWARMING_BOT_ID"] = bot_id
 
   # This variable is used to bootstrap the initial bot.Bot object, which then is
   # used to get the dimensions and state.
   attributes = {
-      'dimensions': {
-          'id': [bot_id]
-      },
-      'state': {},
-      'version': generate_version(),
+    "dimensions": {"id": [bot_id]},
+    "state": {},
+    "version": generate_version(),
   }
   base_dir = THIS_DIR
 
   # Use a temporary Bot object to call get_attributes. Attributes are needed to
   # construct the "real" bot.Bot.
   attributes = get_attributes(
-      bot.Bot(
-          remote_client.RemoteClientNative(config['server'], None, bot_id,
-                                           base_dir), attributes,
-          config['server'], base_dir))
+    bot.Bot(
+      remote_client.RemoteClientNative(
+        config["server"], None, bot_id, base_dir
+      ),
+      attributes,
+      config["server"],
+      base_dir,
+    )
+  )
 
   # Make remote client callback use the returned bot object. We assume here
   # RemoteClient doesn't call its callback in the constructor (since 'botobj' is
   # undefined during the construction).
   botobj = bot.Bot(
-      remote_client.RemoteClientNative(
-          config['server'], lambda: _get_authentication_headers(botobj), bot_id,
-          base_dir), attributes, config['server'], base_dir)
+    remote_client.RemoteClientNative(
+      config["server"],
+      lambda: _get_authentication_headers(botobj),
+      bot_id,
+      base_dir,
+    ),
+    attributes,
+    config["server"],
+    base_dir,
+  )
 
   with botobj.mutate_internals() as mut:
     # Call the on_bot_shutdown hook when the bot exits or reboots.
     mut.add_lifecycle_callback(
-        lambda botobj, _: _call_hook_safe(True, botobj, 'on_bot_shutdown'))
+      lambda botobj, _: _call_hook_safe(True, botobj, "on_bot_shutdown")
+    )
 
     # Aggressively set itself up so we ensure the auto-reboot configuration is
     # fine before restarting the host. This is important as some tasks delete
     # the autorestart script (!)
-    mut.add_lifecycle_callback(lambda botobj, event: setup_bot(botobj, True)
-                               if event == 'reboot' else None)
+    mut.add_lifecycle_callback(
+      lambda botobj, event: (
+        setup_bot(botobj, True) if event == "reboot" else None
+      )
+    )
 
   # Forbid running from '~', since the bot will delete all of it, which will be
   # very bad if this is happening on some workstation.
   if not _is_base_dir_ok(botobj):
-    _set_quarantined_until_restart('Can\'t run from the home directory')
+    _set_quarantined_until_restart("Can't run from the home directory")
 
   return botobj
 
@@ -656,13 +679,13 @@ def get_bot(config):
 def get_config():
   """Returns the data from config.json."""
   try:
-    with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
-      config = json.load(f.open('config/config.json', 'r'))
-    if config['server'].endswith('/'):
-      raise ValueError('Invalid server entry %r' % config['server'])
+    with contextlib.closing(zipfile.ZipFile(THIS_FILE, "r")) as f:
+      config = json.load(f.open("config/config.json", "r"))
+    if config["server"].endswith("/"):
+      raise ValueError("Invalid server entry %r" % config["server"])
   except (zipfile.BadZipfile, IOError, OSError, TypeError, ValueError):
-    logging.exception('Invalid config.json!')
-    config = {'server': ''}
+    logging.exception("Invalid config.json!")
+    config = {"server": ""}
   return config
 
 
@@ -678,7 +701,7 @@ def _cleanup_bot_directory(botobj):
   if not _is_base_dir_ok(botobj):
     # That's an important one-off check as cleaning the $HOME directory has
     # really bad effects on normal host.
-    logging.error('Not cleaning root directory because of bad base directory')
+    logging.error("Not cleaning root directory because of bad base directory")
     return
   for i in fs.listdir(botobj.base_dir):
     if any(fnmatch.fnmatch(i, w) for w in PASSLIST):
@@ -690,8 +713,7 @@ def _cleanup_bot_directory(botobj):
       else:
         file_path.remove(p)
     except (IOError, OSError) as e:
-      botobj.post_error(
-          'Failed to remove %s from bot\'s directory: %s' % (i, e))
+      botobj.post_error("Failed to remove %s from bot's directory: %s" % (i, e))
 
 
 def _run_isolated_flags(botobj):
@@ -700,24 +722,22 @@ def _run_isolated_flags(botobj):
   These are not meant to be processed by task_runner.py.
   """
   settings = _get_settings(botobj)
-  partition = settings['free_partition']['bot']
+  partition = settings["free_partition"]["bot"]
   size = os_utilities.get_disk_size(THIS_FILE)
-  min_free = (
-      _min_free_disk({'size_mb': size}, partition) +
-      partition['wiggle'])
-  logging.info('size %d, partition %s, min_free %s', size, partition, min_free)
+  min_free = _min_free_disk({"size_mb": size}, partition) + partition["wiggle"]
+  logging.info("size %d, partition %s, min_free %s", size, partition, min_free)
   args = [
-      # Shared option.
-      '--min-free-space',
-      str(min_free),
-      '--max-cache-size',
-      str(settings['caches']['isolated']['size']),
-      # CAS cache option.
-      '--cas-cache',
-      os.path.join(botobj.base_dir, 'cas_cache'),
-      # Named cache option.
-      '--named-cache-root',
-      os.path.join(botobj.base_dir, 'c'),
+    # Shared option.
+    "--min-free-space",
+    str(min_free),
+    "--max-cache-size",
+    str(settings["caches"]["isolated"]["size"]),
+    # CAS cache option.
+    "--cas-cache",
+    os.path.join(botobj.base_dir, "cas_cache"),
+    # Named cache option.
+    "--named-cache-root",
+    os.path.join(botobj.base_dir, "c"),
   ]
 
   use_kvs = True
@@ -725,22 +745,22 @@ def _run_isolated_flags(botobj):
   if os_utilities.get_physical_ram() < 2048:
     use_kvs = False
 
-  if sys.platform == 'linux' and platforms.linux.get_inside_docker():
+  if sys.platform == "linux" and platforms.linux.get_inside_docker():
     use_kvs = False
 
-  if sys.platform == 'win32' and platform.architecture()[0] == '32bit':
+  if sys.platform == "win32" and platform.architecture()[0] == "32bit":
     # 32 bit windows may not work with kvs.
     # https://crbug.com/1207762
     use_kvs = False
 
   if use_kvs:
     args += [
-        '--kvs-dir',
-        os.path.join(botobj.base_dir, _CAS_KVS_CACHE_DB),
+      "--kvs-dir",
+      os.path.join(botobj.base_dir, _CAS_KVS_CACHE_DB),
     ]
 
   if _IN_TEST_MODE:
-    args += ['--cipd-enabled', 'false']
+    args += ["--cipd-enabled", "false"]
 
   return args
 
@@ -752,19 +772,20 @@ def _Popen(botobj, cmd, **kwargs):
 
   On Windows, also create a separate console.
   """
-  kwargs.setdefault('stdout', subprocess42.PIPE)
-  if sys.platform == 'win32':
-    prev = kwargs.get('creationflags', 0)
-    kwargs['creationflags'] = prev | subprocess42.CREATE_NEW_CONSOLE
+  kwargs.setdefault("stdout", subprocess42.PIPE)
+  if sys.platform == "win32":
+    prev = kwargs.get("creationflags", 0)
+    kwargs["creationflags"] = prev | subprocess42.CREATE_NEW_CONSOLE
   else:
-    kwargs['close_fds'] = True
+    kwargs["close_fds"] = True
   return subprocess42.Popen(
-      cmd,
-      stdin=subprocess42.PIPE,
-      stderr=subprocess42.STDOUT,
-      cwd=botobj.base_dir,
-      detached=True,
-      **kwargs)
+    cmd,
+    stdin=subprocess42.PIPE,
+    stderr=subprocess42.STDOUT,
+    cwd=botobj.base_dir,
+    detached=True,
+    **kwargs,
+  )
 
 
 def _clean_cache(botobj):
@@ -778,24 +799,29 @@ def _clean_cache(botobj):
   based on the policies and update state.json.
   """
   cmd = [
-    sys.executable, THIS_FILE, 'run_isolated',
-    '--clean',
-    '--log-file', os.path.join(botobj.base_dir, 'logs', 'run_isolated.log'),
+    sys.executable,
+    THIS_FILE,
+    "run_isolated",
+    "--clean",
+    "--log-file",
+    os.path.join(botobj.base_dir, "logs", "run_isolated.log"),
   ]
   cmd.extend(_run_isolated_flags(botobj))
-  logging.info('Running: %s', cmd)
+  logging.info("Running: %s", cmd)
   try:
     # Intentionally do not use a timeout, it can take a while to hash 50gb but
     # better be safe than sorry.
     proc = _Popen(botobj, cmd)
     output, _ = proc.communicate(None)
-    logging.info('Result:\n%s', output)
+    logging.info("Result:\n%s", output)
     if proc.returncode:
       botobj.post_error(
-          'swarming_bot.zip failure during run_isolated --clean:\n%s' % output)
+        "swarming_bot.zip failure during run_isolated --clean:\n%s" % output
+      )
   except OSError:
     botobj.post_error(
-        'swarming_bot.zip internal failure during run_isolated --clean')
+      "swarming_bot.zip internal failure during run_isolated --clean"
+    )
 
 
 def _post_error_task(botobj, error, task_id):
@@ -814,7 +840,7 @@ def _post_error_task(botobj, error, task_id):
         any reason the local test runner script can not be run successfully,
         this function is invoked.
   """
-  logging.error('Error: %s', error)
+  logging.error("Error: %s", error)
   return botobj.remote.post_task_error(task_id, error)
 
 
@@ -826,23 +852,23 @@ def _run_manifest(botobj, manifest, rbe_session):
   # Ensure the manifest is valid. This can throw a json decoding error. Also
   # raise if it is empty.
   if not manifest:
-    raise ValueError('Empty manifest')
+    raise ValueError("Empty manifest")
 
   # Necessary to signal an internal_failure. This occurs when task_runner fails
   # to execute the command. It is important to note that this data is extracted
   # before any I/O is done, like writting the manifest to disk.
-  task_id = manifest['task_id']
-  last_ditch_timeout = manifest['hard_timeout'] or None
+  task_id = manifest["task_id"]
+  last_ditch_timeout = manifest["hard_timeout"] or None
   # The grace period is the time between SIGTERM and SIGKILL.
-  grace_period = max(manifest['grace_period'] or 0, 30)
+  grace_period = max(manifest["grace_period"] or 0, 30)
   if last_ditch_timeout:
     # One for the child process, one for run_isolated, one for task_runner.
     last_ditch_timeout += 3 * grace_period
     # CIPD, isolated download time, plus named cache cleanup is not counted for
     # hard timeout so add more time; hard_timeout is handled by run_isolated.
-    last_ditch_timeout += max(manifest['io_timeout'] or 0, 1200)
+    last_ditch_timeout += max(manifest["io_timeout"] or 0, 1200)
 
-  task_dimensions = manifest['dimensions']
+  task_dimensions = manifest["dimensions"]
   task_result = {}
 
   failure = False
@@ -852,8 +878,8 @@ def _run_manifest(botobj, manifest, rbe_session):
   auth_params_dumper = None
   must_reboot_reason = None
   # Use 'w' instead of 'work' because path length is precious on Windows.
-  work_dir = os.path.join(botobj.base_dir, 'w')
-  session_state_file = os.path.join(work_dir, 'session.json')
+  work_dir = os.path.join(botobj.base_dir, "w")
+  session_state_file = os.path.join(work_dir, "session.json")
   try:
     try:
       if fs.isdir(work_dir):
@@ -864,26 +890,27 @@ def _run_manifest(botobj, manifest, rbe_session):
       # around the undeleteable directory by creating a temporary directory
       # instead. This is not normal behavior. The bot will report a failure on
       # start.
-      work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='w')
+      work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix="w")
     else:
       try:
         fs.makedirs(work_dir)
       except OSError:
         # Sometimes it's a race condition, so do a last ditch attempt.
-        work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='w')
+        work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix="w")
 
     env = os.environ.copy()
-    env['CIPD_ARCHITECTURE'] = os_utilities.get_cipd_architecture()
-    env['SWARMING_TASK_ID'] = task_id
-    env['SWARMING_SERVER'] = botobj.server
+    env["CIPD_ARCHITECTURE"] = os_utilities.get_cipd_architecture()
+    env["SWARMING_TASK_ID"] = task_id
+    env["SWARMING_SERVER"] = botobj.server
 
-    task_in_file = os.path.join(work_dir, 'task_runner_in.json')
-    with fs.open(task_in_file, 'w') as f:
+    task_in_file = os.path.join(work_dir, "task_runner_in.json")
+    with fs.open(task_in_file, "w") as f:
       f.write(json.dumps(manifest))
     handle, bot_file = tempfile.mkstemp(
-        prefix='bot_file', suffix='.json', dir=work_dir)
+      prefix="bot_file", suffix=".json", dir=work_dir
+    )
     os.close(handle)
-    task_result_file = os.path.join(work_dir, 'task_runner_out.json')
+    task_result_file = os.path.join(work_dir, "task_runner_out.json")
     if fs.exists(task_result_file):
       fs.remove(task_result_file)
 
@@ -895,12 +922,14 @@ def _run_manifest(botobj, manifest, rbe_session):
     # MAINTENANCE status.
     if rbe_session:
       if rbe_session.active_lease:
-        logging.info('RBE lease: %r', rbe_session.active_lease.to_dict())
+        logging.info("RBE lease: %r", rbe_session.active_lease.to_dict())
       else:
-        logging.info('RBE lease: none')
+        logging.info("RBE lease: none")
     session_state = remote_client.SessionState(
-        botobj.session_id, botobj.session_token,
-        rbe_session.to_dict() if rbe_session else None)
+      botobj.session_id,
+      botobj.session_token,
+      rbe_session.to_dict() if rbe_session else None,
+    )
     session_state.dump(session_state_file)
 
     # Start a thread that periodically puts authentication headers and other
@@ -909,95 +938,98 @@ def _run_manifest(botobj, manifest, rbe_session):
     #
     # TODO(vadimsh): Switch to pipes or local sockets if the latency tokens
     # propagation here becomes an issue.
-    auth_params_file = os.path.join(work_dir, 'bot_auth_params.json')
+    auth_params_file = os.path.join(work_dir, "bot_auth_params.json")
     auth_params_dumper = file_refresher.FileRefresherThread(
-        auth_params_file,
-        lambda: bot_auth.prepare_auth_params_json(botobj, manifest))
+      auth_params_file,
+      lambda: bot_auth.prepare_auth_params_json(botobj, manifest),
+    )
     auth_params_dumper.start()
 
     command = [
-        sys.executable,
-        THIS_FILE,
-        'task_runner',
-        '--swarming-server',
-        botobj.server,
-        '--in-file',
-        task_in_file,
-        '--out-file',
-        task_result_file,
-        '--cost-usd-hour',
-        str(botobj.state.get('cost_usd_hour') or 0.),
-        # Include the time taken to poll the task in the cost.
-        # TODO(vadimsh): Remove this, it doesn't add much value, just
-        # complicates code.
-        '--start',
-        str(time.time()),
-        '--bot-file',
-        bot_file,
-        '--session-state-file',
-        session_state_file,
-        '--auth-params-file',
-        auth_params_file,
+      sys.executable,
+      THIS_FILE,
+      "task_runner",
+      "--swarming-server",
+      botobj.server,
+      "--in-file",
+      task_in_file,
+      "--out-file",
+      task_result_file,
+      "--cost-usd-hour",
+      str(botobj.state.get("cost_usd_hour") or 0.0),
+      # Include the time taken to poll the task in the cost.
+      # TODO(vadimsh): Remove this, it doesn't add much value, just
+      # complicates code.
+      "--start",
+      str(time.time()),
+      "--bot-file",
+      bot_file,
+      "--session-state-file",
+      session_state_file,
+      "--auth-params-file",
+      auth_params_file,
     ]
 
     # Flags for run_isolated.py are passed through by task_runner.py as-is
     # without interpretation.
-    command.append('--')
+    command.append("--")
     command.extend(_run_isolated_flags(botobj))
 
-    _call_hook_safe(True, botobj, 'on_before_task', bot_file, command, env)
-    logging.debug('Running command: %s', command)
+    _call_hook_safe(True, botobj, "on_before_task", bot_file, command, env)
+    logging.debug("Running command: %s", command)
 
-    base_log = os.path.join(botobj.base_dir, 'logs')
+    base_log = os.path.join(botobj.base_dir, "logs")
     if not fs.isdir(base_log):
       # It was observed that this directory may be unexpectedly deleted.
       # Recreate as needed, otherwise it may throw at the open() call below.
       fs.mkdir(base_log)
-    log_path = os.path.join(base_log, 'task_runner_stdout.log')
+    log_path = os.path.join(base_log, "task_runner_stdout.log")
     os_utilities.roll_log(log_path)
     os_utilities.trim_rolled_log(log_path)
-    with fs.open(log_path, 'a+b') as f:
+    with fs.open(log_path, "a+b") as f:
       proc = _Popen(botobj, command, stdout=f, env=env)
-      logging.info('Subprocess for task_runner started.')
+      logging.info("Subprocess for task_runner started.")
       try:
         proc.wait(last_ditch_timeout)
       except subprocess42.TimeoutExpired:
         # That's the last ditch effort; as task_runner should have completed a
         # while ago and had enforced the io_timeout or run_isolated for
         # hard_timeout.
-        logging.error('Sending SIGTERM to task_runner')
+        logging.error("Sending SIGTERM to task_runner")
         proc.terminate()
         internal_failure = True
-        msg = 'task_runner hung'
+        msg = "task_runner hung"
         try:
-          proc.wait(2*grace_period)
+          proc.wait(2 * grace_period)
         except subprocess42.TimeoutExpired:
-          logging.error('Sending SIGKILL to task_runner')
+          logging.error("Sending SIGKILL to task_runner")
           proc.kill()
         proc.wait()
         return False
 
-    logging.info('task_runner exit: %d', proc.returncode)
+    logging.info("task_runner exit: %d", proc.returncode)
     if fs.exists(task_result_file):
-      with fs.open(task_result_file, 'rb') as fd:
+      with fs.open(task_result_file, "rb") as fd:
         task_result = json.load(fd)
         if task_result:
-          internal_error_reported = task_result.get('internal_error_reported',
-                                                    False)
+          internal_error_reported = task_result.get(
+            "internal_error_reported", False
+          )
     if proc.returncode:
       # STATUS_DLL_INIT_FAILED generally means that something bad happened, and
       # a reboot magically clears things out. :(
-      if sys.platform == 'win32' and proc.returncode == -1073741502:
-        must_reboot_reason = ('Working around STATUS_DLL_INIT_FAILED by '
-                              'task_runner')
-      msg = 'Execution failed: internal error (%d).' % proc.returncode
+      if sys.platform == "win32" and proc.returncode == -1073741502:
+        must_reboot_reason = (
+          "Working around STATUS_DLL_INIT_FAILED by task_runner"
+        )
+      msg = "Execution failed: internal error (%d)." % proc.returncode
       internal_failure = True
     elif not task_result:
-      logging.warning('task_runner failed to write metadata')
-      msg = 'Execution failed: internal error (no metadata).'
+      logging.warning("task_runner failed to write metadata")
+      msg = "Execution failed: internal error (no metadata)."
       internal_failure = True
-    elif task_result['internal_error']:
-      msg = ('Execution failed: %s' % task_result['internal_error'])
+    elif task_result["internal_error"]:
+      msg = "Execution failed: %s" % task_result["internal_error"]
       internal_failure = True
 
     # Load the up-to-date session state, it might have changed while the task
@@ -1008,14 +1040,16 @@ def _run_manifest(botobj, manifest, rbe_session):
     if rbe_session and session_state.rbe_session:
       rbe_session.restore(session_state.rbe_session)
 
-    failure = bool(task_result.get('exit_code')) if task_result else False
+    failure = bool(task_result.get("exit_code")) if task_result else False
     return not internal_failure and not failure
   except Exception as e:
     # Failures include IOError when writing if the disk is full, OSError if
     # swarming_bot.zip doesn't exist anymore, etc.
-    logging.exception('_run_manifest failed')
-    msg = 'Internal exception occurred: %s\n%s' % (
-        e, traceback.format_exc()[-2048:])
+    logging.exception("_run_manifest failed")
+    msg = "Internal exception occurred: %s\n%s" % (
+      e,
+      traceback.format_exc()[-2048:],
+    )
     internal_failure = True
   finally:
     if auth_params_dumper:
@@ -1026,22 +1060,35 @@ def _run_manifest(botobj, manifest, rbe_session):
       try:
         rbe_session.finish_active_lease({}, flush=True)
       except remote_client_errors.RBEServerError as e:
-        botobj.post_error('finish_active_lease failed: %s' % e)
+        botobj.post_error("finish_active_lease failed: %s" % e)
     logging.info(
-        'calling on_after_task: failure=%s, internal_failure=%s, '
-        'task_dimensions=%s, task_result=%s', failure, internal_failure,
-        task_dimensions, task_result)
-    _call_hook_safe(True, botobj, 'on_after_task', failure, internal_failure,
-                    task_dimensions, task_result)
+      "calling on_after_task: failure=%s, internal_failure=%s, "
+      "task_dimensions=%s, task_result=%s",
+      failure,
+      internal_failure,
+      task_dimensions,
+      task_result,
+    )
+    _call_hook_safe(
+      True,
+      botobj,
+      "on_after_task",
+      failure,
+      internal_failure,
+      task_dimensions,
+      task_result,
+    )
     if fs.isdir(work_dir):
       try:
         file_path.rmtree(work_dir)
       except Exception:
-        botobj.post_error('Failed to delete work directory %s: %s' %
-                          (work_dir, traceback.format_exc()[-2048:]))
+        botobj.post_error(
+          "Failed to delete work directory %s: %s"
+          % (work_dir, traceback.format_exc()[-2048:])
+        )
         # Failure to delete could be due to a proc with open file handles. Just
         # reboot the machine in that case.
-        must_reboot_reason = 'Failure to remove %s' % work_dir
+        must_reboot_reason = "Failure to remove %s" % work_dir
     if must_reboot_reason:
       botobj.host_reboot(must_reboot_reason)
 
@@ -1054,9 +1101,10 @@ def _run_bot(arg_error):
   # The quit_bit is to signal that the bot process must shutdown. It is
   # different from a request to restart the bot process or reboot the host.
   quit_bit = threading.Event()
+
   def handler(sig, _):
     # A signal terminates the bot process, it doesn't cause it to restart.
-    logging.info('Got signal %s', sig)
+    logging.info("Got signal %s", sig)
     quit_bit.set()
 
   # TODO(maruel): Set quit_bit when stdin is closed on Windows.
@@ -1067,7 +1115,7 @@ def _run_bot(arg_error):
       try:
         _run_bot_inner(botobj, quit_bit)
       finally:
-        botobj.run_lifecycle_callbacks('exit')
+        botobj.run_lifecycle_callbacks("exit")
   return 0
 
 
@@ -1086,21 +1134,21 @@ def _init_bot(arg_error, quit_bit):
     # There's no need to do error handling here - the "ping" is just to
     # "wake up" the network; if there's something seriously wrong, the handshake
     # will fail and we'll handle it there.
-    resp = net.url_read(config['server'] + '/swarming/api/v1/bot/server_ping')
+    resp = net.url_read(config["server"] + "/swarming/api/v1/bot/server_ping")
     if resp is None:
-      logging.error('Error pinging the server (is network up?)')
+      logging.error("Error pinging the server (is network up?)")
   except Exception:
     # url_read() already traps pretty much every exceptions. This except
     # clause is kept there "just in case".
-    logging.exception('Unexpected exception pinging the server')
+    logging.exception("Unexpected exception pinging the server")
 
   # If we are on GCE, we want to make sure GCE metadata server responds, since
   # we use the metadata to derive dimensions and state.
   if platforms.is_gce():
-    logging.info('Running on GCE, waiting for the metadata server')
+    logging.info("Running on GCE, waiting for the metadata server")
     platforms.gce.wait_for_metadata(quit_bit)
     if quit_bit.is_set():
-      logging.info('Got quit signal when waiting for GCE metadata')
+      logging.info("Got quit signal when waiting for GCE metadata")
       return None
 
   # Next we make sure the bot can make authenticated calls by grabbing the auth
@@ -1110,11 +1158,11 @@ def _init_bot(arg_error, quit_bit):
   try:
     botobj.remote.initialize(quit_bit)
   except remote_client.InitializationError as exc:
-    botobj.post_error('failed to grab auth headers: %s' % exc.last_error)
-    logging.error('Can\'t grab auth headers, continuing anyway...')
+    botobj.post_error("failed to grab auth headers: %s" % exc.last_error)
+    logging.error("Can't grab auth headers, continuing anyway...")
 
   if arg_error:
-    botobj.post_error('Bootstrapping error: %s' % arg_error)
+    botobj.post_error("Bootstrapping error: %s" % arg_error)
 
   return botobj
 
@@ -1134,12 +1182,12 @@ def _run_bot_inner(botobj, quit_bit):
     with botobj.mutate_internals() as mut:
       props = _get_rbe_worker_properties()
       if props:
-        logging.info('RBE worker properties: %s', props.to_dict())
+        logging.info("RBE worker properties: %s", props.to_dict())
       else:
-        logging.info('No RBE worker properties discovered')
+        logging.info("No RBE worker properties discovered")
       mut.update_rbe_worker_properties(props)
 
-  _call_hook_safe(True, botobj, 'on_bot_startup')
+  _call_hook_safe(True, botobj, "on_bot_startup")
 
   # Initial attributes passed to bot.Bot in get_bot above were constructed for
   # 'fake' bot ID ('none'). Refresh them to match the real bot ID, now that we
@@ -1151,21 +1199,21 @@ def _run_bot_inner(botobj, quit_bit):
   rbe_params = _do_handshake(botobj, quit_bit)
 
   if quit_bit.is_set():
-    logging.info('Got quit signal when doing the handshake')
+    logging.info("Got quit signal when doing the handshake")
     return
 
   # Let the bot to finish the initialization, now that it knows its server
   # defined dimensions.
-  _call_hook_safe(True, botobj, 'on_handshake')
+  _call_hook_safe(True, botobj, "on_handshake")
 
   _cleanup_bot_directory(botobj)
   _clean_cache(botobj)
 
   # RBE expects the version string to use a specific format.
-  rbe_bot_version = '%s_%s_swarming/%s' % (
-      os_utilities.get_cipd_os(),
-      os_utilities.get_cipd_architecture(),
-      botobj.bot_version,
+  rbe_bot_version = "%s_%s_swarming/%s" % (
+    os_utilities.get_cipd_os(),
+    os_utilities.get_cipd_architecture(),
+    botobj.bot_version,
   )
 
   # Spin until getting a termination signal. Shutdown RBE on exit.
@@ -1190,8 +1238,9 @@ def _trap_all_exceptions(method):
       if not _TRAP_ALL_EXCEPTIONS:
         raise
       self._loop_iteration_had_errors = True
-      self.report_exception('%s in %s: %s' %
-                            (e.__class__.__name__, method.__name__, e))
+      self.report_exception(
+        "%s in %s: %s" % (e.__class__.__name__, method.__name__, e)
+      )
     return None
 
   return wrapper
@@ -1206,7 +1255,7 @@ def _backoff(cycle, exponent, max_val=300.0):
   # Avoid overflows when calculating the power function.
   if cycle > 100:
     return max_val
-  dur = float(exponent)**cycle
+  dur = float(exponent) ** cycle
   if dur > max_val:
     return max_val
   return random.uniform(dur * 0.8, dur * 1.2)
@@ -1215,12 +1264,9 @@ def _backoff(cycle, exponent, max_val=300.0):
 class _BotLoopState:
   """The state of the main bot poll loop."""
 
-  def __init__(self,
-               botobj,
-               rbe_params,
-               rbe_bot_version,
-               quit_bit,
-               clock_impl=None):
+  def __init__(
+    self, botobj, rbe_params, rbe_bot_version, quit_bit, clock_impl=None
+  ):
     # Instance of Bot.
     self._bot = botobj
     # threading.Event signaled when the bot should gracefully exit.
@@ -1276,7 +1322,7 @@ class _BotLoopState:
     # mode. We should not give preference to Swarming. There are bots that
     # reboot after each task. If we prefer Swarming, such bots may never pick up
     # tasks from RBE.
-    self._next_scheduler = random.choice(['swarming', 'rbe'])
+    self._next_scheduler = random.choice(["swarming", "rbe"])
 
     # Turn on RBE mode if `/bot/handshake` indicated it should be used. This is
     # important in case the first poll should happen through RBE. Except we
@@ -1295,12 +1341,12 @@ class _BotLoopState:
     """
     while not self._quit_bit.is_set():
       if self._rbe_hybrid_mode:
-        logging.debug('Hybrid mode: %s', self._next_scheduler)
+        logging.debug("Hybrid mode: %s", self._next_scheduler)
 
       # Note: on_before_poll should always be called before get_state and
       # get_dimensions (i.e. before _update_bot_attributes). It's part of the
       # bot hooks API contract.
-      _call_hook_safe(False, self._bot, 'on_before_poll')
+      _call_hook_safe(False, self._bot, "on_before_poll")
       _update_bot_attributes(self._bot, self._consecutive_idle_cycles)
 
       # If dimensions has changed, notify Swarming to update the bot listing.
@@ -1308,7 +1354,7 @@ class _BotLoopState:
       # on every loop cycle.
       dims = self._bot.dimensions
       if dims != self._prev_dimensions:
-        logging.info('Dimensions has changed, need to notify Swarming')
+        logging.info("Dimensions has changed, need to notify Swarming")
         self._prev_dimensions = dims
         self._swarming_poll_timer.reset(0.0)
 
@@ -1319,8 +1365,9 @@ class _BotLoopState:
       # only if it is Swarming's turn. Do it by "forcing" a full poll. Otherwise
       # (if it is RBE's turn), we still need to call Swarming to report the bot
       # status and to get lifecycle commands. This is done by a non-forced poll.
-      swarming_forced = (self._rbe_hybrid_mode
-                         and self._next_scheduler == 'swarming')
+      swarming_forced = (
+        self._rbe_hybrid_mode and self._next_scheduler == "swarming"
+      )
 
       # Periodically call Python Swarming server to know when to update,
       # restart, pick up new config, etc.
@@ -1330,15 +1377,16 @@ class _BotLoopState:
         # Call again no matter what. Note this timer may be rescheduled below,
         # e.g. in cmd_sleep(...) or rbe_enable(...).
         self._swarming_poll_timer.reset(
-            _backoff(self._swarming_consecutive_errors, 1.4))
+          _backoff(self._swarming_consecutive_errors, 1.4)
+        )
 
       # Recognize commands that affect RBE state before we call `on_after_poll`
       # hook. We need to poll from RBE before we call the hook, and thus need
       # to know if RBE is enabled.
-      if cmd == 'rbe':
+      if cmd == "rbe":
         # Swarming asked us to use RBE and returned the fresh poll token.
         self.rbe_enable(param)
-      elif cmd == 'run':
+      elif cmd == "run":
         _manifest, rbe_params = param
         if rbe_params:
           # This can happen on a bot in a hybrid RBE mode when the server asks
@@ -1347,13 +1395,13 @@ class _BotLoopState:
         else:
           # No RBE params => it is a native Swarming bot, turn off RBE.
           self.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
-      elif cmd == 'sleep':
+      elif cmd == "sleep":
         # This can only happen for native Swarming bot, turn off RBE.
         self.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
-      elif cmd == 'terminate':
+      elif cmd == "terminate":
         # We are about to terminate the process for good. Tell RBE about that.
         self.rbe_status(remote_client.RBESessionStatus.BOT_TERMINATING)
-      elif cmd in ('update', 'bot_restart', 'host_reboot', 'restart'):
+      elif cmd in ("update", "bot_restart", "host_reboot", "restart"):
         # We are about to restart the bot or the host. Tell RBE about that.
         self.rbe_status(remote_client.RBESessionStatus.HOST_REBOOTING)
 
@@ -1376,49 +1424,51 @@ class _BotLoopState:
       rbe_lease = None
       if rbe_poll:
         rbe_lease = self.rbe_poll(
-            # If we are in the hybrid mode, report maintenance status if it is
-            # not RBE's turn to poll tasks from (i.e. we force-polled from
-            # Swarming). That way we "ping" the RBE session and keep it alive,
-            # but do not pick up any tasks.
-            maintenance=swarming_forced,
-            # Never block in the hybrid mode. If there are no RBE leases we need
-            # to sleep a bit and call Swarming instead of blocking on the
-            # server side waiting for an RBE lease.
-            #
-            # Also do not block if the previous poll returned some tasks. That
-            # way if the queue becomes empty, we'll notice it ASAP (instead of
-            # waiting for a new task to appear). If the queue was empty on the
-            # previous cycle, we'll block for real here. This mechanism is
-            # needed to reduce latency of reporting of the idle status to
-            # Swarming server, since some Swarming clients rely on it for
-            # scheduling.
-            blocking=not self._rbe_hybrid_mode and self.idle,
+          # If we are in the hybrid mode, report maintenance status if it is
+          # not RBE's turn to poll tasks from (i.e. we force-polled from
+          # Swarming). That way we "ping" the RBE session and keep it alive,
+          # but do not pick up any tasks.
+          maintenance=swarming_forced,
+          # Never block in the hybrid mode. If there are no RBE leases we need
+          # to sleep a bit and call Swarming instead of blocking on the
+          # server side waiting for an RBE lease.
+          #
+          # Also do not block if the previous poll returned some tasks. That
+          # way if the queue becomes empty, we'll notice it ASAP (instead of
+          # waiting for a new task to appear). If the queue was empty on the
+          # previous cycle, we'll block for real here. This mechanism is
+          # needed to reduce latency of reporting of the idle status to
+          # Swarming server, since some Swarming clients rely on it for
+          # scheduling.
+          blocking=not self._rbe_hybrid_mode and self.idle,
         )
         # Poll ASAP if in pure RBE mode. In hybrid mode the Swarming timer is
         # used instead.
         if self._rbe_poll_timer:
-          self._rbe_poll_timer.reset(_backoff(self._rbe_consecutive_errors,
-                                              1.4))
+          self._rbe_poll_timer.reset(
+            _backoff(self._rbe_consecutive_errors, 1.4)
+          )
 
       # In the hybrid mode after a polling cycle (even if idle or failed),
       # switch what scheduler should be used next time. We are alternating
       # between Swarming and RBE schedulers.
       if self._rbe_hybrid_mode:
-        if self._next_scheduler == 'swarming':
-          self._next_scheduler = 'rbe'
+        if self._next_scheduler == "swarming":
+          self._next_scheduler = "rbe"
         else:
-          self._next_scheduler = 'swarming'
+          self._next_scheduler = "swarming"
 
       # The polling operation is done. Treat an RBE lease as a `run` command
       # from Swarming. Many existing `on_after_poll` hooks expect to see `run`
       # command here before the task execution.
-      _call_hook_safe(False, self._bot, 'on_after_poll',
-                      'run' if rbe_lease else cmd)
+      _call_hook_safe(
+        False, self._bot, "on_after_poll", "run" if rbe_lease else cmd
+      )
 
       # Execute the Swarming instruction (unless it is `rbe`, which was already
       # handled) or the RBE lease. Note that both can be None if both polls
       # failed. We'll just do nothing this cycle.
-      if cmd and cmd != 'rbe':
+      if cmd and cmd != "rbe":
         self.swarming_handle_cmd(cmd, param)
       elif rbe_lease:
         self.rbe_handle_lease(rbe_lease)
@@ -1440,12 +1490,13 @@ class _BotLoopState:
       # self._rbe_poll_timer.reset(...) above. Same for pure Swarming mode. In
       # the hybrid mode we need to reset the Swarming timer, since it controls
       # polling.
-      if self._rbe_hybrid_mode and (cmd == 'run' or rbe_lease):
+      if self._rbe_hybrid_mode and (cmd == "run" or rbe_lease):
         self._swarming_poll_timer.reset(0.0)
 
       # Decide if this was an idle cycle.
-      logging.info('Swarming idle: %s, RBE idle: %s', self._swarming_idle,
-                   self._rbe_idle)
+      logging.info(
+        "Swarming idle: %s, RBE idle: %s", self._swarming_idle, self._rbe_idle
+      )
       report_idle = False
       if self._rbe_hybrid_mode:
         # In hybrid mode we need to do full polls from both Swarming and RBE
@@ -1473,14 +1524,16 @@ class _BotLoopState:
       with self._bot.mutate_internals() as mut:
         prev_idle = mut.update_idleness(currently_idle)
         mut.update_rbe_state(
-            self._rbe_intended_instance, self._rbe_hybrid_mode,
-            self._rbe_session.session_id if self._rbe_session else None)
+          self._rbe_intended_instance,
+          self._rbe_hybrid_mode,
+          self._rbe_session.session_id if self._rbe_session else None,
+        )
 
       # If the pure RBE bot switched into the idle state just now, report this
       # to Swarming ASAP. Bot idleness status surfaces in the UI and some
       # clients rely on it for scheduling.
       if currently_idle and not prev_idle and self._rbe_poll_timer:
-        logging.info('RBE: the bot became idle, need to report')
+        logging.info("RBE: the bot became idle, need to report")
         self._swarming_poll_timer.reset(0.0)
 
       # Call `on_bot_idle` hook only if the bot didn't execute any task this
@@ -1488,7 +1541,7 @@ class _BotLoopState:
       # executes tasks back to back with no idle time in-between, the hook
       # should **not** be called.
       if currently_idle:
-        _call_hook_safe(True, self._bot, 'on_bot_idle', self.idle_duration)
+        _call_hook_safe(True, self._bot, "on_bot_idle", self.idle_duration)
 
       # If there are "global" unexpected errors, throttle the loop. This is
       # a precaution against accidentally DDoS the server if there are bugs in
@@ -1506,9 +1559,13 @@ class _BotLoopState:
   @property
   def idle(self):
     """True if the bot didn't execute any tasks the last poll cycle."""
-    return (self._consecutive_idle_cycles or self._loop_consecutive_errors
-            or self._swarming_consecutive_errors or self._rbe_consecutive_errors
-            or self._bad_bot_state_errors)
+    return (
+      self._consecutive_idle_cycles
+      or self._loop_consecutive_errors
+      or self._swarming_consecutive_errors
+      or self._rbe_consecutive_errors
+      or self._bad_bot_state_errors
+    )
 
   @property
   def idle_duration(self):
@@ -1531,7 +1588,7 @@ class _BotLoopState:
   def on_idle_poll_cycle(self):
     """Called if a **successful** poll cycle didn't produce any tasks."""
     if self._rbe_hybrid_mode:
-      logging.debug('Hybrid mode: idle cycle')
+      logging.debug("Hybrid mode: idle cycle")
     self._consecutive_idle_cycles += 1
     # Managed to run an idle bot loop cycle. The bot code is good enough.
     _update_lkgbc(self._bot)
@@ -1554,16 +1611,16 @@ class _BotLoopState:
 
     Here `event` is either "exit" or "reboot".
     """
-    self._bot.post_event('bot_shutdown', 'Signal was received')
-    if event == 'exit':
+    self._bot.post_event("bot_shutdown", "Signal was received")
+    if event == "exit":
       self.rbe_disable(remote_client.RBESessionStatus.BOT_TERMINATING)
     else:
       self.rbe_disable(remote_client.RBESessionStatus.HOST_REBOOTING)
 
   def report_exception(self, msg):
     """Called to report an unexpected exception to Swarming server."""
-    logging.exception('%s', msg)
-    body = '%s\n%s' % (msg, traceback.format_exc()[-2048:])
+    logging.exception("%s", msg)
+    body = "%s\n%s" % (msg, traceback.format_exc()[-2048:])
     # Skip reporting the same error over and over again. Report it at most once
     # every 10 min.
     now = self._clock.now()
@@ -1580,7 +1637,8 @@ class _BotLoopState:
       self._loop_consecutive_errors = 0
     self._loop_iteration_had_errors = False
 
-    worst_error_count = max([
+    worst_error_count = max(
+      [
         # If not zero, something super sad happened. The bot is quarantined
         # already, but if it doesn't help, reduce the poll frequency to avoid
         # busy-looping and DDoS of the server. This state is reset only upon bot
@@ -1590,12 +1648,13 @@ class _BotLoopState:
         # were reported. Slow down if they keep happening, the bot is not
         # healthy. This is reset on a successful poll cycle.
         self._loop_consecutive_errors,
-    ])
+      ]
+    )
 
     # If there are errors, throttle the looping frequency.
     if worst_error_count:
       delay = _backoff(worst_error_count, 2.0)
-      logging.warning('Loop throttling: sleeping %.1f sec due to errors', delay)
+      logging.warning("Loop throttling: sleeping %.1f sec due to errors", delay)
       self._clock.sleep(delay)
 
   ##############################################################################
@@ -1613,9 +1672,9 @@ class _BotLoopState:
     """
     # Update the intended RBE state. This state will be eventually realized in
     # rbe_poll(...), perhaps after some retries.
-    self._rbe_intended_instance = rbe_state['instance']
+    self._rbe_intended_instance = rbe_state["instance"]
     self._rbe_intended_status = remote_client.RBESessionStatus.OK
-    self._rbe_hybrid_mode = rbe_state['hybrid_mode']
+    self._rbe_hybrid_mode = rbe_state["hybrid_mode"]
 
     # In the hybrid mode RBE polling is synchronized to the Swarming timer.
     # Cancel RBE timer, if any.
@@ -1629,10 +1688,14 @@ class _BotLoopState:
 
     # If we are changing the RBE instance, terminate the old session and
     # schedule a poll from the new session ASAP.
-    if (self._rbe_session
-        and self._rbe_session.instance != self._rbe_intended_instance):
-      logging.info('RBE: terminating session %s (switching instances)',
-                   self._rbe_session.session_id)
+    if (
+      self._rbe_session
+      and self._rbe_session.instance != self._rbe_intended_instance
+    ):
+      logging.info(
+        "RBE: terminating session %s (switching instances)",
+        self._rbe_session.session_id,
+      )
       self._rbe_session.terminate()
       self._rbe_session = None
       if self._rbe_poll_timer:
@@ -1645,7 +1708,7 @@ class _BotLoopState:
       # *twice* every full polling cycle (once after polling Swarming, once
       # after polling RBE). Note this timer may be rescheduled later if we end
       # up running a task (no need to sleep before the next poll in this case).
-      self._swarming_poll_timer.reset(rbe_state['sleep'] / 2.0)
+      self._swarming_poll_timer.reset(rbe_state["sleep"] / 2.0)
     else:
       # In pure RBE mode contact Python Swarming again ~2m from now. We'll
       # maintain this relatively low and constant polling frequency, since in
@@ -1657,8 +1720,8 @@ class _BotLoopState:
   def rbe_disable(self, status):
     """Terminates and forgets the RBE session and RBE state."""
     assert status in (
-        remote_client.RBESessionStatus.HOST_REBOOTING,
-        remote_client.RBESessionStatus.BOT_TERMINATING,
+      remote_client.RBESessionStatus.HOST_REBOOTING,
+      remote_client.RBESessionStatus.BOT_TERMINATING,
     ), status
     self._rbe_intended_instance = None
     self._rbe_intended_status = status
@@ -1666,8 +1729,11 @@ class _BotLoopState:
     self._rbe_idle = None
     self._rbe_consecutive_errors = 0
     if self._rbe_session:
-      logging.info('RBE: terminating session %s with status %s',
-                   self._rbe_session.session_id, self._rbe_intended_status)
+      logging.info(
+        "RBE: terminating session %s with status %s",
+        self._rbe_session.session_id,
+        self._rbe_intended_status,
+      )
       self._rbe_session.terminate(self._rbe_intended_status)
       self._rbe_session = None
     if self._rbe_poll_timer:
@@ -1680,9 +1746,9 @@ class _BotLoopState:
     # Note that MAINTENANCE status is used by rbe_poll(...) internally while
     # doing a "maintenance" pool. It can't be set via rbe_status(...).
     assert status in (
-        remote_client.RBESessionStatus.OK,
-        remote_client.RBESessionStatus.HOST_REBOOTING,
-        remote_client.RBESessionStatus.BOT_TERMINATING,
+      remote_client.RBESessionStatus.OK,
+      remote_client.RBESessionStatus.HOST_REBOOTING,
+      remote_client.RBESessionStatus.BOT_TERMINATING,
     ), status
     if self._rbe_intended_status != status:
       self._rbe_intended_status = status
@@ -1701,7 +1767,7 @@ class _BotLoopState:
     assert self._rbe_intended_instance
 
     if self._rbe_hybrid_mode:
-      logging.debug('Hybrid mode: poll RBE, maintenance:%s', maintenance)
+      logging.debug("Hybrid mode: poll RBE, maintenance:%s", maintenance)
 
     # An RBE session can die "between polls" while the bot was running a task
     # via task_runner subprocess. Abandon such session to recreate it below.
@@ -1719,21 +1785,26 @@ class _BotLoopState:
       # can happen if the bot is already shutting down. To avoid potential weird
       # issues if the shutdown fails due to errors, reschedule the poll some
       # time later by treating this state as a transient error.
-      if (self._rbe_intended_status != remote_client.RBESessionStatus.OK
-          or self._rbe_termination_pending):
-        logging.warning('The bot is terminating, refusing to open RBE session')
+      if (
+        self._rbe_intended_status != remote_client.RBESessionStatus.OK
+        or self._rbe_termination_pending
+      ):
+        logging.warning("The bot is terminating, refusing to open RBE session")
         self._rbe_consecutive_errors += 1
         return None
       # We need a healthy session. Try to create it.
       try:
-        logging.info('RBE: opening session at %s', self._rbe_intended_instance)
+        logging.info("RBE: opening session at %s", self._rbe_intended_instance)
         self._rbe_session = remote_client.RBESession(
-            self._bot.remote, self._rbe_intended_instance,
-            self._rbe_bot_version, self._bot.rbe_worker_properties)
-        logging.info('RBE: session is %s', self._rbe_session.session_id)
+          self._bot.remote,
+          self._rbe_intended_instance,
+          self._rbe_bot_version,
+          self._bot.rbe_worker_properties,
+        )
+        logging.info("RBE: session is %s", self._rbe_session.session_id)
         self._rbe_consecutive_errors = 0
       except remote_client_errors.RBEServerError as e:
-        self.report_exception('Failed to open RBE Session: %s' % e)
+        self.report_exception("Failed to open RBE Session: %s" % e)
         self._rbe_consecutive_errors += 1
         return None
 
@@ -1742,12 +1813,13 @@ class _BotLoopState:
     # Need to close it, otherwise update(...) below will perpetually complain
     # that there's an open lease. This should not really be happening.
     if self._rbe_session.active_lease:
-      self._rbe_session.finish_active_lease({
-          'bot_internal_error':
-          'Bot crashed before finishing the lease',
-      })
+      self._rbe_session.finish_active_lease(
+        {
+          "bot_internal_error": "Bot crashed before finishing the lease",
+        }
+      )
       self._rbe_consecutive_errors += 1
-      self._bot.post_error('Orphaned RBE lease, bot loop crashing?')
+      self._bot.post_error("Orphaned RBE lease, bot loop crashing?")
 
     # There's a healthy session, we can update it.
     try:
@@ -1758,8 +1830,12 @@ class _BotLoopState:
         report_status = remote_client.RBESessionStatus.BOT_TERMINATING
       elif report_status == remote_client.RBESessionStatus.OK and maintenance:
         report_status = remote_client.RBESessionStatus.MAINTENANCE
-      logging.info('RBE: updating %s as %s (blocking=%s)',
-                   self._rbe_session.session_id, report_status, blocking)
+      logging.info(
+        "RBE: updating %s as %s (blocking=%s)",
+        self._rbe_session.session_id,
+        report_status,
+        blocking,
+      )
       lease = self._rbe_session.update(report_status, blocking)
 
       # This session could have been closed (either by us or by the server).
@@ -1782,7 +1858,7 @@ class _BotLoopState:
 
     except remote_client_errors.RBEServerError as e:
       if self._rbe_consecutive_errors > 3:
-        self.report_exception('Failed to update RBE Session: %s' % e)
+        self.report_exception("Failed to update RBE Session: %s" % e)
       self._rbe_consecutive_errors += 1
       self._rbe_idle = None
       return None
@@ -1810,8 +1886,10 @@ class _BotLoopState:
       # But for the bare metal bots, we can't just shut down. There's nothing
       # that can revive them. Instead we'll treat such session as dead and get
       # a new one. Proceed to abandoning the session.
-      logging.warning('RBE: session %s is unexpectedly terminated by RBE',
-                      self._rbe_session.session_id)
+      logging.warning(
+        "RBE: session %s is unexpectedly terminated by RBE",
+        self._rbe_session.session_id,
+      )
 
     # Abandoning a session is a rare event. As a precaution against busy-looping
     # if something goes wrong treat a session closure as a transient error to
@@ -1823,46 +1901,57 @@ class _BotLoopState:
 
   def rbe_recognize_pending_termination(self):
     """Sets "termination is pending" flag and logs this."""
-    if (self._rbe_session and self._rbe_session.terminating
-        and not self._rbe_termination_pending):
-      logging.warning('RBE: the bot is terminated by the RBE server')
+    if (
+      self._rbe_session
+      and self._rbe_session.terminating
+      and not self._rbe_termination_pending
+    ):
+      logging.warning("RBE: the bot is terminated by the RBE server")
       self._rbe_termination_pending = True
 
   @_trap_all_exceptions
   def rbe_handle_lease(self, rbe_lease):
     """Executes the RBE lease."""
-    logging.info('RBE: got lease %s: %s', rbe_lease.id, rbe_lease.payload)
+    logging.info("RBE: got lease %s: %s", rbe_lease.id, rbe_lease.payload)
 
     # Close "noop" leases ASAP without hitting any other Swarming machinery.
     # They can be used to measure end-to-end RBE polling latency.
-    if rbe_lease.payload.get('noop'):
+    if rbe_lease.payload.get("noop"):
       self._rbe_session.finish_active_lease({})
       self.on_task_completed(True)
       return
 
     # At least `task_id` must be set. Integer-valued fields may be missing if
     # they are equal to 0 (per protobuf jsonpb encoding rules).
-    task_id = rbe_lease.payload['task_id']
-    task_to_run_shard = rbe_lease.payload.get('task_to_run_shard', 0)
-    task_to_run_id = rbe_lease.payload.get('task_to_run_id', 0)
+    task_id = rbe_lease.payload["task_id"]
+    task_to_run_shard = rbe_lease.payload.get("task_to_run_shard", 0)
+    task_to_run_id = rbe_lease.payload.get("task_to_run_id", 0)
 
     # Tell Swarming we are about to start working on this lease.
-    logging.info('RBE: claiming %s (shard %d, id %d)', task_id,
-                 task_to_run_shard, task_to_run_id)
-    cmd, param = self._bot.remote.claim(self._bot.attributes, rbe_lease.id,
-                                        task_id, task_to_run_shard,
-                                        task_to_run_id)
+    logging.info(
+      "RBE: claiming %s (shard %d, id %d)",
+      task_id,
+      task_to_run_shard,
+      task_to_run_id,
+    )
+    cmd, param = self._bot.remote.claim(
+      self._bot.attributes,
+      rbe_lease.id,
+      task_id,
+      task_to_run_shard,
+      task_to_run_id,
+    )
 
-    if cmd == 'skip':
-      logging.warning('RBE: skipping %s: %s', task_id, param)
-      self._rbe_session.finish_active_lease({'skip_reason': param or 'unknown'})
-    elif cmd == 'terminate':
+    if cmd == "skip":
+      logging.warning("RBE: skipping %s: %s", task_id, param)
+      self._rbe_session.finish_active_lease({"skip_reason": param or "unknown"})
+    elif cmd == "terminate":
       self.cmd_terminate(param)
       self._rbe_session.finish_active_lease({})
-    elif cmd == 'run':
+    elif cmd == "run":
       self.cmd_run(param, self._rbe_session)
     else:
-      raise ValueError('Unexpected claim outcome: %s' % cmd)
+      raise ValueError("Unexpected claim outcome: %s" % cmd)
 
   @_trap_all_exceptions
   def rbe_handle_termination(self):
@@ -1874,7 +1963,7 @@ class _BotLoopState:
       if self._bot.rbe_worker_properties:
         mut.update_auto_cleanup(True)
     # Set the quit bit only after the server acknowledged the termination.
-    self._bot.post_event('bot_shutdown', 'Terminated by RBE')
+    self._bot.post_event("bot_shutdown", "Terminated by RBE")
     self._quit_bit.set()
 
   ##############################################################################
@@ -1898,13 +1987,13 @@ class _BotLoopState:
     # We'll just log errors locally instead.
     try:
       if self._rbe_hybrid_mode:
-        logging.debug('Hybrid mode: poll Swarming, force:%s', force)
+        logging.debug("Hybrid mode: poll Swarming, force:%s", force)
       cmd, param = self._bot.remote.poll(self._bot.attributes, force)
-      logging.debug('Swarming poll response:\n%s: %s', cmd, param)
-      if cmd == 'sleep':
+      logging.debug("Swarming poll response:\n%s: %s", cmd, param)
+      if cmd == "sleep":
         # Pure Swarming bot, no tasks.
         self._swarming_idle = True
-      elif cmd != 'rbe':
+      elif cmd != "rbe":
         # Any kind of bot, have a pending task or some command.
         self._swarming_idle = False
       elif not self._rbe_hybrid_mode or force:
@@ -1915,7 +2004,7 @@ class _BotLoopState:
       self._swarming_consecutive_errors = 0
       return cmd, param
     except remote_client_errors.PollError as e:
-      logging.error('Swarming poll error: %s' % e)
+      logging.error("Swarming poll error: %s" % e)
       self._swarming_consecutive_errors += 1
       self._swarming_idle = None
       return None, None
@@ -1925,18 +2014,18 @@ class _BotLoopState:
 
     The `rbe` command is more complicated and is handled in the main loop body.
     """
-    if cmd == 'sleep':
+    if cmd == "sleep":
       self.cmd_sleep(param)
-    elif cmd == 'terminate':
+    elif cmd == "terminate":
       self.cmd_terminate(param)
-    elif cmd == 'run':
+    elif cmd == "run":
       manifest, _rbe_params = param
       self.cmd_run(manifest, self._rbe_session)
-    elif cmd == 'update':
+    elif cmd == "update":
       self.cmd_update(param)
-    elif cmd in ('host_reboot', 'restart'):
+    elif cmd in ("host_reboot", "restart"):
       self.cmd_host_reboot(param)
-    elif cmd == 'bot_restart':
+    elif cmd == "bot_restart":
       self.cmd_bot_restart(param)
     else:
       self.cmd_unknown(cmd)
@@ -1946,7 +2035,7 @@ class _BotLoopState:
     """Called if the Swarming command is unrecognized."""
     # Just report it via _trap_all_exceptions mechanism. It needs an exception
     # context for a stack trace.
-    raise ValueError('Unexpected Swarming command %s' % cmd)
+    raise ValueError("Unexpected Swarming command %s" % cmd)
 
   @_trap_all_exceptions
   def cmd_sleep(self, duration):
@@ -1962,7 +2051,7 @@ class _BotLoopState:
       # if there's an error here before, so let's preserve that behavior
       # (though anything that's not a remote_client.InternalError will make
       # it through, again preserving prior behavior).
-      self._bot.remote.post_task_update(task_id, {'duration': 0}, None, 0)
+      self._bot.remote.post_task_update(task_id, {"duration": 0}, None, 0)
     except remote_client_errors.InternalError:
       pass
 
@@ -1977,19 +2066,19 @@ class _BotLoopState:
   def cmd_update(self, version):
     """Called when Swarming asks the bot to self-update."""
     _update_bot(self._bot, version)
-    self._should_have_exited_but_didnt('Failed to self-update the bot')
+    self._should_have_exited_but_didnt("Failed to self-update the bot")
 
   @_trap_all_exceptions
   def cmd_host_reboot(self, message):
     """Called when Swarming asks the bot to reboot the host machine."""
     self._bot.host_reboot(message)
-    self._should_have_exited_but_didnt('Failed to reboot the host')
+    self._should_have_exited_but_didnt("Failed to reboot the host")
 
   @_trap_all_exceptions
   def cmd_bot_restart(self, message):
     """Called when Swarming asks the bot to restart its own process."""
     _bot_restart(self._bot, message)
-    self._should_have_exited_but_didnt('Failed to restart the bot process')
+    self._should_have_exited_but_didnt("Failed to restart the bot process")
 
   def _should_have_exited_but_didnt(self, message):
     _set_quarantined_until_restart(message)
@@ -2011,34 +2100,38 @@ def _do_handshake(botobj, quit_bit):
   loop_clock = clock.Clock(quit_bit)
   attempt = 0
   while not quit_bit.is_set():
-    logging.info('Swarming bot session ID: %s', botobj.session_id)
+    logging.info("Swarming bot session ID: %s", botobj.session_id)
     resp = botobj.remote.do_handshake(botobj.attributes, botobj.session_id)
     if resp:
-      logging.info('Connected to %s', resp.get('server_version'))
-      if resp.get('bot_version') != botobj.bot_version:
+      logging.info("Connected to %s", resp.get("server_version"))
+      if resp.get("bot_version") != botobj.bot_version:
         logging.warning(
-            'Found out we\'ll need to update: server said %s; we\'re %s',
-            resp.get('bot_version'), botobj.bot_version)
+          "Found out we'll need to update: server said %s; we're %s",
+          resp.get("bot_version"),
+          botobj.bot_version,
+        )
       # Register the Python module with bot hooks.
-      content = resp.get('bot_config')
-      rev = resp.get('bot_config_rev')
-      script = resp.get('bot_config_name')
+      content = resp.get("bot_config")
+      rev = resp.get("bot_config_rev")
+      script = resp.get("bot_config_name")
       if content:
         _register_extra_bot_config(content, rev, script)
       with botobj.mutate_internals() as mut:
         mut.update_bot_config(script, rev)
-        rbe_params = resp.get('rbe')
+        rbe_params = resp.get("rbe")
         if rbe_params:
-          mut.update_rbe_state(rbe_params['instance'],
-                               rbe_params['hybrid_mode'], None)
-        bot_group_cfg = resp.get('bot_group_cfg')
+          mut.update_rbe_state(
+            rbe_params["instance"], rbe_params["hybrid_mode"], None
+          )
+        bot_group_cfg = resp.get("bot_group_cfg")
         if bot_group_cfg:
           mut.update_bot_group_cfg(bot_group_cfg)
       return rbe_params
     attempt += 1
     sleep_time = _backoff(attempt, 2.0)
     logging.error(
-        'Failed to contact for handshake, retrying in %d sec...', sleep_time)
+      "Failed to contact for handshake, retrying in %d sec...", sleep_time
+    )
     loop_clock.sleep(sleep_time)
   return None
 
@@ -2054,9 +2147,9 @@ def _update_bot(botobj, version):
   Returns only in case of failure to get the new bot code.
   """
   # Alternate between .1.zip and .2.zip.
-  new_zip = 'swarming_bot.1.zip'
+  new_zip = "swarming_bot.1.zip"
   if os.path.basename(THIS_FILE) == new_zip:
-    new_zip = 'swarming_bot.2.zip'
+    new_zip = "swarming_bot.2.zip"
   new_zip = os.path.join(botobj.base_dir, new_zip)
 
   # Download as a new file.
@@ -2065,7 +2158,7 @@ def _update_bot(botobj, version):
   except remote_client.BotCodeError as e:
     botobj.post_error(str(e))
   else:
-    _bot_restart(botobj, 'Updating to %s' % version, filepath=new_zip)
+    _bot_restart(botobj, "Updating to %s" % version, filepath=new_zip)
 
 
 def _bot_restart(botobj, message, filepath=None):
@@ -2075,27 +2168,29 @@ def _bot_restart(botobj, message, filepath=None):
   """
   filepath = filepath or THIS_FILE
   s = fs.stat(filepath)
-  logging.info('Restarting to %s; %d bytes.', filepath, s.st_size)
+  logging.info("Restarting to %s; %d bytes.", filepath, s.st_size)
   sys.stdout.flush()
   sys.stderr.flush()
 
-  proc = _Popen(botobj, [sys.executable, filepath, 'is_fine'])
+  proc = _Popen(botobj, [sys.executable, filepath, "is_fine"])
   output, _ = proc.communicate()
   if proc.returncode:
     botobj.post_error(
-        'New bot code is bad: proc exit = %s. stdout:\n%s' %
-        (proc.returncode, output))
-    if sys.platform == 'win32' and proc.returncode == -1073741502:
+      "New bot code is bad: proc exit = %s. stdout:\n%s"
+      % (proc.returncode, output)
+    )
+    if sys.platform == "win32" and proc.returncode == -1073741502:
       # STATUS_DLL_INIT_FAILED generally means that something bad happened, and
       # a reboot magically clears things out. :(
       botobj.host_reboot(
-          'Working around STATUS_DLL_INIT_FAILED when restarting the bot')
+        "Working around STATUS_DLL_INIT_FAILED when restarting the bot"
+      )
     return
 
-  botobj.post_event('bot_shutdown', 'About to restart: %s' % message)
+  botobj.post_event("bot_shutdown", "About to restart: %s" % message)
 
   # Do the final cleanup, if any. Note we aren't rebooting the host here.
-  botobj.run_lifecycle_callbacks('exit')
+  botobj.run_lifecycle_callbacks("exit")
 
   # Sleep a bit to make sure new bot process connects to a GAE instance with
   # the fresh bot group config cache (it gets refreshed each second). This makes
@@ -2110,10 +2205,10 @@ def _bot_restart(botobj, message, filepath=None):
   # to outlive the new code child process. Launchd really wants the main process
   # to survive, and it'll restart it if it disappears. os.exec*() replaces the
   # process so this is fine.
-  cmd = [filepath, 'start_slave', '--survive']
+  cmd = [filepath, "start_slave", "--survive"]
   if _IN_TEST_MODE:
-    cmd.append('--test-mode')
-  logging.debug('Restarting bot, cmd: %s', cmd)
+    cmd.append("--test-mode")
+  logging.debug("Restarting bot, cmd: %s", cmd)
   ret = common.exec_python(cmd)
   if ret in (1073807364, -1073741510):
     # 1073807364 is returned when the process is killed due to shutdown. No need
@@ -2124,7 +2219,7 @@ def _bot_restart(botobj, message, filepath=None):
     # In any case, zap out the error code.
     ret = 0
   elif ret:
-    botobj.post_error('Bot failed to respawn after update: %s' % ret)
+    botobj.post_error("Bot failed to respawn after update: %s" % ret)
   sys.exit(ret)
 
 
@@ -2136,10 +2231,10 @@ def _update_lkgbc(botobj):
   try:
     if not fs.isfile(THIS_FILE):
       # TODO(maruel): Try to download the code again from the server.
-      botobj.post_error('Missing file %s for LKGBC' % THIS_FILE)
+      botobj.post_error("Missing file %s for LKGBC" % THIS_FILE)
       return False
 
-    golden = os.path.join(botobj.base_dir, 'swarming_bot.zip')
+    golden = os.path.join(botobj.base_dir, "swarming_bot.zip")
     if fs.isfile(golden):
       org = fs.stat(golden)
       cur = fs.stat(THIS_FILE)
@@ -2147,11 +2242,11 @@ def _update_lkgbc(botobj):
         return False
 
     # Copy the current file back to LKGBC.
-    logging.info('Updating LKGBC')
+    logging.info("Updating LKGBC")
     shutil.copy(THIS_FILE, golden)
     return True
   except Exception as e:
-    botobj.post_error('Failed to update LKGBC: %s' % e)
+    botobj.post_error("Failed to update LKGBC: %s" % e)
     return False
 
 
@@ -2171,52 +2266,55 @@ def main(argv):
 
   # Add SWARMING_HEADLESS into environ so subcommands know that they are running
   # in a headless (non-interactive) mode.
-  os.environ['SWARMING_HEADLESS'] = '1'
+  os.environ["SWARMING_HEADLESS"] = "1"
 
   # Kick out any lingering env vars that will be set later.
-  os.environ.pop('SWARMING_SERVER', None)
-  os.environ.pop('SWARMING_TASK_ID', None)
+  os.environ.pop("SWARMING_SERVER", None)
+  os.environ.pop("SWARMING_TASK_ID", None)
 
   # The only reason this is kept is to enable the unit test to use --help to
   # quit the process.
   parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
-  parser.add_argument('unsupported', nargs='*', help=argparse.SUPPRESS)
-  parser.add_argument('--test-mode', action='store_true')
+  parser.add_argument("unsupported", nargs="*", help=argparse.SUPPRESS)
+  parser.add_argument("--test-mode", action="store_true")
   args = parser.parse_args(argv)
 
   global _IN_TEST_MODE
   _IN_TEST_MODE = args.test_mode
   if _IN_TEST_MODE:
-    logging.debug('bot_main running in TEST mode')
+    logging.debug("bot_main running in TEST mode")
 
-  if sys.platform == 'win32':
-    if not file_path.enable_privilege('SeShutdownPrivilege'):
-      logging.error('Failed to enable SeShutdownPrivilege')
+  if sys.platform == "win32":
+    if not file_path.enable_privilege("SeShutdownPrivilege"):
+      logging.error("Failed to enable SeShutdownPrivilege")
 
   # Enforces that only one process with a bot in this directory can be run on
   # this host at once.
   if not SINGLETON.acquire():
-    if sys.platform == 'darwin':
+    if sys.platform == "darwin":
       msg = (
-          'Found a previous bot, %d rebooting as a workaround for '
-          'https://crbug.com/569610.') % os.getpid()
+        "Found a previous bot, %d rebooting as a workaround for "
+        "https://crbug.com/569610."
+      ) % os.getpid()
     else:
-      msg = ('Found a previous bot, %d rebooting as a workaround for '
-             'https://crbug.com/1061531' % os.getpid())
+      msg = (
+        "Found a previous bot, %d rebooting as a workaround for "
+        "https://crbug.com/1061531" % os.getpid()
+      )
     print(msg, file=sys.stderr)
     _PRE_REBOOT_SLEEP_SECS = 5 * 60
-    print('Sleeping for %s secs' % _PRE_REBOOT_SLEEP_SECS, file=sys.stderr)
+    print("Sleeping for %s secs" % _PRE_REBOOT_SLEEP_SECS, file=sys.stderr)
     time.sleep(_PRE_REBOOT_SLEEP_SECS)
     os_utilities.host_reboot(msg)
     return 1
 
   base_dir = os.path.dirname(THIS_FILE)
-  for t in ('out', 'err'):
-    log_path = os.path.join(base_dir, 'logs', 'bot_std%s.log' % t)
+  for t in ("out", "err"):
+    log_path = os.path.join(base_dir, "logs", "bot_std%s.log" % t)
     os_utilities.roll_log(log_path)
     os_utilities.trim_rolled_log(log_path)
 
   error = None
   if len(args.unsupported) != 0:
-    error = 'Unexpected arguments: %s' % args
+    error = "Unexpected arguments: %s" % args
   return _run_bot(error)

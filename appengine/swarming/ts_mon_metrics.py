@@ -21,14 +21,19 @@ from server import task_result
 # - id is unique for each bot.
 # - temp_band is android specific.
 # Keep in sync with ../swarming_bot/bot_code/bot_main.py
-_IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id', 'server_version',
-                       'temp_band')
+_IGNORED_DIMENSIONS = (
+  "android_devices",
+  "caches",
+  "id",
+  "server_version",
+  "temp_band",
+)
 
 # Override default target fields for app-global metrics.
 _TARGET_FIELDS = {
-    'job_name': '',  # module name
-    'hostname': '',  # version
-    'task_num': 0,  # instance ID
+  "job_name": "",  # module name
+  "hostname": "",  # version
+  "task_num": 0,  # instance ID
 }
 
 
@@ -37,29 +42,30 @@ _TARGET_FIELDS = {
 
 # Custom bucketer with 12% resolution in the range of 1..10**5. Used for job
 # cycle times.
-_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
-                                         num_finite_buckets=100)
+_bucketer = gae_ts_mon.GeometricBucketer(
+  growth_factor=10**0.05, num_finite_buckets=100
+)
 
 # Custom bucketer with 2% resolution in the range of 100ms...100s. Used for
 # pubsub latency measurements.
 # Roughly speaking measurements range between 150ms and 300ms. However timeout
 # for pubsub notification is 10s.
-_pubsub_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
-                                                num_finite_buckets=300,
-                                                scale=10)
+_pubsub_bucketer = gae_ts_mon.GeometricBucketer(
+  growth_factor=10**0.01, num_finite_buckets=300, scale=10
+)
 
 # Custom bucketer with 2% resolution in the range of 100ms...100000s. Used for
 # task scheduling latency measurements.
-_scheduler_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
-                                                   num_finite_buckets=600,
-                                                   scale=100)
+_scheduler_bucketer = gae_ts_mon.GeometricBucketer(
+  growth_factor=10**0.01, num_finite_buckets=600, scale=100
+)
 
 # Custom bucketer with 2% resolution in the range of 100ms...100000s. Used for
 # task dead detection latency.
 # cron job runs every 60s, but can also fail for a few hours.
-_detection_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
-                                                   num_finite_buckets=600,
-                                                   scale=100)
+_detection_bucketer = gae_ts_mon.GeometricBucketer(
+  growth_factor=10**0.01, num_finite_buckets=600, scale=100
+)
 
 # Regular (instance-local) metrics: jobs/completed and jobs/durations.
 # Both have the following metric fields:
@@ -70,29 +76,33 @@ _detection_bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.01,
 # - spec_name: name of a job specification.
 # - result: one of 'success', 'failure', or 'infra-failure'.
 _jobs_completed = gae_ts_mon.CounterMetric(
-    'jobs/completed',
-    'Number of completed jobs.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('rbe'),
-        gae_ts_mon.StringField('result'),
-        gae_ts_mon.StringField('status'),
-    ])
+  "jobs/completed",
+  "Number of completed jobs.",
+  [
+    gae_ts_mon.StringField("spec_name"),
+    gae_ts_mon.StringField("project_id"),
+    gae_ts_mon.StringField("subproject_id"),
+    gae_ts_mon.StringField("pool"),
+    gae_ts_mon.StringField("rbe"),
+    gae_ts_mon.StringField("result"),
+    gae_ts_mon.StringField("status"),
+  ],
+)
 
 
 _jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
-    'jobs/durations',
-    'Cycle times of completed jobs, in seconds.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('rbe'),
-        gae_ts_mon.StringField('result'),
-    ],
-    bucketer=_bucketer)
+  "jobs/durations",
+  "Cycle times of completed jobs, in seconds.",
+  [
+    gae_ts_mon.StringField("spec_name"),
+    gae_ts_mon.StringField("project_id"),
+    gae_ts_mon.StringField("subproject_id"),
+    gae_ts_mon.StringField("pool"),
+    gae_ts_mon.StringField("rbe"),
+    gae_ts_mon.StringField("result"),
+  ],
+  bucketer=_bucketer,
+)
 
 
 # Similar to jobs/completed and jobs/duration, but with a dedup field.
@@ -103,15 +113,17 @@ _jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
 # - rbe: RBE instance of the task or literal 'none'.
 # - deduped: boolean describing whether the job was deduped or not.
 _jobs_requested = gae_ts_mon.CounterMetric(
-    'jobs/requested',
-    'Number of requested jobs over time.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('rbe'),
-        gae_ts_mon.BooleanField('deduped'),
-    ])
+  "jobs/requested",
+  "Number of requested jobs over time.",
+  [
+    gae_ts_mon.StringField("spec_name"),
+    gae_ts_mon.StringField("project_id"),
+    gae_ts_mon.StringField("subproject_id"),
+    gae_ts_mon.StringField("pool"),
+    gae_ts_mon.StringField("rbe"),
+    gae_ts_mon.BooleanField("deduped"),
+  ],
+)
 
 
 # Swarming-specific metric. Metric fields:
@@ -122,66 +134,74 @@ _jobs_requested = gae_ts_mon.CounterMetric(
 # - rbe: RBE instance of the task or literal 'none'.
 # - priority: priority of a task.
 _tasks_expired = gae_ts_mon.CounterMetric(
-    'swarming/tasks/expired', 'Number of expired tasks', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('rbe'),
-        gae_ts_mon.IntegerField('priority'),
-    ])
+  "swarming/tasks/expired",
+  "Number of expired tasks",
+  [
+    gae_ts_mon.StringField("spec_name"),
+    gae_ts_mon.StringField("project_id"),
+    gae_ts_mon.StringField("subproject_id"),
+    gae_ts_mon.StringField("pool"),
+    gae_ts_mon.StringField("rbe"),
+    gae_ts_mon.IntegerField("priority"),
+  ],
+)
 
 
 # Swarming-specific metric. Metric fields:
 # - project_id: e.g. 'chromium'.
 # - rbe: RBE instance of the task or literal 'none'.
 _tasks_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
-    'swarming/tasks/expiration_delay',
-    'Delay of task expiration, in seconds.', [
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('rbe'),
-    ])
+  "swarming/tasks/expiration_delay",
+  "Delay of task expiration, in seconds.",
+  [
+    gae_ts_mon.StringField("project_id"),
+    gae_ts_mon.StringField("rbe"),
+  ],
+)
 
 
 # Swarming-specific metric. Metric fields:
 # - project_id: e.g. 'chromium'.
 # - rbe: RBE instance of the task or literal 'none'.
 _tasks_slice_expiration_delay = gae_ts_mon.CumulativeDistributionMetric(
-    'swarming/tasks/slice_expiration_delay',
-    'Delay of task slice expiration, in seconds.',
-    [
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('rbe'),
-        gae_ts_mon.IntegerField('slice_index'),
-        gae_ts_mon.StringField('reason'),
-    ],
-    bucketer=gae_ts_mon.FixedWidthBucketer(width=30),
+  "swarming/tasks/slice_expiration_delay",
+  "Delay of task slice expiration, in seconds.",
+  [
+    gae_ts_mon.StringField("project_id"),
+    gae_ts_mon.StringField("rbe"),
+    gae_ts_mon.IntegerField("slice_index"),
+    gae_ts_mon.StringField("reason"),
+  ],
+  bucketer=gae_ts_mon.FixedWidthBucketer(width=30),
 )
 
 # Instance metric. Metric fields:
 # - auth_method = one of 'luci_token', 'service_account', 'ip_whitelist'.
 # - condition = depends on the auth method (e.g. email for 'service_account').
 _bot_auth_successes = gae_ts_mon.CounterMetric(
-    'swarming/bot_auth/success',
-    'Number of successful bot authentication events', [
-        gae_ts_mon.StringField('auth_method'),
-        gae_ts_mon.StringField('condition'),
-    ])
+  "swarming/bot_auth/success",
+  "Number of successful bot authentication events",
+  [
+    gae_ts_mon.StringField("auth_method"),
+    gae_ts_mon.StringField("condition"),
+  ],
+)
 
 # Instance metric. Metric fields:
 # - pool: e.g. 'skia'.
 # - status: e.g. 'User canceled'.
 # - http_status_code: e.g. 404.
-_task_state_change_pubsub_notify_latencies = \
+_task_state_change_pubsub_notify_latencies = (
   gae_ts_mon.CumulativeDistributionMetric(
-    'swarming/tasks/state_change_pubsub_notify_latencies',
-    'Latency (in ms) of PubSub notification when backend receives task_update',
+    "swarming/tasks/state_change_pubsub_notify_latencies",
+    "Latency (in ms) of PubSub notification when backend receives task_update",
     [
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('status'),
-        gae_ts_mon.IntegerField('http_status_code')
+      gae_ts_mon.StringField("pool"),
+      gae_ts_mon.StringField("status"),
+      gae_ts_mon.IntegerField("http_status_code"),
     ],
     bucketer=_pubsub_bucketer,
+  )
 )
 
 # Instance metric. Measures the latency for Swarming to recognise a task
@@ -189,32 +209,30 @@ _task_state_change_pubsub_notify_latencies = \
 # Metric fields:
 # - pool: e.g. 'skia'.
 # - cron: e.g. True if dead task was initiated by cron job, False otherwise
-_dead_task_detection_latencies = \
-  gae_ts_mon.CumulativeDistributionMetric(
-    'swarming/tasks/dead_task_detection_latencies',
-    'Latency (in ms) of task scheduling request',
-    [
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.BooleanField('cron'),
-    ],
-    bucketer=_detection_bucketer,
+_dead_task_detection_latencies = gae_ts_mon.CumulativeDistributionMetric(
+  "swarming/tasks/dead_task_detection_latencies",
+  "Latency (in ms) of task scheduling request",
+  [
+    gae_ts_mon.StringField("pool"),
+    gae_ts_mon.BooleanField("cron"),
+  ],
+  bucketer=_detection_bucketer,
 )
 
 # Instance metric. Metric fields:
 # - pool: e.g. 'skia'.
 # - spec_name: 'linux_chromium_tsan_rel_ng'
 # - status: e.g. 'No resource available'.
-_task_state_change_schedule_latencies = \
-  gae_ts_mon.CumulativeDistributionMetric(
-    'swarming/tasks/state_change_scheduling_latencies',
-    'Latency (in ms) of task scheduling request',
-    [
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('status'),
-        gae_ts_mon.StringField('device_type'),
-    ],
-    bucketer=_scheduler_bucketer,
+_task_state_change_schedule_latencies = gae_ts_mon.CumulativeDistributionMetric(
+  "swarming/tasks/state_change_scheduling_latencies",
+  "Latency (in ms) of task scheduling request",
+  [
+    gae_ts_mon.StringField("pool"),
+    gae_ts_mon.StringField("spec_name"),
+    gae_ts_mon.StringField("status"),
+    gae_ts_mon.StringField("device_type"),
+  ],
+  bucketer=_scheduler_bucketer,
 )
 
 # Instance metric. Metric fields:
@@ -223,55 +241,60 @@ _task_state_change_schedule_latencies = \
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
 # - pool: e.g. 'Chrome'.
 # - rbe: RBE instance of the task or literal 'none'.
-_ttr_consume_latencies = \
-  gae_ts_mon.CumulativeDistributionMetric(
-    'swarming/tasks/ttr_consume_latencies',
-    'Latency (in ms) between TaskToRun is created and consumed',
-    [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('rbe'),
-    ],
-    bucketer=_scheduler_bucketer,
+_ttr_consume_latencies = gae_ts_mon.CumulativeDistributionMetric(
+  "swarming/tasks/ttr_consume_latencies",
+  "Latency (in ms) between TaskToRun is created and consumed",
+  [
+    gae_ts_mon.StringField("spec_name"),
+    gae_ts_mon.StringField("project_id"),
+    gae_ts_mon.StringField("subproject_id"),
+    gae_ts_mon.StringField("pool"),
+    gae_ts_mon.StringField("rbe"),
+  ],
+  bucketer=_scheduler_bucketer,
 )
 
 # Instance metric. Metric fields:
 # - pool: e.g. 'skia'.
 # - queue_count: number of queues scanned in parallel (up to 30).
 _scheduler_scans = gae_ts_mon.CounterMetric(
-    'swarming/scheduler/scans', 'Number of queue scans', [
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.IntegerField('queue_count'),
-    ])
+  "swarming/scheduler/scans",
+  "Number of queue scans",
+  [
+    gae_ts_mon.StringField("pool"),
+    gae_ts_mon.IntegerField("queue_count"),
+  ],
+)
 
 # Instance metric. Metric fields:
 # - pool: e.g. 'skia'.
 # - status: 'claimed', 'expired', etc.
 _scheduler_visits = gae_ts_mon.CumulativeDistributionMetric(
-    'swarming/scheduler/visits',
-    'Distribution of TaskToRunShard visited per scan', [
-        gae_ts_mon.StringField('pool'),
-        gae_ts_mon.StringField('status'),
-    ],
-    bucketer=gae_ts_mon.FixedWidthBucketer(width=5))
+  "swarming/scheduler/visits",
+  "Distribution of TaskToRunShard visited per scan",
+  [
+    gae_ts_mon.StringField("pool"),
+    gae_ts_mon.StringField("status"),
+  ],
+  bucketer=gae_ts_mon.FixedWidthBucketer(width=5),
+)
 
 # Number of timeouts. Metric fields:
 # - endpoint: e.g. 'bot/poll'
 # - stage: e.g. 'assert_bot_async'
 # - exception: e.g. 'DeadlineExceededError'
 _handler_timeouts = gae_ts_mon.CounterMetric(
-    'swarming/api/timeouts', 'Number of timeout events in API handlers.', [
-        gae_ts_mon.StringField('endpoint'),
-        gae_ts_mon.StringField('stage'),
-        gae_ts_mon.StringField('exception'),
-    ])
+  "swarming/api/timeouts",
+  "Number of timeout events in API handlers.",
+  [
+    gae_ts_mon.StringField("endpoint"),
+    gae_ts_mon.StringField("stage"),
+    gae_ts_mon.StringField("exception"),
+  ],
+)
 
 
 ### Private stuff.
-
-
 
 
 def _tags_to_dict(tags):
@@ -283,7 +306,7 @@ def _tags_to_dict(tags):
   tags_dict = {}
   for tag in tags:
     try:
-      key, value = tag.split(':', 1)
+      key, value = tag.split(":", 1)
       tags_dict[key] = value
     except ValueError:
       pass
@@ -300,7 +323,7 @@ def _extract_given_job_fields(tags, tag_names):
   tags_dict = _tags_to_dict(tags)
   fields = {}
   for tag in tag_names:
-    fields[tag] = tags_dict.get(tag, '')
+    fields[tag] = tags_dict.get(tag, "")
   return fields
 
 
@@ -310,13 +333,13 @@ def _extract_spec_name_field(tags_dict):
   Args:
     tags_dict: tags dictionary.
   """
-  spec_name = tags_dict.get('spec_name')
+  spec_name = tags_dict.get("spec_name")
   if not spec_name:
-    spec_name = tags_dict.get('buildername', '')
-    if tags_dict.get('build_is_experimental') == 'true':
-      spec_name += ':experimental'
-  if not spec_name and tags_dict.get('terminate') == '1':
-    return 'swarming:terminate'
+    spec_name = tags_dict.get("buildername", "")
+    if tags_dict.get("build_is_experimental") == "true":
+      spec_name += ":experimental"
+  if not spec_name and tags_dict.get("terminate") == "1":
+    return "swarming:terminate"
   return spec_name
 
 
@@ -327,21 +350,22 @@ def _extract_job_fields(tags_dict):
     tags_dict: tags dictionary.
   """
   fields = {
-      'project_id': tags_dict.get('project', ''),
-      'subproject_id': tags_dict.get('subproject', ''),
-      'pool': tags_dict.get('pool', ''),
-      'spec_name': _extract_spec_name_field(tags_dict),
-      'rbe': tags_dict.get('rbe', 'none'),
+    "project_id": tags_dict.get("project", ""),
+    "subproject_id": tags_dict.get("subproject", ""),
+    "pool": tags_dict.get("pool", ""),
+    "spec_name": _extract_spec_name_field(tags_dict),
+    "rbe": tags_dict.get("rbe", "none"),
   }
   return fields
 
 
 ### Public API.
 
+
 def on_task_requested(summary, deduped):
   """When a task is created."""
   fields = _extract_job_fields(_tags_to_dict(summary.tags))
-  fields['deduped'] = deduped
+  fields["deduped"] = deduped
   _jobs_requested.increment(fields=fields)
 
 
@@ -349,19 +373,19 @@ def on_task_completed(summary):
   """When a task is stopped from being processed."""
   fields = _extract_job_fields(_tags_to_dict(summary.tags))
   if summary.state == task_result.State.EXPIRED:
-    fields['priority'] = summary.priority
+    fields["priority"] = summary.priority
     _tasks_expired.increment(fields=fields)
     return
 
   if summary.internal_failure:
-    fields['result'] = 'infra-failure'
+    fields["result"] = "infra-failure"
   elif summary.failure:
-    fields['result'] = 'failure'
+    fields["result"] = "failure"
   else:
-    fields['result'] = 'success'
+    fields["result"] = "success"
 
   completed_fields = fields.copy()
-  completed_fields['status'] = task_result.State.to_string(summary.state)
+  completed_fields["status"] = task_result.State.to_string(summary.state)
   _jobs_completed.increment(fields=completed_fields)
   if summary.duration is not None:
     _jobs_durations.add(summary.duration, fields=fields)
@@ -371,17 +395,18 @@ def on_task_expired(summary, task_to_run, reason):
   """When a task slice is expired."""
   tags_dict = _tags_to_dict(summary.tags)
   fields = {
-      'project_id': tags_dict.get('project', ''),
-      'rbe': tags_dict.get('rbe', 'none'),
+    "project_id": tags_dict.get("project", ""),
+    "rbe": tags_dict.get("rbe", "none"),
   }
 
   # slice expiration delay
   if task_to_run.expiration_delay is not None:
     _tasks_slice_expiration_delay.add(
-        task_to_run.expiration_delay,
-        fields=dict(fields,
-                    slice_index=task_to_run.task_slice_index,
-                    reason=reason))
+      task_to_run.expiration_delay,
+      fields=dict(
+        fields, slice_index=task_to_run.task_slice_index, reason=reason
+      ),
+    )
 
   # task expiration delay
   if summary.expiration_delay is not None:
@@ -396,67 +421,85 @@ def on_task_to_run_consumed(summary, task_to_run):
 
 
 def on_bot_auth_success(auth_method, condition):
-  _bot_auth_successes.increment(fields={
-      'auth_method': auth_method,
-      'condition': condition,
-  })
+  _bot_auth_successes.increment(
+    fields={
+      "auth_method": auth_method,
+      "condition": condition,
+    }
+  )
 
 
-def on_task_status_change_pubsub_latency(tags, state, http_status_code,
-                                         latency):
-  fields = _extract_given_job_fields(tags, [
-      'pool',
-  ])
-  fields['status'] = task_result.State.to_string(state)
-  fields['http_status_code'] = http_status_code
-  logging.debug('Incrementing ts_mon PubSub notification count with fields=%s',
-                fields)
+def on_task_status_change_pubsub_latency(
+  tags, state, http_status_code, latency
+):
+  fields = _extract_given_job_fields(
+    tags,
+    [
+      "pool",
+    ],
+  )
+  fields["status"] = task_result.State.to_string(state)
+  fields["http_status_code"] = http_status_code
+  logging.debug(
+    "Incrementing ts_mon PubSub notification count with fields=%s", fields
+  )
   _task_state_change_pubsub_notify_latencies.add(latency, fields=fields)
 
 
 def on_task_status_change_scheduler_latency(summary):
-  fields = _extract_given_job_fields(summary.tags, [
-      'pool', 'device_type',
-  ])
-  fields['spec_name'] = _extract_spec_name_field(_tags_to_dict(summary.tags))
-  fields['status'] = task_result.State.to_string(summary.state)
+  fields = _extract_given_job_fields(
+    summary.tags,
+    [
+      "pool",
+      "device_type",
+    ],
+  )
+  fields["spec_name"] = _extract_spec_name_field(_tags_to_dict(summary.tags))
+  fields["status"] = task_result.State.to_string(summary.state)
   latency = summary.pending_now(utils.utcnow())
-  _task_state_change_schedule_latencies.add(round(latency.total_seconds() *
-                                                  1000),
-                                            fields=fields)
+  _task_state_change_schedule_latencies.add(
+    round(latency.total_seconds() * 1000), fields=fields
+  )
 
 
 def on_dead_task_detection_latency(tags, latency, cron):
-  fields = _extract_given_job_fields(tags, [
-      'pool',
-  ])
-  fields['cron'] = cron
-  _dead_task_detection_latencies.add(round(latency.total_seconds() * 1000),
-                                     fields=fields)
+  fields = _extract_given_job_fields(
+    tags,
+    [
+      "pool",
+    ],
+  )
+  fields["cron"] = cron
+  _dead_task_detection_latencies.add(
+    round(latency.total_seconds() * 1000), fields=fields
+  )
 
 
 def on_scheduler_scan(pool, queue_count):
   _scheduler_scans.increment(
-      fields={
-          'pool': pool,
-          'queue_count': 30 if queue_count > 30 else queue_count,
-      })
+    fields={
+      "pool": pool,
+      "queue_count": 30 if queue_count > 30 else queue_count,
+    }
+  )
 
 
 def on_scheduler_visits(pool, claimed, mismatch, stale, total, visited):
   def add(key, val):
-    _scheduler_visits.add(val, fields={'pool': pool, 'status': key})
+    _scheduler_visits.add(val, fields={"pool": pool, "status": key})
 
-  add('claimed', claimed)
-  add('mismatch', mismatch)
-  add('stale', stale)
-  add('total', total)
-  add('visited', visited)
+  add("claimed", claimed)
+  add("mismatch", mismatch)
+  add("stale", stale)
+  add("total", total)
+  add("visited", visited)
 
 
 def on_handler_timeout(endpoint, stage, exception):
-  _handler_timeouts.increment(fields={
-      'endpoint': endpoint,
-      'stage': stage,
-      'exception': exception,
-  })
+  _handler_timeouts.increment(
+    fields={
+      "endpoint": endpoint,
+      "stage": stage,
+      "exception": exception,
+    }
+  )

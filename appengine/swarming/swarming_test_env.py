@@ -11,4 +11,5 @@ APP_DIR = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
 def setup_test_env():
   """Sets up App Engine test environment."""
   from test_support import test_env
+
   test_env.setup_test_env(APP_DIR)

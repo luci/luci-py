@@ -4,4 +4,4 @@
 # that can be found in the LICENSE file.
 
 # Or dimension separtor
-OR_DIM_SEP = '|'
+OR_DIM_SEP = "|"

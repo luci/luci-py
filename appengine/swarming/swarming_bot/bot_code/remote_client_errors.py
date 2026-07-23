@@ -7,16 +7,18 @@ class InitializationError(Exception):
   """Raised by RemoteClient.initialize on fatal errors."""
 
   def __init__(self, last_error):
-    super(InitializationError, self).__init__('Failed to grab auth headers')
+    super(InitializationError, self).__init__("Failed to grab auth headers")
     self.last_error = last_error
 
 
 class BotCodeError(Exception):
   """Raised by RemoteClient.get_bot_code."""
+
   def __init__(self, new_zip, url, version):
-    super(BotCodeError,
-          self).__init__('Unable to download %s from %s; first tried version %s'
-                         % (new_zip, url, version))
+    super(BotCodeError, self).__init__(
+      "Unable to download %s from %s; first tried version %s"
+      % (new_zip, url, version)
+    )
 
 
 class ClaimError(Exception):

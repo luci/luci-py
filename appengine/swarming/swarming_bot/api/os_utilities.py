@@ -34,6 +34,7 @@ import urllib.error
 import urllib.parse
 
 from utils import tools
+
 tools.force_local_third_party()
 
 # third_party/
@@ -47,52 +48,52 @@ from utils import fs
 
 # https://cloud.google.com/compute/pricing#machinetype
 GCE_MACHINE_COST_HOUR_US = {
-    'n1-standard-1': 0.050,
-    'n1-standard-2': 0.100,
-    'n1-standard-4': 0.200,
-    'n1-standard-8': 0.400,
-    'n1-standard-16': 0.800,
-    'n1-standard-32': 1.600,
-    'f1-micro': 0.008,
-    'g1-small': 0.027,
-    'n1-highmem-2': 0.126,
-    'n1-highmem-4': 0.252,
-    'n1-highmem-8': 0.504,
-    'n1-highmem-16': 1.008,
-    'n1-highmem-32': 2.016,
-    'n1-highcpu-2': 0.076,
-    'n1-highcpu-4': 0.152,
-    'n1-highcpu-8': 0.304,
-    'n1-highcpu-16': 0.608,
-    'n1-highcpu-32': 1.216,
+  "n1-standard-1": 0.050,
+  "n1-standard-2": 0.100,
+  "n1-standard-4": 0.200,
+  "n1-standard-8": 0.400,
+  "n1-standard-16": 0.800,
+  "n1-standard-32": 1.600,
+  "f1-micro": 0.008,
+  "g1-small": 0.027,
+  "n1-highmem-2": 0.126,
+  "n1-highmem-4": 0.252,
+  "n1-highmem-8": 0.504,
+  "n1-highmem-16": 1.008,
+  "n1-highmem-32": 2.016,
+  "n1-highcpu-2": 0.076,
+  "n1-highcpu-4": 0.152,
+  "n1-highcpu-8": 0.304,
+  "n1-highcpu-16": 0.608,
+  "n1-highcpu-32": 1.216,
 }
 
 # https://cloud.google.com/compute/pricing#machinetype
 GCE_MACHINE_COST_HOUR_EUROPE_ASIA = {
-    'n1-standard-1': 0.055,
-    'n1-standard-2': 0.110,
-    'n1-standard-4': 0.220,
-    'n1-standard-8': 0.440,
-    'n1-standard-16': 0.880,
-    'n1-standard-32': 1.760,
-    'f1-micro': 0.009,
-    'g1-small': 0.030,
-    'n1-highmem-2': 0.139,
-    'n1-highmem-4': 0.278,
-    'n1-highmem-8': 0.556,
-    'n1-highmem-16': 1.112,
-    'n1-highmem-32': 2.224,
-    'n1-highcpu-2': 0.084,
-    'n1-highcpu-4': 0.168,
-    'n1-highcpu-8': 0.336,
-    'n1-highcpu-16': 0.672,
-    'n1-highcpu-32': 1.344,
+  "n1-standard-1": 0.055,
+  "n1-standard-2": 0.110,
+  "n1-standard-4": 0.220,
+  "n1-standard-8": 0.440,
+  "n1-standard-16": 0.880,
+  "n1-standard-32": 1.760,
+  "f1-micro": 0.009,
+  "g1-small": 0.030,
+  "n1-highmem-2": 0.139,
+  "n1-highmem-4": 0.278,
+  "n1-highmem-8": 0.556,
+  "n1-highmem-16": 1.112,
+  "n1-highmem-32": 2.224,
+  "n1-highcpu-2": 0.084,
+  "n1-highcpu-4": 0.168,
+  "n1-highcpu-8": 0.336,
+  "n1-highcpu-16": 0.672,
+  "n1-highcpu-32": 1.344,
 }
 
 GCE_RAM_GB_PER_CORE_RATIOS = {
-    0.9: 'n1-highcpu-',
-    3.75: 'n1-standard-',
-    6.5: 'n1-highmem-',
+  0.9: "n1-highcpu-",
+  3.75: "n1-standard-",
+  6.5: "n1-highmem-",
 }
 
 
@@ -105,8 +106,8 @@ GCE_SSD_GB_COST_MONTH = 0.17
 GCE_WINDOWS_COST_CORE_HOUR = 0.04
 
 
-MONITORING_ENDPOINT = 'https://www.googleapis.com/cloudmonitoring/v2beta2'
-MONITORING_SCOPES = ['https://www.googleapis.com/auth/monitoring']
+MONITORING_ENDPOINT = "https://www.googleapis.com/cloudmonitoring/v2beta2"
+MONITORING_SCOPES = ["https://www.googleapis.com/auth/monitoring"]
 
 
 ### Private stuff.
@@ -118,20 +119,20 @@ _STARTED_TS = time.time()
 
 def _write(filepath, content):
   """Writes out a file and returns True on success."""
-  logging.info('Writing in %s:\n%s', filepath, content)
+  logging.info("Writing in %s:\n%s", filepath, content)
   try:
-    with open(filepath, mode='w') as f:
+    with open(filepath, mode="w") as f:
       f.write(content)
     return True
   except IOError as e:
-    logging.error('Failed to write %s: %s', filepath, e)
+    logging.error("Failed to write %s: %s", filepath, e)
     return False
 
 
 def _safe_read(filepath):
   """Returns the content of the file if possible, None otherwise."""
   try:
-    with open(filepath, 'rb') as f:
+    with open(filepath, "rb") as f:
       return f.read()
   except (IOError, OSError):
     return None
@@ -149,36 +150,36 @@ def get_os_values():
   """
   os_name = get_os_name()
   out = [os_name]
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     # On Windows, do not use the version numbers, use the marketing name
     # instead.
     names = platforms.win.get_os_version_names()
-    out.extend('%s-%s' % (os_name, n) for n in names)
-  elif sys.platform == 'cygwin':
+    out.extend("%s-%s" % (os_name, n) for n in names)
+  elif sys.platform == "cygwin":
     # ... except on cygwin.
-    out.append('%s-%s' % (os_name, platforms.win.get_os_version_number()))
-  elif sys.platform == 'darwin':
+    out.append("%s-%s" % (os_name, platforms.win.get_os_version_number()))
+  elif sys.platform == "darwin":
     # Expects '10.a.b'. Add both '10.a' and '10.a.b'.
     number = platforms.osx.get_os_version_number()
     build = platforms.osx.get_os_build_version()
     version_parts = get_os_version_parts(number, os_name)
     out.extend(version_parts)
-    out.append('%s-%s-%s' % (os_name, number, build))
-  elif sys.platform == 'linux':
+    out.append("%s-%s-%s" % (os_name, number, build))
+  elif sys.platform == "linux":
     # TODO(crbug/1018836): Get rid of this, Linux is not an OS, it's a kernel.
-    out.append('Linux')
+    out.append("Linux")
     number = platforms.linux.get_os_version_number()
-    version = ''
-    for i in number.split('.'):
-      version += '.' + i
-      out.append('%s-%s' % (os_name, version[1:]))
+    version = ""
+    for i in number.split("."):
+      version += "." + i
+      out.append("%s-%s" % (os_name, version[1:]))
   else:
     # Split a release into chunks, saving the separators.
-    parts = re.split(r'([-._])', platform.release())
+    parts = re.split(r"([-._])", platform.release())
     # Rejoin, first just the first part, then a separator and the next part
     # 7.1_FOO -> [7, 7.1, 7.1_FOO]
     for i in range(len(parts) // 2 + 1):
-      out.append('%s-%s' % (os_name, ''.join(parts[:i * 2 + 1])))
+      out.append("%s-%s" % (os_name, "".join(parts[: i * 2 + 1])))
 
   out.sort()
   return out
@@ -188,12 +189,12 @@ def get_python_versions():
   """Returns the values to use for 'python' dimension as a list."""
   v = sys.version_info
   return [
-      '%s' % v.major,
-      '%s.%s' % (v.major, v.minor),
-      # Use sys.version instead of sys.version_info to keep
-      # additional biuld information after micro version.
-      # e.g. 3.8.0+chromium.8
-      sys.version.split()[0],
+    "%s" % v.major,
+    "%s.%s" % (v.major, v.minor),
+    # Use sys.version instead of sys.version_info to keep
+    # additional biuld information after micro version.
+    # e.g. 3.8.0+chromium.8
+    sys.version.split()[0],
   ]
 
 
@@ -207,27 +208,27 @@ def get_os_name():
     Windows, Mac, Ubuntu, Raspbian, etc.
   """
   value = {
-      'cygwin': 'Windows',
-      # TODO(maruel): 'Mac' is an historical accident, it should be named 'OSX'.
-      'darwin': 'Mac',
-      'win32': 'Windows',
-      'sunos5': 'Solaris',
+    "cygwin": "Windows",
+    # TODO(maruel): 'Mac' is an historical accident, it should be named 'OSX'.
+    "darwin": "Mac",
+    "win32": "Windows",
+    "sunos5": "Solaris",
   }.get(sys.platform)
   if value:
     return value
 
-  if sys.platform == 'linux':
+  if sys.platform == "linux":
     # Try to figure out the distro. Supported distros are Debian, Ubuntu,
     # Raspbian.
     # Add support for other OSes as relevant.
-    content = _safe_read('/etc/os-release')
+    content = _safe_read("/etc/os-release")
     if content:
-      os_release = dict(l.split(b'=', 1) for l in content.splitlines() if l)
-      os_id = os_release.get(b'ID').strip(b'"').decode('utf-8')
+      os_release = dict(l.split(b"=", 1) for l in content.splitlines() if l)
+      os_id = os_release.get(b"ID").strip(b'"').decode("utf-8")
       # Uppercase the first letter for consistency with the other platforms.
       return os_id[0].upper() + os_id[1:]
 
-  return sys.platform.lower().rstrip('0123456789.-_')
+  return sys.platform.lower().rstrip("0123456789.-_")
 
 
 @tools.cached
@@ -236,34 +237,34 @@ def get_cpu_type():
   # On Windows prefer to use WMI: it is more accurate. Fallback to
   # platform.machine() if the WMI method is not available (e.g. pywin32 is
   # missing).
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     cpu_type = platforms.win.get_cpu_type_with_wmi()
-    if cpu_type in ('amd64', 'i686'):
-      return 'x86'
+    if cpu_type in ("amd64", "i686"):
+      return "x86"
     if cpu_type:
       return cpu_type  # e.g. `arm64`
-  elif sys.platform.startswith('aix'):
+  elif sys.platform.startswith("aix"):
     # platform.machine() returns the aix machine ID (uname -m), which is
     # not useful. Modern AIX only supports powerpc64.
-    return 'ppc64'
-  elif sys.platform.startswith('netbsd') and platform.machine() == 'evbarm':
+    return "ppc64"
+  elif sys.platform.startswith("netbsd") and platform.machine() == "evbarm":
     # NetBSD has multiple ARM sub-platforms.
     processor = platform.processor().lower()
-    if processor == 'aarch64':
-      return 'arm64'
+    if processor == "aarch64":
+      return "arm64"
     # The following are not quite accurate, since there are also big-endian
     # variants. E.g. earmv7hfeb is ARMv7, hardware FPU, big-endian.
-    if processor.startswith('earmv6'):
-      return 'armv6l'
-    if processor.startswith('earmv'):
-      return 'armv7l'
+    if processor.startswith("earmv6"):
+      return "armv6l"
+    if processor.startswith("earmv"):
+      return "armv7l"
   machine = platform.machine().lower()
-  if machine in ('amd64', 'x86_64', 'i386', 'i686', 'i86pc'):
-    return 'x86'
-  if machine == 'aarch64':
-    return 'arm64'
-  if machine == 'mips64':
-    return 'mips'
+  if machine in ("amd64", "x86_64", "i386", "i686", "i86pc"):
+    return "x86"
+  if machine == "aarch64":
+    return "arm64"
+  if machine == "mips64":
+    return "mips"
   return machine
 
 
@@ -281,35 +282,35 @@ def get_cpu_bitness():
   # On Windows prefer to use WMI: it is more accurate. Fallback to
   # platform.machine() if the WMI method is not available (e.g. pywin32 is
   # missing).
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     cpu_type = platforms.win.get_cpu_type_with_wmi()
     try:
       bitness = {
-          'amd64': '64',
-          'arm64': '64',
-          'i686': '32',
-          None: None,  # need to fallback to `platform.machine()`
+        "amd64": "64",
+        "arm64": "64",
+        "i686": "32",
+        None: None,  # need to fallback to `platform.machine()`
       }[cpu_type]
       if bitness:
         return bitness
     except KeyError as e:
-      logging.error('Unrecognized Windows CPU type %s', e)
+      logging.error("Unrecognized Windows CPU type %s", e)
 
-  if sys.platform in ('darwin', 'win32') and platform.machine().endswith('64'):
-    return '64'
-  return '64' if sys.maxsize > 2**32 else '32'
+  if sys.platform in ("darwin", "win32") and platform.machine().endswith("64"):
+    return "64"
+  return "64" if sys.maxsize > 2**32 else "32"
 
 
 def get_cipd_os():
   """Returns the bots CIPD OS variant (e.g. `linux`, `mac`)."""
   os_name = {
-      'darwin': 'mac',
-      'linux': 'linux',
-      'win32': 'windows',
-      'sunos5': 'solaris',
+    "darwin": "mac",
+    "linux": "linux",
+    "win32": "windows",
+    "sunos5": "solaris",
   }.get(sys.platform)
   if not os_name:
-    os_name = sys.platform.lower().rstrip('0123456789.-_')
+    os_name = sys.platform.lower().rstrip("0123456789.-_")
   return os_name
 
 
@@ -322,21 +323,21 @@ def get_cipd_architecture():
   bot is running through an emulation layer.
   """
   cpu_type = get_cpu_type()
-  if cpu_type == 'x86':
-    return 'amd64' if get_cpu_bitness() == '64' else '386'
-  if cpu_type.startswith('armv') and cpu_type.endswith('l'):
-    if get_cipd_os() == 'netbsd':
+  if cpu_type == "x86":
+    return "amd64" if get_cpu_bitness() == "64" else "386"
+  if cpu_type.startswith("armv") and cpu_type.endswith("l"):
+    if get_cipd_os() == "netbsd":
       return cpu_type
     # 32-bit ARM: Standardize on ARM v6 baseline.
-    return 'armv6l'
-  if cpu_type == 'evbarm':  # NetBSD's name for ARM, both 32 and 64-bit
-    return 'arm64' if get_cpu_bitness() == '64' else 'armv6l'
-  if cpu_type == 'powerpc64':  # OpenBSD's name for ppc64
-    return 'ppc64'
-  if cpu_type == 'riscv':
-    return 'riscv64' if get_cpu_bitness() == '64' else 'riscv'
-  if cpu_type == 'loongarch64':
-    return 'loong64'
+    return "armv6l"
+  if cpu_type == "evbarm":  # NetBSD's name for ARM, both 32 and 64-bit
+    return "arm64" if get_cpu_bitness() == "64" else "armv6l"
+  if cpu_type == "powerpc64":  # OpenBSD's name for ppc64
+    return "ppc64"
+  if cpu_type == "riscv":
+    return "riscv64" if get_cpu_bitness() == "64" else "riscv"
+  if cpu_type == "loongarch64":
+    return "loong64"
 
   # TODO(vadimsh): Detection of following architectures is likely broken:
   #   mips64, mips64le, mipsle, ppc64, ppc64le.
@@ -352,11 +353,11 @@ def _parse_intel_model(name):
   # regexp than try to make one that matches them all.
   # They shall be in decreasing order of precision.
   regexps = [
-      r' ([a-zA-Z]\d-\d{4}[A-Z]{0,2} [vV]\d) ',
-      r' ([a-zA-Z]\d-\d{4}[A-Z]{0,2}) ',
-      r' ([A-Z]\d{4}[A-Z]{0,2}) ',
-      # As generated by platforms.gce.get_cpuinfo():
-      r' ((:?[A-Z][a-z]+ )+GCE)',
+    r" ([a-zA-Z]\d-\d{4}[A-Z]{0,2} [vV]\d) ",
+    r" ([a-zA-Z]\d-\d{4}[A-Z]{0,2}) ",
+    r" ([A-Z]\d{4}[A-Z]{0,2}) ",
+    # As generated by platforms.gce.get_cpuinfo():
+    r" ((:?[A-Z][a-z]+ )+GCE)",
   ]
   for r in regexps:
     m = re.search(r, name)
@@ -370,25 +371,25 @@ def get_cpu_dimensions():
   cpu_type = get_cpu_type()
   bitness = get_cpu_bitness()
   info = get_cpuinfo()
-  out = [cpu_type, '%s-%s' % (cpu_type, bitness)]
-  if 'avx2' in info.get('flags', []):
-    out.append('%s-%s-%s' % (cpu_type, bitness, 'avx2'))
+  out = [cpu_type, "%s-%s" % (cpu_type, bitness)]
+  if "avx2" in info.get("flags", []):
+    out.append("%s-%s-%s" % (cpu_type, bitness, "avx2"))
 
-  vendor = info.get('vendor') or ''
-  name = info.get('name') or ''
-  if 'GenuineIntel' == vendor:
+  vendor = info.get("vendor") or ""
+  name = info.get("name") or ""
+  if "GenuineIntel" == vendor:
     model = _parse_intel_model(name)
     if model:
-      out.append('%s-%s-%s' % (cpu_type, bitness, model.replace(' ', '_')))
-  elif cpu_type.startswith('arm'):
+      out.append("%s-%s-%s" % (cpu_type, bitness, model.replace(" ", "_")))
+  elif cpu_type.startswith("arm"):
     if name:
-      out.append('%s-%s-%s' % (cpu_type, bitness, name.replace(' ', '_')))
-    if cpu_type != 'arm':
-      out.append('arm')
-      out.append('arm-' + bitness)
-  elif cpu_type.startswith('mips') or cpu_type.startswith('ppc64'):
+      out.append("%s-%s-%s" % (cpu_type, bitness, name.replace(" ", "_")))
+    if cpu_type != "arm":
+      out.append("arm")
+      out.append("arm-" + bitness)
+  elif cpu_type.startswith("mips") or cpu_type.startswith("ppc64"):
     if name:
-      out.append('%s-%s-%s' % (cpu_type, bitness, name.replace(' ', '_')))
+      out.append("%s-%s-%s" % (cpu_type, bitness, name.replace(" ", "_")))
   # else AMD like "AMD PRO A6-8500B R5, 6 Compute Cores 2C+4G     "
 
   out.sort()
@@ -398,13 +399,13 @@ def get_cpu_dimensions():
 @tools.cached
 def get_cpuinfo():
   """Returns the flags of the processor."""
-  if sys.platform == 'darwin':
+  if sys.platform == "darwin":
     info = platforms.osx.get_cpuinfo()
-  elif sys.platform == 'win32':
+  elif sys.platform == "win32":
     info = platforms.win.get_cpuinfo()
-  elif sys.platform == 'linux':
+  elif sys.platform == "linux":
     info = platforms.linux.get_cpuinfo()
-  elif sys.platform == 'aix':
+  elif sys.platform == "aix":
     info = platforms.aix.get_cpuinfo()
   else:
     info = {}
@@ -426,7 +427,7 @@ def get_ip():
     # This doesn't actually connect to the Google DNS server but this forces the
     # network system to figure out an IP interface to use.
     try:
-      s.connect(('8.8.8.8', 80))
+      s.connect(("8.8.8.8", 80))
       return s.getsockname()[0]
     except socket.error:
       # Can raise "error: [Errno 10051] A socket operation was attempted to an
@@ -434,7 +435,7 @@ def get_ip():
       # this function to crash.
       if i == max_tries - 1:
         # Can't determine the IP.
-        return '0.0.0.0'
+        return "0.0.0.0"
       time.sleep(0.05)
     finally:
       s.close()
@@ -443,18 +444,18 @@ def get_ip():
 @tools.cached
 def get_hostname():
   """Returns the machine's hostname."""
-  if platforms.is_gce() and not os.path.isfile('/.dockerenv'):
+  if platforms.is_gce() and not os.path.isfile("/.dockerenv"):
     # When running on GCE, always use the hostname as defined by GCE. It's
     # possible the VM hadn't learned about it yet. We ignore GCE hostname when
     # running inside a Docker container and instead use its own hostname.
     meta = platforms.gce.get_metadata() or {}
-    hostname = meta.get('instance', {}).get('hostname')
+    hostname = meta.get("instance", {}).get("hostname")
     if hostname:
       return hostname
 
   # Windows enjoys putting random case in there. Enforces lower case for sanity.
   hostname = socket.getfqdn().lower()
-  if hostname.endswith('.in-addr.arpa'):
+  if hostname.endswith(".in-addr.arpa"):
     # When OSX fails to get the FDQN, it returns as the base name the IPv4
     # address reversed, which is not useful. Get the base hostname as defined by
     # the host itself instead of the FQDN since the returned FQDN is useless.
@@ -465,7 +466,7 @@ def get_hostname():
 @tools.cached
 def get_hostname_short():
   """Returns the base host name."""
-  return get_hostname().split('.', 1)[0]
+  return get_hostname().split(".", 1)[0]
 
 
 @tools.cached
@@ -475,47 +476,46 @@ def get_num_processors():
   Python on OSX 10.6 raises a NotImplementedError exception.
   """
   try:
-    if sys.platform == 'linux':
+    if sys.platform == "linux":
       return platforms.linux.get_num_processors()
     # Multiprocessing
     return multiprocessing.cpu_count()
   except:  # pylint: disable=W0702
     try:
       # Mac OS 10.6
-      return int(os.sysconf('SC_NPROCESSORS_ONLN'))  # pylint: disable=E1101
+      return int(os.sysconf("SC_NPROCESSORS_ONLN"))  # pylint: disable=E1101
     except:
       # Returns non-zero, otherwise it could generate a divide by zero later
       # when doing calculations, leading to a crash. Saw it happens on Win2K8R2
       # on python 2.7.5 on cygwin 1.7.28.
-      logging.error('get_num_processors() failed to query number of cores')
+      logging.error("get_num_processors() failed to query number of cores")
       # Return an improbable number to make it easier to catch.
       return 5
 
 
 @tools.cached
 def get_physical_ram():
-  """Returns the amount of installed RAM in Mb, rounded to the nearest number.
-  """
-  if sys.platform == 'win32':
+  """Returns the amount of installed RAM in Mb, rounded to the nearest number."""
+  if sys.platform == "win32":
     return platforms.win.get_physical_ram()
-  if sys.platform == 'darwin':
+  if sys.platform == "darwin":
     return platforms.osx.get_physical_ram()
-  if sys.platform == 'linux':
-    meminfo = _safe_read('/proc/meminfo') or ''
-    matched = re.search(br'MemTotal:\s+(\d+) kB', meminfo)
+  if sys.platform == "linux":
+    meminfo = _safe_read("/proc/meminfo") or ""
+    matched = re.search(rb"MemTotal:\s+(\d+) kB", meminfo)
     if matched:
-      mb = int(matched.groups()[0]) / 1024.
-      if 0. < mb < 1.:
+      mb = int(matched.groups()[0]) / 1024.0
+      if 0.0 < mb < 1.0:
         return 1
       return int(round(mb))
-    logging.error('get_physical_ram() failed to query amount of physical RAM')
+    logging.error("get_physical_ram() failed to query amount of physical RAM")
 
   return 0
 
 
 def get_disks_info():
   """Returns a dict of dict of free and total disk space."""
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     return platforms.win.get_disks_info()
   return platforms.posix.get_disks_info()
 
@@ -525,29 +525,31 @@ def get_disk_size(path):
   """Returns the partition size that is referenced by this path in Mb."""
   # Find the disk for the path.
   path = os.path.realpath(path)
-  paths = sorted(((p, k['size_mb']) for p, k in get_disks_info().items()),
-                 key=lambda x: -len(x[0]))
+  paths = sorted(
+    ((p, k["size_mb"]) for p, k in get_disks_info().items()),
+    key=lambda x: -len(x[0]),
+  )
   # It'd be nice if it were possible to know on a per-path basis, e.g. you can
   # have both case sensitive and insensitive partitions mounted on OSX.
-  case_insensitive = sys.platform in ('darwin', 'win32')
+  case_insensitive = sys.platform in ("darwin", "win32")
   if case_insensitive:
     path = path.lower()
   for base, size_mb in paths:
     if path.startswith(base.lower() if case_insensitive else base):
       return size_mb
   # We have no idea.
-  return 0.
+  return 0.0
 
 
 def get_audio():
   """Returns the active audio card(s)."""
   # There's a risk that an audio card may "appear", which may be especially true
   # on OSX when an audio cable is plugged in.
-  if sys.platform == 'darwin':
+  if sys.platform == "darwin":
     return platforms.osx.get_audio()
-  if sys.platform == 'linux':
+  if sys.platform == "linux":
     return platforms.linux.get_audio()
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     return platforms.win.get_audio()
   return None
 
@@ -561,19 +563,19 @@ def get_gpu():
     All the video cards detected.
     tuple(list(dimensions), list(state)).
   """
-  if sys.platform == 'darwin':
+  if sys.platform == "darwin":
     dimensions, state = platforms.osx.get_gpu()
-  elif sys.platform == 'linux':
+  elif sys.platform == "linux":
     dimensions, state = platforms.linux.get_gpu()
-  elif sys.platform == 'win32':
+  elif sys.platform == "win32":
     dimensions, state = platforms.win.get_gpu()
   else:
     dimensions, state = None, None
 
   # 15ad is VMWare. It's akin not having a GPU card so replace it with the
   # string 'none'.
-  if not dimensions or '15ad' in dimensions:
-    dimensions = ['none']
+  if not dimensions or "15ad" in dimensions:
+    dimensions = ["none"]
   dimensions.sort()
   return dimensions, state
 
@@ -581,7 +583,7 @@ def get_gpu():
 @tools.cached
 def get_monitor_hidpi():
   """Returns '1' if there is an hidpi monitor detected."""
-  if sys.platform == 'darwin':
+  if sys.platform == "darwin":
     return [platforms.osx.get_monitor_hidpi()]
   return None
 
@@ -592,22 +594,22 @@ def get_cost_hour():
   # Machine.
   machine_type = get_machine_type()
   if platforms.is_gce():
-    if platforms.gce.get_zone().startswith('us-'):
-      machine_cost = GCE_MACHINE_COST_HOUR_US.get(machine_type, 0.)
+    if platforms.gce.get_zone().startswith("us-"):
+      machine_cost = GCE_MACHINE_COST_HOUR_US.get(machine_type, 0.0)
     else:
-      machine_cost = GCE_MACHINE_COST_HOUR_EUROPE_ASIA.get(machine_type, 0.)
+      machine_cost = GCE_MACHINE_COST_HOUR_EUROPE_ASIA.get(machine_type, 0.0)
   else:
     # Guess an equivalent machine_type.
-    machine_cost = GCE_MACHINE_COST_HOUR_US.get(machine_type, 0.)
+    machine_cost = GCE_MACHINE_COST_HOUR_US.get(machine_type, 0.0)
 
   # OS.
-  os_cost = 0.
-  if sys.platform == 'darwin':
+  os_cost = 0.0
+  if sys.platform == "darwin":
     # Apple tax. It's 50% better, right?
     os_cost = GCE_WINDOWS_COST_CORE_HOUR * 1.5 * get_num_processors()
-  elif sys.platform == 'win32':
+  elif sys.platform == "win32":
     # MS tax.
-    if machine_type in ('f1-micro', 'g1-small'):
+    if machine_type in ("f1-micro", "g1-small"):
       os_cost = 0.02
     else:
       os_cost = GCE_WINDOWS_COST_CORE_HOUR * get_num_processors()
@@ -615,10 +617,11 @@ def get_cost_hour():
   # Disk.
   # TODO(maruel): Figure out the disk type. The metadata is not useful AFAIK.
   # Assume HDD for now, it's the cheapest. That's not true, we do have SSDs.
-  disk_gb_cost = 0.
+  disk_gb_cost = 0.0
   for disk in get_disks_info().values():
-    disk_gb_cost += disk['free_mb'] / 1024. * (GCE_HDD_GB_COST_MONTH / 30. /
-                                               24.)
+    disk_gb_cost += (
+      disk["free_mb"] / 1024.0 * (GCE_HDD_GB_COST_MONTH / 30.0 / 24.0)
+    )
 
   # TODO(maruel): Network. It's not a constant cost, it's per task.
   # See https://cloud.google.com/monitoring/api/metrics
@@ -636,20 +639,20 @@ def get_machine_type():
   if platforms.is_gce():
     return platforms.gce.get_machine_type()
 
-  ram_gb = get_physical_ram() / 1024.
+  ram_gb = get_physical_ram() / 1024.0
   cores = get_num_processors()
   ram_gb_per_core = ram_gb / cores
-  logging.info('RAM GB/core = %.3f', ram_gb_per_core)
+  logging.info("RAM GB/core = %.3f", ram_gb_per_core)
   best_fit = None
   for ratio, prefix in GCE_RAM_GB_PER_CORE_RATIOS.items():
-    delta = (ram_gb_per_core-ratio)**2
+    delta = (ram_gb_per_core - ratio) ** 2
     if best_fit is None or delta < best_fit[0]:
       best_fit = (delta, prefix)
   prefix = best_fit[1]
   machine_type = prefix + str(cores)
   if machine_type not in GCE_MACHINE_COST_HOUR_US:
     # Try a best fit.
-    logging.info('Failed to find a good machine_type match: %s', machine_type)
+    logging.info("Failed to find a good machine_type match: %s", machine_type)
     for i in (16, 8, 4, 2):
       if cores > i:
         machine_type = prefix + str(i)
@@ -658,13 +661,13 @@ def get_machine_type():
       if cores == 1:
         # There's no n1-highcpu-1 nor n1-highmem-1.
         if ram_gb < 1.7:
-          machine_type = 'f1-micro'
+          machine_type = "f1-micro"
         elif ram_gb < 3.75:
-          machine_type = 'g1-small'
+          machine_type = "g1-small"
         else:
-          machine_type = 'n1-standard-1'
+          machine_type = "n1-standard-1"
       else:
-        logging.info('Failed to find a fit: %s', machine_type)
+        logging.info("Failed to find a fit: %s", machine_type)
 
   if machine_type not in GCE_MACHINE_COST_HOUR_US:
     return None
@@ -676,7 +679,7 @@ def get_locale():
   """Returns the OS's UI active locale."""
   locales = locale.getlocale()
   if locales[0]:
-    return '.'.join(locales)
+    return ".".join(locales)
 
 
 def get_uptime():
@@ -684,14 +687,14 @@ def get_uptime():
 
   May or may not include sleep time.
   """
-  if sys.platform == 'darwin':
+  if sys.platform == "darwin":
     return platforms.osx.get_uptime()
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     return platforms.win.get_uptime()
-  if sys.platform == 'linux':
+  if sys.platform == "linux":
     return platforms.linux.get_uptime()
   # Not important.
-  return 0.
+  return 0.0
 
 
 def get_reboot_required():
@@ -699,23 +702,23 @@ def get_reboot_required():
 
   This is not guaranteed to notice all conditions that could require reboot.
   """
-  if sys.platform == 'darwin':
+  if sys.platform == "darwin":
     # There doesn't seem to be a good way to do this for OSX.
     return False
-  if sys.platform == 'win32' or sys.platform == 'cygwin':
+  if sys.platform == "win32" or sys.platform == "cygwin":
     return platforms.win.get_reboot_required()
-  if sys.platform == 'linux':
+  if sys.platform == "linux":
     return platforms.linux.get_reboot_required()
   return False
 
 
 def get_ssd():
   """Returns a list of SSD disks."""
-  if sys.platform == 'darwin':
+  if sys.platform == "darwin":
     return platforms.osx.get_ssd()
-  if sys.platform == 'linux':
+  if sys.platform == "linux":
     return platforms.linux.get_ssd()
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     return platforms.win.get_ssd()
   return ()
 
@@ -733,19 +736,19 @@ def get_cipd_cache_info():
   try:
     items = 0
     total = 0
-    root = os.path.join('cipd_cache', 'cache', 'instances')
+    root = os.path.join("cipd_cache", "cache", "instances")
     for i in os.listdir(root):
-      if i != 'state.db':
+      if i != "state.db":
         items += 1
         total += os.stat(os.path.join(root, i)).st_size
-    return {'items': items, 'size': total}
+    return {"items": items, "size": total}
   except (IOError, OSError):
     return {}
   return 0
 
 
 def get_named_caches_info():
-  """"Returns the items in state.json describing named caches."""
+  """Returns the items in state.json describing named caches."""
   # Strictly speaking, this is a layering violation. This data is managed by
   # run_isolated.py but this is valuable to expose this as a Swarming bot
   # dimension and state so ¯\_(ツ)_/¯
@@ -764,8 +767,8 @@ def get_named_caches_info():
   #
   # but hey, the following code is 5 lines...
   try:
-    with open(os.path.join('c', 'state.json'), 'rb') as f:
-      return dict(json.load(f)['items'])
+    with open(os.path.join("c", "state.json"), "rb") as f:
+      return dict(json.load(f)["items"])
   except (IOError, KeyError, OSError, TypeError, ValueError):
     return {}
 
@@ -777,9 +780,9 @@ def get_python_packages():
     # --disable-pip-version-check is only supported in v6.0 and we still have
     # bots running very old versions. Use the environment variable instead.
     env = os.environ.copy()
-    env['PIP_DISABLE_PIP_VERSION_CHECK'] = '1'
-    cmd = ['pip', 'freeze']
-    return subprocess.check_output(cmd, env=env).decode('utf-8').splitlines()
+    env["PIP_DISABLE_PIP_VERSION_CHECK"] = "1"
+    cmd = ["pip", "freeze"]
+    return subprocess.check_output(cmd, env=env).decode("utf-8").splitlines()
   except (subprocess.CalledProcessError, OSError):
     return None
 
@@ -798,8 +801,8 @@ def authenticated_http_request(service_account, *args, **kwargs):
   Raises:
     AuthenticatedHttpRequestFailure
   """
-  scopes = kwargs.pop('scopes', [])
-  kwargs['headers'] = kwargs.get('headers', {}).copy()
+  scopes = kwargs.pop("scopes", [])
+  kwargs["headers"] = kwargs.get("headers", {}).copy()
   http = httplib2.Http(ca_certs=tools.get_cacerts_bundle())
 
   # Authorize the request. In general, we need to produce an OAuth2 bearer token
@@ -809,10 +812,11 @@ def authenticated_http_request(service_account, *args, **kwargs):
   if platforms.is_gce():
     try:
       gce_bearer_token, _ = platforms.gce.oauth2_access_token_with_expiration(
-          account=service_account)
+        account=service_account
+      )
     except (IOError, urllib.error.HTTPError) as e:
       raise AuthenticatedHttpRequestFailure(e)
-    kwargs['headers']['Authorization'] = 'Bearer %s' % gce_bearer_token
+    kwargs["headers"]["Authorization"] = "Bearer %s" % gce_bearer_token
   else:
     try:
       oauth2client = get_oauth2_client(service_account, scopes)
@@ -863,32 +867,37 @@ def get_timeseries_data(name, project, service_account, **kwargs):
     GetTimeseriesDataFailure
   """
   params = {
-      'youngest':
-          kwargs.get('youngest')
-          or time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+    "youngest": kwargs.get("youngest")
+    or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
   }
-  if kwargs.get('count'):
-    params['count'] = kwargs['count']
-  if kwargs.get('labels'):
-    params['labels'] = kwargs['labels']
-  if kwargs.get('oldest'):
-    params['oldest'] = kwargs['oldest']
-  if kwargs.get('page_token'):
-    params['pageToken'] = kwargs['page_token']
+  if kwargs.get("count"):
+    params["count"] = kwargs["count"]
+  if kwargs.get("labels"):
+    params["labels"] = kwargs["labels"]
+  if kwargs.get("oldest"):
+    params["oldest"] = kwargs["oldest"]
+  if kwargs.get("page_token"):
+    params["pageToken"] = kwargs["page_token"]
 
-  metric = urllib.parse.quote('custom.cloudmonitoring.googleapis.com/%s' % name,
-                              '')
+  metric = urllib.parse.quote(
+    "custom.cloudmonitoring.googleapis.com/%s" % name, ""
+  )
   params = urllib.parse.urlencode(params, True)
-  url = '%s/projects/%s/timeseries/%s?%s' % (
-      MONITORING_ENDPOINT, project, metric, params)
-  logging.info('Attempting to get timeseries data: %s', url)
+  url = "%s/projects/%s/timeseries/%s?%s" % (
+    MONITORING_ENDPOINT,
+    project,
+    metric,
+    params,
+  )
+  logging.info("Attempting to get timeseries data: %s", url)
   try:
     response, content = authenticated_http_request(
-        service_account, url, method='GET', scopes=MONITORING_SCOPES)
+      service_account, url, method="GET", scopes=MONITORING_SCOPES
+    )
   except (AuthenticatedHttpRequestFailure, IOError) as e:
     raise GetTimeseriesDataFailure(e)
 
-  if response['status'] != '200':
+  if response["status"] != "200":
     try:
       content = json.loads(content)
     except ValueError:
@@ -896,7 +905,7 @@ def get_timeseries_data(name, project, service_account, **kwargs):
     raise GetTimeseriesDataFailure(content)
 
   content = json.loads(content)
-  return content.get('timeseries', []), content.get('nextPageToken')
+  return content.get("timeseries", []), content.get("nextPageToken")
 
 
 class SendMetricsFailure(Exception):
@@ -918,41 +927,46 @@ def send_metric(name, value, labels, project, service_account):
     SendMetricsFailure
   """
   headers = {
-      'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   }
 
-  now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+  now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
   body = {
-      'commonLabels': labels,
-      'timeseries': [{
-          'point': {
-              'end': now,
-              'start': now,
-          },
-          'timeseriesDesc': {
-              'metric': 'custom.cloudmonitoring.googleapis.com/%s' % name,
-              'project': project,
-          },
-      }],
+    "commonLabels": labels,
+    "timeseries": [
+      {
+        "point": {
+          "end": now,
+          "start": now,
+        },
+        "timeseriesDesc": {
+          "metric": "custom.cloudmonitoring.googleapis.com/%s" % name,
+          "project": project,
+        },
+      }
+    ],
   }
   # Cloud Monitoring only supports int64 and double for custom metrics.
   if isinstance(value, int):
-    body['timeseries'][0]['point']['int64Value'] = value
+    body["timeseries"][0]["point"]["int64Value"] = value
   elif isinstance(value, float):
-    body['timeseries'][0]['point']['doubleValue'] = value
+    body["timeseries"][0]["point"]["doubleValue"] = value
   else:
-    raise SendMetricsFailure('Invalid value type: %s' % type(value))
+    raise SendMetricsFailure("Invalid value type: %s" % type(value))
 
   try:
     response, content = authenticated_http_request(
-        service_account,
-        '%s/projects/%s/timeseries:write' % (MONITORING_ENDPOINT, project),
-        method='POST', body=json.dumps(body), headers=headers,
-        scopes=MONITORING_SCOPES)
+      service_account,
+      "%s/projects/%s/timeseries:write" % (MONITORING_ENDPOINT, project),
+      method="POST",
+      body=json.dumps(body),
+      headers=headers,
+      scopes=MONITORING_SCOPES,
+    )
   except (AuthenticatedHttpRequestFailure, IOError) as e:
     raise SendMetricsFailure(e)
 
-  if response['status'] != '200':
+  if response["status"] != "200":
     try:
       content = json.loads(content)
     except ValueError:
@@ -972,44 +986,44 @@ def _get_oauth2_client(service_account_json_file, scopes):
   with open(service_account_json_file) as f:
     service_account_json = json.load(f)
   return client.SignedJwtAssertionCredentials(
-      service_account_json['client_email'], service_account_json['private_key'],
-      scopes)
+    service_account_json["client_email"],
+    service_account_json["private_key"],
+    scopes,
+  )
 
 
 ### Android.
 
 
 def get_dimensions_all_devices_android(devices):
-  """Returns the default dimensions for an host with multiple android devices.
-  """
+  """Returns the default dimensions for an host with multiple android devices."""
   dimensions = get_dimensions()
   if not devices:
     return dimensions
 
   # Pop a few dimensions otherwise there will be too many dimensions.
-  del dimensions['cpu']
-  del dimensions['cores']
-  del dimensions['gpu']
-  dimensions.pop('cpu_governor', None)
-  dimensions.pop('kvm', None)
-  dimensions.pop('machine_type')
-  dimensions.pop('ssd', None)
+  del dimensions["cpu"]
+  del dimensions["cores"]
+  del dimensions["gpu"]
+  dimensions.pop("cpu_governor", None)
+  dimensions.pop("kvm", None)
+  dimensions.pop("machine_type")
+  dimensions.pop("ssd", None)
 
   dimensions.update(platforms.android.get_dimensions(devices))
   return dimensions
 
 
 def get_state_all_devices_android(devices):
-  """Returns state information about all the devices connected to the host.
-  """
+  """Returns state information about all the devices connected to the host."""
   state = get_state()
   if not devices:
     return state
 
   # Add a few values that were popped from dimensions.
-  state['host_dimensions'] = get_dimensions()
+  state["host_dimensions"] = get_dimensions()
   # The default value is irrelevant.
-  state['host_dimensions'].pop('pool', None)
+  state["host_dimensions"].pop("pool", None)
   state.update(platforms.android.get_state(devices))
   return state
 
@@ -1020,7 +1034,7 @@ def get_state_all_devices_android(devices):
 @tools.cached
 def get_bot_id():
   """Returns the bot ID, perhaps taking it from SWARMING_BOT_ID."""
-  from_env = os.environ.get('SWARMING_BOT_ID')
+  from_env = os.environ.get("SWARMING_BOT_ID")
   if from_env:
     return from_env
   return get_hostname_short()
@@ -1029,86 +1043,86 @@ def get_bot_id():
 def get_dimensions():
   """Returns the default dimensions."""
   dimensions = {
-      'cipd_platform': ['%s-%s' % (get_cipd_os(), get_cipd_architecture())],
-      'cores': [str(get_num_processors())],
-      'cpu': get_cpu_dimensions(),
-      'gpu': get_gpu()[0],
-      'id': [get_bot_id()],
-      'os': get_os_values(),
-      # This value is frequently overridden by bots.cfg via luci-config.
-      'pool': ['default'],
-      'python': get_python_versions(),
+    "cipd_platform": ["%s-%s" % (get_cipd_os(), get_cipd_architecture())],
+    "cores": [str(get_num_processors())],
+    "cpu": get_cpu_dimensions(),
+    "gpu": get_gpu()[0],
+    "id": [get_bot_id()],
+    "os": get_os_values(),
+    # This value is frequently overridden by bots.cfg via luci-config.
+    "pool": ["default"],
+    "python": get_python_versions(),
   }
 
   caches = get_named_caches_info()
   if caches:
-    dimensions['caches'] = sorted(caches)
+    dimensions["caches"] = sorted(caches)
 
-  if 'none' not in dimensions['gpu']:
+  if "none" not in dimensions["gpu"]:
     hidpi = get_monitor_hidpi()
     if hidpi:
-      dimensions['hidpi'] = hidpi
+      dimensions["hidpi"] = hidpi
 
   machine_type = get_machine_type()
   if machine_type:
-    dimensions['machine_type'] = [machine_type]
+    dimensions["machine_type"] = [machine_type]
 
   if platforms.is_gce():
-    dimensions['gce'] = ['1']
+    dimensions["gce"] = ["1"]
     image = platforms.gce.get_image()
     if image:
-      dimensions['image'] = [image]
-    dimensions['zone'] = platforms.gce.get_zones()
-    dimensions['gcp'] = platforms.gce.get_gcp()
+      dimensions["image"] = [image]
+    dimensions["zone"] = platforms.gce.get_zones()
+    dimensions["gcp"] = platforms.gce.get_gcp()
   else:
-    dimensions['gce'] = ['0']
+    dimensions["gce"] = ["0"]
 
   loc = get_locale()
   if loc:
-    dimensions['locale'] = [loc]
+    dimensions["locale"] = [loc]
 
   ssd = get_ssd()
   if ssd:
-    dimensions['ssd'] = ['1']
+    dimensions["ssd"] = ["1"]
   else:
-    dimensions['ssd'] = ['0']
+    dimensions["ssd"] = ["0"]
 
-  dimensions['inside_docker'] = ['0']
-  if sys.platform == 'linux':
+  dimensions["inside_docker"] = ["0"]
+  if sys.platform == "linux":
     inside_docker = platforms.linux.get_inside_docker()
     if inside_docker:
-      dimensions['inside_docker'] = ['1', inside_docker]
+      dimensions["inside_docker"] = ["1", inside_docker]
 
-    dimensions['kernel'] = [platforms.linux.get_kernel()]
-    dimensions['kvm'] = [str(int(platforms.linux.get_kvm()))]
+    dimensions["kernel"] = [platforms.linux.get_kernel()]
+    dimensions["kvm"] = [str(int(platforms.linux.get_kvm()))]
 
     comp = platforms.linux.get_device_tree_compatible()
     if comp:
-      dimensions['device_tree_compatible'] = comp
+      dimensions["device_tree_compatible"] = comp
     # Just check CPU #0. In practice different CPU core could have different CPU
     # governor.
     gov = platforms.linux.get_cpu_scaling_governor(0)
     if gov:
-      dimensions['cpu_governor'] = gov
+      dimensions["cpu_governor"] = gov
 
     display_attached = platforms.linux.is_display_attached()
     if display_attached:
-      dimensions['display_attached'] = ['1']
+      dimensions["display_attached"] = ["1"]
     else:
-      dimensions['display_attached'] = ['0']
+      dimensions["display_attached"] = ["0"]
 
-  if sys.platform == 'darwin':
+  if sys.platform == "darwin":
     model = platforms.osx.get_hardware_model_string()
     if model:
-      dimensions['mac_model'] = [model]
+      dimensions["mac_model"] = [model]
     xcode_versions = platforms.osx.get_xcode_versions()
     if xcode_versions:
-      dimensions['xcode_version'] = xcode_versions
+      dimensions["xcode_version"] = xcode_versions
     display_attached = platforms.osx.is_display_attached()
     if display_attached:
-      dimensions['display_attached'] = ['1']
+      dimensions["display_attached"] = ["1"]
     else:
-      dimensions['display_attached'] = ['0']
+      dimensions["display_attached"] = ["0"]
 
     # iOS devices
     udids = platforms.osx.get_ios_device_ids()
@@ -1116,42 +1130,41 @@ def get_dimensions():
     for udid in udids:
       version = platforms.osx.get_ios_version(udid)
       if version:
-        os_name = 'iOS'
-        dimensions['os'].append(os_name)
+        os_name = "iOS"
+        dimensions["os"].append(os_name)
         version_parts = get_os_version_parts(version, os_name)
-        dimensions['os'].extend(version_parts)
-        dimensions['os'].sort()
+        dimensions["os"].extend(version_parts)
+        dimensions["os"].sort()
       device_type = platforms.osx.get_ios_device_type(udid)
       if device_type:
         device_types.add(device_type)
     if device_types:
-      dimensions['device'] = sorted(device_types)
+      dimensions["device"] = sorted(device_types)
     # if an iDevice is connected through usbmuxd, but the OS has some issues
     # such as Apple bugs, it will not be recognized by libimobiledevice
-    if not dimensions.get('device') and platforms.osx.is_ios_device_attached():
+    if not dimensions.get("device") and platforms.osx.is_ios_device_attached():
       # restart usbmuxd as a workaround such that libimobiledevice might
       # work again and iOS dimensions can be populated on the next run.
       platforms.osx.kill_usbmuxd()
 
-
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     integrity = platforms.win.get_integrity_level()
     if integrity is not None:
-      dimensions['integrity'] = [integrity]
+      dimensions["integrity"] = [integrity]
     vs_versions = platforms.win.get_visual_studio_versions()
     if vs_versions:
-      dimensions['visual_studio_version'] = vs_versions
+      dimensions["visual_studio_version"] = vs_versions
     windows_client_versions = platforms.win.get_client_versions()
     if windows_client_versions:
-      dimensions['windows_client_version'] = windows_client_versions
+      dimensions["windows_client_version"] = windows_client_versions
     display_attached = platforms.win.is_display_attached()
     if display_attached:
-      dimensions['display_attached'] = ['1']
+      dimensions["display_attached"] = ["1"]
       screen_scaling_percent = platforms.win.get_screen_scaling_percent()
       if screen_scaling_percent:
-        dimensions['screen_scaling_percent'] = [screen_scaling_percent]
+        dimensions["screen_scaling_percent"] = [screen_scaling_percent]
     else:
-      dimensions['display_attached'] = ['0']
+      dimensions["display_attached"] = ["0"]
 
   return dimensions
 
@@ -1169,18 +1182,18 @@ def get_state():
   try:
     nb_files_in_temp = len(os.listdir(tmpdir))
   except OSError:
-    nb_files_in_temp = 'N/A'
+    nb_files_in_temp = "N/A"
 
   # Only including a subset of the environment variables that are used by
   # Swarming, as state is not designed to sustain large load at the moment.
   env = {}
   env_keys = [
-      'ISOLATED_CACHE_SIZE',
-      'LUCI_MACHINE_TOKEN',
-      'PATH',
-      'SWARMING_ALLOW_ANY_USER',
-      'SWARMING_EXTERNAL_BOT_SETUP',
-      'SWARMING_NEVER_REBOOT',
+    "ISOLATED_CACHE_SIZE",
+    "LUCI_MACHINE_TOKEN",
+    "PATH",
+    "SWARMING_ALLOW_ANY_USER",
+    "SWARMING_EXTERNAL_BOT_SETUP",
+    "SWARMING_NEVER_REBOOT",
   ]
   for key in env_keys:
     val = os.environ.get(key)
@@ -1188,76 +1201,77 @@ def get_state():
       env[key] = val
 
   state = {
-      'audio': get_audio(),
-      'cpu_name': get_cpuinfo().get('name'),
-      'cost_usd_hour': get_cost_hour(),
-      'cwd': os.getcwd(),
-      'disks': get_disks_info(),
-      'env': env,
-      'gpu': get_gpu()[1],
-      'hostname': get_hostname(),
-      'ip': get_ip(),
-      'nb_files_in_temp': nb_files_in_temp,
-      'pid': os.getpid(),
-      'python': {
-          'executable': sys.executable,
-          'packages': get_python_packages(),
-          'version': sys.version,
-      },
-      'ram': get_physical_ram(),
-      'running_time': int(round(time.time() - _STARTED_TS)),
-      'ssd': list(get_ssd()),
-      'started_ts': int(round(_STARTED_TS)),
-      'uptime': int(round(get_uptime())),
-      'user': getpass.getuser(),
+    "audio": get_audio(),
+    "cpu_name": get_cpuinfo().get("name"),
+    "cost_usd_hour": get_cost_hour(),
+    "cwd": os.getcwd(),
+    "disks": get_disks_info(),
+    "env": env,
+    "gpu": get_gpu()[1],
+    "hostname": get_hostname(),
+    "ip": get_ip(),
+    "nb_files_in_temp": nb_files_in_temp,
+    "pid": os.getpid(),
+    "python": {
+      "executable": sys.executable,
+      "packages": get_python_packages(),
+      "version": sys.version,
+    },
+    "ram": get_physical_ram(),
+    "running_time": int(round(time.time() - _STARTED_TS)),
+    "ssd": list(get_ssd()),
+    "started_ts": int(round(_STARTED_TS)),
+    "uptime": int(round(get_uptime())),
+    "user": getpass.getuser(),
   }
   if get_reboot_required():
-    state['reboot_required'] = True
+    state["reboot_required"] = True
   cache = get_named_caches_info()
   if cache:
-    state['named_caches'] = cache
-  if sys.platform in ('cygwin', 'win32'):
-    state['cygwin'] = [sys.platform == 'cygwin']
+    state["named_caches"] = cache
+  if sys.platform in ("cygwin", "win32"):
+    state["cygwin"] = [sys.platform == "cygwin"]
     _set_display_resolution_state(state, platforms.win.get_display_resolution())
     active_displays = platforms.win.get_active_displays() or []
-    state['active_displays'] = active_displays
-  if sys.platform == 'darwin':
-    state['xcode'] = platforms.osx.get_xcode_state()
+    state["active_displays"] = active_displays
+  if sys.platform == "darwin":
+    state["xcode"] = platforms.osx.get_xcode_state()
     temp = platforms.osx.get_temperatures()
     if temp is not None:
-      state['temp'] = temp
+      state["temp"] = temp
     _set_display_resolution_state(state, platforms.osx.get_display_resolution())
-  if sys.platform == 'linux':
+  if sys.platform == "linux":
     temp = platforms.linux.get_temperatures()
     if temp:
-      state['temp'] = temp
+      state["temp"] = temp
 
-    docker_host_hostname = os.environ.get('DOCKER_HOST_HOSTNAME')
+    docker_host_hostname = os.environ.get("DOCKER_HOST_HOSTNAME")
     if docker_host_hostname:
-      state['docker_host_hostname'] = docker_host_hostname
-    _set_display_resolution_state(state,
-                                  platforms.linux.get_display_resolution())
+      state["docker_host_hostname"] = docker_host_hostname
+    _set_display_resolution_state(
+      state, platforms.linux.get_display_resolution()
+    )
   if platforms.is_gce():
     networks = platforms.gce.get_networks()
     if networks:
-      state['networks'] = networks
+      state["networks"] = networks
 
   # Put an arbitrary limit on the amount of junk that can stay in TEMP.
-  if nb_files_in_temp == 'N/A':
-    state['quarantined'] = 'Failed to access TEMP (%s)' % tmpdir
+  if nb_files_in_temp == "N/A":
+    state["quarantined"] = "Failed to access TEMP (%s)" % tmpdir
   elif nb_files_in_temp > 1024:
-    state['quarantined'] = '> 1024 files in TEMP (%s)' % tmpdir
+    state["quarantined"] = "> 1024 files in TEMP (%s)" % tmpdir
   return state
 
 
 def _set_display_resolution_state(state, resolution):
-  state['display_resolution'] = {}
+  state["display_resolution"] = {}
   if resolution:
-    state['display_resolution']['horizontal'] = resolution[0]
-    state['display_resolution']['vertical'] = resolution[1]
+    state["display_resolution"]["horizontal"] = resolution[0]
+    state["display_resolution"]["vertical"] = resolution[1]
   else:
-    state['display_resolution']['horizontal'] = 'unavailable'
-    state['display_resolution']['vertical'] = 'unavailable'
+    state["display_resolution"]["horizontal"] = "unavailable"
+    state["display_resolution"]["vertical"] = "unavailable"
 
 
 ## State mutating.
@@ -1282,16 +1296,16 @@ def setup_auto_startup_win(command, cwd, batch_name, overwrite=True):
 
   TODO(maruel): This function assumes |command| is python script to be run.
   """
-  logging.info('setup_auto_startup_win(%s, %s, %s)', command, cwd, batch_name)
+  logging.info("setup_auto_startup_win(%s, %s, %s)", command, cwd, batch_name)
   if not os.path.isabs(cwd):
-    raise ValueError('Refusing relative path')
-  assert batch_name.endswith('.bat'), batch_name
+    raise ValueError("Refusing relative path")
+  assert batch_name.endswith(".bat"), batch_name
   batch_path = platforms.win.get_startup_dir() + batch_name
 
   # If we are running through cygwin, the path to write to must be changed to be
   # in the cywgin format, but we also need to change the commands to be in
   # non-cygwin format (since they will execute in a batch file).
-  if sys.platform == 'cygwin':
+  if sys.platform == "cygwin":
     batch_path = platforms.win.to_cygwin_path(batch_path)
     assert batch_path
     cwd = platforms.win.from_cygwin_path(cwd)
@@ -1299,11 +1313,11 @@ def setup_auto_startup_win(command, cwd, batch_name, overwrite=True):
 
     # Convert all the cygwin paths in the command.
     for i in range(len(command)):
-      if '/cygdrive/' in command[i]:
+      if "/cygdrive/" in command[i]:
         command[i] = platforms.win.from_cygwin_path(command[i])
 
   if not overwrite and os.path.exists(batch_path):
-    logging.info('%s already exists. Not overwriting it.', batch_path)
+    logging.info("%s already exists. Not overwriting it.", batch_path)
     return
 
   # Don't forget the CRLF, otherwise cmd.exe won't process it.
@@ -1319,33 +1333,31 @@ def setup_auto_startup_win(command, cwd, batch_name, overwrite=True):
   # only available starting python 3.3 and it's tricky on Windows with '^'. So
   # skip this for now and hope for the best.
   content = (
-      '@echo off\r\n'
-      ':: This file was generated automatically by os_platforms.py.\r\n'
-      'setlocal enableextensions enabledelayedexpansion\r\n'
-      'cd /d %(root)s\r\n'
-      '\r\n'
-      'if not exist logs mkdir logs\r\n'
-      'if exist logs\\bot_stdout.log.9 del logs\\bot_stdout.log.9\r\n'
-      'for %%%%i in (8 7 6 5 4 3 2 1) do (\r\n'
-      '  if exist logs\\bot_stdout.log.%%%%i (\r\n'
-      '    set /a "j=%%%%i+1"\r\n'
-      '    echo move logs\\bot_stdout.log.%%%%i logs\\bot_stdout.log.!j!\r\n'
-      '    move logs\\bot_stdout.log.%%%%i logs\\bot_stdout.log.!j!\r\n'
-      '    set j=\r\n'
-      '  )\r\n'
-      ')\r\n'
-      'if exist logs\\bot_stdout.log (\r\n'
-      '  echo move logs\\bot_stdout.log logs\\bot_stdout.log.1\r\n'
-      '  move logs\\bot_stdout.log logs\\bot_stdout.log.1\r\n'
-      ')\r\n'
-      '\r\n'
-      'echo Running: %(command)s\r\n'
-      '%(command)s 1>> logs\\bot_stdout.log 2>&1\r\n') % {
-          'root': cwd,
-          'command': ' '.join(command)
-      }
+    "@echo off\r\n"
+    ":: This file was generated automatically by os_platforms.py.\r\n"
+    "setlocal enableextensions enabledelayedexpansion\r\n"
+    "cd /d %(root)s\r\n"
+    "\r\n"
+    "if not exist logs mkdir logs\r\n"
+    "if exist logs\\bot_stdout.log.9 del logs\\bot_stdout.log.9\r\n"
+    "for %%%%i in (8 7 6 5 4 3 2 1) do (\r\n"
+    "  if exist logs\\bot_stdout.log.%%%%i (\r\n"
+    '    set /a "j=%%%%i+1"\r\n'
+    "    echo move logs\\bot_stdout.log.%%%%i logs\\bot_stdout.log.!j!\r\n"
+    "    move logs\\bot_stdout.log.%%%%i logs\\bot_stdout.log.!j!\r\n"
+    "    set j=\r\n"
+    "  )\r\n"
+    ")\r\n"
+    "if exist logs\\bot_stdout.log (\r\n"
+    "  echo move logs\\bot_stdout.log logs\\bot_stdout.log.1\r\n"
+    "  move logs\\bot_stdout.log logs\\bot_stdout.log.1\r\n"
+    ")\r\n"
+    "\r\n"
+    "echo Running: %(command)s\r\n"
+    "%(command)s 1>> logs\\bot_stdout.log 2>&1\r\n"
+  ) % {"root": cwd, "command": " ".join(command)}
   success = _write(batch_path, content)
-  if success and sys.platform == 'cygwin':
+  if success and sys.platform == "cygwin":
     # For some reason, cygwin tends to create the file with 0644.
     os.chmod(batch_path, 0o755)
   return success
@@ -1359,34 +1371,35 @@ def setup_auto_startup_osx(command, cwd, plistname, overwrite=True):
   In case of failure like reboot loop, simply remove the file in
   ~/Library/LaunchAgents/.
   """
-  logging.info('setup_auto_startup_osx(%s, %s, %s)', command, cwd, plistname)
+  logging.info("setup_auto_startup_osx(%s, %s, %s)", command, cwd, plistname)
   if not os.path.isabs(cwd):
-    raise ValueError('Refusing relative path')
-  assert plistname.endswith('.plist'), plistname
-  launchd_dir = os.path.expanduser('~/Library/LaunchAgents')
+    raise ValueError("Refusing relative path")
+  assert plistname.endswith(".plist"), plistname
+  launchd_dir = os.path.expanduser("~/Library/LaunchAgents")
   if not os.path.isdir(launchd_dir):
     # This directory doesn't exist by default.
     # Sometimes ~/Library gets deleted.
     os.makedirs(launchd_dir)
   filepath = os.path.join(launchd_dir, plistname)
   if not overwrite and os.path.exists(filepath):
-    logging.info('%s already exists. Not overwriting it.', filepath)
+    logging.info("%s already exists. Not overwriting it.", filepath)
     return
   return _write(
-      filepath, platforms.osx.generate_launchd_plist(command, cwd, plistname))
+    filepath, platforms.osx.generate_launchd_plist(command, cwd, plistname)
+  )
 
 
-def setup_auto_startup_initd_linux(command, cwd, user=None, name='swarming'):
+def setup_auto_startup_initd_linux(command, cwd, user=None, name="swarming"):
   """Uses init.d to start the bot automatically."""
   if not user:
     user = getpass.getuser()
   logging.info(
-      'setup_auto_startup_initd_linux(%s, %s, %s, %s)',
-      command, cwd, user, name)
+    "setup_auto_startup_initd_linux(%s, %s, %s, %s)", command, cwd, user, name
+  )
   if not os.path.isabs(cwd):
-    raise ValueError('Refusing relative path')
+    raise ValueError("Refusing relative path")
   script = platforms.linux.generate_initd(command, cwd, user)
-  filepath = shlex.quote(os.path.join('/etc/init.d', name))
+  filepath = shlex.quote(os.path.join("/etc/init.d", name))
   with tempfile.NamedTemporaryFile() as f:
     if not _write(f.name, script):
       return False
@@ -1395,33 +1408,36 @@ def setup_auto_startup_initd_linux(command, cwd, user=None, name='swarming'):
     # request.
     # TODO(maruel): Likely not the sanest thing, reevaluate.
     cmd = [
-        'sudo', '/bin/sh', '-c',
-        "cp %s %s && chmod 0755 %s && update-rc.d %s defaults" %
-        (shlex.quote(f.name), filepath, filepath, name)
+      "sudo",
+      "/bin/sh",
+      "-c",
+      "cp %s %s && chmod 0755 %s && update-rc.d %s defaults"
+      % (shlex.quote(f.name), filepath, filepath, name),
     ]
     subprocess.check_call(cmd)
-    print('To remove, use:')
-    print('  sudo update-rc.d -f %s remove' % name)
-    print('  sudo rm %s' % filepath)
+    print("To remove, use:")
+    print("  sudo update-rc.d -f %s remove" % name)
+    print("  sudo rm %s" % filepath)
   return True
 
 
-def setup_auto_startup_autostart_desktop_linux(command,
-                                               name='swarming',
-                                               overwrite=True):
+def setup_auto_startup_autostart_desktop_linux(
+  command, name="swarming", overwrite=True
+):
   """Uses ~/.config/autostart to start automatically the bot on user login.
 
   http://standards.freedesktop.org/autostart-spec/autostart-spec-latest.html
   """
-  basedir = os.path.expanduser('~/.config/autostart')
+  basedir = os.path.expanduser("~/.config/autostart")
   if not os.path.isdir(basedir):
     os.makedirs(basedir)
-  filepath = os.path.join(basedir, '%s.desktop' % name)
+  filepath = os.path.join(basedir, "%s.desktop" % name)
   if not overwrite and os.path.exists(filepath):
-    logging.info('%s already exists. Not overwriting it.', filepath)
+    logging.info("%s already exists. Not overwriting it.", filepath)
     return
   return _write(
-      filepath, platforms.linux.generate_autostart_desktop(command, name))
+    filepath, platforms.linux.generate_autostart_desktop(command, name)
+  )
 
 
 def host_reboot(message=None, timeout=None):
@@ -1446,7 +1462,7 @@ def host_reboot(message=None, timeout=None):
       duration = min(300, deadline - time.time()) if timeout else 300
       if duration <= 0:
         break
-      logging.info('Sleeping for %s', duration)
+      logging.info("Sleeping for %s", duration)
       try:
         time.sleep(duration)
         loop = False
@@ -1454,10 +1470,11 @@ def host_reboot(message=None, timeout=None):
         # Ignore "[Errno 4] Interrupted function call"; we do not want the
         # process to die, so let's sleep again until the OS forcibly kill the
         # process.
-        logging.info('Interrupted sleep: %s', e)
+        logging.info("Interrupted sleep: %s", e)
     if timeout and time.time() >= deadline:
       logging.warning(
-          'Waited for host to reboot for too long (%s); aborting', timeout)
+        "Waited for host to reboot for too long (%s); aborting", timeout
+      )
       return False
 
 
@@ -1470,39 +1487,40 @@ def host_reboot_and_return(message=None):
   Returns:
     True if at least one command succeeded.
   """
-  if sys.platform == 'win32':
+  if sys.platform == "win32":
     cmds = [
-      ['shutdown', '-r', '-f', '-t', '1'],
+      ["shutdown", "-r", "-f", "-t", "1"],
     ]
-  elif sys.platform == 'cygwin':
+  elif sys.platform == "cygwin":
     # The one that will succeed depends if it is executed via a prompt or via
     # a ssh command. #itscomplicated.
     cmds = [
-      ['shutdown', '-r', '-f', '-t', '1'],
-      ['shutdown', '-r', '-f', '1'],
+      ["shutdown", "-r", "-f", "-t", "1"],
+      ["shutdown", "-r", "-f", "1"],
     ]
-  elif sys.platform == 'linux':
+  elif sys.platform == "linux":
     # We also include 'reboot' in case 'shutdown' gives
     # us 'Failed to talk to init daemon'.
     cmds = [
-        ['sudo', '-n', '/sbin/shutdown', '-r', 'now'],
-        ['sudo', '-n', '/sbin/reboot', '-f'],
+      ["sudo", "-n", "/sbin/shutdown", "-r", "now"],
+      ["sudo", "-n", "/sbin/reboot", "-f"],
     ]
-  elif sys.platform == 'darwin':
+  elif sys.platform == "darwin":
     # -f is supported on linux but not OSX.
-    cmds = [['sudo', '-n', '/sbin/shutdown', '-r', 'now']]
+    cmds = [["sudo", "-n", "/sbin/shutdown", "-r", "now"]]
   else:
-    cmds = [['sudo', '-n', 'shutdown', '-r', 'now']]
+    cmds = [["sudo", "-n", "shutdown", "-r", "now"]]
 
   success = False
   for cmd in cmds:
     logging.info(
-        'Restarting machine with command %s (%s)', ' '.join(cmd), message)
+      "Restarting machine with command %s (%s)", " ".join(cmd), message
+    )
     try:
       subprocess.check_call(cmd)
-      logging.info('Restart command exited successfully')
+      logging.info("Restart command exited successfully")
     except (OSError, subprocess.CalledProcessError) as e:
-      logging.error('Failed to run %s: %s', ' '.join(cmd), e)
+      logging.error("Failed to run %s: %s", " ".join(cmd), e)
     else:
       success = True
   return success
@@ -1511,39 +1529,39 @@ def host_reboot_and_return(message=None):
 def get_os_version_parts(version, os_name):
   """Returns a list of progressively more precise versions strings."""
   os_dimensions = []
-  parts = version.split('.')
+  parts = version.split(".")
   # major only (e.g iOS-17)
-  os_dimensions.append('%s-%s' % (os_name, parts[0]))
+  os_dimensions.append("%s-%s" % (os_name, parts[0]))
   if len(parts) == 3:
     # major.minor (e.g. iOS-17.5)
-    os_dimensions.append('%s-%s.%s' % (os_name, parts[0], parts[1]))
+    os_dimensions.append("%s-%s.%s" % (os_name, parts[0], parts[1]))
   # full (e.g. iOS-17.5.1)
-  os_dimensions.append('%s-%s' % (os_name, version))
+  os_dimensions.append("%s-%s" % (os_name, version))
   return os_dimensions
 
 
 def roll_log(name):
   """Rolls a log in 5Mb chunks and keep the last 10 files."""
   try:
-    if not os.path.isfile(name) or os.stat(name).st_size < 5*1024*1024:
+    if not os.path.isfile(name) or os.stat(name).st_size < 5 * 1024 * 1024:
       return
-    if os.path.isfile('%s.9' % name):
-      os.remove('%s.9' % name)
+    if os.path.isfile("%s.9" % name):
+      os.remove("%s.9" % name)
     for i in range(8, 0, -1):
-      item = '%s.%d' % (name, i)
+      item = "%s.%d" % (name, i)
       if os.path.isfile(item):
-        os.rename(item, '%s.%d' % (name, i+1))
+        os.rename(item, "%s.%d" % (name, i + 1))
     if os.path.isfile(name):
-      os.rename(name, '%s.1' % name)
+      os.rename(name, "%s.1" % name)
   except Exception as e:
-    logging.exception('roll_log(%s) failed: %s', name, e)
+    logging.exception("roll_log(%s) failed: %s", name, e)
 
 
 def trim_rolled_log(name):
   try:
-    for item in glob.iglob('%s.??' % name):
+    for item in glob.iglob("%s.??" % name):
       os.remove(item)
-    for item in glob.iglob('%s.???' % name):
+    for item in glob.iglob("%s.???" % name):
       os.remove(item)
   except Exception as e:
-    logging.exception('trim_rolled_log(%s) failed: %s', name, e)
+    logging.exception("trim_rolled_log(%s) failed: %s", name, e)

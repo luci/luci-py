@@ -19,7 +19,7 @@ def exec_python(args):
   earliest opportunity.
   """
   cmd = [sys.executable] + args
-  if sys.platform not in ('cygwin', 'win32'):
+  if sys.platform not in ("cygwin", "win32"):
     os.execv(cmd[0], cmd)
     return 1
 
@@ -32,15 +32,15 @@ def exec_python(args):
     proc = subprocess42.Popen(cmd, detached=True, stdin=subprocess42.PIPE)
 
     def handler(sig, _):
-      logging.info('Got signal %s', sig)
+      logging.info("Got signal %s", sig)
       # Always send SIGTERM, which is properly translated.
       proc.send_signal(signal.SIGTERM)
 
-    sig = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGTERM
+    sig = signal.SIGBREAK if sys.platform == "win32" else signal.SIGTERM
     with subprocess42.set_signal_handler([sig], handler):
       proc.wait()
       return proc.returncode
   except Exception as e:
-    logging.exception('failed to start: %s', e)
+    logging.exception("failed to start: %s", e)
     # Swallow the exception.
     return 1

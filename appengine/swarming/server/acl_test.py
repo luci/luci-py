@@ -8,6 +8,7 @@ import sys
 import unittest
 
 import test_env
+
 test_env.setup_test_env()
 
 # from components.auth import api
@@ -24,7 +25,7 @@ from server import task_request
 
 
 # Default names of authorization groups.
-ADMINS_GROUP = 'administrators'
+ADMINS_GROUP = "administrators"
 PRIVILEGED_USERS_GROUP = ADMINS_GROUP
 USERS_GROUP = ADMINS_GROUP
 BOT_BOOTSTRAP_GROUP = ADMINS_GROUP
@@ -38,14 +39,17 @@ class AclTest(test_case.TestCase):
 
     def settings():
       return config_pb2.SettingsCfg(
-          auth=config_pb2.AuthSettings(
-            admins_group='admins',
-            bot_bootstrap_group='bot_bootstrap',
-            privileged_users_group='privileged_users',
-            users_group='users',
-            view_all_bots_group='view_all_bots',
-            view_all_tasks_group='view_all_tasks'))
-    self.mock(config, 'settings', settings)
+        auth=config_pb2.AuthSettings(
+          admins_group="admins",
+          bot_bootstrap_group="bot_bootstrap",
+          privileged_users_group="privileged_users",
+          users_group="users",
+          view_all_bots_group="view_all_bots",
+          view_all_tasks_group="view_all_tasks",
+        )
+      )
+
+    self.mock(config, "settings", settings)
 
   @staticmethod
   def _add_to_group(group):
@@ -85,7 +89,7 @@ class AclTest(test_case.TestCase):
     self.assertTrue(acl.can_view_all_tasks())
 
   def test_ip_whitelisted(self):
-    self.mock(auth, 'is_in_ip_whitelist', lambda _name, _ip, _warn: True)
+    self.mock(auth, "is_in_ip_whitelist", lambda _name, _ip, _warn: True)
     self.assertTrue(acl.is_ip_whitelisted_machine())
     self.assertFalse(acl.can_access())
     self.assertFalse(acl.can_view_config())
@@ -101,7 +105,7 @@ class AclTest(test_case.TestCase):
     self.assertFalse(acl.can_view_all_tasks())
 
   def test_admins(self):
-    self._add_to_group('admins')
+    self._add_to_group("admins")
     self.assertFalse(acl.is_ip_whitelisted_machine())
     self.assertTrue(acl.can_access())
     self.assertTrue(acl.can_view_config())
@@ -117,7 +121,7 @@ class AclTest(test_case.TestCase):
     self.assertTrue(acl.can_view_all_tasks())
 
   def test_bot_bootstrap(self):
-    self._add_to_group('bot_bootstrap')
+    self._add_to_group("bot_bootstrap")
     self.assertFalse(acl.is_ip_whitelisted_machine())
     self.assertFalse(acl.can_access())
     self.assertFalse(acl.can_view_config())
@@ -133,7 +137,7 @@ class AclTest(test_case.TestCase):
     self.assertFalse(acl.can_view_all_tasks())
 
   def test_privileged_users(self):
-    self._add_to_group('privileged_users')
+    self._add_to_group("privileged_users")
     self.assertFalse(acl.is_ip_whitelisted_machine())
     self.assertTrue(acl.can_access())
     self.assertFalse(acl.can_view_config())
@@ -149,7 +153,7 @@ class AclTest(test_case.TestCase):
     self.assertTrue(acl.can_view_all_tasks())
 
   def test_users(self):
-    self._add_to_group('users')
+    self._add_to_group("users")
     self.assertFalse(acl.is_ip_whitelisted_machine())
     self.assertTrue(acl.can_access())
     self.assertFalse(acl.can_view_config())
@@ -165,7 +169,7 @@ class AclTest(test_case.TestCase):
     self.assertFalse(acl.can_view_all_tasks())
 
   def test_view_all_bots(self):
-    self._add_to_group('view_all_bots')
+    self._add_to_group("view_all_bots")
     self.assertFalse(acl.is_ip_whitelisted_machine())
     self.assertTrue(acl.can_access())
     self.assertFalse(acl.can_view_config())
@@ -181,7 +185,7 @@ class AclTest(test_case.TestCase):
     self.assertFalse(acl.can_view_all_tasks())
 
   def test_view_all_tasks(self):
-    self._add_to_group('view_all_tasks')
+    self._add_to_group("view_all_tasks")
     self.assertFalse(acl.is_ip_whitelisted_machine())
     self.assertTrue(acl.can_access())
     self.assertFalse(acl.can_view_config())
@@ -197,9 +201,10 @@ class AclTest(test_case.TestCase):
     self.assertTrue(acl.can_view_all_tasks())
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
+    level=logging.DEBUG if "-v" in sys.argv else logging.CRITICAL
+  )
   unittest.main()

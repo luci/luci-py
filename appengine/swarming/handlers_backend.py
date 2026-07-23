@@ -33,8 +33,8 @@ import ts_mon_metrics
 
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.write('ok')
+    self.response.headers["Content-Type"] = "text/plain; charset=utf-8"
+    self.response.write("ok")
 
 
 ## Cron jobs.
@@ -76,7 +76,7 @@ class CronTidyTaskDimensionSets(_CronHandlerBase):
   def run_cron(self):
     f = task_queues.tidy_task_dimension_sets_async()
     if not f.get_result():
-      self.response.set_status(429, 'Need to retry')
+      self.response.set_status(429, "Need to retry")
 
 
 class CronTidyBotDimensionsMatches(_CronHandlerBase):
@@ -84,9 +84,10 @@ class CronTidyBotDimensionsMatches(_CronHandlerBase):
 
   def run_cron(self):
     f = task_queues.tidy_bot_dimensions_matches_async(
-        bot_management.check_bot_alive_async)
+      bot_management.check_bot_alive_async
+    )
     if not f.get_result():
-      self.response.set_status(429, 'Need to retry')
+      self.response.set_status(429, "Need to retry")
 
 
 class CronUpdateBotInfoComposite(_CronHandlerBase):
@@ -136,17 +137,19 @@ class TaskCancelTasksHandler(webapp2.RequestHandler):
   """Cancels tasks given a list of their ids."""
 
   @decorators.silence(datastore_utils.CommitError)
-  @decorators.require_taskqueue('cancel-tasks')
+  @decorators.require_taskqueue("cancel-tasks")
   def post(self):
     payload = json.loads(self.request.body)
-    logging.info('Cancelling tasks with ids: %s', payload['tasks'])
-    kill_running = payload['kill_running']
+    logging.info("Cancelling tasks with ids: %s", payload["tasks"])
+    kill_running = payload["kill_running"]
     # TODO(maruel): Parallelize.
-    for task_id in payload['tasks']:
+    for task_id in payload["tasks"]:
       ok, was_running = task_scheduler.cancel_task_with_id(
-          task_id, kill_running, None)
-      logging.info('task %s canceled: %s was running: %s',
-                   task_id, ok, was_running)
+        task_id, kill_running, None
+      )
+      logging.info(
+        "task %s canceled: %s was running: %s", task_id, ok, was_running
+      )
 
 
 class TaskCancelTaskOnBotHandler(webapp2.RequestHandler):
@@ -156,34 +159,37 @@ class TaskCancelTaskOnBotHandler(webapp2.RequestHandler):
   If bot is specified, and task is not running on bot, then do nothing.
   """
 
-  @decorators.require_taskqueue('cancel-task-on-bot')
+  @decorators.require_taskqueue("cancel-task-on-bot")
   def post(self):
     payload = json.loads(self.request.body)
-    task_id = payload.get('task_id')
+    task_id = payload.get("task_id")
     if not task_id:
-      logging.error('Missing task_id.')
+      logging.error("Missing task_id.")
       return
-    bot_id = payload.get('bot_id')
+    bot_id = payload.get("bot_id")
     try:
       ok, was_running = task_scheduler.cancel_task_with_id(
-          task_id, True, bot_id)
-      logging.info('task %s canceled: %s was running: %s',
-                   task_id, ok, was_running)
+        task_id, True, bot_id
+      )
+      logging.info(
+        "task %s canceled: %s was running: %s", task_id, ok, was_running
+      )
     except ValueError:
       # Ignore errors that may be due to missing or invalid tasks.
-      logging.warning('Ignoring a task cancellation due to exception.',
-          exc_info=True)
+      logging.warning(
+        "Ignoring a task cancellation due to exception.", exc_info=True
+      )
 
 
 class TaskCancelChildrenTasksHandler(webapp2.RequestHandler):
   """Cancels children tasks with pending state of the given task."""
 
   @decorators.silence(runtime.DeadlineExceededError)
-  @decorators.require_taskqueue('cancel-children-tasks')
+  @decorators.require_taskqueue("cancel-children-tasks")
   def post(self):
     payload = json.loads(self.request.body)
-    task = payload['task']
-    logging.info('Cancelling children tasks of task %s', task)
+    task = payload["task"]
+    logging.info("Cancelling children tasks of task %s", task)
 
     task_scheduler.task_cancel_running_children_tasks(task)
 
@@ -191,37 +197,37 @@ class TaskCancelChildrenTasksHandler(webapp2.RequestHandler):
 class TaskExpireTasksHandler(webapp2.RequestHandler):
   """Expires a list of tasks, given a list of their ids."""
 
-  @decorators.require_taskqueue('task-expire')
+  @decorators.require_taskqueue("task-expire")
   def post(self):
     payload = json.loads(self.request.body)
-    task_scheduler.task_expire_tasks(payload['entities'])
+    task_scheduler.task_expire_tasks(payload["entities"])
 
 
 class TaskUpdateBotMatchesHandler(webapp2.RequestHandler):
   """Assigns new task queues to existing bots."""
 
-  @decorators.require_taskqueue('update-bot-matches')
+  @decorators.require_taskqueue("update-bot-matches")
   def post(self):
     f = task_queues.update_bot_matches_async(self.request.body)
     if not f.get_result():
-      self.response.set_status(429, 'Need to retry')
+      self.response.set_status(429, "Need to retry")
 
 
 class TaskRescanMatchingTaskSetsHandler(webapp2.RequestHandler):
   """A task queue task that finds all matching TaskDimensionsSets for a bot."""
 
-  @decorators.require_taskqueue('rescan-matching-task-sets')
+  @decorators.require_taskqueue("rescan-matching-task-sets")
   def post(self):
     f = task_queues.rescan_matching_task_sets_async(self.request.body)
     if not f.get_result():
-      self.response.set_status(429, 'Need to retry')
+      self.response.set_status(429, "Need to retry")
 
 
 class TaskSendPubSubMessage(webapp2.RequestHandler):
   """Sends PubSub notification about task completion."""
 
   # Add task_id to the URL for better visibility in request logs.
-  @decorators.require_taskqueue('pubsub')
+  @decorators.require_taskqueue("pubsub")
   def post(self, task_id):  # pylint: disable=unused-argument
     task_scheduler.task_handle_pubsub_task(json.loads(self.request.body))
 
@@ -229,7 +235,7 @@ class TaskSendPubSubMessage(webapp2.RequestHandler):
 class TaskNotifyBuildbucketHandler(webapp2.RequestHandler):
   """Sends updates to Buildbucket about task status."""
 
-  @decorators.require_taskqueue('buildbucket-notify')
+  @decorators.require_taskqueue("buildbucket-notify")
   def post(self, task_id):  # pylint: disable=unused-argument
     task_scheduler.task_buildbucket_update(json.loads(self.request.body))
 
@@ -237,10 +243,10 @@ class TaskNotifyBuildbucketHandler(webapp2.RequestHandler):
 class TaskESNotifyTasksHandler(webapp2.RequestHandler):
   """Sends task notifications to external scheduler."""
 
-  @decorators.require_taskqueue('es-notify-tasks')
+  @decorators.require_taskqueue("es-notify-tasks")
   def post(self):
-    es_host = self.request.get('es_host')
-    request_json = self.request.get('request_json')
+    es_host = self.request.get("es_host")
+    request_json = self.request.get("request_json")
     request = plugin_pb2.NotifyTasksRequest()
     json_format.Parse(request_json, request)
     external_scheduler.notify_request_now(es_host, request)
@@ -249,7 +255,7 @@ class TaskESNotifyTasksHandler(webapp2.RequestHandler):
 class TaskESNotifyKickHandler(webapp2.RequestHandler):
   """Kicks off the pull queue worker to batch the es-notifications."""
 
-  @decorators.require_taskqueue('es-notify-kick')
+  @decorators.require_taskqueue("es-notify-kick")
   def post(self):
     external_scheduler.task_batch_handle_notifications()
 
@@ -258,11 +264,11 @@ class TaskNamedCachesPool(webapp2.RequestHandler):
   """Update named caches cache for a pool."""
 
   @decorators.silence(datastore_errors.Timeout)
-  @decorators.require_taskqueue('named-cache-task')
+  @decorators.require_taskqueue("named-cache-task")
   def post(self):
     params = json.loads(self.request.body)
-    logging.info('Handling pool: %s', params['pool'])
-    named_caches.task_update_pool(params['pool'])
+    logging.info("Handling pool: %s", params["pool"])
+    named_caches.task_update_pool(params["pool"])
 
 
 ###
@@ -271,47 +277,75 @@ class TaskNamedCachesPool(webapp2.RequestHandler):
 def get_routes():
   """Returns internal urls that should only be accessible via the backend."""
   routes = [
-      ('/_ah/warmup', WarmupHandler),
-
-      # Cron jobs.
-      ('/internal/cron/important/scheduler/abort_bot_missing',
-       CronBotDiedHandler),
-      ('/internal/cron/important/scheduler/abort_expired',
-       CronAbortExpiredShardToRunHandler),
-      ('/internal/cron/cleanup/task_dimension_sets', CronTidyTaskDimensionSets),
-      ('/internal/cron/cleanup/bot_dimensions_matches',
-       CronTidyBotDimensionsMatches),
-      ('/internal/cron/monitoring/bots/update_bot_info',
-       CronUpdateBotInfoComposite),
-      ('/internal/cron/important/bot_groups_config',
-       CronBotGroupsConfigHandler),
-      ('/internal/cron/important/external_scheduler/cancellations',
-       CronExternalSchedulerCancellationsHandler),
-      ('/internal/cron/important/external_scheduler/get_callbacks',
-       CronExternalSchedulerGetCallbacksHandler),
-      ('/internal/cron/important/named_caches/update', CronNamedCachesUpdate),
-
-      # Task queues.
-      ('/internal/taskqueue/important/tasks/cancel', TaskCancelTasksHandler),
-      ('/internal/taskqueue/important/tasks/cancel-task-on-bot',
-       TaskCancelTaskOnBotHandler),
-      ('/internal/taskqueue/important/tasks/cancel-children-tasks',
-       TaskCancelChildrenTasksHandler),
-      ('/internal/taskqueue/important/tasks/expire', TaskExpireTasksHandler),
-      ('/internal/taskqueue/important/task_queues/update-bot-matches',
-       TaskUpdateBotMatchesHandler),
-      ('/internal/taskqueue/important/task_queues/rescan-matching-task-sets',
-       TaskRescanMatchingTaskSetsHandler),
-      (r'/internal/taskqueue/important/pubsub/notify-task/<task_id:[0-9a-f]+>',
-       TaskSendPubSubMessage),
-      (r'/internal/taskqueue/important/buildbucket/notify-task/'
-       r'<task_id:[0-9a-f]+>', TaskNotifyBuildbucketHandler),
-      ('/internal/taskqueue/important/external_scheduler/notify-tasks',
-       TaskESNotifyTasksHandler),
-      ('/internal/taskqueue/important/external_scheduler/notify-kick',
-       TaskESNotifyKickHandler),
-      (r'/internal/taskqueue/important/named_cache/update-pool',
-       TaskNamedCachesPool),
+    ("/_ah/warmup", WarmupHandler),
+    # Cron jobs.
+    (
+      "/internal/cron/important/scheduler/abort_bot_missing",
+      CronBotDiedHandler,
+    ),
+    (
+      "/internal/cron/important/scheduler/abort_expired",
+      CronAbortExpiredShardToRunHandler,
+    ),
+    ("/internal/cron/cleanup/task_dimension_sets", CronTidyTaskDimensionSets),
+    (
+      "/internal/cron/cleanup/bot_dimensions_matches",
+      CronTidyBotDimensionsMatches,
+    ),
+    (
+      "/internal/cron/monitoring/bots/update_bot_info",
+      CronUpdateBotInfoComposite,
+    ),
+    ("/internal/cron/important/bot_groups_config", CronBotGroupsConfigHandler),
+    (
+      "/internal/cron/important/external_scheduler/cancellations",
+      CronExternalSchedulerCancellationsHandler,
+    ),
+    (
+      "/internal/cron/important/external_scheduler/get_callbacks",
+      CronExternalSchedulerGetCallbacksHandler,
+    ),
+    ("/internal/cron/important/named_caches/update", CronNamedCachesUpdate),
+    # Task queues.
+    ("/internal/taskqueue/important/tasks/cancel", TaskCancelTasksHandler),
+    (
+      "/internal/taskqueue/important/tasks/cancel-task-on-bot",
+      TaskCancelTaskOnBotHandler,
+    ),
+    (
+      "/internal/taskqueue/important/tasks/cancel-children-tasks",
+      TaskCancelChildrenTasksHandler,
+    ),
+    ("/internal/taskqueue/important/tasks/expire", TaskExpireTasksHandler),
+    (
+      "/internal/taskqueue/important/task_queues/update-bot-matches",
+      TaskUpdateBotMatchesHandler,
+    ),
+    (
+      "/internal/taskqueue/important/task_queues/rescan-matching-task-sets",
+      TaskRescanMatchingTaskSetsHandler,
+    ),
+    (
+      r"/internal/taskqueue/important/pubsub/notify-task/<task_id:[0-9a-f]+>",
+      TaskSendPubSubMessage,
+    ),
+    (
+      r"/internal/taskqueue/important/buildbucket/notify-task/"
+      r"<task_id:[0-9a-f]+>",
+      TaskNotifyBuildbucketHandler,
+    ),
+    (
+      "/internal/taskqueue/important/external_scheduler/notify-tasks",
+      TaskESNotifyTasksHandler,
+    ),
+    (
+      "/internal/taskqueue/important/external_scheduler/notify-kick",
+      TaskESNotifyKickHandler,
+    ),
+    (
+      r"/internal/taskqueue/important/named_cache/update-pool",
+      TaskNamedCachesPool,
+    ),
   ]
   return [webapp2.Route(*a) for a in routes]
 

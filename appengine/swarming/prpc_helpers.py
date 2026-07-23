@@ -14,13 +14,13 @@ from components.prpc import codes
 import handlers_exceptions
 
 EXCEPTIONS_TO_CODE = {
-    handlers_exceptions.NotFoundException: codes.StatusCode.NOT_FOUND,
-    handlers_exceptions.BadRequestException: codes.StatusCode.INVALID_ARGUMENT,
-    datastore_errors.BadValueError: codes.StatusCode.INVALID_ARGUMENT,
-    handlers_exceptions.PermissionException: codes.StatusCode.PERMISSION_DENIED,
-    handlers_exceptions.InternalException: codes.StatusCode.INTERNAL,
-    auth.AuthenticationError: codes.StatusCode.UNAUTHENTICATED,
-    auth.AuthorizationError: codes.StatusCode.PERMISSION_DENIED,
+  handlers_exceptions.NotFoundException: codes.StatusCode.NOT_FOUND,
+  handlers_exceptions.BadRequestException: codes.StatusCode.INVALID_ARGUMENT,
+  datastore_errors.BadValueError: codes.StatusCode.INVALID_ARGUMENT,
+  handlers_exceptions.PermissionException: codes.StatusCode.PERMISSION_DENIED,
+  handlers_exceptions.InternalException: codes.StatusCode.INTERNAL,
+  auth.AuthenticationError: codes.StatusCode.UNAUTHENTICATED,
+  auth.AuthorizationError: codes.StatusCode.PERMISSION_DENIED,
 }
 
 
@@ -33,7 +33,7 @@ def process_exception(e, prpc_context):
   code = EXCEPTIONS_TO_CODE.get(exc_type)
   if code is None:
     prpc_context.set_code(codes.StatusCode.INTERNAL)
-    prpc_context.set_details('Internal Server Error')
+    prpc_context.set_details("Internal Server Error")
     return None
 
   logging.error(e)

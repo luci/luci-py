@@ -11,14 +11,14 @@ _SC_IMPL = 2
 
 # Known AIX cpu mappings
 _impl_map = {
-    0x10000: "POWER8",
-    0x20000: "POWER9",
-    0x40000: "POWER10",
+  0x10000: "POWER8",
+  0x20000: "POWER9",
+  0x40000: "POWER10",
 }
 
 
 def _getsystemcfg(num):
-  libc = ctypes.CDLL('/lib/libc.a(shr_64.o)')
+  libc = ctypes.CDLL("/lib/libc.a(shr_64.o)")
   val = libc.getsystemcfg(ctypes.c_int(num))
   return val
 
@@ -28,5 +28,5 @@ def get_cpuinfo():
   sc_impl = _getsystemcfg(_SC_IMPL)
   cpu_info = {}
   if sc_impl in _impl_map:
-    cpu_info['name'] = _impl_map[sc_impl]
+    cpu_info["name"] = _impl_map[sc_impl]
   return cpu_info

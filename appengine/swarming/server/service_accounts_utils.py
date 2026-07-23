@@ -5,7 +5,7 @@
 import re
 
 # Matches service account email (or rather close enough superset of it).
-_SERVICE_ACCOUNT_RE = re.compile(r'^[0-9a-zA-Z_\-\.\+\%]+@[0-9a-zA-Z_\-\.]+$')
+_SERVICE_ACCOUNT_RE = re.compile(r"^[0-9a-zA-Z_\-\.\+\%]+@[0-9a-zA-Z_\-\.]+$")
 
 
 def is_service_account(value):

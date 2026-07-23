@@ -19,7 +19,7 @@ def warmup():
   try:
     get_shared_hmac_secret().access()
   except Exception:
-    logging.exception('Failed to warmup up HMAC key')
+    logging.exception("Failed to warmup up HMAC key")
 
 
 def new_mac():
@@ -34,9 +34,9 @@ def get_shared_hmac_secret():
   if utils.is_local_dev_server():
     return _LocalDevServer()
   return gsm.Secret(
-      project=app_identity.get_application_id(),
-      secret='shared-hmac',
-      version='current',
+    project=app_identity.get_application_id(),
+    secret="shared-hmac",
+    version="current",
   )
 
 
@@ -44,4 +44,4 @@ class _LocalDevServer(object):
   """Used when running the server locally e.g. in the smoke test."""
 
   def access(self):
-    return 'local-dev-server'
+    return "local-dev-server"

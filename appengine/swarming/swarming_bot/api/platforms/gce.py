@@ -37,7 +37,7 @@ _CACHED_METADATA_TOKEN_LOCK = threading.Lock()
 def _padded_b64_decode(data):
   mod = len(data) % 4
   if mod:
-    data += b'=' * (4 - mod)
+    data += b"=" * (4 - mod)
   return base64.urlsafe_b64decode(data)
 
 
@@ -50,22 +50,23 @@ def _raw_metadata_request(path):
   Args:
     path: path on the metadata server to query ('/computeMetadata/...').
   """
-  assert path.startswith('/'), path
+  assert path.startswith("/"), path
   if not is_gce():
-    logging.info('GCE metadata is not available: not on GCE')
+    logging.info("GCE metadata is not available: not on GCE")
     return None
-  url = 'http://169.254.169.254' + path
-  headers = {'Metadata-Flavor': 'Google'}
+  url = "http://169.254.169.254" + path
+  headers = {"Metadata-Flavor": "Google"}
   for i in range(0, 6):
     time.sleep(2**i)
     try:
       resp = urllib.request.urlopen(
-          urllib.request.Request(url, headers=headers), timeout=30)
+        urllib.request.Request(url, headers=headers), timeout=30
+      )
       return resp.read()
     except IOError as e:
       logging.warning(
-          'Failed to grab GCE metadata from %s on attempt #%d: %s',
-          path, i+1, e)
+        "Failed to grab GCE metadata from %s on attempt #%d: %s", path, i + 1, e
+      )
   return None
 
 
@@ -82,7 +83,7 @@ def is_gce():
   # See also https://github.com/GoogleCloudPlatform/gcloud-golang/issues/194.
   try:
     # 169.254.169.254 is the documented metadata server IP address.
-    return socket.gethostbyname('metadata.google.internal') == '169.254.169.254'
+    return socket.gethostbyname("metadata.google.internal") == "169.254.169.254"
   except socket.error:
     return False
 
@@ -101,7 +102,7 @@ def get_metadata_uncached():
       http://169.254.169.254/computeMetadata/v1/?recursive=true \
       -H "Metadata-Flavor: Google" | python -m json.tool | less
   """
-  raw = _raw_metadata_request('/computeMetadata/v1/?recursive=true')
+  raw = _raw_metadata_request("/computeMetadata/v1/?recursive=true")
   return json.loads(raw) if raw else None
 
 
@@ -148,22 +149,24 @@ def oauth2_access_token_with_expiration(account):
   with _CACHED_OAUTH2_TOKEN_LOCK:
     cached_tok = _CACHED_OAUTH2_TOKEN.get(account)
     # Cached and expires in more than 10 min from now.
-    if cached_tok and cached_tok['expiresAt'] >= time.time() + 600:
-      return cached_tok['accessToken'], cached_tok['expiresAt']
+    if cached_tok and cached_tok["expiresAt"] >= time.time() + 600:
+      return cached_tok["accessToken"], cached_tok["expiresAt"]
     # Grab the token.
-    url = ('http://169.254.169.254/computeMetadata/v1/instance'
-           '/service-accounts/%s/token' % account)
-    headers = {'Metadata-Flavor': 'Google'}
+    url = (
+      "http://169.254.169.254/computeMetadata/v1/instance"
+      "/service-accounts/%s/token" % account
+    )
+    headers = {"Metadata-Flavor": "Google"}
     access_token, expires_at = oauth.oauth2_access_token_from_url(url, headers)
     tok = {
-      'accessToken': access_token,
-      'expiresAt': expires_at,
+      "accessToken": access_token,
+      "expiresAt": expires_at,
     }
     _CACHED_OAUTH2_TOKEN[account] = tok
     return access_token, expires_at
 
 
-def oauth2_access_token(account='default'):
+def oauth2_access_token(account="default"):
   """Returns a value of oauth2 access token.
 
   Same as oauth2_access_token_with_expiration, but discards expiration and
@@ -173,20 +176,20 @@ def oauth2_access_token(account='default'):
   return oauth2_access_token_with_expiration(account)[0]
 
 
-def oauth2_available_scopes(account='default'):
+def oauth2_available_scopes(account="default"):
   """Returns a list of OAuth2 scopes granted to GCE service account."""
   metadata = get_metadata()
   if not metadata:
     return []
-  accounts = metadata['instance'].get('serviceAccounts', {})
-  return accounts.get(account, {}).get('scopes') or []
+  accounts = metadata["instance"].get("serviceAccounts", {})
+  return accounts.get(account, {}).get("scopes") or []
 
 
 @tools.cached
 def can_send_metric(service_account):
   """True if 'send_metric' really does something."""
   # Scope to use Cloud Monitoring.
-  scope = 'https://www.googleapis.com/auth/monitoring'
+  scope = "https://www.googleapis.com/auth/monitoring"
   return scope in oauth2_available_scopes(account=service_account)
 
 
@@ -203,12 +206,13 @@ def signed_metadata_token(audience):
   """
   with _CACHED_METADATA_TOKEN_LOCK:
     cached_tok = _CACHED_METADATA_TOKEN.get(audience)
-    if cached_tok and cached_tok['exp'] >= time.time() + 600:
-      return cached_tok['jwt'], cached_tok['exp']
+    if cached_tok and cached_tok["exp"] >= time.time() + 600:
+      return cached_tok["jwt"], cached_tok["exp"]
 
     jwt = _raw_metadata_request(
-        '/computeMetadata/v1/instance/service-accounts/default/'
-        'identity?audience=%s&format=full' % urllib.parse.quote_plus(audience))
+      "/computeMetadata/v1/instance/service-accounts/default/"
+      "identity?audience=%s&format=full" % urllib.parse.quote_plus(audience)
+    )
     if not jwt:
       return None, None
 
@@ -224,14 +228,14 @@ def signed_metadata_token(audience):
     # so if metadata server returns something crazy, we'll know on the server
     # side.
     try:
-      payload = json.loads(_padded_b64_decode(jwt.split(b'.')[1]))
-      exp = int(time.time()) + (payload['exp'] - payload['iat'])
+      payload = json.loads(_padded_b64_decode(jwt.split(b".")[1]))
+      exp = int(time.time()) + (payload["exp"] - payload["iat"])
     except (IndexError, KeyError, TypeError, ValueError) as exc:
-      logging.error('Metadata server returned invalid JWT (%s):\n%s', exc, jwt)
+      logging.error("Metadata server returned invalid JWT (%s):\n%s", exc, jwt)
       return None, None
 
     jwt = jwt.decode()
-    _CACHED_METADATA_TOKEN[audience] = {'jwt': jwt, 'exp': exp}
+    _CACHED_METADATA_TOKEN[audience] = {"jwt": jwt, "exp": exp}
     return jwt, exp
 
 
@@ -240,10 +244,10 @@ def get_image():
   """Returns the image used by the GCE VM."""
   # Format is projects/<id>/global/images/<image>
   metadata = get_metadata()
-  image = metadata['instance'].get('image')
+  image = metadata["instance"].get("image")
   if not image:
-    return 'unknown'
-  return image.rsplit('/', 1)[-1]
+    return "unknown"
+  return image.rsplit("/", 1)[-1]
 
 
 @tools.cached
@@ -251,10 +255,10 @@ def get_zone():
   """Returns the zone containing the GCE VM."""
   # Format is projects/<id>/zones/<zone>
   metadata = get_metadata()
-  zone = metadata['instance'].get('zone')
+  zone = metadata["instance"].get("zone")
   if not zone:
-    return 'unknown'
-  return zone.rsplit('/', 1)[-1]
+    return "unknown"
+  return zone.rsplit("/", 1)[-1]
 
 
 @tools.cached
@@ -262,11 +266,11 @@ def get_networks():
   """Returns the names of the networks used by the GCE VM."""
   metadata = get_metadata()
   names = []
-  for network in metadata['instance'].get('networkInterfaces', []):
+  for network in metadata["instance"].get("networkInterfaces", []):
     # Can be a nonsense string ("0") when running inside a GKE container that
     # emulates GCE metadata server in a buggy way. Skip it. We want a dict.
     if isinstance(network, dict):
-      names.append(network['network'])
+      names.append(network["network"])
   return names
 
 
@@ -275,15 +279,15 @@ def get_zones():
   """Returns the list of zone values for the GCE VM."""
   # Ref: https://cloud.google.com/compute/docs/regions-zones/
   # 'continent-regionN-L' where N is a number and L a letter.
-  m = re.match(r'([a-z]+)-([a-z]+)(\d)-([a-z])', get_zone())
+  m = re.match(r"([a-z]+)-([a-z]+)(\d)-([a-z])", get_zone())
   if not m:
     # Safety fallback in case a new form appears.
     return [get_zone()]
   return [
-      m.group(1),
-      m.group(1) + '-' + m.group(2),
-      m.group(1) + '-' + m.group(2) + m.group(3),
-      m.group(1) + '-' + m.group(2) + m.group(3) + '-' + m.group(4),
+    m.group(1),
+    m.group(1) + "-" + m.group(2),
+    m.group(1) + "-" + m.group(2) + m.group(3),
+    m.group(1) + "-" + m.group(2) + m.group(3) + "-" + m.group(4),
   ]
 
 
@@ -291,7 +295,7 @@ def get_zones():
 def get_gcp():
   """Returns the string identifier of the GCE VM's Cloud Project."""
   metadata = get_metadata()
-  project = metadata.get('project', {}).get('projectId')
+  project = metadata.get("project", {}).get("projectId")
   return [project] if project else []
 
 
@@ -300,10 +304,10 @@ def get_machine_type():
   """Returns the GCE machine type."""
   # Format is projects/<id>/machineTypes/<machine_type>
   metadata = get_metadata()
-  machine_type = metadata['instance'].get('machineType')
+  machine_type = metadata["instance"].get("machineType")
   if not machine_type:
-    return 'unknown'
-  return machine_type.rsplit('/', 1)[-1]
+    return "unknown"
+  return machine_type.rsplit("/", 1)[-1]
 
 
 @tools.cached
@@ -316,7 +320,7 @@ def get_cpuinfo_uncached():
   metadata = get_metadata()
   if not metadata:
     return None
-  cpu_platform = metadata['instance'].get('cpuPlatform')
+  cpu_platform = metadata["instance"].get("cpuPlatform")
   if not cpu_platform:
     return None
   # Normalize according to the expected name as reported by the CPUID
@@ -331,23 +335,23 @@ def get_cpuinfo_uncached():
   # away.
   cpu_name = None
   vendor = None
-  if cpu_platform.startswith('Intel '):
-    cpu_name = 'Intel(R) Xeon(R) CPU %s GCE' % cpu_platform[len('Intel '):]
-    vendor = 'GenuineIntel'
-  elif cpu_platform.startswith('AMD '):
-    cpu_name = '%s GCE' % cpu_platform
-    vendor = 'AuthenticAMD'
-  elif cpu_platform.startswith(('Ampere ', 'Google Axion', 'Google Tamar')):
-    cpu_name = '%s GCE' % cpu_platform
-    vendor = 'ARM'
+  if cpu_platform.startswith("Intel "):
+    cpu_name = "Intel(R) Xeon(R) CPU %s GCE" % cpu_platform[len("Intel ") :]
+    vendor = "GenuineIntel"
+  elif cpu_platform.startswith("AMD "):
+    cpu_name = "%s GCE" % cpu_platform
+    vendor = "AuthenticAMD"
+  elif cpu_platform.startswith(("Ampere ", "Google Axion", "Google Tamar")):
+    cpu_name = "%s GCE" % cpu_platform
+    vendor = "ARM"
   assert cpu_name is not None, cpu_platform
   return {
-      'name': cpu_name,
-      'vendor': vendor,
+    "name": cpu_name,
+    "vendor": vendor,
   }
 
 
 @tools.cached
 def get_tags():
   """Returns a list of instance tags or empty list if not GCE VM."""
-  return get_metadata()['instance'].get('tags') or []
+  return get_metadata()["instance"].get("tags") or []

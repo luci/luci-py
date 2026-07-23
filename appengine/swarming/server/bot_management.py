@@ -79,6 +79,7 @@ class _BotCommon(ndb.Model):
 
   Parent is BotRoot.
   """
+
   # State is purely informative. It is completely free form.
   state = datastore_utils.DeterministicJsonProperty(json_type=dict)
 
@@ -92,7 +93,7 @@ class _BotCommon(ndb.Model):
   authenticated_as = ndb.StringProperty(indexed=False)
 
   # Version of swarming_bot.zip the bot is currently running.
-  version = ndb.StringProperty(default='', indexed=False)
+  version = ndb.StringProperty(default="", indexed=False)
 
   # Set when either:
   # - dimensions['quarantined'] or state['quarantined'] is set. This either
@@ -141,7 +142,7 @@ class _BotCommon(ndb.Model):
     """Returns a dict representation of self.dimensions_flat."""
     out = {}
     for i in self.dimensions_flat:
-      k, v = i.split(':', 1)
+      k, v = i.split(":", 1)
       out.setdefault(k, []).append(v)
     return out
 
@@ -156,9 +157,9 @@ class _BotCommon(ndb.Model):
     return task_pack.unpack_run_result_key(self.task_id)
 
   def to_dict(self, exclude=None):
-    exclude = ['dimensions_flat'] + (exclude or [])
+    exclude = ["dimensions_flat"] + (exclude or [])
     out = super(_BotCommon, self).to_dict(exclude=exclude)
-    out['dimensions'] = self.dimensions
+    out["dimensions"] = self.dimensions
     return out
 
   def to_proto(self, out):
@@ -166,14 +167,14 @@ class _BotCommon(ndb.Model):
     # Used by BotEvent.to_proto() and BotInfo.to_proto().
     if self.key:
       out.bot_id = self.key.parent().string_id()
-    #out.session_id = ''  # https://crbug.com/786735
+    # out.session_id = ''  # https://crbug.com/786735
     for l in self.dimensions_flat:
-      if l.startswith(u'pool:'):
-        out.pools.append(l[len(u'pool:'):])
+      if l.startswith("pool:"):
+        out.pools.append(l[len("pool:") :])
 
     if self.is_dead:
       out.status = swarming_pb2.MISSING
-      out.status_msg = ''
+      out.status_msg = ""
 
     if self.is_idle:
       out.status = swarming_pb2.IDLE
@@ -184,12 +185,12 @@ class _BotCommon(ndb.Model):
     # https://crbug.com/913978: RESERVED
     if self.quarantined:
       out.status = swarming_pb2.QUARANTINED_BY_BOT
-      msg = (self.state or {}).get(u'quarantined')
+      msg = (self.state or {}).get("quarantined")
       if msg:
         if not isinstance(msg, basestring):
           # Having {'quarantined': True} is valid for the state, convert this to
           # a string.
-          msg = 'true'
+          msg = "true"
         out.status_msg = msg
     elif self.maintenance_msg:
       out.status = swarming_pb2.OVERHEAD_MAINTENANCE_EXTERNAL
@@ -226,6 +227,7 @@ class _BotCommon(ndb.Model):
 
 class LastTaskDetails(ndb.Model):
   """Information about the task most recently finished by the bot."""
+
   # ID of the finished task.
   task_id = ndb.StringProperty(indexed=False)
   # Display name of the finished task.
@@ -244,6 +246,7 @@ class BotInfo(_BotCommon):
   This entity is a cache of the last BotEvent and is additionally updated on
   poll, which does not create a BotEvent.
   """
+
   # One of:
   NOT_IN_MAINTENANCE = 1 << 9  # 512
   IN_MAINTENANCE = 1 << 8  # 256
@@ -254,8 +257,8 @@ class BotInfo(_BotCommon):
   HEALTHY = 1 << 3  # 8
   QUARANTINED = 1 << 2  # 4
   # One of:
-  IDLE = 1<<1 # 2
-  BUSY = 1<<0 # 1
+  IDLE = 1 << 1  # 2
+  BUSY = 1 << 0  # 1
 
   # First time this bot was seen.
   first_seen_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
@@ -288,11 +291,10 @@ class BotInfo(_BotCommon):
   def calc_composite(self):
     """Returns the value for BotInfo.composite, which permits quick searches."""
     return [
-        self.IN_MAINTENANCE
-        if self.maintenance_msg else self.NOT_IN_MAINTENANCE,
-        self.DEAD if self._should_be_dead() else self.ALIVE,
-        self.QUARANTINED if self.quarantined else self.HEALTHY,
-        self.IDLE if self.idle_since_ts else self.BUSY,
+      self.IN_MAINTENANCE if self.maintenance_msg else self.NOT_IN_MAINTENANCE,
+      self.DEAD if self._should_be_dead() else self.ALIVE,
+      self.QUARANTINED if self.quarantined else self.HEALTHY,
+      self.IDLE if self.idle_since_ts else self.BUSY,
     ]
 
   def _should_be_dead(self, deadline=None):
@@ -302,17 +304,17 @@ class BotInfo(_BotCommon):
 
   @property
   def is_dead(self):
-    assert self.composite, 'Please store first'
+    assert self.composite, "Please store first"
     return self.DEAD in self.composite
 
   def to_dict(self, exclude=None):
     out = super(BotInfo, self).to_dict(exclude=exclude)
     # Inject the bot id, since it's the entity key.
-    out['id'] = self.id
-    out['is_dead'] = self.is_dead
+    out["id"] = self.id
+    out["is_dead"] = self.is_dead
     return out
 
-  #def to_proto(self, out):
+  # def to_proto(self, out):
   #  """Converts self to a swarming_pb2.Bot."""
   # This populates most of the data.
   # super(BotInfo, self).to_proto(out)
@@ -354,54 +356,51 @@ class BotEvent(_BotCommon):
 
   This entity is created on each bot state transition.
   """
+
   _MAPPING = {
-      'bot_connected': swarming_pb2.BOT_NEW_SESSION,
-      'bot_error': swarming_pb2.BOT_HOOK_ERROR,
-      'bot_log': swarming_pb2.BOT_HOOK_LOG,
-      'bot_missing': swarming_pb2.BOT_MISSING,
-      'bot_rebooting': swarming_pb2.BOT_REBOOTING_HOST,
-      'bot_shutdown': swarming_pb2.BOT_SHUTDOWN,
-      'bot_terminate': swarming_pb2.INSTRUCT_TERMINATE_BOT,
-      'request_restart': swarming_pb2.INSTRUCT_RESTART_BOT,
-
-      # Shall only be stored when there is a significant difference in the bot
-      # state versus the previous event.
-      'request_sleep': swarming_pb2.INSTRUCT_IDLE,
-      'request_task': swarming_pb2.INSTRUCT_START_TASK,
-      'request_update': swarming_pb2.INSTRUCT_UPDATE_BOT_CODE,
-      'task_completed': swarming_pb2.TASK_COMPLETED,
-      'task_error': swarming_pb2.TASK_INTERNAL_FAILURE,
-      'task_killed': swarming_pb2.TASK_KILLED,
-
-      # These values are not registered in the API.
-      'bot_idle': None,
-      'bot_polling': None,
-      'task_update': None,
+    "bot_connected": swarming_pb2.BOT_NEW_SESSION,
+    "bot_error": swarming_pb2.BOT_HOOK_ERROR,
+    "bot_log": swarming_pb2.BOT_HOOK_LOG,
+    "bot_missing": swarming_pb2.BOT_MISSING,
+    "bot_rebooting": swarming_pb2.BOT_REBOOTING_HOST,
+    "bot_shutdown": swarming_pb2.BOT_SHUTDOWN,
+    "bot_terminate": swarming_pb2.INSTRUCT_TERMINATE_BOT,
+    "request_restart": swarming_pb2.INSTRUCT_RESTART_BOT,
+    # Shall only be stored when there is a significant difference in the bot
+    # state versus the previous event.
+    "request_sleep": swarming_pb2.INSTRUCT_IDLE,
+    "request_task": swarming_pb2.INSTRUCT_START_TASK,
+    "request_update": swarming_pb2.INSTRUCT_UPDATE_BOT_CODE,
+    "task_completed": swarming_pb2.TASK_COMPLETED,
+    "task_error": swarming_pb2.TASK_INTERNAL_FAILURE,
+    "task_killed": swarming_pb2.TASK_KILLED,
+    # These values are not registered in the API.
+    "bot_idle": None,
+    "bot_polling": None,
+    "task_update": None,
   }
 
   ALLOWED_EVENTS = {
-      # Bot specific events that are outside the scope of a task:
-      'bot_connected',
-      'bot_error',
-      'bot_idle',
-      'bot_log',
-      'bot_missing',
-      'bot_polling',
-      'bot_rebooting',
-      'bot_shutdown',
-      'bot_terminate',
-
-      # Bot polling result:
-      'request_restart',
-      'request_sleep',
-      'request_task',
-      'request_update',
-
-      # Task lifetime as processed by the bot:
-      'task_completed',
-      'task_error',
-      'task_killed',
-      'task_update',
+    # Bot specific events that are outside the scope of a task:
+    "bot_connected",
+    "bot_error",
+    "bot_idle",
+    "bot_log",
+    "bot_missing",
+    "bot_polling",
+    "bot_rebooting",
+    "bot_shutdown",
+    "bot_terminate",
+    # Bot polling result:
+    "request_restart",
+    "request_sleep",
+    "request_task",
+    "request_update",
+    # Task lifetime as processed by the bot:
+    "task_completed",
+    "task_error",
+    "task_killed",
+    "task_update",
   }
 
   # Common properties for all events (which includes everything in _BotCommon).
@@ -413,12 +412,15 @@ class BotEvent(_BotCommon):
 
   @property
   def is_dead(self):
-    return self.event_type == 'bot_missing'
+    return self.event_type == "bot_missing"
 
   @property
   def is_idle(self):
-    return (self.event_type in ('request_sleep', 'bot_idle')
-            and not self.quarantined and not self.maintenance_msg)
+    return (
+      self.event_type in ("request_sleep", "bot_idle")
+      and not self.quarantined
+      and not self.maintenance_msg
+    )
 
   def to_proto(self, out):
     """Converts self to a swarming_pb2.BotEvent."""
@@ -440,6 +442,7 @@ class BotSettings(ndb.Model):
 
   This entity must always be updated in a transaction.
   """
+
   # If set to True, no task is handed out to this bot due to the bot being in a
   # broken situation.
   quarantined = ndb.BooleanProperty()
@@ -451,25 +454,25 @@ class BotSettings(ndb.Model):
 def get_root_key(bot_id):
   """Returns the BotRoot ndb.Key for a known bot."""
   if not bot_id:
-    raise ValueError('Bad id')
+    raise ValueError("Bad id")
   return ndb.Key(BotRoot, bot_id)
 
 
 def get_info_key(bot_id):
   """Returns the BotInfo ndb.Key for a known bot."""
-  return ndb.Key(BotInfo, 'info', parent=get_root_key(bot_id))
+  return ndb.Key(BotInfo, "info", parent=get_root_key(bot_id))
 
 
 def get_events_query(bot_id):
-  """Returns an ndb.Query for most recent events in reverse chronological order.
-  """
+  """Returns an ndb.Query for most recent events in reverse chronological order."""
   # Disable the in-process local cache. This is important, as there can be up to
   # a thousand entities loaded in memory, and this is a pure memory leak, as
   # there's no chance this specific instance will need these again, therefore
   # this leads to 'Exceeded soft memory limit' AppEngine errors.
   q = BotEvent.query(
-      default_options=ndb.QueryOptions(use_cache=False),
-      ancestor=get_root_key(bot_id))
+    default_options=ndb.QueryOptions(use_cache=False),
+    ancestor=get_root_key(bot_id),
+  )
   q = q.order(-BotEvent.ts)
   return q
 
@@ -512,17 +515,19 @@ def get_latest_info(bot_id):
     return bot, True
 
   # Reconstruct BotInfo of the deleted bot based on the latest event.
-  bot = BotInfo(key=info_key,
-                dimensions_flat=events[0].dimensions_flat,
-                state=events[0].state,
-                session_id=events[0].session_id,
-                external_ip=events[0].external_ip,
-                authenticated_as=events[0].authenticated_as,
-                version=events[0].version,
-                quarantined=events[0].quarantined,
-                maintenance_msg=events[0].maintenance_msg,
-                task_id=events[0].task_id,
-                last_seen_ts=events[0].ts)
+  bot = BotInfo(
+    key=info_key,
+    dimensions_flat=events[0].dimensions_flat,
+    state=events[0].state,
+    session_id=events[0].session_id,
+    external_ip=events[0].external_ip,
+    authenticated_as=events[0].authenticated_as,
+    version=events[0].version,
+    quarantined=events[0].quarantined,
+    maintenance_msg=events[0].maintenance_msg,
+    task_id=events[0].task_id,
+    last_seen_ts=events[0].ts,
+  )
 
   # message_conversion.bot_info_to_rpc calls `is_dead` and this property
   # require `composite` to be calculated. The calculation is done in
@@ -560,19 +565,19 @@ def get_bot_pools(bot_id):
 
 def get_settings_key(bot_id):
   """Returns the BotSettings ndb.Key for a known bot."""
-  return ndb.Key(BotSettings, 'settings', parent=get_root_key(bot_id))
+  return ndb.Key(BotSettings, "settings", parent=get_root_key(bot_id))
 
 
 def filter_dimensions(q, dimensions):
   """Filters a ndb.Query for BotInfo based on dimensions in the request."""
   for d in dimensions:
-    parts = d.split(':', 1)
+    parts = d.split(":", 1)
     if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
-      raise ValueError('Invalid dimensions')
+      raise ValueError("Invalid dimensions")
     # expand OR operator
     # e.g. 'foo:A|B' -> ['foo:A', 'foo:B']
     values = parts[1].split(OR_DIM_SEP)
-    dims = ['%s:%s' % (parts[0], v) for v in values]
+    dims = ["%s:%s" % (parts[0], v) for v in values]
     q = q.filter(BotInfo.dimensions_flat.IN(dims))
   return q
 
@@ -607,11 +612,24 @@ def filter_availability(q, quarantined, in_maintenance, is_dead, is_busy):
   return q
 
 
-def _apply_event_updates(bot_info, event_type, now, session_id, task_id,
-                         task_name, external_ip, authenticated_as,
-                         dimensions_flat, state, version, quarantined,
-                         maintenance_msg, register_dimensions,
-                         rbe_effective_bot_id, set_rbe_effective_bot_id):
+def _apply_event_updates(
+  bot_info,
+  event_type,
+  now,
+  session_id,
+  task_id,
+  task_name,
+  external_ip,
+  authenticated_as,
+  dimensions_flat,
+  state,
+  version,
+  quarantined,
+  maintenance_msg,
+  register_dimensions,
+  rbe_effective_bot_id,
+  set_rbe_effective_bot_id,
+):
   """Mutates BotInfo based on event details passed to bot_event(...)."""
   # Bump the expiration time every time the entity is touched. Note that this
   # field is unindexed (Cloud Datastore TTL policy doesn't need an index),
@@ -624,7 +642,7 @@ def _apply_event_updates(bot_info, event_type, now, session_id, task_id,
   # If the `last_seen_ts` gets updated, it would change the bot composite
   # to alive. And if it clears `maintenance_msg`, it would change the composite
   # to NOT_IN_MAINTENANCE and lose the message.
-  if event_type != 'bot_missing':
+  if event_type != "bot_missing":
     bot_info.last_seen_ts = now
     if session_id is not None:
       bot_info.session_id = session_id
@@ -647,9 +665,9 @@ def _apply_event_updates(bot_info, event_type, now, session_id, task_id,
     bot_info.task_name = task_name
 
   # Remember if the started task is a termination task.
-  if event_type == 'bot_terminate':
+  if event_type == "bot_terminate":
     bot_info.task_flags = TASK_FLAG_TERMINATION
-  elif event_type == 'request_task':
+  elif event_type == "request_task":
     bot_info.task_flags = 0
 
   # Remove the task from the BotInfo summary in the following cases
@@ -662,64 +680,89 @@ def _apply_event_updates(bot_info, event_type, now, session_id, task_id,
   #    So ensure the task is removed.
   # 3) When the bot is missing
   #    We assume it can't process assigned task anymore.
-  if event_type in ('task_completed', 'task_error', 'task_killed',
-                    'request_sleep', 'bot_idle', 'bot_polling', 'bot_missing'):
+  if event_type in (
+    "task_completed",
+    "task_error",
+    "task_killed",
+    "request_sleep",
+    "bot_idle",
+    "bot_polling",
+    "bot_missing",
+  ):
     if bot_info.task_id:
       bot_info.last_finished_task = LastTaskDetails(
-          task_id=bot_info.task_id,
-          task_name=bot_info.task_name,
-          task_flags=bot_info.task_flags,
-          finished_due=event_type)
+        task_id=bot_info.task_id,
+        task_name=bot_info.task_name,
+        task_flags=bot_info.task_flags,
+        finished_due=event_type,
+      )
     bot_info.task_id = None
     bot_info.task_name = None
     bot_info.task_flags = None
 
   # idle_since_ts is updated only when bot is idle in healthy state.
-  is_idle = (event_type in ('request_sleep', 'bot_idle')
-             and not bot_info.quarantined and not bot_info.maintenance_msg)
+  is_idle = (
+    event_type in ("request_sleep", "bot_idle")
+    and not bot_info.quarantined
+    and not bot_info.maintenance_msg
+  )
   if is_idle:
     bot_info.idle_since_ts = bot_info.idle_since_ts or now
   else:
     bot_info.idle_since_ts = None
 
   # Update dimensions only if they are given and `register_dimensions` is True.
-  if (dimensions_flat and register_dimensions
-      and bot_info.dimensions_flat != dimensions_flat):
-    logging.debug('bot_event: Updating dimensions. from: %s, to: %s',
-                  bot_info.dimensions_flat, dimensions_flat)
+  if (
+    dimensions_flat
+    and register_dimensions
+    and bot_info.dimensions_flat != dimensions_flat
+  ):
+    logging.debug(
+      "bot_event: Updating dimensions. from: %s, to: %s",
+      bot_info.dimensions_flat,
+      dimensions_flat,
+    )
     bot_info.dimensions_flat = dimensions_flat
 
   # Update rbe_effective_bot_id only when `set_rbe_effective_bot_id` is True.
-  if (set_rbe_effective_bot_id
-      and bot_info.rbe_effective_bot_id != rbe_effective_bot_id):
-    logging.debug('bot_event: Updating rbe_effective_bot_id. from: %s, to: %s',
-                  bot_info.rbe_effective_bot_id, rbe_effective_bot_id)
+  if (
+    set_rbe_effective_bot_id
+    and bot_info.rbe_effective_bot_id != rbe_effective_bot_id
+  ):
+    logging.debug(
+      "bot_event: Updating rbe_effective_bot_id. from: %s, to: %s",
+      bot_info.rbe_effective_bot_id,
+      rbe_effective_bot_id,
+    )
     bot_info.rbe_effective_bot_id = rbe_effective_bot_id
 
 
 def _snapshot_bot_info(bot_info):
   """Captures a subset of BotInfo used to detect it we need to emit an event."""
   return (
-      bot_info.calc_composite(),
-      bot_info.dimensions_flat,
+    bot_info.calc_composite(),
+    bot_info.dimensions_flat,
   )
 
 
 # Events that happen very often and not worth reporting individually.
 _FREQUENT_EVENTS = frozenset(
-    ['request_sleep', 'task_update', 'bot_idle', 'bot_polling'])
+  ["request_sleep", "task_update", "bot_idle", "bot_polling"]
+)
 
 # Events that may result in creation of new BotInfo entities (i.e. a new bot
 # appearing). Most often this is just bot_connected.
-_HEALTHY_BOT_EVENTS = frozenset([
-    'bot_connected',
-    'bot_idle',
-    'bot_polling',
-    'request_restart',
-    'request_sleep',
-    'request_task',
-    'request_update',
-])
+_HEALTHY_BOT_EVENTS = frozenset(
+  [
+    "bot_connected",
+    "bot_idle",
+    "bot_polling",
+    "request_restart",
+    "request_sleep",
+    "request_task",
+    "request_update",
+  ]
+)
 
 
 def _should_store_event(event_type, before, after):
@@ -734,12 +777,13 @@ def _should_store_event(event_type, before, after):
     True or False.
   """
   return (
-      # Record all "rare" events.
-      event_type not in _FREQUENT_EVENTS
-      # Record status changing events (crbug.com/952984, crbug.com/1040345).
-      or before[0] != after[0]
-      # Record changes to dimensions (crbug.com/1015365).
-      or before[1] != after[1])
+    # Record all "rare" events.
+    event_type not in _FREQUENT_EVENTS
+    # Record status changing events (crbug.com/952984, crbug.com/1040345).
+    or before[0] != after[0]
+    # Record changes to dimensions (crbug.com/1015365).
+    or before[1] != after[1]
+  )
 
 
 def _insert_bot_with_txn(root_key, bot_info, event):
@@ -757,42 +801,56 @@ def _insert_bot_with_txn(root_key, bot_info, event):
 
   attempt = 1
   delay = 0.1
-  what = 'event %s' % event.event_type if event else 'bot info'
+  what = "event %s" % event.event_type if event else "bot info"
   while True:
     try:
-      logging.info('Attempt %d to insert %s (%d entities) for bot_id %s',
-                   attempt, what, len(entities), root_key.id())
+      logging.info(
+        "Attempt %d to insert %s (%d entities) for bot_id %s",
+        attempt,
+        what,
+        len(entities),
+        root_key.id(),
+      )
       attempt += 1
       if len(entities) == 1:
         entities[0].put()
       else:
         datastore_utils.transaction(lambda: ndb.put_multi(entities), retries=0)
       break
-    except (datastore_utils.CommitError, datastore_errors.InternalError,
-            datastore_errors.Timeout,
-            datastore_errors.TransactionFailedError) as exc:
-      logging.warning('_insert_bot_with_txn: error inserting %s for %s: %s',
-                      what, root_key.id(), exc)
+    except (
+      datastore_utils.CommitError,
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+    ) as exc:
+      logging.warning(
+        "_insert_bot_with_txn: error inserting %s for %s: %s",
+        what,
+        root_key.id(),
+        exc,
+      )
       delay = min(5.0, delay * 2.0)
       time.sleep(delay)
 
 
-def bot_event(event_type,
-              bot_id,
-              session_id=None,
-              task_id=None,
-              task_name=None,
-              external_ip=None,
-              authenticated_as=None,
-              dimensions=None,
-              state=None,
-              version=None,
-              quarantined=None,
-              maintenance_msg=None,
-              event_msg=None,
-              register_dimensions=False,
-              rbe_effective_bot_id=None,
-              set_rbe_effective_bot_id=False):
+def bot_event(
+  event_type,
+  bot_id,
+  session_id=None,
+  task_id=None,
+  task_name=None,
+  external_ip=None,
+  authenticated_as=None,
+  dimensions=None,
+  state=None,
+  version=None,
+  quarantined=None,
+  maintenance_msg=None,
+  event_msg=None,
+  register_dimensions=False,
+  rbe_effective_bot_id=None,
+  set_rbe_effective_bot_id=False,
+):
   """Updates the state of the bot in the datastore.
 
   This call usually means the bot is alive (not dead), except for `bot_missing`
@@ -856,11 +914,12 @@ def bot_event(event_type,
   if not bot_info:
     # Register only id and pool dimensions at the first handshake.
     bot_info = BotInfo(
-        key=info_key,
-        dimensions_flat=[
-            d for d in dimensions_flat
-            if d.startswith('id:') or d.startswith('pool:')
-        ],
+      key=info_key,
+      dimensions_flat=[
+        d
+        for d in dimensions_flat
+        if d.startswith("id:") or d.startswith("pool:")
+      ],
     )
     # Create BotInfo only if this event indicates the bot is actually alive.
     # This check exists to workaround race conditions when deleting bots. In
@@ -873,7 +932,7 @@ def bot_event(event_type,
     # event).
     store_bot_info = event_type in _HEALTHY_BOT_EVENTS
     if not store_bot_info:
-      logging.warning('No BotInfo(%s) when storing %s', bot_id, event_type)
+      logging.warning("No BotInfo(%s) when storing %s", bot_id, event_type)
 
   # Use the exact same timestamp in both BotInfo and BotEvent for consistency.
   now = utils.utcnow()
@@ -882,22 +941,24 @@ def bot_event(event_type,
   state_before = _snapshot_bot_info(bot_info)
 
   # Mutate BotInfo in place based on the event details.
-  _apply_event_updates(bot_info=bot_info,
-                       event_type=event_type,
-                       now=now,
-                       session_id=session_id,
-                       task_id=task_id,
-                       task_name=task_name,
-                       external_ip=external_ip,
-                       authenticated_as=authenticated_as,
-                       dimensions_flat=dimensions_flat,
-                       state=state,
-                       version=version,
-                       quarantined=quarantined,
-                       maintenance_msg=maintenance_msg,
-                       register_dimensions=register_dimensions,
-                       rbe_effective_bot_id=rbe_effective_bot_id,
-                       set_rbe_effective_bot_id=set_rbe_effective_bot_id)
+  _apply_event_updates(
+    bot_info=bot_info,
+    event_type=event_type,
+    now=now,
+    session_id=session_id,
+    task_id=task_id,
+    task_name=task_name,
+    external_ip=external_ip,
+    authenticated_as=authenticated_as,
+    dimensions_flat=dimensions_flat,
+    state=state,
+    version=version,
+    quarantined=quarantined,
+    maintenance_msg=maintenance_msg,
+    register_dimensions=register_dimensions,
+    rbe_effective_bot_id=rbe_effective_bot_id,
+    set_rbe_effective_bot_id=set_rbe_effective_bot_id,
+  )
 
   # Snapshot the state after changes, used in _should_store_event.
   state_after = _snapshot_bot_info(bot_info)
@@ -910,25 +971,27 @@ def bot_event(event_type,
   # bot alive in the datastore, but we should record BotEvent only in case
   # something interesting happens.
   if _should_store_event(event_type, state_before, state_after):
-    event = BotEvent(parent=bot_info.key.parent(),
-                     event_type=event_type,
-                     ts=now,
-                     expire_at=now + _OLD_BOT_EVENTS_CUT_OFF,
-                     session_id=bot_info.session_id,
-                     external_ip=bot_info.external_ip,
-                     authenticated_as=bot_info.authenticated_as,
-                     dimensions_flat=(dimensions_flat
-                                      or bot_info.dimensions_flat),
-                     quarantined=bot_info.quarantined,
-                     maintenance_msg=bot_info.maintenance_msg,
-                     state=bot_info.state,
-                     task_id=task_id or bot_info.task_id,
-                     version=bot_info.version,
-                     last_seen_ts=bot_info.last_seen_ts,
-                     idle_since_ts=bot_info.idle_since_ts,
-                     message=event_msg)
-    _insert_bot_with_txn(info_key.root(), bot_info if store_bot_info else None,
-                         event)
+    event = BotEvent(
+      parent=bot_info.key.parent(),
+      event_type=event_type,
+      ts=now,
+      expire_at=now + _OLD_BOT_EVENTS_CUT_OFF,
+      session_id=bot_info.session_id,
+      external_ip=bot_info.external_ip,
+      authenticated_as=bot_info.authenticated_as,
+      dimensions_flat=(dimensions_flat or bot_info.dimensions_flat),
+      quarantined=bot_info.quarantined,
+      maintenance_msg=bot_info.maintenance_msg,
+      state=bot_info.state,
+      task_id=task_id or bot_info.task_id,
+      version=bot_info.version,
+      last_seen_ts=bot_info.last_seen_ts,
+      idle_since_ts=bot_info.idle_since_ts,
+      message=event_msg,
+    )
+    _insert_bot_with_txn(
+      info_key.root(), bot_info if store_bot_info else None, event
+    )
     return event.key
 
   # No need to emit an event. Just update BotInfo on its own.
@@ -966,7 +1029,7 @@ def has_capacity(dimensions):
 
     num = yield q.count_async(limit=1)
     if num:
-      logging.info('Found capacity via BotInfo: %s', flat)
+      logging.info("Found capacity via BotInfo: %s", flat)
       raise ndb.Return(True)
 
     # Search a bit harder. In this case, we're looking for BotEvent which would
@@ -977,12 +1040,12 @@ def has_capacity(dimensions):
       q = q.filter(BotEvent.dimensions_flat == f)
     num = yield q.count_async(limit=1)
     if num:
-      logging.info('Found capacity via BotEvent: %s', flat)
+      logging.info("Found capacity via BotEvent: %s", flat)
       raise ndb.Return(True)
     raise ndb.Return(False)
 
   futures = [
-      run_query(f) for f in task_queues.expand_dimensions_to_flats(dimensions)
+    run_query(f) for f in task_queues.expand_dimensions_to_flats(dimensions)
   ]
 
   ndb.tasklets.Future.wait_all(futures)
@@ -990,32 +1053,34 @@ def has_capacity(dimensions):
     task_queues.set_has_capacity(dimensions, seconds)
     return True
 
-  logging.warning('HAS NO CAPACITY: %s', dimensions)
+  logging.warning("HAS NO CAPACITY: %s", dimensions)
   return False
 
 
 def get_pools_from_dimensions_flat(dimensions_flat):
   """Gets pools from dimensions_flat."""
   return [
-      d.replace('pool:', '') for d in dimensions_flat if d.startswith('pool:')
+    d.replace("pool:", "") for d in dimensions_flat if d.startswith("pool:")
   ]
 
 
 def cron_update_bot_info():
   """Refreshes BotInfo.composite for dead bots."""
+
   @ndb.tasklet
   def run(bot_key):
     bot = bot_key.get()
     if not bot:
-      logging.debug('BotInfo %s deleted since query or query was stale',
-                    bot_key)
+      logging.debug(
+        "BotInfo %s deleted since query or query was stale", bot_key
+      )
       raise ndb.Return(None)
     if not bot.is_dead and bot._should_be_dead():
       # `is_dead` is updated in _pre_put_hook based on should_be_dead.
-      logging.info('Changing Bot status to DEAD: %s', bot.id)
+      logging.info("Changing Bot status to DEAD: %s", bot.id)
       yield bot.put_async()
       raise ndb.Return(bot)
-    logging.debug('BotInfo changed since query or query was stale, %r', bot)
+    logging.debug("BotInfo changed since query or query was stale, %r", bot)
     raise ndb.Return(None)
 
   # Note: tx_result can potentially block for a significant amount of time since
@@ -1025,20 +1090,20 @@ def cron_update_bot_info():
     try:
       bot = future.get_result()
       if not bot:
-        stats['stale'] += 1
+        stats["stale"] += 1
         return
-      stats['dead'] += 1
+      stats["dead"] += 1
 
       # Unregister the bot from task queues since it can't reap anything.
       task_queues.cleanup_after_bot(bot.id)
 
       # Note: this is best effort at this point. If it fails, there'll be no
       # retry: the bot is already marked as dead.
-      logging.info('Sending bot_missing event: %s', bot.id)
-      bot_event('bot_missing', bot.id)
+      logging.info("Sending bot_missing event: %s", bot.id)
+      bot_event("bot_missing", bot.id)
     except datastore_utils.CommitError:
-      logging.warning('Failed to commit a Tx')
-      stats['failed'] += 1
+      logging.warning("Failed to commit a Tx")
+      stats["failed"] += 1
 
   # The assumption here is that a cron job can visit all alive bots fast enough.
   # The number of bots is expected to be up to ~30k. It takes about a minute to
@@ -1046,10 +1111,10 @@ def cron_update_bot_info():
   # cron.yaml `/internal/cron/monitoring/bots/update_bot_info` entry that
   # depends on this timing.
   cron_stats = {
-      'seen': 0,
-      'dead': 0,
-      'failed': 0,
-      'stale': 0,
+    "seen": 0,
+    "dead": 0,
+    "failed": 0,
+    "stale": 0,
   }
 
   # _deadline() hits the instance config cache. Do it only once here instead of
@@ -1057,12 +1122,12 @@ def cron_update_bot_info():
   deadline = BotInfo._deadline()
 
   futures = []
-  logging.debug('Finding dead based on deadline %s...', deadline)
+  logging.debug("Finding dead based on deadline %s...", deadline)
   try:
     for info in BotInfo.yield_alive_bots():
-      cron_stats['seen'] += 1
-      if cron_stats['seen'] % 500 == 0:
-        logging.debug('Visited %d bots so far', cron_stats['seen'])
+      cron_stats["seen"] += 1
+      if cron_stats["seen"] % 500 == 0:
+        logging.debug("Visited %d bots so far", cron_stats["seen"])
 
       # We visit all alive bots and check if any should be marked as dead now.
       # Note that an alternative would be to have an index on `last_seen_ts`,
@@ -1074,8 +1139,9 @@ def cron_update_bot_info():
       # Transactionally flip the state of the bot to DEAD. Retry more often than
       # the default 1. We do not want to throw too much in the logs and there
       # should be plenty of time to do the retries.
-      f = datastore_utils.transaction_async(functools.partial(run, info.key),
-                                            retries=5)
+      f = datastore_utils.transaction_async(
+        functools.partial(run, info.key), retries=5
+      )
       futures.append(f)
 
       # Limit the number of concurrent transactions to avoid OOMs.
@@ -1094,16 +1160,21 @@ def cron_update_bot_info():
       tx_result(f, cron_stats)
 
   finally:
-    logging.debug('Seen: %d, marked as dead: %d, stale: %d, failed: %d',
-                  cron_stats['seen'], cron_stats['dead'], cron_stats['stale'],
-                  cron_stats['failed'])
+    logging.debug(
+      "Seen: %d, marked as dead: %d, stale: %d, failed: %d",
+      cron_stats["seen"],
+      cron_stats["dead"],
+      cron_stats["stale"],
+      cron_stats["failed"],
+    )
 
-  return cron_stats['dead']
+  return cron_stats["dead"]
 
 
 @ndb.tasklet
 def check_bot_alive_async(bot_id):
   """Returns True if this bot exists and is alive (i.e. is sending pings)."""
-  bot = yield get_info_key(bot_id).get_async(use_cache=False,
-                                             use_memcache=False)
+  bot = yield get_info_key(bot_id).get_async(
+    use_cache=False, use_memcache=False
+  )
   raise ndb.Return(bot and not bot.is_dead)

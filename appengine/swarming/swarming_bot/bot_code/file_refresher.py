@@ -34,7 +34,8 @@ class FileRefresherThread(object):
     assert self._thread is None
     self._dump()  # initial dump
     self._thread = threading.Thread(
-        target=self._run, name='FileRefresherThread %s' % self._path)
+      target=self._run, name="FileRefresherThread %s" % self._path
+    )
     self._thread.daemon = True
     self._thread.start()
 
@@ -45,7 +46,7 @@ class FileRefresherThread(object):
     self._signal.put(None)
     self._thread.join(60)  # don't wait forever
     if self._thread.is_alive():
-      logging.error('FileRefresherThread failed to terminate in time')
+      logging.error("FileRefresherThread failed to terminate in time")
 
   def _dump(self):
     """Attempts to rewrite the file, retrying a bunch of times.
@@ -57,11 +58,12 @@ class FileRefresherThread(object):
       content = None
       content = self._producer_callback()
       blob = json.dumps(
-          content, sort_keys=True, indent=2,
-          separators=(',', ': ')).encode('utf-8')
+        content, sort_keys=True, indent=2, separators=(",", ": ")
+      ).encode("utf-8")
     except Exception:
-      logging.exception('Unexpected exception in the callback, content=%s',
-                        content)
+      logging.exception(
+        "Unexpected exception in the callback, content=%s", content
+      )
       return True
     if blob == self._last_dumped_blob:
       return True  # already have it on disk
@@ -73,14 +75,15 @@ class FileRefresherThread(object):
       try:
         file_path.atomic_replace(self._path, blob)
         self._last_dumped_blob = blob
-        logging.info('Updated %s', self._path)
+        logging.info("Updated %s", self._path)
         return True  # success!
       except (IOError, OSError) as e:
-        logging.error('Failed to update the file: %s', e)
+        logging.error("Failed to update the file: %s", e)
       if not attempts:
         logging.error(
-            'Failed to update the file %s after many attempts, giving up',
-            self._path)
+          "Failed to update the file %s after many attempts, giving up",
+          self._path,
+        )
         return True
       attempts -= 1
       if not self._wait(0.05):

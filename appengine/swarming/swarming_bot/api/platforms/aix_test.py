@@ -18,7 +18,6 @@ import aix
 
 
 class TestCPUInfo(auto_stub.TestCase):
-
   def setUp(self):
     super(TestCPUInfo, self).setUp()
     tools.clear_cache_all()
@@ -28,25 +27,26 @@ class TestCPUInfo(auto_stub.TestCase):
     tools.clear_cache_all()
 
   def test_get_cpuinfo_power8(self):
-    self.mock(aix, '_getsystemcfg', lambda x: 0x10000)
-    self.assertEqual({'name': 'POWER8'}, aix.get_cpuinfo())
+    self.mock(aix, "_getsystemcfg", lambda x: 0x10000)
+    self.assertEqual({"name": "POWER8"}, aix.get_cpuinfo())
 
   def test_get_cpuinfo_power9(self):
-    self.mock(aix, '_getsystemcfg', lambda x: 0x20000)
-    self.assertEqual({'name': 'POWER9'}, aix.get_cpuinfo())
+    self.mock(aix, "_getsystemcfg", lambda x: 0x20000)
+    self.assertEqual({"name": "POWER9"}, aix.get_cpuinfo())
 
   def test_get_cpuinfo_power10(self):
-    self.mock(aix, '_getsystemcfg', lambda x: 0x40000)
-    self.assertEqual({'name': 'POWER10'}, aix.get_cpuinfo())
+    self.mock(aix, "_getsystemcfg", lambda x: 0x40000)
+    self.assertEqual({"name": "POWER10"}, aix.get_cpuinfo())
 
   def test_get_cpuinfo_unknown(self):
-    self.mock(aix, '_getsystemcfg', lambda x: 0x00000)
+    self.mock(aix, "_getsystemcfg", lambda x: 0x00000)
     self.assertEqual({}, aix.get_cpuinfo())
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
+    level=logging.DEBUG if "-v" in sys.argv else logging.ERROR
+  )
   unittest.main()

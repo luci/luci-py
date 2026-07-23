@@ -21,9 +21,8 @@ from api import os_utilities
 
 
 class Bot(object):
-
   def __init__(self, remote, attributes, server, base_dir):
-    assert server is None or not server.endswith('/'), server
+    assert server is None or not server.endswith("/"), server
 
     # Immutable.
     self._base_dir = base_dir
@@ -35,9 +34,9 @@ class Bot(object):
     self._lock = threading.Lock()
     self._lifecycle_callbacks = []
     self._idle = False
-    self._dimensions = (attributes or {}).get('dimensions') or {}
-    self._state = (attributes or {}).get('state') or {}
-    self._bot_version = (attributes or {}).get('version') or 'unknown'
+    self._dimensions = (attributes or {}).get("dimensions") or {}
+    self._state = (attributes or {}).get("state") or {}
+    self._bot_version = (attributes or {}).get("version") or "unknown"
     self._server_side_dimensions = {}
     self._bot_restart_msg = None
     self._bot_config = {}
@@ -66,11 +65,11 @@ class Bot(object):
   @property
   def config_dir(self):
     """The directory used for configuration files on the machine."""
-    if sys.platform == 'win32':
-      return 'C:\\swarming_config'
-    if sys.platform == 'cygwin':
-      return '/cygdrive/c/swarming_config'
-    return '/etc/swarming_config'
+    if sys.platform == "win32":
+      return "C:\\swarming_config"
+    if sys.platform == "cygwin":
+      return "/cygdrive/c/swarming_config"
+    return "/etc/swarming_config"
 
   @property
   def dimensions(self):
@@ -159,9 +158,9 @@ class Bot(object):
     """A copy of the dict with bot attributes to send to the server."""
     with self._lock:
       return {
-          'dimensions': copy.deepcopy(self._dimensions),
-          'state': copy.deepcopy(self._state),
-          'version': self._bot_version,
+        "dimensions": copy.deepcopy(self._dimensions),
+        "state": copy.deepcopy(self._state),
+        "version": self._bot_version,
       }
 
   @property
@@ -175,7 +174,7 @@ class Bot(object):
     This is generally used by bot_config.setup_bot() when setting up the bot to
     automatically start upon boot.
     """
-    return os.path.join(self.base_dir, 'swarming_bot.zip')
+    return os.path.join(self.base_dir, "swarming_bot.zip")
 
   def get_pseudo_rand(self, width):
     """Returns a constant pseudo-random factor for the bot within +/-width.
@@ -186,14 +185,14 @@ class Bot(object):
     Returns:
       float between [-width, +width] rounded to 4 decimals.
     """
-    b = struct.unpack('h',
-                      hashlib.md5(bytes(
-                          self.id.encode('utf-8'))).digest()[:2])[0]
-    return round(b / 32768. * width, 4)
+    b = struct.unpack(
+      "h", hashlib.md5(bytes(self.id.encode("utf-8"))).digest()[:2]
+    )[0]
+    return round(b / 32768.0 * width, 4)
 
   def post_event(self, event_type, message):
     """Posts an event to the server."""
-    is_shutdown = event_type in ('bot_shutdown', 'bot_rebooting')
+    is_shutdown = event_type in ("bot_shutdown", "bot_rebooting")
     if is_shutdown and self._shutdown_event_posted:
       return  # do not spam repeated messages if shutdown fails and gets retried
     self._remote.post_bot_event(event_type, message, self.attributes)
@@ -208,12 +207,12 @@ class Bot(object):
     Include a full stack trace, because sometimes the error is not sufficient
     by itself.
     """
-    logging.error('post_error(%s)', message)
-    stack = '\nCalling stack:\n%s' % _make_stack()
+    logging.error("post_error(%s)", message)
+    stack = "\nCalling stack:\n%s" % _make_stack()
     try:
-      self.post_event('bot_error', '%s%s' % (message.rstrip(), stack))
+      self.post_event("bot_error", "%s%s" % (message.rstrip(), stack))
     except Exception:
-      logging.exception('post_error(%s) failed.%s', message, stack)
+      logging.exception("post_error(%s) failed.%s", message, stack)
 
   def host_reboot(self, message):
     """Reboots the machine.
@@ -224,11 +223,11 @@ class Bot(object):
     If reboot fails, logs the error to the server and moves the bot to
     quarantined mode.
     """
-    self.post_event('bot_rebooting', message)
+    self.post_event("bot_rebooting", message)
 
     # Run the callbacks to prepare for the reboot. They will shutdown RBE
     # session and prepare the bot to auto-start after the reboot.
-    self.run_lifecycle_callbacks('reboot')
+    self.run_lifecycle_callbacks("reboot")
 
     # os_utilities.host_reboot should never return, unless the reboot is not
     # happening (e.g. sudo shutdown requires a password). If rebooting the host
@@ -241,10 +240,10 @@ class Bot(object):
       # is likely in read-only mode and there isn't much that can be done. This
       # exception is deep inside pickle.py. So notify the server then hang in
       # there.
-      self.post_error('This host partition is bad; please fix the host')
+      self.post_error("This host partition is bad; please fix the host")
       while True:
         time.sleep(1)
-    self.post_error('Host is stuck rebooting for: %s' % message)
+    self.post_error("Host is stuck rebooting for: %s" % message)
 
   # Compatibility code. TODO(maruel): Remove once all call sites are updated.
   restart = host_reboot
@@ -260,7 +259,7 @@ class Bot(object):
     assert isinstance(message, str), message
     with self._lock:
       if self._bot_restart_msg:
-        self._bot_restart_msg += '\n' + message
+        self._bot_restart_msg += "\n" + message
       else:
         self._bot_restart_msg = message
 
@@ -284,14 +283,14 @@ class Bot(object):
 
   def run_lifecycle_callbacks(self, event):
     """Executes registered lifecycle callbacks."""
-    assert event in ('reboot', 'exit'), event
+    assert event in ("reboot", "exit"), event
     with self._lock:
       cbs = self._lifecycle_callbacks[:]
     for cb in reversed(cbs):
       try:
         cb(self, event)
       except Exception as e:
-        logging.exception('%s lifecycle callback failed: %s', event, e)
+        logging.exception("%s lifecycle callback failed: %s", event, e)
 
 
 class BotMutator(object):
@@ -315,7 +314,7 @@ class BotMutator(object):
 
     See docs for '/handshake' call for the format of 'cfg' dict.
     """
-    self._bot._server_side_dimensions = (cfg or {}).get('dimensions')
+    self._bot._server_side_dimensions = (cfg or {}).get("dimensions")
     self._refresh_attributes()
 
   def update_bot_config(self, name, rev):
@@ -323,7 +322,7 @@ class BotMutator(object):
 
     This is called at start, and after handshake if a custom script is injected.
     """
-    self._bot._bot_config = {'name': name, 'revision': rev}
+    self._bot._bot_config = {"name": name, "revision": rev}
     self._refresh_attributes()
 
   def update_idleness(self, idle):
@@ -354,30 +353,30 @@ class BotMutator(object):
     """Updates `bot.dimensions` by merging-in automatically set dimensions."""
     dimensions = new_dimensions.copy()
     dimensions.update(self._bot._server_side_dimensions)
-    dimensions['id'] = [self._bot.id]
-    bot_config_name = self._bot._bot_config.get('name')
+    dimensions["id"] = [self._bot.id]
+    bot_config_name = self._bot._bot_config.get("name")
     if bot_config_name:
-      dimensions['bot_config'] = [bot_config_name]
+      dimensions["bot_config"] = [bot_config_name]
     self._bot._dimensions = dimensions
 
   def update_state(self, new_state):
     """Updates `bot.state` by merging-in automatically set keys."""
     state = new_state.copy()
-    state['rbe_instance'] = self._bot._rbe_instance
+    state["rbe_instance"] = self._bot._rbe_instance
     if self._bot._rbe_instance:
-      state['rbe_session'] = self._bot._rbe_session
-      state['rbe_hybrid_mode'] = self._bot._rbe_hybrid_mode
-      state['rbe_idle'] = self._bot._idle
+      state["rbe_session"] = self._bot._rbe_session
+      state["rbe_hybrid_mode"] = self._bot._rbe_hybrid_mode
+      state["rbe_idle"] = self._bot._idle
     else:
-      state.pop('rbe_session', None)
-      state.pop('rbe_hybrid_mode', None)
-      state.pop('rbe_idle', None)
+      state.pop("rbe_session", None)
+      state.pop("rbe_hybrid_mode", None)
+      state.pop("rbe_idle", None)
     if self._bot._rbe_worker_properties:
-      state['rbe_worker_props'] = self._bot._rbe_worker_properties.to_dict()
+      state["rbe_worker_props"] = self._bot._rbe_worker_properties.to_dict()
     else:
-      state.pop('rbe_worker_props', None)
+      state.pop("rbe_worker_props", None)
     if self._bot._bot_config:
-      state['bot_config'] = self._bot._bot_config
+      state["bot_config"] = self._bot._bot_config
     self._bot._state = state
 
   def add_lifecycle_callback(self, callback):
@@ -416,8 +415,11 @@ def _get_stripper(paths):
 
   stdlib = os.path.dirname(os.__file__)
   # Find the common root for paths not in stdlib and not relative.
-  split_paths = [[c for c in p.split(os.path.sep) if c] for p in paths
-                 if os.path.isabs(p) and not p.startswith(stdlib)]
+  split_paths = [
+    [c for c in p.split(os.path.sep) if c]
+    for p in paths
+    if os.path.isabs(p) and not p.startswith(stdlib)
+  ]
   common = None
   if split_paths:
     common = []
@@ -426,17 +428,17 @@ def _get_stripper(paths):
         break
       common.append(c1)
     if common:
-      if sys.platform == 'win32':
+      if sys.platform == "win32":
         common = os.path.sep.join(common)
       else:
         common = os.path.sep + os.path.sep.join(common)
 
   def stripper(f):
     if f.startswith(stdlib):
-      return f[len(stdlib) + 1:]
+      return f[len(stdlib) + 1 :]
     if os.path.isabs(f) and common:
-      return f[len(common) + 1:]
-    if f.startswith('./'):
+      return f[len(common) + 1 :]
+    if f.startswith("./"):
       return f[2:]
     return f
 
@@ -451,12 +453,13 @@ def _make_stack():
     frames.append(frame)
     frame = frame.f_back
   strip = _get_stripper(f.f_code.co_filename for f in frames)
-  return '\n'.join(
-      '  %-2d %s:%s:%s()' %
-      (i, strip(f.f_code.co_filename), f.f_lineno, f.f_code.co_name)
-      for i, f in enumerate(frames))
+  return "\n".join(
+    "  %-2d %s:%s:%s()"
+    % (i, strip(f.f_code.co_filename), f.f_lineno, f.f_code.co_name)
+    for i, f in enumerate(frames)
+  )
 
 
 def _gen_session_id():
   """Generates a new bot session ID."""
-  return '%s/%d' % (uuid.uuid4().hex, os.getpid())
+  return "%s/%d" % (uuid.uuid4().hex, os.getpid())

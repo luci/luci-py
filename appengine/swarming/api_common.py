@@ -1,8 +1,8 @@
 # Copyright 2023 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
-"""Contains code which is common between bot the prpc API and the protorpc api.
-"""
+"""Contains code which is common between bot the prpc API and the protorpc api."""
+
 import re
 import logging
 import os
@@ -31,7 +31,7 @@ from server import task_result
 from server import task_scheduler
 
 # Whitespace replacement regexp
-_WHITESPACE_RE = re.compile(r'[\t|\n]+')
+_WHITESPACE_RE = re.compile(r"[\t|\n]+")
 
 
 def _get_or_raise(key):
@@ -41,7 +41,7 @@ def _get_or_raise(key):
   # _get_or_raise is only used to get BotInfo.
   result = key.get(use_cache=False, use_memcache=False)
   if not result:
-    raise handlers_exceptions.NotFoundException('%s not found.' % key.id())
+    raise handlers_exceptions.NotFoundException("%s not found." % key.id())
   return result
 
 
@@ -124,17 +124,18 @@ def terminate_bot(bot_id, reason=None):
   bot = _get_or_raise(bot_management.get_info_key(bot_id))
   pools = bot_management.get_pools_from_dimensions_flat(bot.dimensions_flat)
   if not pools:
-    raise handlers_exceptions.BadRequestException('The bot is not in any pool')
+    raise handlers_exceptions.BadRequestException("The bot is not in any pool")
   rbe_instance = None
   rbe_cfg = rbe.get_rbe_config_for_bot(bot_id, pools)
   if rbe_cfg and not rbe_cfg.hybrid_mode:
     rbe_instance = rbe_cfg.instance
 
   if reason:
-    reason = re.sub(_WHITESPACE_RE, ' ', reason)
+    reason = re.sub(_WHITESPACE_RE, " ", reason)
     if len(reason) > 1000:
       raise handlers_exceptions.BadRequestException(
-          'The bot termination reason is too long: %d > 1000' % len(reason))
+        "The bot termination reason is too long: %d > 1000" % len(reason)
+      )
 
   # Skip submitting a new task if there's already a pending termination task.
   # This matters when GCE Provider terminate bots that run for days. It calls
@@ -146,16 +147,16 @@ def terminate_bot(bot_id, reason=None):
   # existing one is being processed right now. Such duplicate task will just
   # naturally eventually expire.
   query = task_result.get_result_summaries_query(
-      start=None,
-      end=None,
-      sort='created_ts',
-      state='pending',
-      tags=['id:%s' % bot_id, 'swarming.terminate:1'],
+    start=None,
+    end=None,
+    sort="created_ts",
+    state="pending",
+    tags=["id:%s" % bot_id, "swarming.terminate:1"],
   )
   keys, _ = datastore_utils.fetch_page(query, 1, None, keys_only=True)
   if keys:
     existing_task_id = task_pack.pack_result_summary_key(keys[0])
-    logging.info('Deduplicating termination task: %s', existing_task_id)
+    logging.info("Deduplicating termination task: %s", existing_task_id)
     return existing_task_id
 
   try:
@@ -170,23 +171,24 @@ def terminate_bot(bot_id, reason=None):
 
 # Stores a list of filters for the function task_result.get_run_results_query
 TaskFilters = namedtuple(
-    'TaskFilters',
-    [
-        # datetime.datetime object or None. If not None, only tasks where the
-        # datetime field specified by `sort` is greater than `start` will be
-        # shown.
-        'start',
-        # Datetime.datetime object or None. If not None, only tasks where the
-        # datetime field specified by `sort` is less than `end` will be shown.
-        'end',
-        # May be either 'created_ts', 'started_ts' or 'completed_ts'. Specifies
-        # which which datetime field in the task to apply [start, end] filter.
-        'sort',
-        # A string representation of possible task_state_query State.
-        'state',
-        # list of key:value pair strings.
-        'tags',
-    ])
+  "TaskFilters",
+  [
+    # datetime.datetime object or None. If not None, only tasks where the
+    # datetime field specified by `sort` is greater than `start` will be
+    # shown.
+    "start",
+    # Datetime.datetime object or None. If not None, only tasks where the
+    # datetime field specified by `sort` is less than `end` will be shown.
+    "end",
+    # May be either 'created_ts', 'started_ts' or 'completed_ts'. Specifies
+    # which which datetime field in the task to apply [start, end] filter.
+    "sort",
+    # A string representation of possible task_state_query State.
+    "state",
+    # list of key:value pair strings.
+    "tags",
+  ],
+)
 
 
 def list_bot_tasks(bot_id, filters, limit, cursor):
@@ -209,12 +211,14 @@ def list_bot_tasks(bot_id, filters, limit, cursor):
   """
   try:
     realms.check_bot_tasks_acl(bot_id)
-    q = task_result.get_run_results_query(filters.start, filters.end,
-                                          filters.sort, filters.state, bot_id)
+    q = task_result.get_run_results_query(
+      filters.start, filters.end, filters.sort, filters.state, bot_id
+    )
     return datastore_utils.fetch_page(q, limit, cursor)
   except ValueError as e:
     raise handlers_exceptions.BadRequestException(
-        'Inappropriate filter for bot.tasks: %s' % e)
+      "Inappropriate filter for bot.tasks: %s" % e
+    )
 
 
 def to_keys(task_id):
@@ -232,8 +236,9 @@ def to_keys(task_id):
   try:
     return task_pack.get_request_and_result_keys(task_id)
   except ValueError as e:
-    raise handlers_exceptions.BadRequestException('invalid task_id %s: %s' %
-                                                  (task_id, e))
+    raise handlers_exceptions.BadRequestException(
+      "invalid task_id %s: %s" % (task_id, e)
+    )
 
 
 # Used by get_task_request_async(), clearer than using True/False and important
@@ -264,17 +269,18 @@ def get_task_request_async(task_id, request_key, permission):
   try:
     request = yield request_key.get_async()
   except ValueError as e:
-    raise handlers_exceptions.BadRequestException("invalid task_id %s: %s" %
-                                                  (task_id, e))
+    raise handlers_exceptions.BadRequestException(
+      "invalid task_id %s: %s" % (task_id, e)
+    )
   if not request:
-    raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
+    raise handlers_exceptions.NotFoundException("%s not found." % task_id)
   access_info = realms.task_access_info_from_request(request)
   if permission == VIEW:
     realms.check_task_get_acl(access_info)
   elif permission == CANCEL:
     realms.check_task_cancel_acl(access_info)
   else:
-    raise handlers_exceptions.InternalException('get_task_request_async()')
+    raise handlers_exceptions.InternalException("get_task_request_async()")
   raise ndb.Return(request)
 
 
@@ -300,9 +306,9 @@ def get_request_and_result(task_id, permission):
     # the TaskRequest, albeit it is the TaskRequest that enforces ACL. Do the
     # task result fetch first, the worst that will happen is unnecessarily
     # fetching the task result.
-    result_future = result_key.get_async(use_cache=False,
-                                         use_memcache=False,
-                                         use_datastore=True)
+    result_future = result_key.get_async(
+      use_cache=False, use_memcache=False, use_datastore=True
+    )
 
     # The TaskRequest has P(99.9%) chance of being fetched from memcache since
     # it is immutable.
@@ -311,10 +317,11 @@ def get_request_and_result(task_id, permission):
     result = result_future.get_result()
     request = request_future.get_result()
   except ValueError as e:
-    raise handlers_exceptions.BadRequestException('invalid task_id %s: %s' %
-                                                  (task_id, e))
+    raise handlers_exceptions.BadRequestException(
+      "invalid task_id %s: %s" % (task_id, e)
+    )
   if not result:
-    raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
+    raise handlers_exceptions.NotFoundException("%s not found." % task_id)
   return request, result
 
 
@@ -346,10 +353,13 @@ def cancel_task(task_id, kill_running):
     handlers_exceptions.NotFoundException: if no task is found for task_id.
   """
   request_key, result_key = to_keys(task_id)
-  request_obj = get_task_request_async(task_id, request_key,
-                                       CANCEL).get_result()
-  return task_scheduler.cancel_task(request_obj, result_key, kill_running
-                                    or False, None)
+  request_obj = get_task_request_async(
+    task_id, request_key, CANCEL
+  ).get_result()
+  return task_scheduler.cancel_task(
+    request_obj, result_key, kill_running or False, None
+  )
+
 
 # Maximum content fetched at once, mostly for compatibility with previous
 # behavior. pRPC implementation should limit to a multiple of CHUNK_SIZE
@@ -375,12 +385,14 @@ def get_output(task_id, offset, length):
   return output, result.state
 
 
-NewTaskResult = namedtuple('NewTaskResult',
-                           ['request', 'task_id', 'task_result'])
+NewTaskResult = namedtuple(
+  "NewTaskResult", ["request", "task_id", "task_result"]
+)
 
 
-def new_task(request, secret_bytes, template_apply, evaluate_only,
-             request_uuid):
+def new_task(
+  request, secret_bytes, template_apply, evaluate_only, request_uuid
+):
   """Schedules a new task for a bot with given dimensions.
 
   Arguments:
@@ -420,22 +432,25 @@ def new_task(request, secret_bytes, template_apply, evaluate_only,
 
   try:
     result_summary = task_scheduler.schedule_request(
-        request,
-        request_id,
-        enable_resultdb=(request.resultdb and request.resultdb.enable),
-        secret_bytes=secret_bytes)
+      request,
+      request_id,
+      enable_resultdb=(request.resultdb and request.resultdb.enable),
+      secret_bytes=secret_bytes,
+    )
   except (datastore_errors.BadValueError, TypeError, ValueError) as e:
     logging.exception("got exception around task_scheduler.schedule_request")
     raise handlers_exceptions.BadRequestException(e.message)
 
-  return NewTaskResult(request=request,
-                       task_id=task_pack.pack_result_summary_key(
-                           result_summary.key),
-                       task_result=result_summary)
+  return NewTaskResult(
+    request=request,
+    task_id=task_pack.pack_result_summary_key(result_summary.key),
+    task_result=result_summary,
+  )
 
 
-TasksCancelResult = namedtuple('TasksCancelResponse',
-                               ['cursor', 'matched', 'now'])
+TasksCancelResult = namedtuple(
+  "TasksCancelResponse", ["cursor", "matched", "now"]
+)
 
 
 def cancel_tasks(tags, start, end, limit, cursor, kill_running):
@@ -463,7 +478,8 @@ def cancel_tasks(tags, start, end, limit, cursor, kill_running):
   if not tags:
     # Prevent accidental cancellation of everything.
     raise handlers_exceptions.BadRequestException(
-        'You must specify tags when cancelling multiple tasks.')
+      "You must specify tags when cancelling multiple tasks."
+    )
 
   # Check permission.
   # If the caller has global permission, it can access all tasks.
@@ -474,12 +490,16 @@ def cancel_tasks(tags, start, end, limit, cursor, kill_running):
   now = utils.utcnow()
 
   query = task_result.get_result_summaries_query(
-      start, end, 'created_ts',
-      'pending_running' if kill_running else 'pending', tags)
+    start,
+    end,
+    "created_ts",
+    "pending_running" if kill_running else "pending",
+    tags,
+  )
   try:
-    cursor, results = task_scheduler.cancel_tasks(limit,
-                                                  query=query,
-                                                  cursor=cursor)
+    cursor, results = task_scheduler.cancel_tasks(
+      limit, query=query, cursor=cursor
+    )
   except ValueError as e:
     raise handlers_exceptions.BadRequestException(str(e))
 
@@ -503,34 +523,41 @@ def list_task_results(filters, limit, cursor):
 
   try:
     return datastore_utils.fetch_page(
-        task_result.get_result_summaries_query(filters.start, filters.end,
-                                               filters.sort, filters.state,
-                                               filters.tags), limit, cursor)
+      task_result.get_result_summaries_query(
+        filters.start, filters.end, filters.sort, filters.state, filters.tags
+      ),
+      limit,
+      cursor,
+    )
   except ValueError as e:
     raise handlers_exceptions.BadRequestException(
-        'Inappropriate filter for tasks/list: %s' % e)
+      "Inappropriate filter for tasks/list: %s" % e
+    )
   except datastore_errors.NeedIndexError as e:
     raise handlers_exceptions.BadRequestException(
-        'Requires new index, ask admin to create one.')
+      "Requires new index, ask admin to create one."
+    )
   except datastore_errors.BadArgumentError as e:
     raise handlers_exceptions.BadRequestException(
-        'This combination is unsupported, sorry.')
+      "This combination is unsupported, sorry."
+    )
 
 
 BotFilters = namedtuple(
-    'BotFilters',
-    [
-        # List of 'key:value' strings representing the dimensions of the bot.
-        'dimensions',
-        # Bool, if true bots will be filtered if not quarantined.
-        'quarantined',
-        # Bool, if true bots will be filtered if not in maintenance mode.
-        'in_maintenance',
-        # Bool, if true, bots will be filtered if not dead.
-        'is_dead',
-        # Bool, if true, bots will be filtered if idle.
-        'is_busy',
-    ])
+  "BotFilters",
+  [
+    # List of 'key:value' strings representing the dimensions of the bot.
+    "dimensions",
+    # Bool, if true bots will be filtered if not quarantined.
+    "quarantined",
+    # Bool, if true bots will be filtered if not in maintenance mode.
+    "in_maintenance",
+    # Bool, if true, bots will be filtered if not dead.
+    "is_dead",
+    # Bool, if true, bots will be filtered if idle.
+    "is_busy",
+  ],
+)
 
 
 def list_bots(filters, limit, cursor):
@@ -554,13 +581,18 @@ def list_bots(filters, limit, cursor):
   # to a thousand entities loaded in memory, and this is a pure memory leak,
   # as there's no chance this specific instance will need these again,
   # therefore this leads to 'Exceeded soft memory limit' AppEngine errors.
-  q = bot_management.BotInfo.query(default_options=ndb.QueryOptions(
-      use_cache=False))
+  q = bot_management.BotInfo.query(
+    default_options=ndb.QueryOptions(use_cache=False)
+  )
   try:
     q = bot_management.filter_dimensions(q, filters.dimensions)
-    q = bot_management.filter_availability(q, filters.quarantined,
-                                           filters.in_maintenance,
-                                           filters.is_dead, filters.is_busy)
+    q = bot_management.filter_availability(
+      q,
+      filters.quarantined,
+      filters.in_maintenance,
+      filters.is_dead,
+      filters.is_busy,
+    )
   except ValueError as e:
     raise handlers_exceptions.BadRequestException(str(e))
   # this is required to request MultiQuery for OR dimension support.
@@ -570,23 +602,25 @@ def list_bots(filters, limit, cursor):
     return datastore_utils.fetch_page(q, limit, cursor)
   except ValueError as e:
     raise handlers_exceptions.BadRequestException(
-        'Inappropriate filter for tasks/list: %s' % e)
+      "Inappropriate filter for tasks/list: %s" % e
+    )
 
 
 BotsCount = namedtuple(
-    'BotCount',
-    [
-        # total number of bots.
-        'count',
-        # number of dead bots.
-        'dead',
-        # number of quarantined bots.
-        'quarantined',
-        # number of bots in maintenance.
-        'maintenance',
-        # number of non-idle bots.
-        'busy',
-    ])
+  "BotCount",
+  [
+    # total number of bots.
+    "count",
+    # number of dead bots.
+    "dead",
+    # number of quarantined bots.
+    "quarantined",
+    # number of bots in maintenance.
+    "maintenance",
+    # number of non-idle bots.
+    "busy",
+  ],
+)
 
 
 def count_bots(dimensions):
@@ -614,26 +648,32 @@ def count_bots(dimensions):
     raise handlers_exceptions.BadRequestException(str(e))
 
   f_count = q.count_async()
-  f_dead = bot_management.filter_availability(q, None, None, True,
-                                              None).count_async()
-  f_quarantined = bot_management.filter_availability(q, True, None, None,
-                                                     None).count_async()
-  f_maintenance = bot_management.filter_availability(q, None, True, None,
-                                                     None).count_async()
-  f_busy = bot_management.filter_availability(q, None, None, None,
-                                              True).count_async()
-  return BotsCount(count=f_count.get_result(),
-                   dead=f_dead.get_result(),
-                   quarantined=f_quarantined.get_result(),
-                   maintenance=f_maintenance.get_result(),
-                   busy=f_busy.get_result())
+  f_dead = bot_management.filter_availability(
+    q, None, None, True, None
+  ).count_async()
+  f_quarantined = bot_management.filter_availability(
+    q, True, None, None, None
+  ).count_async()
+  f_maintenance = bot_management.filter_availability(
+    q, None, True, None, None
+  ).count_async()
+  f_busy = bot_management.filter_availability(
+    q, None, None, None, True
+  ).count_async()
+  return BotsCount(
+    count=f_count.get_result(),
+    dead=f_dead.get_result(),
+    quarantined=f_quarantined.get_result(),
+    maintenance=f_maintenance.get_result(),
+    busy=f_busy.get_result(),
+  )
 
 
 def _memcache_key(filters, now):
   # Floor now to minute to account for empty "end"
   end = filters.end or now.replace(second=0, microsecond=0)
   filters.tags.sort()
-  return '%s|%s|%s|%s' % (filters.tags, filters.state, filters.start, end)
+  return "%s|%s|%s|%s" % (filters.tags, filters.state, filters.start, end)
 
 
 def count_tasks(filters, now):
@@ -658,21 +698,23 @@ def count_tasks(filters, now):
 
   if not filters.start:
     raise handlers_exceptions.BadRequestException(
-        'start (as epoch) is required')
+      "start (as epoch) is required"
+    )
   now = utils.utcnow()
   mem_key = _memcache_key(filters, now)
-  count = memcache.get(mem_key, namespace='tasks_count')
+  count = memcache.get(mem_key, namespace="tasks_count")
   if count is not None:
     return count
 
   try:
-    count = task_result.get_result_summaries_query(filters.start, filters.end,
-                                                   filters.sort, filters.state,
-                                                   filters.tags).count()
-    memcache.add(mem_key, count, 24 * 60 * 60, namespace='tasks_count')
+    count = task_result.get_result_summaries_query(
+      filters.start, filters.end, filters.sort, filters.state, filters.tags
+    ).count()
+    memcache.add(mem_key, count, 24 * 60 * 60, namespace="tasks_count")
   except ValueError as e:
     raise handlers_exceptions.BadRequestException(
-        'Inappropriate filter for tasks/count: %s' % e)
+      "Inappropriate filter for tasks/count: %s" % e
+    )
   return count
 
 
@@ -697,27 +739,30 @@ def list_task_requests_no_realm_check(filters, limit, cursor):
   try:
     # Get the TaskResultSummary keys, then fetch the corresponding
     # TaskRequest entities.
-    query = task_result.get_result_summaries_query(filters.start, filters.end,
-                                                   filters.sort, filters.state,
-                                                   filters.tags)
-    keys, cursor = datastore_utils.fetch_page(query,
-                                              limit,
-                                              cursor,
-                                              keys_only=True)
+    query = task_result.get_result_summaries_query(
+      filters.start, filters.end, filters.sort, filters.state, filters.tags
+    )
+    keys, cursor = datastore_utils.fetch_page(
+      query, limit, cursor, keys_only=True
+    )
     items = ndb.get_multi(
-        task_pack.result_summary_key_to_request_key(k) for k in keys)
+      task_pack.result_summary_key_to_request_key(k) for k in keys
+    )
     return items, cursor
   except ValueError as e:
     raise handlers_exceptions.BadRequestException(
-        'Inappropriate filter for tasks/requests: %s' % e)
+      "Inappropriate filter for tasks/requests: %s" % e
+    )
   except datastore_errors.NeedIndexError as e:
-    logging.error('%s', e)
+    logging.error("%s", e)
     raise handlers_exceptions.BadRequestException(
-        'Requires new index, ask admin to create one.')
+      "Requires new index, ask admin to create one."
+    )
   except datastore_errors.BadArgumentError as e:
-    logging.error('%s', e)
+    logging.error("%s", e)
     raise handlers_exceptions.BadRequestException(
-        'This combination is unsupported, sorry.')
+      "This combination is unsupported, sorry."
+    )
 
 
 def get_states(task_ids):
@@ -738,29 +783,31 @@ def get_states(task_ids):
   try:
     task_results = task_result.fetch_task_results(list(task_ids))
   except ValueError as e:
-    raise handlers_exceptions.BadRequestException('Invalid task_id: %s' %
-                                                  str(e))
+    raise handlers_exceptions.BadRequestException(
+      "Invalid task_id: %s" % str(e)
+    )
   return [
-      result.state if result else task_result.State.PENDING
-      for result in task_results
+    result.state if result else task_result.State.PENDING
+    for result in task_results
   ]
 
 
 ServerDetails = namedtuple(
-    'ServerDetails',
-    [
-        # str of commit hash of currently deployed swarming_bot.
-        'bot_version',
-        # str of commit hash of currently deployed swarming_server.
-        'server_version',
-        # A url to a task display server (e.g. milo).  This should have a %s
-        # where a task id can go.
-        'display_server_url_template',
-        # str hostname of luci_config server.
-        'luci_config',
-        # Host of RBE-CAS viewer server.
-        'cas_viewer_server',
-    ])
+  "ServerDetails",
+  [
+    # str of commit hash of currently deployed swarming_bot.
+    "bot_version",
+    # str of commit hash of currently deployed swarming_server.
+    "server_version",
+    # A url to a task display server (e.g. milo).  This should have a %s
+    # where a task id can go.
+    "display_server_url_template",
+    # str hostname of luci_config server.
+    "luci_config",
+    # Host of RBE-CAS viewer server.
+    "cas_viewer_server",
+  ],
+)
 
 
 def get_server_details():
@@ -770,36 +817,38 @@ def get_server_details():
   server_version = utils.get_app_version()
 
   return ServerDetails(
-      bot_version=bot_code.get_bot_version(bot_code.STABLE_BOT)[0],
-      server_version=server_version,
-      display_server_url_template=cfg.display_server_url_template,
-      luci_config=config.config.config_service_hostname(),
-      cas_viewer_server=cfg.cas.viewer_server)
+    bot_version=bot_code.get_bot_version(bot_code.STABLE_BOT)[0],
+    server_version=server_version,
+    display_server_url_template=cfg.display_server_url_template,
+    luci_config=config.config.config_service_hostname(),
+    cas_viewer_server=cfg.cas.viewer_server,
+  )
 
 
 ClientPermissions = namedtuple(
-    'ClientPermissions',
-    [
-        # Client delete a bot.
-        'delete_bot',
-        # Clients mass delete bots.
-        'delete_bots',
-        # Client can call terminate bot.
-        'terminate_bot',
-        # Client can get bot_config.
-        'get_configs',
-        'put_configs',
-        # Client can cancel a single task with given task_id.
-        'cancel_task',
-        # Client may mass cancel many tasks.
-        'cancel_tasks',
-        # Client may access the bootstrap token for a given bot.
-        'get_bootstrap_token',
-        # List of pools which client may list bots.
-        'list_bots',
-        # List of pools for which a client may list tasks.
-        'list_tasks',
-    ])
+  "ClientPermissions",
+  [
+    # Client delete a bot.
+    "delete_bot",
+    # Clients mass delete bots.
+    "delete_bots",
+    # Client can call terminate bot.
+    "terminate_bot",
+    # Client can get bot_config.
+    "get_configs",
+    "put_configs",
+    # Client can cancel a single task with given task_id.
+    "cancel_task",
+    # Client may mass cancel many tasks.
+    "cancel_tasks",
+    # Client may access the bootstrap token for a given bot.
+    "get_bootstrap_token",
+    # List of pools which client may list bots.
+    "list_bots",
+    # List of pools for which a client may list tasks.
+    "list_tasks",
+  ],
+)
 
 
 def _can_cancel_task(task_id):
@@ -811,7 +860,7 @@ def _can_cancel_task(task_id):
   task_key, _ = to_keys(task_id)
   task = task_key.get()
   if not task:
-    raise handlers_exceptions.NotFoundException('%s not found.' % task_id)
+    raise handlers_exceptions.NotFoundException("%s not found." % task_id)
   return realms.can_cancel_task(realms.task_access_info_from_request(task))
 
 
@@ -828,16 +877,18 @@ def get_permissions(bot_id, task_id, tags):
   """
   pools_list_bots = [p for p in pools_config.known() if realms.can_list_bots(p)]
   pools_list_tasks = [
-      p for p in pools_config.known() if realms.can_list_tasks(p)
+    p for p in pools_config.known() if realms.can_list_tasks(p)
   ]
   pool_tags = bot_management.get_pools_from_dimensions_flat(tags)
-  return ClientPermissions(delete_bot=realms.can_delete_bot(bot_id),
-                           delete_bots=realms.can_delete_bots(pool_tags),
-                           terminate_bot=realms.can_terminate_bot(bot_id),
-                           get_configs=acl.can_view_config(),
-                           put_configs=acl.can_edit_config(),
-                           cancel_task=_can_cancel_task(task_id),
-                           cancel_tasks=realms.can_cancel_tasks(pool_tags),
-                           get_bootstrap_token=acl.can_create_bot(),
-                           list_bots=pools_list_bots,
-                           list_tasks=pools_list_tasks)
+  return ClientPermissions(
+    delete_bot=realms.can_delete_bot(bot_id),
+    delete_bots=realms.can_delete_bots(pool_tags),
+    terminate_bot=realms.can_terminate_bot(bot_id),
+    get_configs=acl.can_view_config(),
+    put_configs=acl.can_edit_config(),
+    cancel_task=_can_cancel_task(task_id),
+    cancel_tasks=realms.can_cancel_tasks(pool_tags),
+    get_bootstrap_token=acl.can_create_bot(),
+    list_bots=pools_list_bots,
+    list_tasks=pools_list_tasks,
+  )

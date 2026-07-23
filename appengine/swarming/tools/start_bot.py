@@ -20,10 +20,10 @@ import tempfile
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 LUCI_DIR = os.path.dirname(os.path.dirname(os.path.dirname(THIS_DIR)))
-CLIENT_DIR = os.path.join(LUCI_DIR, 'client')
-GO_CLIENT_DIR = os.path.join(LUCI_DIR, 'luci-go')
+CLIENT_DIR = os.path.join(LUCI_DIR, "client")
+GO_CLIENT_DIR = os.path.join(LUCI_DIR, "luci-go")
 sys.path.insert(0, CLIENT_DIR)
-sys.path.insert(0, os.path.join(CLIENT_DIR, 'third_party'))
+sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party"))
 # third_party/
 from depot_tools import fix_encoding
 from six.moves import urllib
@@ -37,7 +37,7 @@ def _safe_rm(path):
     try:
       shutil.rmtree(path)
     except OSError as e:
-      logging.error('Failed to delete %s: %s', path, e)
+      logging.error("Failed to delete %s: %s", path, e)
 
 
 class LocalBot(object):
@@ -47,8 +47,9 @@ class LocalBot(object):
   locally.
   """
 
-  def __init__(self, swarming_server_url, cas_addr, redirect, botdir,
-               python=None):
+  def __init__(
+    self, swarming_server_url, cas_addr, redirect, botdir, python=None
+  ):
     self._botdir = botdir
     self._swarming_server_url = swarming_server_url
     self._cas_addr = cas_addr
@@ -64,52 +65,50 @@ class LocalBot(object):
     restarting it.
     """
     if restart:
-      logging.info('wipe_cache(): Restarting the bot')
+      logging.info("wipe_cache(): Restarting the bot")
       self.stop()
       # Deletion needs to happen while the bot is not running to ensure no side
       # effect.
       # These values are from ./swarming_bot/bot_code/bot_main.py.
-      _safe_rm(os.path.join(self._botdir, 'c'))
-      _safe_rm(os.path.join(self._botdir, 'isolated_cache'))
+      _safe_rm(os.path.join(self._botdir, "c"))
+      _safe_rm(os.path.join(self._botdir, "isolated_cache"))
       self.start()
     else:
-      logging.info('wipe_cache(): wiping cache without telling the bot')
-      _safe_rm(os.path.join(self._botdir, 'c'))
-      _safe_rm(os.path.join(self._botdir, 'isolated_cache'))
+      logging.info("wipe_cache(): wiping cache without telling the bot")
+      _safe_rm(os.path.join(self._botdir, "c"))
+      _safe_rm(os.path.join(self._botdir, "isolated_cache"))
 
   @property
   def bot_id(self):
     # TODO(maruel): Big assumption.
-    return socket.getfqdn().split('.')[0]
+    return socket.getfqdn().split(".")[0]
 
   @property
   def log(self):
     """Returns the log output. Only set after calling stop()."""
-    return '\n'.join(self._logs.values()) if self._logs else None
+    return "\n".join(self._logs.values()) if self._logs else None
 
   def start(self):
     """Starts the local Swarming bot."""
     assert not self._proc
-    bot_zip = os.path.join(self._botdir, 'swarming_bot.zip')
-    urllib.request.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
-    tmpdir = os.path.join(self._botdir, 'tmp')
+    bot_zip = os.path.join(self._botdir, "swarming_bot.zip")
+    urllib.request.urlretrieve(self._swarming_server_url + "/bot_code", bot_zip)
+    tmpdir = os.path.join(self._botdir, "tmp")
     if not os.path.exists(tmpdir):
       os.makedirs(tmpdir)
     env = os.environ.copy()
-    env['TEMP'] = tmpdir
-    env['RUN_ISOLATED_CAS_ADDRESS'] = self._cas_addr
-    env['LUCI_GO_CLIENT_DIR'] = GO_CLIENT_DIR
-    cmd = [self.python, bot_zip, 'start_slave', '--test-mode']
+    env["TEMP"] = tmpdir
+    env["RUN_ISOLATED_CAS_ADDRESS"] = self._cas_addr
+    env["LUCI_GO_CLIENT_DIR"] = GO_CLIENT_DIR
+    cmd = [self.python, bot_zip, "start_slave", "--test-mode"]
     if self._redirect:
-      logs = os.path.join(self._botdir, 'logs')
+      logs = os.path.join(self._botdir, "logs")
       if not os.path.isdir(logs):
         os.mkdir(logs)
-      with open(os.path.join(logs, 'bot_stdout.log'), 'wb') as f:
-        self._proc = subprocess.Popen(cmd,
-                                      cwd=self._botdir,
-                                      stdout=f,
-                                      stderr=f,
-                                      env=env)
+      with open(os.path.join(logs, "bot_stdout.log"), "wb") as f:
+        self._proc = subprocess.Popen(
+          cmd, cwd=self._botdir, stdout=f, stderr=f, env=env
+        )
     else:
       self._proc = subprocess.Popen(cmd, cwd=self._botdir, env=env)
 
@@ -125,7 +124,7 @@ class LocalBot(object):
       except OSError:
         pass
     exit_code = self._proc.returncode
-    for i in sorted(glob.glob(os.path.join(self._botdir, 'logs', '*.log'))):
+    for i in sorted(glob.glob(os.path.join(self._botdir, "logs", "*.log"))):
       self._read_log(i)
     self._proc = None
     return exit_code
@@ -147,21 +146,21 @@ class LocalBot(object):
 
   def dump_log(self):
     """Prints dev_appserver log to stderr, works only if app is stopped."""
-    print('-' * 60, file=sys.stderr)
-    print('swarming_bot log', file=sys.stderr)
-    print('-' * 60, file=sys.stderr)
+    print("-" * 60, file=sys.stderr)
+    print("swarming_bot log", file=sys.stderr)
+    print("-" * 60, file=sys.stderr)
     if not self._logs:
-      print('<N/A>', file=sys.stderr)
+      print("<N/A>", file=sys.stderr)
     else:
       for name, content in sorted(self._logs.items()):
-        sys.stderr.write(name + ':\n')
-        for l in content.strip('\n').splitlines():
-          sys.stderr.write('  %s\n' % l)
-    print('-' * 60, file=sys.stderr)
+        sys.stderr.write(name + ":\n")
+        for l in content.strip("\n").splitlines():
+          sys.stderr.write("  %s\n" % l)
+    print("-" * 60, file=sys.stderr)
 
   def _read_log(self, path):
     try:
-      with open(path, 'rb') as f:
+      with open(path, "rb") as f:
         self._logs[os.path.basename(path)] = f.read()
     except (IOError, OSError):
       pass
@@ -169,11 +168,11 @@ class LocalBot(object):
 
 def main():
   parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
-  parser.add_argument('server', help='Swarming server to connect bot to.')
-  parser.add_argument('cas-addr', help='CAS server to connect bot to.')
+  parser.add_argument("server", help="Swarming server to connect bot to.")
+  parser.add_argument("cas-addr", help="CAS server to connect bot to.")
   args = parser.parse_args()
   fix_encoding.fix_encoding()
-  botdir = tempfile.mkdtemp(prefix='start_bot')
+  botdir = tempfile.mkdtemp(prefix="start_bot")
   try:
     bot = LocalBot(args.server, args.cas_addr, False, botdir)
     try:
@@ -181,7 +180,7 @@ def main():
       bot.wait()
       bot.dump_log()
     except KeyboardInterrupt:
-      print('<Ctrl-C> received; stopping bot', file=sys.stderr)
+      print("<Ctrl-C> received; stopping bot", file=sys.stderr)
     finally:
       exit_code = bot.stop()
   finally:
@@ -189,5 +188,5 @@ def main():
   return exit_code
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   sys.exit(main())

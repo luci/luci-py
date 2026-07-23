@@ -17,24 +17,25 @@ from unittest import mock
 from nose2.tools import params
 
 import test_env_platforms
+
 test_env_platforms.setup_test_env()
 
 from utils import tools
 
-if sys.platform == 'darwin':
+if sys.platform == "darwin":
   import osx
 
 
-@unittest.skipUnless(sys.platform == 'darwin',
-                     'Tests only run under darwin platform')
+@unittest.skipUnless(
+  sys.platform == "darwin", "Tests only run under darwin platform"
+)
 class TestOsx(unittest.TestCase):
-
   def setUp(self):
     super(TestOsx, self).setUp()
     tools.clear_cache_all()
-    self.mock_check_output = mock.patch('subprocess.check_output').start()
-    self.mock_listdir = mock.patch('os.listdir').start()
-    self.mock_path_exists = mock.patch('os.path.exists').start()
+    self.mock_check_output = mock.patch("subprocess.check_output").start()
+    self.mock_listdir = mock.patch("os.listdir").start()
+    self.mock_path_exists = mock.patch("os.path.exists").start()
 
   def tearDown(self):
     super(TestOsx, self).tearDown()
@@ -47,39 +48,39 @@ class TestOsx(unittest.TestCase):
       Build version 11E608c
     """)
     self.mock_listdir.side_effect = [
-        # os.listdir('/Applications')
-        ['Google Chrome.app', 'Safari.app', 'Xcode.app'],
-        # pylint: disable=line-too-long
-        # os.listdir('/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport')
-        ['1.0', '2.0'],
+      # os.listdir('/Applications')
+      ["Google Chrome.app", "Safari.app", "Xcode.app"],
+      # pylint: disable=line-too-long
+      # os.listdir('/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport')
+      ["1.0", "2.0"],
     ]
 
     state = osx.get_xcode_state()
-    version = state['/Applications/Xcode.app']['version']
-    build_version = state['/Applications/Xcode.app']['build version']
-    device_support = state['/Applications/Xcode.app']['device support']
-    self.assertEqual(version, '11.5')
-    self.assertEqual(build_version, '11E608c')
-    self.assertEqual(device_support, ['1.0', '2.0'])
+    version = state["/Applications/Xcode.app"]["version"]
+    build_version = state["/Applications/Xcode.app"]["build version"]
+    device_support = state["/Applications/Xcode.app"]["device support"]
+    self.assertEqual(version, "11.5")
+    self.assertEqual(build_version, "11E608c")
+    self.assertEqual(device_support, ["1.0", "2.0"])
 
   def test_get_xcode_versions(self):
     self.mock_check_output.side_effect = [
-        textwrap.dedent("""\
+      textwrap.dedent("""\
         Xcode 11.5
         Build version abcd
       """),
-        textwrap.dedent("""\
+      textwrap.dedent("""\
         Xcode 11.4
         Build version efgh
       """),
     ]
     self.mock_listdir.side_effect = [
-        # os.listdir('/Applications')
-        ['Xcode11.5.app', 'Xcode11.4.app'],
+      # os.listdir('/Applications')
+      ["Xcode11.5.app", "Xcode11.4.app"],
     ]
     self.mock_path_exists.side_effect = [True, False, True, False]
     versions = osx.get_xcode_versions()
-    self.assertEqual(versions, ['11.4', '11.5'])
+    self.assertEqual(versions, ["11.4", "11.5"])
 
   def test_get_current_xcode_version(self):
     self.mock_check_output.return_value = textwrap.dedent("""\
@@ -88,19 +89,19 @@ class TestOsx(unittest.TestCase):
     """)
 
     version = osx.get_current_xcode_version()
-    self.assertEqual(version, ('11.5', '11E608c'))
+    self.assertEqual(version, ("11.5", "11E608c"))
 
   def test_get_ios_device_ids(self):
-    self.mock_check_output.return_value = '1234abcd\n'
-    self.assertEqual(osx.get_ios_device_ids(), ['1234abcd'])
+    self.mock_check_output.return_value = "1234abcd\n"
+    self.assertEqual(osx.get_ios_device_ids(), ["1234abcd"])
 
   def test_get_ios_version(self):
-    self.mock_check_output.return_value = '13.5\n'
-    self.assertEqual(osx.get_ios_version('1234abcd'), '13.5')
+    self.mock_check_output.return_value = "13.5\n"
+    self.assertEqual(osx.get_ios_version("1234abcd"), "13.5")
 
   def test_get_ios_device_type(self):
-    self.mock_check_output.return_value = 'iPhone12,1\n'
-    self.assertEqual(osx.get_ios_device_type('1234abcd'), 'iPhone12,1')
+    self.mock_check_output.return_value = "iPhone12,1\n"
+    self.assertEqual(osx.get_ios_device_type("1234abcd"), "iPhone12,1")
 
   def test_is_ios_device_attached_return_true(self):
     self.mock_check_output.return_value = 1
@@ -111,19 +112,19 @@ class TestOsx(unittest.TestCase):
     self.assertFalse(osx.is_ios_device_attached())
 
   def test_get_hardware_model_string(self):
-    self.mock_check_output.return_value = 'MacBookPro15,1\n'
+    self.mock_check_output.return_value = "MacBookPro15,1\n"
     hw_model = osx.get_hardware_model_string()
-    self.assertEqual(hw_model, 'MacBookPro15,1')
+    self.assertEqual(hw_model, "MacBookPro15,1")
 
   def test_get_os_version_number(self):
-    self.mock_check_output.return_value = '10.15.5\n'
+    self.mock_check_output.return_value = "10.15.5\n"
     os_version = osx.get_os_version_number()
-    self.assertEqual(os_version, '10.15.5')
+    self.assertEqual(os_version, "10.15.5")
 
   def test_get_os_build_version(self):
-    self.mock_check_output.return_value = '19F101\n'
+    self.mock_check_output.return_value = "19F101\n"
     build_version = osx.get_os_build_version()
-    self.assertEqual(build_version, '19F101')
+    self.assertEqual(build_version, "19F101")
 
   def test_get_audio(self):
     plist = textwrap.dedent("""\
@@ -179,7 +180,7 @@ class TestOsx(unittest.TestCase):
       </array>
       </plist>""").encode()
     self.mock_check_output.return_value = plist
-    self.assertEqual(osx.get_audio(), ['MacBook Pro Speakers'])
+    self.assertEqual(osx.get_audio(), ["MacBook Pro Speakers"])
 
   def test_get_audio_no_devices(self):
     plist = textwrap.dedent("""\
@@ -241,9 +242,13 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.side_effect = [plist]
 
     gpus = osx.get_gpu()
-    self.assertEqual((['1002', '1002:67ef', '8086', '8086:3e9b'
-                       ], ['AMD Radeon RX 560', 'Intel UHD Graphics 630']),
-                     gpus)
+    self.assertEqual(
+      (
+        ["1002", "1002:67ef", "8086", "8086:3e9b"],
+        ["AMD Radeon RX 560", "Intel UHD Graphics 630"],
+      ),
+      gpus,
+    )
 
   def test_get_gpu_apple_m2(self):
     # Copied from actual output of 'system_profiler SPDisplaysDataType -xml' on
@@ -279,7 +284,7 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.side_effect = [plist]
 
     gpus = osx.get_gpu()
-    self.assertEqual((['apple', 'apple:m2'], ['apple m2']), gpus)
+    self.assertEqual((["apple", "apple:m2"], ["apple m2"]), gpus)
 
   def test_get_cpuinfo(self):
     self.mock_check_output.return_value = textwrap.dedent("""\
@@ -339,20 +344,66 @@ class TestOsx(unittest.TestCase):
     """)
 
     expected = {
-        'vendor':
-        'GenuineIntel',
-        'model': [6, 158, 10, 202],
-        'flags': [
-            'acpi', 'aes', 'apic', 'avx1.0', 'clfsh', 'cmov', 'cx16', 'cx8',
-            'de', 'ds', 'dscpl', 'dtes64', 'est', 'f16c', 'fma', 'fpu', 'fxsr',
-            'htt', 'mca', 'mce', 'mmx', 'mon', 'movbe', 'msr', 'mtrr',
-            'osxsave', 'pae', 'pat', 'pbe', 'pcid', 'pclmulqdq', 'pdcm', 'pge',
-            'popcnt', 'pse', 'pse36', 'rdrand', 'seglim64', 'sep', 'ss', 'sse',
-            'sse2', 'sse3', 'sse4.1', 'sse4.2', 'ssse3', 'tm', 'tm2', 'tpr',
-            'tsc', 'tsctmr', 'vme', 'vmx', 'x2apic', 'xsave'
-        ],
-        'name':
-        'Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz'
+      "vendor": "GenuineIntel",
+      "model": [6, 158, 10, 202],
+      "flags": [
+        "acpi",
+        "aes",
+        "apic",
+        "avx1.0",
+        "clfsh",
+        "cmov",
+        "cx16",
+        "cx8",
+        "de",
+        "ds",
+        "dscpl",
+        "dtes64",
+        "est",
+        "f16c",
+        "fma",
+        "fpu",
+        "fxsr",
+        "htt",
+        "mca",
+        "mce",
+        "mmx",
+        "mon",
+        "movbe",
+        "msr",
+        "mtrr",
+        "osxsave",
+        "pae",
+        "pat",
+        "pbe",
+        "pcid",
+        "pclmulqdq",
+        "pdcm",
+        "pge",
+        "popcnt",
+        "pse",
+        "pse36",
+        "rdrand",
+        "seglim64",
+        "sep",
+        "ss",
+        "sse",
+        "sse2",
+        "sse3",
+        "sse4.1",
+        "sse4.2",
+        "ssse3",
+        "tm",
+        "tm2",
+        "tpr",
+        "tsc",
+        "tsctmr",
+        "vme",
+        "vmx",
+        "x2apic",
+        "xsave",
+      ],
+      "name": "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz",
     }
     self.assertEqual(osx.get_cpuinfo(), expected)
 
@@ -363,16 +414,16 @@ class TestOsx(unittest.TestCase):
       self.assertGreater(val, lower)
       self.assertLess(val, upper)
 
-    assertOpenBetween(temp1['cpu'], 0, 100)
+    assertOpenBetween(temp1["cpu"], 0, 100)
 
     # use sensor cache.
     temp2 = osx.get_temperatures()
-    assertOpenBetween(temp2['cpu'], 0, 100)
+    assertOpenBetween(temp2["cpu"], 0, 100)
 
   @params(
-      # Retina 10.12.4 or later
-      (
-          """\
+    # Retina 10.12.4 or later
+    (
+      """\
           <plist>
             <array>
               <dict>
@@ -395,11 +446,11 @@ class TestOsx(unittest.TestCase):
               </dict>
             </array>
           </plist>""",
-          '1',
-      ),
-      # Retina 10.12.3 and earlier
-      (
-          """\
+      "1",
+    ),
+    # Retina 10.12.3 and earlier
+    (
+      """\
           <plist>
             <array>
               <dict>
@@ -420,11 +471,11 @@ class TestOsx(unittest.TestCase):
               </dict>
             </array>
           </plist>""",
-          '1',
-      ),
-      # None retina
-      (
-          """\
+      "1",
+    ),
+    # None retina
+    (
+      """\
           <plist>
             <array>
               <dict>
@@ -443,8 +494,9 @@ class TestOsx(unittest.TestCase):
               </dict>
             </array>
           </plist>""",
-          '0',
-      ))
+      "0",
+    ),
+  )
   def test_get_monitor_hidpi(self, plist, expected):
     self.mock_check_output.return_value = textwrap.dedent(plist).encode()
     self.assertEqual(osx.get_monitor_hidpi(), expected)
@@ -461,48 +513,54 @@ class TestOsx(unittest.TestCase):
   def mock_physical_disks_list(self, disks_data):
     content = []
     content.append(
-        textwrap.dedent("""\
+      textwrap.dedent("""\
       <plist>
       <dict>
           <key>WholeDisks</key>
           <array>
-    """))
+    """)
+    )
     for disk_name, _ in disks_data.items():
-      content.append('<string>%s</string>' % disk_name)
+      content.append("<string>%s</string>" % disk_name)
     content.append(
-        textwrap.dedent("""\
+      textwrap.dedent("""\
         </array>
     </dict>
     </plist>
-    """))
-    return '\n'.join(content).encode()
+    """)
+    )
+    return "\n".join(content).encode()
 
   def mock_disk_info(self, disk_data):
     content = []
-    content.append(textwrap.dedent("""\
+    content.append(
+      textwrap.dedent("""\
     <plist>
     <dict>
-    """))
+    """)
+    )
     for key_name, value in disk_data.items():
-      content.append('<key>%s</key>' % key_name)
+      content.append("<key>%s</key>" % key_name)
       content.append(value)
-    content.append(textwrap.dedent("""\
+    content.append(
+      textwrap.dedent("""\
     </dict>
     </plist>
-    """))
-    return '\n'.join(content).encode()
+    """)
+    )
+    return "\n".join(content).encode()
 
   def test_get_ssd(self):
     disks_data = {
-        'disk0': {
-            'SolidState': '<true/>',
-        },
-        'disk1': {
-            'SolidState': '<false/>',
-        },
-        'disk2': {
-            'SolidState': '<true/>',
-        },
+      "disk0": {
+        "SolidState": "<true/>",
+      },
+      "disk1": {
+        "SolidState": "<false/>",
+      },
+      "disk2": {
+        "SolidState": "<true/>",
+      },
     }
     side_effect = [self.mock_physical_disks_list(disks_data)]
     for _, disk_data in disks_data.items():
@@ -510,16 +568,16 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.side_effect = side_effect
 
     ssd = osx.get_ssd()
-    self.assertEqual(('disk0', 'disk2'), ssd)
+    self.assertEqual(("disk0", "disk2"), ssd)
 
   def test_get_disks_model(self):
     disks_data = {
-        'disk0': {
-            'MediaName': '<string>APPLE SSD AP0257M</string>',
-        },
-        'disk1': {
-            'MediaName': '<string>APPLE SSD AP0256M</string>',
-        },
+      "disk0": {
+        "MediaName": "<string>APPLE SSD AP0257M</string>",
+      },
+      "disk1": {
+        "MediaName": "<string>APPLE SSD AP0256M</string>",
+      },
     }
     side_effect = [self.mock_physical_disks_list(disks_data)]
     for _, disk_data in disks_data.items():
@@ -527,15 +585,16 @@ class TestOsx(unittest.TestCase):
     self.mock_check_output.side_effect = side_effect
 
     disks_model = osx.get_disks_model()
-    self.assertEqual(('APPLE SSD AP0256M', 'APPLE SSD AP0257M'), disks_model)
+    self.assertEqual(("APPLE SSD AP0256M", "APPLE SSD AP0257M"), disks_model)
 
   def test_generate_launchd_plist(self):
-    plist_data = osx.generate_launchd_plist(['echo', 'hi'], os.getcwd(),
-                                            'org.swarm.bot.plist')
+    plist_data = osx.generate_launchd_plist(
+      ["echo", "hi"], os.getcwd(), "org.swarm.bot.plist"
+    )
     plist = plistlib.loads(plist_data.encode())
-    self.assertEqual(plist['Label'], 'org.swarm.bot.plist')
-    self.assertEqual(plist['Program'], 'echo')
-    self.assertEqual(plist['ProgramArguments'], ['echo', 'hi'])
+    self.assertEqual(plist["Label"], "org.swarm.bot.plist")
+    self.assertEqual(plist["Program"], "echo")
+    self.assertEqual(plist["ProgramArguments"], ["echo", "hi"])
 
   def test_is_display_attached(self):
     # Whether a display is detected or not is going to be dependent on the
@@ -561,9 +620,10 @@ class TestOsx(unittest.TestCase):
     self.assertIsInstance(thermal_state, str)
 
 
-if __name__ == '__main__':
-  if '-v' in sys.argv:
+if __name__ == "__main__":
+  if "-v" in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
+    level=logging.DEBUG if "-v" in sys.argv else logging.CRITICAL
+  )
   unittest.main()

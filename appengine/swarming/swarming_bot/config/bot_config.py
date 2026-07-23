@@ -66,63 +66,63 @@ def get_settings(bot):
   # Here is the default values. Keep in sync with the default values in
   # ../bot_code/bot_main.py.
   return {
-      # Free partition (disk) space to keep and to self-quarantine on.
-      #
-      # The exact minimum free space can be calculated with:
-      #   max(disk_size * 'min_percent', min('size', disk_size * 'max_percent'))
-      # where 'min_percent' and 'max_percent' are relative to the total
-      # partition size.
-      # Setting any value to 0 disables the check for that value.
-      # Setting all values to 0 disables the minimum free disk space check.
-      # In practice, with the default values:
-      # - For disks <27GB this will be "disk_size * max_percent"
-      # - For disks 27GB-80GB this will be 4GB
-      # - For disks >80GB this will be "disk_size * min_percent"
-      #
-      # When trimming the cache, 'wiggle' is added to the value selected above.
-      #
-      'free_partition': {
-          # Settings specifically for the OS root partition: / on Linux
-          # distributions and OSX, generally (but not necessarily)
-          # C:\ on Windows).
-          # If the bot runs on the root partition, these values are ignored.
-          'root': {
-              # Minimum free space in bytes to use, if lower than 'max_percent'.
-              'size': 1 * 1024 * 1024 * 1024,
-              # Maximum free space in percent to ensure to keep free, if lower
-              # than 'size'.
-              'max_percent': 10.,
-              # Minimum of of free space percentage, even if higher than 'size'.
-              'min_percent': 6.,
-          },
-          # Settings specifically for the partition in which the bot runs on.
-          # These values are expected to be higher than 'root' values.
-          'bot': {
-              'size': 4 * 1024 * 1024 * 1024,
-              'max_percent': 15.,
-              'min_percent': 7.,
-              # Number of bytes to add to the minimum value selected above when
-              # calculating the isolated cache trimming. This is to ensure that
-              # system level processes writing logs and such do not cause to
-              # criss the self-quarantine line while the bot is idle.
-              'wiggle': 250 * 1024 * 1024,
-          },
+    # Free partition (disk) space to keep and to self-quarantine on.
+    #
+    # The exact minimum free space can be calculated with:
+    #   max(disk_size * 'min_percent', min('size', disk_size * 'max_percent'))
+    # where 'min_percent' and 'max_percent' are relative to the total
+    # partition size.
+    # Setting any value to 0 disables the check for that value.
+    # Setting all values to 0 disables the minimum free disk space check.
+    # In practice, with the default values:
+    # - For disks <27GB this will be "disk_size * max_percent"
+    # - For disks 27GB-80GB this will be 4GB
+    # - For disks >80GB this will be "disk_size * min_percent"
+    #
+    # When trimming the cache, 'wiggle' is added to the value selected above.
+    #
+    "free_partition": {
+      # Settings specifically for the OS root partition: / on Linux
+      # distributions and OSX, generally (but not necessarily)
+      # C:\ on Windows).
+      # If the bot runs on the root partition, these values are ignored.
+      "root": {
+        # Minimum free space in bytes to use, if lower than 'max_percent'.
+        "size": 1 * 1024 * 1024 * 1024,
+        # Maximum free space in percent to ensure to keep free, if lower
+        # than 'size'.
+        "max_percent": 10.0,
+        # Minimum of of free space percentage, even if higher than 'size'.
+        "min_percent": 6.0,
       },
-      # Local caches settings.
-      'caches': {
-          # Local isolated cache settings, used for isolated tasks. The cache
-          # actual size is bounded by the lesser of all 3:
-          # - The cache total size in bytes
-          # - The number of items in the cache
-          # - The cache is further trimmed until 'free_partition' value is
-          #   respected.
-          'isolated': {
-              # Maximum local isolated cache size in bytes.
-              'size': 50 * 1024 * 1024 * 1024,
-              # Maximum number of items in the local isolated cache.
-              'items': 50 * 1024,
-          },
+      # Settings specifically for the partition in which the bot runs on.
+      # These values are expected to be higher than 'root' values.
+      "bot": {
+        "size": 4 * 1024 * 1024 * 1024,
+        "max_percent": 15.0,
+        "min_percent": 7.0,
+        # Number of bytes to add to the minimum value selected above when
+        # calculating the isolated cache trimming. This is to ensure that
+        # system level processes writing logs and such do not cause to
+        # criss the self-quarantine line while the bot is idle.
+        "wiggle": 250 * 1024 * 1024,
       },
+    },
+    # Local caches settings.
+    "caches": {
+      # Local isolated cache settings, used for isolated tasks. The cache
+      # actual size is bounded by the lesser of all 3:
+      # - The cache total size in bytes
+      # - The number of items in the cache
+      # - The cache is further trimmed until 'free_partition' value is
+      #   respected.
+      "isolated": {
+        # Maximum local isolated cache size in bytes.
+        "size": 50 * 1024 * 1024 * 1024,
+        # Maximum number of items in the local isolated cache.
+        "items": 50 * 1024,
+      },
+    },
   }
 
 
@@ -175,10 +175,12 @@ def get_authentication_headers(bot):
     # By default, VMs do not have "User info" API enabled, as commented above.
     # When this is the case, the oauth token is unusable. So do not use the
     # oauth token in this case and fall back to IP based allowlist.
-    if ('https://www.googleapis.com/auth/userinfo.email' in platforms.gce
-        .oauth2_available_scopes('default')):
-      tok, exp = platforms.gce.oauth2_access_token_with_expiration('default')
-      return {'Authorization': 'Bearer %s' % tok}, exp
+    if (
+      "https://www.googleapis.com/auth/userinfo.email"
+      in platforms.gce.oauth2_available_scopes("default")
+    ):
+      tok, exp = platforms.gce.oauth2_access_token_with_expiration("default")
+      return {"Authorization": "Bearer %s" % tok}, exp
   return (None, None)
 
 
@@ -274,9 +276,9 @@ def on_after_task(bot, failure, internal_failure, task_dimensions, summary):
   - summary: dict, Summary of the task execution.
   """
   # Example code:
-  #if failure:
+  # if failure:
   #  bot.host_reboot('Task failure')
-  #elif internal_failure:
+  # elif internal_failure:
   #  bot.host_reboot('Internal failure')
 
 
@@ -302,7 +304,7 @@ def on_bot_idle(bot, since_last_action):
                        bot has been idle.
   """
   # Don't try this if running inside docker.
-  #if (sys.platform != 'linux' or
+  # if (sys.platform != 'linux' or
   #    not platforms.linux.get_inside_docker()):
   #  uptime = os_utilities.get_uptime()
   #  if uptime > 12*60*60 * (1. + bot.get_pseudo_rand(0.2)):
@@ -327,8 +329,9 @@ def setup_bot(bot):
   Example: making this script starts automatically on user login via
   os_utilities.set_auto_startup_win() or os_utilities.set_auto_startup_osx().
   """
-  with open(os.path.join(bot.base_dir, 'README'), 'w') as f:
-    f.write("""This directory contains a Swarming bot.
+  with open(os.path.join(bot.base_dir, "README"), "w") as f:
+    f.write(
+      """This directory contains a Swarming bot.
 
 Swarming source code is hosted at
 https://chromium.googlesource.com/infra/luci/luci-py.git.
@@ -336,5 +339,7 @@ https://chromium.googlesource.com/infra/luci/luci-py.git.
 The bot was generated from the server %s. To get the bot's attributes, run:
 
   python swarming_bot.zip attributes
-""" % bot.server)
+"""
+      % bot.server
+    )
     return True

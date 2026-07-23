@@ -11,7 +11,7 @@ class TimerCanceledException(Exception):
   """Raised by Timer methods if the timer was already canceled."""
 
   def __init__(self):
-    super().__init__('The timer was canceled already')
+    super().__init__("The timer was canceled already")
 
 
 class Clock:
@@ -57,7 +57,7 @@ class Clock:
     t = Timer(self, self.now() + duration)
     self._timers.append(t)
     if len(self._timers) > 10:
-      logging.warning('Too many pending timers: %d!', len(self._timers))
+      logging.warning("Too many pending timers: %d!", len(self._timers))
     return t
 
   def sleep(self, duration):
@@ -75,10 +75,10 @@ class Clock:
         self._stop_event.wait(duration)
       except IOError:
         # This can happen on signals in Python 3.4 and older.
-        logging.exception('IOError while waiting in threading.Event')
+        logging.exception("IOError while waiting in threading.Event")
       if self._stop_event.is_set():
         return False
-      duration -= (self.now() - start)
+      duration -= self.now() - start
     return True
 
   def wait_next_timer(self):
@@ -95,7 +95,7 @@ class Clock:
     If the sleep was interrupted by firing `stop_event`, returns None as well.
     """
     if not self._timers:
-      logging.error('No active timers, sleeping for 30 sec')
+      logging.error("No active timers, sleeping for 30 sec")
       self.sleep(30.0)
       return None
 

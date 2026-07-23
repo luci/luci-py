@@ -16,26 +16,27 @@ from server import pools_config
 from server import task_scheduler
 from server import task_queues
 
-_TRACKING_BUG = 'crbug.com/1066839'
+_TRACKING_BUG = "crbug.com/1066839"
 
 
 # Properties of a task that affect who can access it.
 #
 # Extracted either from TaskRequest or from TaskResultSummary.
 TaskAccessInfo = namedtuple(
-    'TaskAccessInfo',
-    [
-        # ID of the task. Only for error messages and logs!
-        'task_id',
-        # The realm the task belongs to, as "<project>:<realm>" string.
-        'realm',
-        # Task's pool as a string.
-        'pool',
-        # The bot ID the task is targeting or None.
-        'bot_id',
-        # auth.Identity of whoever submitted the task.
-        'submitter',
-    ])
+  "TaskAccessInfo",
+  [
+    # ID of the task. Only for error messages and logs!
+    "task_id",
+    # The realm the task belongs to, as "<project>:<realm>" string.
+    "realm",
+    # Task's pool as a string.
+    "pool",
+    # The bot ID the task is targeting or None.
+    "bot_id",
+    # auth.Identity of whoever submitted the task.
+    "submitter",
+  ],
+)
 
 
 def get_permission(enum_permission):
@@ -51,12 +52,12 @@ def get_permission(enum_permission):
     realm_permission: an instance of auth.Permission.
   """
   enum_name = realms_pb2.RealmPermission.Name(enum_permission)
-  words = enum_name.replace('REALM_PERMISSION_', '').split('_')
+  words = enum_name.replace("REALM_PERMISSION_", "").split("_")
   # convert first word to subject e.g. pools, tasks
   subject = words[0].lower()
   # convert following words to verb e.g. createTask, listBots
-  verb = words[1].lower() + ''.join(map(lambda x: x.capitalize(), words[2:]))
-  return auth.Permission('swarming.%s.%s' % (subject, verb))
+  verb = words[1].lower() + "".join(map(lambda x: x.capitalize(), words[2:]))
+  return auth.Permission("swarming.%s.%s" % (subject, verb))
 
 
 def is_enforced_permission(perm, pool_cfg=None):
@@ -116,8 +117,9 @@ def check_pools_create_task(pool_cfg, enforce):
 
   # pool_cfg.realm is optional.
   if not pool_cfg.realm:
-    logging.warning('%s: realm is missing in Pool "%s"', _TRACKING_BUG,
-                    pool_cfg.name)
+    logging.warning(
+      '%s: realm is missing in Pool "%s"', _TRACKING_BUG, pool_cfg.name
+    )
 
   legacy_allowed = True
   try:
@@ -130,7 +132,8 @@ def check_pools_create_task(pool_cfg, enforce):
     # is specified.
     if pool_cfg.realm:
       auth.has_permission_dryrun(
-          perm, [pool_cfg.realm], legacy_allowed, tracking_bug=_TRACKING_BUG)
+        perm, [pool_cfg.realm], legacy_allowed, tracking_bug=_TRACKING_BUG
+      )
   return False
 
 
@@ -160,7 +163,8 @@ def check_tasks_create_in_realm(realm, pool_cfg, enforce):
     # There is no existing permission that corresponds to the realm
     # permission. So always pass expected_result=True to the dryrun.
     auth.has_permission_dryrun(
-        perm, [realm], expected_result=True, tracking_bug=_TRACKING_BUG)
+      perm, [realm], expected_result=True, tracking_bug=_TRACKING_BUG
+    )
   return False
 
 
@@ -211,10 +215,12 @@ def check_tasks_act_as(task_request, pool_cfg, enforce):
   finally:
     if task_request.realm:
       auth.has_permission_dryrun(
-          perm, [task_request.realm],
-          legacy_allowed,
-          identity=identity,
-          tracking_bug=_TRACKING_BUG)
+        perm,
+        [task_request.realm],
+        legacy_allowed,
+        identity=identity,
+        tracking_bug=_TRACKING_BUG,
+      )
   return False
 
 
@@ -364,8 +370,9 @@ def can_delete_bots(pools):
     return acl.can_delete_bot()
 
   try:
-    _check_pools_filters_acl(realms_pb2.REALM_PERMISSION_POOLS_DELETE_BOT,
-                             pools)
+    _check_pools_filters_acl(
+      realms_pb2.REALM_PERMISSION_POOLS_DELETE_BOT, pools
+    )
     return True
   except auth.AuthorizationError:
     return False
@@ -413,8 +420,9 @@ def can_list_bots(pool):
 
   try:
     _check_permission(
-        get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_BOTS),
-        [pool_cfg.realm])
+      get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_BOTS),
+      [pool_cfg.realm],
+    )
     return True
   except auth.AuthorizationError:
     return False
@@ -422,11 +430,13 @@ def can_list_bots(pool):
 
 def task_access_info_from_request(task_request):
   """Extracts information for task ACL check from TaskRequest."""
-  return TaskAccessInfo(task_id=task_request.task_id,
-                        realm=task_request.realm,
-                        pool=task_request.pool,
-                        bot_id=task_request.bot_id,
-                        submitter=task_request.authenticated)
+  return TaskAccessInfo(
+    task_id=task_request.task_id,
+    realm=task_request.realm,
+    pool=task_request.pool,
+    bot_id=task_request.bot_id,
+    submitter=task_request.authenticated,
+  )
 
 
 def task_access_info_from_result_summary(result_summary):
@@ -436,12 +446,14 @@ def task_access_info_from_result_summary(result_summary):
     ValueError if it doesn't have expected fields populated.
   """
   if not result_summary.request_realm:
-    raise ValueError('Unsupported TaskResultSummary entity')
-  return TaskAccessInfo(task_id=result_summary.task_id,
-                        realm=result_summary.request_realm,
-                        pool=result_summary.request_pool,
-                        bot_id=result_summary.request_bot_id,
-                        submitter=result_summary.request_authenticated)
+    raise ValueError("Unsupported TaskResultSummary entity")
+  return TaskAccessInfo(
+    task_id=result_summary.task_id,
+    realm=result_summary.request_realm,
+    pool=result_summary.request_pool,
+    bot_id=result_summary.request_bot_id,
+    submitter=result_summary.request_authenticated,
+  )
 
 
 def check_task_get_acl(access_info):
@@ -469,8 +481,11 @@ def check_task_get_acl(access_info):
     return
   if acl.can_view_all_tasks():
     return
-  _check_task_acl(access_info, realms_pb2.REALM_PERMISSION_TASKS_GET,
-                  realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS)
+  _check_task_acl(
+    access_info,
+    realms_pb2.REALM_PERMISSION_TASKS_GET,
+    realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS,
+  )
 
 
 def check_task_cancel_acl(access_info):
@@ -498,8 +513,11 @@ def check_task_cancel_acl(access_info):
     return
   if acl.can_edit_one_task():
     return
-  _check_task_acl(access_info, realms_pb2.REALM_PERMISSION_TASKS_CANCEL,
-                  realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK)
+  _check_task_acl(
+    access_info,
+    realms_pb2.REALM_PERMISSION_TASKS_CANCEL,
+    realms_pb2.REALM_PERMISSION_POOLS_CANCEL_TASK,
+  )
 
 
 def can_cancel_task(access_info):
@@ -562,8 +580,9 @@ def can_list_tasks(pool):
 
   try:
     _check_permission(
-        get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS),
-        [pool_cfg.realm])
+      get_permission(realms_pb2.REALM_PERMISSION_POOLS_LIST_TASKS),
+      [pool_cfg.realm],
+    )
     return True
   except auth.AuthorizationError:
     return False
@@ -635,16 +654,27 @@ def _check_permission(perm, realms, identity=None):
     identity = auth.get_current_identity()
 
   if not realms:
-    raise auth.AuthorizationError('Realm is missing')
+    raise auth.AuthorizationError("Realm is missing")
 
   if not auth.has_permission(perm, realms, identity=identity):
     logging.warning(
-        '[realms] %s "%s" does not have permission "%s" in any realms %s',
-        identity.kind, identity.name, perm.name, realms)
-    raise auth.AuthorizationError('%s "%s" does not have permission "%s"' %
-                                  (identity.kind, identity.name, perm.name))
-  logging.info('[realms] %s "%s" has permission "%s" in any realms %s',
-               identity.kind, identity.name, perm.name, realms)
+      '[realms] %s "%s" does not have permission "%s" in any realms %s',
+      identity.kind,
+      identity.name,
+      perm.name,
+      realms,
+    )
+    raise auth.AuthorizationError(
+      '%s "%s" does not have permission "%s"'
+      % (identity.kind, identity.name, perm.name)
+    )
+  logging.info(
+    '[realms] %s "%s" has permission "%s" in any realms %s',
+    identity.kind,
+    identity.name,
+    perm.name,
+    realms,
+  )
 
 
 def _bot_pool_realms(bot_id):
@@ -658,9 +688,9 @@ def _bot_pool_realms(bot_id):
   for p in bot_management.get_bot_pools(bot_id):
     pool_cfg = pools_config.get_pool_config(p)
     if not pool_cfg:
-      logging.warning('Bot pool is missing. pool: %s, bot: %s', p, bot_id)
+      logging.warning("Bot pool is missing. pool: %s, bot: %s", p, bot_id)
     elif not pool_cfg.realm:
-      logging.warning('Bot pool has no realm. pool: %s, bot: %s', p, bot_id)
+      logging.warning("Bot pool has no realm. pool: %s, bot: %s", p, bot_id)
     else:
       realms.append(pool_cfg.realm)
   return realms
@@ -676,7 +706,7 @@ def _check_pools_filters_acl(perm_enum, pools):
   """
   # Pool dimension is required if the caller doesn't have global permission.
   if not pools:
-    raise auth.AuthorizationError('No pool is specified')
+    raise auth.AuthorizationError("No pool is specified")
 
   perm = get_permission(perm_enum)
 
@@ -685,7 +715,8 @@ def _check_pools_filters_acl(perm_enum, pools):
     pool_cfg = pools_config.get_pool_config(p)
     if not pool_cfg:
       raise auth.AuthorizationError(
-          'No such pool or no permission to use it: %s' % p)
+        "No such pool or no permission to use it: %s" % p
+      )
 
     _check_permission(perm, [pool_cfg.realm])
 
@@ -702,7 +733,8 @@ def _check_bot_acl(perm_enum, bot_id):
   bot_realms = _bot_pool_realms(bot_id)
   if not bot_realms:
     raise auth.AuthorizationError(
-        'No such bot or no permission to use it: %s.' % bot_id)
+      "No such bot or no permission to use it: %s." % bot_id
+    )
   _check_permission(get_permission(perm_enum), bot_realms)
 
 
@@ -737,9 +769,9 @@ def _check_task_acl(access_info, task_perm_enum, pool_perm_enum):
   if access_info.pool:
     pool_cfg = pools_config.get_pool_config(access_info.pool)
     if not pool_cfg:
-      logging.warning('Task pool is missing. pool: %s', access_info.pool)
+      logging.warning("Task pool is missing. pool: %s", access_info.pool)
     elif not pool_cfg.realm:
-      logging.warning('Task pool has no realm. pool: %s', access_info.pool)
+      logging.warning("Task pool has no realm. pool: %s", access_info.pool)
     elif auth.has_permission(pool_perm, [pool_cfg.realm]):
       return
 
@@ -751,5 +783,6 @@ def _check_task_acl(access_info, task_perm_enum, pool_perm_enum):
     if bot_realms and auth.has_permission(pool_perm, bot_realms):
       return
 
-  raise auth.AuthorizationError('Task "%s" is not accessible' %
-                                access_info.task_id)
+  raise auth.AuthorizationError(
+    'Task "%s" is not accessible' % access_info.task_id
+  )

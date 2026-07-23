@@ -7,8 +7,10 @@
 The imports are done late so if an ImportError occurs, it is localized to this
 command only.
 """
+
 from __future__ import print_function
-__version__ = '1.0.0'
+
+__version__ = "1.0.0"
 
 import argparse
 import code
@@ -31,15 +33,16 @@ from utils import zip_package
 THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 # libusb1 expects to be directly in sys.path.
-sys.path.insert(0, os.path.join(THIS_FILE, 'python_libusb1'))
+sys.path.insert(0, os.path.join(THIS_FILE, "python_libusb1"))
 
 # Copied from //client/utils/oauth.py.
-sys.path.insert(0, os.path.join(THIS_FILE, 'third_party'))
-sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'httplib2',
-                                'python3'))
-sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1'))
-sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1_modules'))
-sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'rsa'))
+sys.path.insert(0, os.path.join(THIS_FILE, "third_party"))
+sys.path.insert(
+  0, os.path.join(THIS_FILE, "third_party", "httplib2", "python3")
+)
+sys.path.insert(0, os.path.join(THIS_FILE, "third_party", "pyasn1"))
+sys.path.insert(0, os.path.join(THIS_FILE, "third_party", "pyasn1_modules"))
+sys.path.insert(0, os.path.join(THIS_FILE, "third_party", "rsa"))
 
 
 def fix_protobuf_package():
@@ -51,17 +54,19 @@ def fix_protobuf_package():
   # loaded by using the zip support, as used with swarming_bot.zip. Using
   # 'python -s -S' doesn't work to skip 'import site' in this case. So use the
   # nuclear option, unload the package if found.
-  if 'google' in sys.modules:
-    del sys.modules['google']
+  if "google" in sys.modules:
+    del sys.modules["google"]
   # Completely zap out preinstalled google. This works because package google
   # itself has no functionality.
-  path_to_google = os.path.join(THIS_FILE, 'third_party', 'google')
+  path_to_google = os.path.join(THIS_FILE, "third_party", "google")
   import google
+
   google.__path__.insert(0, path_to_google)
   del google.__path__[1:]
 
   # Sanity check.
   import google.protobuf
+
   # pylint: disable=unused-variable
   from google.protobuf import symbol_database
 
@@ -84,14 +89,16 @@ from bot_code import common
 def CMDattributes(_args):
   """Prints out the bot's attributes."""
   from bot_code import bot_main
+
   botobj = bot_main.get_bot(bot_main.get_config())
   json.dump(
-      bot_main.get_attributes(botobj),
-      sys.stdout,
-      indent=2,
-      sort_keys=True,
-      separators=(',', ': '))
-  print('')
+    bot_main.get_attributes(botobj),
+    sys.stdout,
+    indent=2,
+    sort_keys=True,
+    separators=(",", ": "),
+  )
+  print("")
   return 0
 
 
@@ -99,8 +106,9 @@ def CMDconfig(_args):
   """Prints the config.json embedded in this zip."""
   logging_utils.prepare_logging(None)
   from bot_code import bot_main
+
   json.dump(bot_main.get_config(), sys.stdout, indent=2, sort_keys=True)
-  print('')
+  print("")
   return 0
 
 
@@ -115,10 +123,11 @@ def CMDis_fine(_args):
   from bot_code import bot_main
   from config import bot_config
 
-  resp = net.url_read(bot_main.get_config()['server'] +
-                      '/swarming/api/v1/bot/server_ping')
+  resp = net.url_read(
+    bot_main.get_config()["server"] + "/swarming/api/v1/bot/server_ping"
+  )
   if resp is None:
-    logging.error('No response from server_ping')
+    logging.error("No response from server_ping")
     return 1
   return 0
 
@@ -129,6 +138,7 @@ def CMDreboot(_args):
   logging_utils.prepare_logging(None)
   logging.info("reboot with args: %s", args)
   import os_utilities
+
   # This function doesn't return.
   os_utilities.host_reboot()
   # Should never reach here.
@@ -137,16 +147,18 @@ def CMDreboot(_args):
 
 def CMDrun_isolated(args):
   """Internal command to run an isolated command."""
-  sys.path.insert(0, os.path.join(THIS_FILE, 'client'))
+  sys.path.insert(0, os.path.join(THIS_FILE, "client"))
   # run_isolated setups logging by itself.
   import run_isolated
+
   return run_isolated.main(args)
 
 
 def CMDsetup(_args):
   """Setup the bot to auto-start but doesn't start the bot."""
-  logging_utils.prepare_logging(os.path.join('logs', 'bot_config.log'))
+  logging_utils.prepare_logging(os.path.join("logs", "bot_config.log"))
   from bot_code import bot_main
+
   bot_main.setup_bot(None, True)
   return 0
 
@@ -155,7 +167,8 @@ def CMDserver(_args):
   """Prints the server url. It's like 'config' but easier to parse."""
   logging_utils.prepare_logging(None)
   from bot_code import bot_main
-  print(bot_main.get_config()['server'])
+
+  print(bot_main.get_config()["server"])
   return 0
 
 
@@ -167,72 +180,79 @@ def CMDshell(args):
   from bot_code import bot_main
   from api import os_utilities
   from api import platforms
+
   local_vars = {
-      'bot_main': bot_main,
-      'json': json,
-      'os_utilities': os_utilities,
-      'platforms': platforms,
+    "bot_main": bot_main,
+    "json": json,
+    "os_utilities": os_utilities,
+    "platforms": platforms,
   }
   # Can't use: from api.platforms import *
   local_vars.update(
-      (k, v) for k, v in platforms.__dict__.items()
-      if not k.startswith('_'))
+    (k, v) for k, v in platforms.__dict__.items() if not k.startswith("_")
+  )
 
   if args:
     for arg in args:
-      exec (code.compile_command(arg), local_vars)
+      exec(code.compile_command(arg), local_vars)
   else:
-    code.interact('Locals:\n  ' + '\n  '.join(sorted(local_vars)), None,
-                  local_vars)
+    code.interact(
+      "Locals:\n  " + "\n  ".join(sorted(local_vars)), None, local_vars
+    )
   return 0
 
 
 def CMDstart_bot(args):
   """Starts the swarming bot."""
-  logging_utils.prepare_logging(os.path.join('logs', 'swarming_bot.log'))
+  logging_utils.prepare_logging(os.path.join("logs", "swarming_bot.log"))
   logging.info("start_bot with args: %s", args)
   from bot_code import bot_main
-  logging.info('importing bot_main: %s, %s', THIS_FILE,
-               bot_main.generate_version())
-  adb_logger = logging.getLogger('adb')
-  logging_utils.prepare_logging(os.path.join('logs', 'adb.log'), adb_logger)
+
+  logging.info(
+    "importing bot_main: %s, %s", THIS_FILE, bot_main.generate_version()
+  )
+  adb_logger = logging.getLogger("adb")
+  logging_utils.prepare_logging(os.path.join("logs", "adb.log"), adb_logger)
   adb_logger.setLevel(logging.DEBUG)
-  for child in ('high', 'low', 'usb', 'cmd'):
+  for child in ("high", "low", "usb", "cmd"):
     adb_logger.getChild(child).setLevel(logging.DEBUG)
   adb_logger.propagate = False
   result = bot_main.main(args)
-  logging.info('bot_main exit code: %d', result)
+  logging.info("bot_main exit code: %d", result)
   return result
 
 
 def CMDstart_slave(args):
   """Ill named command that actually sets up the bot then start it."""
   # TODO(maruel): Rename function.
-  logging_utils.prepare_logging(os.path.join('logs', 'bot_config.log'))
+  logging_utils.prepare_logging(os.path.join("logs", "bot_config.log"))
   logging.info("start_slave with args: %s", args)
   parser = argparse.ArgumentParser()
   parser.add_argument(
-      '--survive',
-      action='store_true',
-      help='Do not reboot the host even if bot_config.setup_bot() asked to')
+    "--survive",
+    action="store_true",
+    help="Do not reboot the host even if bot_config.setup_bot() asked to",
+  )
   options, args = parser.parse_known_args(args)
 
   try:
     from bot_code import bot_main
+
     bot_main.setup_bot(None, options.survive)
   except Exception:
-    logging.exception('bot_main.py failed.')
+    logging.exception("bot_main.py failed.")
 
-  cmd = [THIS_FILE, 'start_bot'] + args
-  logging.info('Starting the bot: %s', cmd)
+  cmd = [THIS_FILE, "start_bot"] + args
+  logging.info("Starting the bot: %s", cmd)
   return common.exec_python(cmd)
 
 
 def CMDtask_runner(args):
   """Internal command to run a swarming task."""
-  logging_utils.prepare_logging(os.path.join('logs', 'task_runner.log'))
+  logging_utils.prepare_logging(os.path.join("logs", "task_runner.log"))
   logging.info("task_runner with args: %s", args)
   from bot_code import task_runner
+
   return task_runner.main(args)
 
 
@@ -246,19 +266,21 @@ def CMDversion(_args):
 def main():
   # Setup a temporary 'best effort' logger. This is to be used before the actual
   # logger is initialised.
-  logger = logging.getLogger('init')
+  logger = logging.getLogger("init")
   logging_utils.prepare_logging(
-      os.path.join(tempfile.gettempdir(), "swarming_bot_init.log"), logger)
+    os.path.join(tempfile.gettempdir(), "swarming_bot_init.log"), logger
+  )
 
   base_dir = os.path.dirname(THIS_FILE)
 
   # Log to a permanant location as well. This is the log that should be piped by
   # cloudtail. Continue logging to the temp dir as a backup (in case there's an
   # issue with the handler)
-  perm_log_location = os.path.join(base_dir, 'logs', 'swarming_bot_init.log')
+  perm_log_location = os.path.join(base_dir, "logs", "swarming_bot_init.log")
   try:
     logger.addHandler(
-        logging_utils.new_rotating_file_handler(perm_log_location))
+      logging_utils.new_rotating_file_handler(perm_log_location)
+    )
   except Exception:
     logger.exception("Failed to open: %s\n", perm_log_location)
 
@@ -270,14 +292,15 @@ def main():
     # Always create the logs dir first thing, before printing anything out.
     # This is already done above when adding the rotating file handler, but
     # just in case it fails we should try again.
-    if not os.path.isdir('logs'):
-      os.mkdir('logs')
+    if not os.path.isdir("logs"):
+      os.mkdir("logs")
   except OSError:
-    logger.exception("Failed to create logging directory at path: %s\n",
-                     base_dir)
+    logger.exception(
+      "Failed to create logging directory at path: %s\n", base_dir
+    )
 
   try:
-    user_agent = 'swarming_bot/' + __version__ + '@' + socket.gethostname()
+    user_agent = "swarming_bot/" + __version__ + "@" + socket.gethostname()
   except OSError:
     logger.exception("Failed to obtain hostname")
 
@@ -294,11 +317,11 @@ def main():
   # This is extremely useful to debug hangs.
   signal_trace.register()
 
-  if os.path.basename(THIS_FILE) == 'swarming_bot.zip':
+  if os.path.basename(THIS_FILE) == "swarming_bot.zip":
     # Self-replicate itself right away as swarming_bot.1.zip and restart the bot
     # process as this copy. This enables LKGBC logic.
-    logger.info('Self replicating pid:%d.', os.getpid())
-    new_zip = os.path.join(base_dir, 'swarming_bot.1.zip')
+    logger.info("Self replicating pid:%d.", os.getpid())
+    new_zip = os.path.join(base_dir, "swarming_bot.1.zip")
     try:
       if os.path.isfile(new_zip):
         os.remove(new_zip)
@@ -307,30 +330,30 @@ def main():
       logger.exception("Failed to replicate %s to %s\n", THIS_FILE, new_zip)
 
     cmd = [new_zip] + sys.argv[1:]
-    logger.info('cmd: %s', cmd)
+    logger.info("cmd: %s", cmd)
     return common.exec_python(cmd)
 
   # sys.argv[0] is the zip file itself.
-  cmd = 'start_slave'
+  cmd = "start_slave"
   args = []
   if len(sys.argv) > 1:
     cmd = sys.argv[1]
     args = sys.argv[2:]
 
-  fn = getattr(sys.modules[__name__], 'CMD%s' % cmd, None)
+  fn = getattr(sys.modules[__name__], "CMD%s" % cmd, None)
   if fn:
     try:
       logger.info("Executing function: CMD%s", cmd)
       return fn(args)
     except ImportError:
-      logger.exception('Failed to run %s', cmd)
-      with zipfile.ZipFile(THIS_FILE, 'r') as f:
-        logger.error('Files in %s:\n%s', THIS_FILE, f.namelist())
+      logger.exception("Failed to run %s", cmd)
+      with zipfile.ZipFile(THIS_FILE, "r") as f:
+        logger.error("Files in %s:\n%s", THIS_FILE, f.namelist())
       return 1
 
-  logger.error('Unknown command %s' % cmd)
+  logger.error("Unknown command %s" % cmd)
   return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   sys.exit(main())

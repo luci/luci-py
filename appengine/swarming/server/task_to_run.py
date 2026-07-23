@@ -105,6 +105,7 @@ class _TaskToRunBase(ndb.Model):
   to get a TaskToRunShard kind. The shard number is derived deterministically by
   calculating dimensions hash % N_SHARDS.
   """
+
   # This entity is used in transactions. It is not worth using either cache.
   # https://cloud.google.com/appengine/docs/standard/python/ndb/cache
   _use_cache = False
@@ -125,8 +126,9 @@ class _TaskToRunBase(ndb.Model):
   # fetching it from a datastore query.
   #
   # Used in both native and RBE mode.
-  dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict,
-                                                         indexed=False)
+  dimensions = datastore_utils.DeterministicJsonProperty(
+    json_type=dict, indexed=False
+  )
 
   # RBE reservation name that is (or will be) handling this TaskToRunShard.
   #
@@ -204,7 +206,7 @@ class _TaskToRunBase(ndb.Model):
   def shard_index(self):
     """Returns the index of TaskToRunShard extracting it from the key."""
     kind = self.key.kind()
-    assert kind.startswith('TaskToRunShard'), kind
+    assert kind.startswith("TaskToRunShard"), kind
     return int(kind[14:])
 
   @property
@@ -227,8 +229,7 @@ class _TaskToRunBase(ndb.Model):
     """Returns the TaskRunResult ndb.Key that will be created for this
     TaskToRunShard once reaped.
     """
-    summary_key = task_pack.request_key_to_result_summary_key(
-        self.request_key)
+    summary_key = task_pack.request_key_to_result_summary_key(self.request_key)
     return task_pack.result_summary_key_to_run_result_key(summary_key)
 
   @property
@@ -238,17 +239,19 @@ class _TaskToRunBase(ndb.Model):
 
   def populate_rbe_reservation(self):
     """Populates rbe_reservation field based on the entity key."""
-    self.rbe_reservation = rbe.gen_rbe_reservation_id(self.request_key,
-                                                      self.task_slice_index)
+    self.rbe_reservation = rbe.gen_rbe_reservation_id(
+      self.request_key, self.task_slice_index
+    )
 
   def to_dict(self):
     """Purely used for unit testing."""
     out = super(_TaskToRunBase, self).to_dict(
-        exclude=['claim_id', 'dimensions', 'rbe_reservation', 'retry_count'])
+      exclude=["claim_id", "dimensions", "rbe_reservation", "retry_count"]
+    )
     # Consistent formatting makes it easier to reason about.
-    if out['queue_number']:
-      out['queue_number'] = '0x%016x' % out['queue_number']
-    out['task_slice_index'] = self.task_slice_index
+    if out["queue_number"]:
+      out["queue_number"] = "0x%016x" % out["queue_number"]
+    out["task_slice_index"] = self.task_slice_index
     return out
 
   def _pre_put_hook(self):
@@ -258,29 +261,33 @@ class _TaskToRunBase(ndb.Model):
       qn = self.queue_number is not None
       if ex != qn:
         raise datastore_errors.BadValueError(
-            'TaskToRun: queue_number and expiration_ts should either be both '
-            'set or unset')
+          "TaskToRun: queue_number and expiration_ts should either be both "
+          "set or unset"
+        )
 
 
 # Instantiate all TaskToRunShard<X> classes.
 _TaskToRunShards = {
-    shard: type('TaskToRunShard%d' % shard, (_TaskToRunBase, ), {})
-    for shard in range(N_SHARDS)
+  shard: type("TaskToRunShard%d" % shard, (_TaskToRunBase,), {})
+  for shard in range(N_SHARDS)
 }
 
 
 def get_shard_kind(shard):
   """Returns a TaskToRunShard kind for the given shard number."""
-  assert shard < N_SHARDS, 'Shard number must be < %d, but %d is given' % (
-      N_SHARDS, shard)
+  assert shard < N_SHARDS, "Shard number must be < %d, but %d is given" % (
+    N_SHARDS,
+    shard,
+  )
   return _TaskToRunShards[shard]
 
 
 ### Private functions.
 
 
-def _gen_queue_number(dimensions_hash, timestamp, priority,
-                      scheduling_algorithm):
+def _gen_queue_number(
+  dimensions_hash, timestamp, priority, scheduling_algorithm
+):
   """Generates a 63 bit packed value used for TaskToRunShard.queue_number.
 
   Arguments:
@@ -310,17 +317,17 @@ def _gen_queue_number(dimensions_hash, timestamp, priority,
     next_year = datetime.datetime(timestamp.year + 1, 1, 1)
     # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
     # assert works.
-    t = long(round((next_year - timestamp).total_seconds() * 10.))
+    t = long(round((next_year - timestamp).total_seconds() * 10.0))
   else:
     # Default scheduling algorithm is FIFO to avoid confusion.
     assert scheduling_algorithm in (
-        pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN,
-        pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
-    ), ('Unknown Pool.SchedulingAlgorithm: %d' % scheduling_algorithm)
+      pools_pb2.Pool.SCHEDULING_ALGORITHM_UNKNOWN,
+      pools_pb2.Pool.SCHEDULING_ALGORITHM_FIFO,
+    ), "Unknown Pool.SchedulingAlgorithm: %d" % scheduling_algorithm
     year_start = datetime.datetime(timestamp.year, 1, 1)
     # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
     # assert works.
-    t = long(round((timestamp - year_start).total_seconds() * 10.))
+    t = long(round((timestamp - year_start).total_seconds() * 10.0))
 
   assert 0 <= t <= 0x7FFFFFFF, (hex(t), dimensions_hash, timestamp, priority)
   # 31-22 == 9, leaving room for overflow with the addition.
@@ -328,7 +335,7 @@ def _gen_queue_number(dimensions_hash, timestamp, priority,
   # It is important that priority mixed with time is an addition, not a bitwise
   # or.
   low_part = (long(priority) << 22) + t
-  assert 0 <= low_part <= 0xFFFFFFFF, '0x%X is out of band' % (low_part)
+  assert 0 <= low_part <= 0xFFFFFFFF, "0x%X is out of band" % (low_part)
   # int may be 32 bits, upgrade to long for consistency, albeit this is
   # significantly slower.
   high_part = long(dimensions_hash) << 31
@@ -361,12 +368,16 @@ def _memcache_to_run_key(to_run_key):
   See Claim for more explanation.
   """
   request_key = task_to_run_key_to_request_key(to_run_key)
-  return '%x-%d-%d' % (request_key.integer_id(), LEGACY_TRY_NUMBER,
-                       task_to_run_key_slice_index(to_run_key))
+  return "%x-%d-%d" % (
+    request_key.integer_id(),
+    LEGACY_TRY_NUMBER,
+    task_to_run_key_slice_index(to_run_key),
+  )
 
 
 class _QueryStats(object):
   """Statistics for a yield_next_available_task_to_dispatch() loop."""
+
   claimed = 0
   mismatch = 0
   stale = 0
@@ -374,29 +385,35 @@ class _QueryStats(object):
   visited = 0
 
   def __str__(self):
-    return ('%d total, %d visited, %d already claimed, %d stale, '
-            '%d dimensions mismatch') % (self.total, self.visited, self.claimed,
-                                         self.stale, self.mismatch)
+    return (
+      "%d total, %d visited, %d already claimed, %d stale, "
+      "%d dimensions mismatch"
+    ) % (self.total, self.visited, self.claimed, self.stale, self.mismatch)
 
 
 def _get_task_to_run_query(dimensions_hash):
-  """Returns a ndb.Query of TaskToRunShard within this dimensions_hash queue.
-  """
+  """Returns a ndb.Query of TaskToRunShard within this dimensions_hash queue."""
   # dimensions_hash should be 32 bits but on AppEngine, which is using 32 bits
   # python, it is silently upgraded to long.
   assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)
+
   # See _gen_queue_number() as of why << 31. This query cannot use the key
   # because it is not a root entity.
   def _query(kind):
-    return kind.query().order(kind.queue_number).filter(
-        kind.queue_number >= (dimensions_hash << 31), kind.queue_number <
-        ((dimensions_hash + 1) << 31))
+    return (
+      kind.query()
+      .order(kind.queue_number)
+      .filter(
+        kind.queue_number >= (dimensions_hash << 31),
+        kind.queue_number < ((dimensions_hash + 1) << 31),
+      )
+    )
 
   return [_query(get_shard_kind(dimensions_hash % N_SHARDS))]
 
 
 class _TaskToRunItem(object):
-  __slots__ = ('key', 'ttr')
+  __slots__ = ("key", "ttr")
 
   def __init__(self, ttr):
     self.key = _queue_number_order_priority(ttr)
@@ -433,8 +450,9 @@ _MC_CLIENT = memcache.Client()
 
 
 class _ActiveQuery(object):
-  def __init__(self, query, dim_hash, bot_id, stats, bot_dims_matcher,
-               deadline):
+  def __init__(
+    self, query, dim_hash, bot_id, stats, bot_dims_matcher, deadline
+  ):
     self._query = query
     self._dim_hash = dim_hash
     self._bot_id = bot_id
@@ -490,20 +508,21 @@ class _ActiveQuery(object):
     """
     deadline = (self._deadline - utils.utcnow()).total_seconds()
     if not self._canceled and deadline < 1.0:
-      self._log('not enough time to make an RPC, canceling this query')
+      self._log("not enough time to make an RPC, canceling this query")
       self._canceled = True
 
     if not self._canceled:
       try:
         self._pages += 1
-        self._log('fetching page #%d (deadline %.3fs)', self._pages, deadline)
+        self._log("fetching page #%d (deadline %.3fs)", self._pages, deadline)
         fetched, cursor, more = yield self._query.fetch_page_async(
-            self._page_size, start_cursor=cursor, deadline=deadline)
+          self._page_size, start_cursor=cursor, deadline=deadline
+        )
       except (apiproxy_errors.DeadlineExceededError, datastore_errors.Timeout):
         # TODO(vadimsh): Maybe it makes sense to use a smaller RPC deadline and
         # instead retry the call a bunch of times until reaching the overall
         # deadline?
-        self._log('RPC deadline exceeded, canceling this query')
+        self._log("RPC deadline exceeded, canceling this query")
         self._canceled = True
 
     # Exit ASAP if the query was cancelled while waiting in fetch_page_async.
@@ -520,8 +539,11 @@ class _ActiveQuery(object):
       if ttr.is_reapable:
         fresh.append(ttr)
       else:
-        self._log('TaskToRunShard %s (slice %d) is stale', ttr.task_id,
-                  ttr.task_slice_index)
+        self._log(
+          "TaskToRunShard %s (slice %d) is stale",
+          ttr.task_id,
+          ttr.task_slice_index,
+        )
     self._stats.stale += len(fetched) - len(fresh)
 
     # Filter out all entries that have already been claimed by other bots. This
@@ -545,27 +567,34 @@ class _ActiveQuery(object):
       if self._bot_dims_matcher(ttr.dimensions):
         matched.append(ttr)
       else:
-        self._log('TaskToRunShard %s (slice %d) dimensions mismatch',
-                  ttr.task_id, ttr.task_slice_index)
+        self._log(
+          "TaskToRunShard %s (slice %d) dimensions mismatch",
+          ttr.task_id,
+          ttr.task_slice_index,
+        )
     self._stats.mismatch += len(available) - len(matched)
 
     if fetched:
-      self._log('got %d items (%d stale, %d already claimed, %d mismatch)',
-                len(fetched),
-                len(fetched) - len(fresh),
-                len(fresh) - len(available),
-                len(available) - len(matched))
+      self._log(
+        "got %d items (%d stale, %d already claimed, %d mismatch)",
+        len(fetched),
+        len(fetched) - len(fresh),
+        len(fresh) - len(available),
+        len(available) - len(matched),
+      )
     if not more:
-      self._log('exhausted')
+      self._log("exhausted")
     raise ndb.Return((matched, cursor, more))
 
   def _log(self, msg, *args):
-    logging.debug('_ActiveQuery(%s, %d): %s', self._bot_id, self._dim_hash,
-                  msg % args)
+    logging.debug(
+      "_ActiveQuery(%s, %d): %s", self._bot_id, self._dim_hash, msg % args
+    )
 
 
-def _yield_potential_tasks(bot_id, pool, queues, stats, bot_dims_matcher,
-                           deadline):
+def _yield_potential_tasks(
+  bot_id, pool, queues, stats, bot_dims_matcher, deadline
+):
   """Queries given task queues in parallel and yields the tasks in order
   of priority until all queues are exhausted or the deadline is reached.
 
@@ -594,9 +623,10 @@ def _yield_potential_tasks(bot_id, pool, queues, stats, bot_dims_matcher,
     ScanDeadlineError if reached the deadline before exhausting queues.
   """
   if utils.utcnow() >= deadline:
-    logging.debug('_yield_potential_tasks(%s): skipping due to deadline',
-                  bot_id)
-    raise ScanDeadlineError('skipped', 'No time left to run the scan at all')
+    logging.debug(
+      "_yield_potential_tasks(%s): skipping due to deadline", bot_id
+    )
+    raise ScanDeadlineError("skipped", "No time left to run the scan at all")
 
   # Keep track how many queues we scan in parallel.
   ts_mon_metrics.on_scheduler_scan(pool, len(queues))
@@ -608,7 +638,8 @@ def _yield_potential_tasks(bot_id, pool, queues, stats, bot_dims_matcher,
   for d in queues:
     for q in _get_task_to_run_query(d):
       queries.append(
-          _ActiveQuery(q, d, bot_id, stats, bot_dims_matcher, deadline))
+        _ActiveQuery(q, d, bot_id, stats, bot_dims_matcher, deadline)
+      )
 
   # Run tasklets for at most 1 sec or until all fetches are done.
   #
@@ -626,19 +657,22 @@ def _yield_potential_tasks(bot_id, pool, queues, stats, bot_dims_matcher,
   # Log how many items we actually got. On loaded servers it will actually
   # be 0 pretty often, since 1 sec is not that much.
   logging.debug(
-      '_yield_potential_tasks(%s): waited %.3fs for %d items from queues '
-      '%s', bot_id,
-      time.time() - start, sum(len(q.page()) for q in queries if q.ready()),
-      [q.dim_hash for q in queries])
+    "_yield_potential_tasks(%s): waited %.3fs for %d items from queues %s",
+    bot_id,
+    time.time() - start,
+    sum(len(q.page()) for q in queries if q.ready()),
+    [q.dim_hash for q in queries],
+  )
 
   # We may be running of time already if the initial fetch above was
   # particularly slow.
   if utils.utcnow() >= deadline:
     for q in queries:
       q.cancel()
-    logging.debug('_yield_potential_tasks(%s): deadline before the poll loop',
-                  bot_id)
-    raise ScanDeadlineError('initializing', 'Deadline before the poll loop')
+    logging.debug(
+      "_yield_potential_tasks(%s): deadline before the poll loop", bot_id
+    )
+    raise ScanDeadlineError("initializing", "Deadline before the poll loop")
 
   # A priority queue with TaskToRunShard ordered by the priority+timestamp,
   # extracted from queue_number using _queue_number_order_priority.
@@ -681,8 +715,11 @@ def _yield_potential_tasks(bot_id, pool, queues, stats, bot_dims_matcher,
     # Log the final stats if anything changed.
     if changed:
       logging.debug(
-          '_yield_potential_tasks(%s): %s items pending. active queues %s',
-          bot_id, queue.size(), [q.dim_hash for q in pending])
+        "_yield_potential_tasks(%s): %s items pending. active queues %s",
+        bot_id,
+        queue.size(),
+        [q.dim_hash for q in pending],
+      )
     return pending
 
   # Pick up all first pages we managed to fetch in 1 sec above and put them
@@ -715,17 +752,22 @@ def _yield_potential_tasks(bot_id, pool, queues, stats, bot_dims_matcher,
   canceled = [q for q in queries if q.canceled]
   if canceled:
     logging.debug(
-        '_yield_potential_tasks(%s): deadline in queues %s, dropping %d items',
-        bot_id, [q.dim_hash for q in canceled], queue.size())
-    raise ScanDeadlineError('fetching', 'Deadline fetching queues')
+      "_yield_potential_tasks(%s): deadline in queues %s, dropping %d items",
+      bot_id,
+      [q.dim_hash for q in canceled],
+      queue.size(),
+    )
+    raise ScanDeadlineError("fetching", "Deadline fetching queues")
 
   if utils.utcnow() >= deadline:
     logging.debug(
-        '_yield_potential_tasks(%s): deadline processing, dropping %d items',
-        bot_id, queue.size())
-    raise ScanDeadlineError('processing', 'Deadline processing fetched items')
+      "_yield_potential_tasks(%s): deadline processing, dropping %d items",
+      bot_id,
+      queue.size(),
+    )
+    raise ScanDeadlineError("processing", "Deadline processing fetched items")
 
-  logging.debug('_yield_potential_tasks(%s): all queues exhausted', bot_id)
+  logging.debug("_yield_potential_tasks(%s): all queues exhausted", bot_id)
 
 
 ### Public API.
@@ -748,14 +790,14 @@ def request_to_task_to_run_key(request, task_slice_index):
   assert 0 <= task_slice_index < request.num_task_slices
   h = request.task_slice(task_slice_index).properties.dimensions_hash
   kind = get_shard_kind(h % N_SHARDS)
-  return ndb.Key(kind,
-                 LEGACY_TRY_NUMBER | (task_slice_index << 4),
-                 parent=request.key)
+  return ndb.Key(
+    kind, LEGACY_TRY_NUMBER | (task_slice_index << 4), parent=request.key
+  )
 
 
 def task_to_run_key_to_request_key(to_run_key):
   """Returns the ndb.Key for a TaskToRunShard from a TaskRequest key."""
-  assert to_run_key.kind().startswith('TaskToRunShard'), to_run_key
+  assert to_run_key.kind().startswith("TaskToRunShard"), to_run_key
   return to_run_key.parent()
 
 
@@ -774,7 +816,7 @@ def task_to_run_key_from_parts(request_key, shard_index, entity_id):
     shard_index: index of TaskToRunShard entity class.
     entity_id: int64 with TaskToRunShard entity key.
   """
-  assert request_key.kind() == 'TaskRequest', request_key
+  assert request_key.kind() == "TaskRequest", request_key
   return ndb.Key(get_shard_kind(shard_index), entity_id, parent=request_key)
 
 
@@ -813,9 +855,9 @@ def new_task_to_run(request, task_slice_index):
   if request.rbe_instance:
     ttr.populate_rbe_reservation()
   else:
-    ttr.queue_number = _gen_queue_number(h, request.created_ts,
-                                         request.priority,
-                                         request.scheduling_algorithm)
+    ttr.queue_number = _gen_queue_number(
+      h, request.created_ts, request.priority, request.scheduling_algorithm
+    )
 
   return ttr
 
@@ -837,11 +879,14 @@ def dimensions_matcher(bot_dimensions):
       # Here if key='k' and vals=['a', 'b|c'], we should check that
       #   ('k:a' in bot_flat) AND ('k:b' in bot_flat OR 'k:c' in bot_flat)
       for val in vals:
-        match = any(u'%s:%s' % (key, variant) in bot_flat
-                    for variant in val.split(OR_DIM_SEP))
+        match = any(
+          "%s:%s" % (key, variant) in bot_flat
+          for variant in val.split(OR_DIM_SEP)
+        )
         if not match:
-          logging.warning('Mismatch: bot %r, req %r', bot_dimensions,
-                          request_dimensions)
+          logging.warning(
+            "Mismatch: bot %r, req %r", bot_dimensions, request_dimensions
+          )
           return False
     return True
 
@@ -850,9 +895,10 @@ def dimensions_matcher(bot_dimensions):
 
 class Claim(object):
   """Represents a claim on a TaskToRunShard."""
-  _NAMESPACE = 'task_to_run'
 
-  __slots__ = ('_key', '_expiry', '_released')
+  _NAMESPACE = "task_to_run"
+
+  __slots__ = ("_key", "_expiry", "_released")
 
   @classmethod
   def obtain(cls, to_run_key, duration=60):
@@ -885,8 +931,9 @@ class Claim(object):
   def check(cls, to_run_key):
     """Returns True if there's an existing claim on TaskToRunShard."""
     key = _memcache_to_run_key(to_run_key)
-    val = ndb.get_context().memcache_get(key,
-                                         namespace=cls._NAMESPACE).get_result()
+    val = (
+      ndb.get_context().memcache_get(key, namespace=cls._NAMESPACE).get_result()
+    )
     return val is not None
 
   def __init__(self, key, expiry):
@@ -924,8 +971,9 @@ class Claim(object):
     self.release()
 
 
-def yield_next_available_task_to_dispatch(bot_id, pool, queues,
-                                          bot_dims_matcher, deadline):
+def yield_next_available_task_to_dispatch(
+  bot_id, pool, queues, bot_dims_matcher, deadline
+):
   """Yields next available TaskToRunShard in roughly decreasing order of
   priority.
 
@@ -947,35 +995,46 @@ def yield_next_available_task_to_dispatch(bot_id, pool, queues,
   now = utils.utcnow()
   stats = _QueryStats()
   try:
-    for ttr in _yield_potential_tasks(bot_id, pool, queues, stats,
-                                      bot_dims_matcher, deadline):
+    for ttr in _yield_potential_tasks(
+      bot_id, pool, queues, stats, bot_dims_matcher, deadline
+    ):
       # Try to claim this TaskToRunShard. Only one bot will pass this. It then
       # will have ~60s to submit a transaction that assigns the TaskToRunShard
       # to this bot before another bot will be able to try that.
       if Claim.obtain(ttr.key):
         logging.debug(
-            'yield_next_available_task_to_dispatch(%s): ready to reap %s',
-            bot_id, ttr.task_id)
+          "yield_next_available_task_to_dispatch(%s): ready to reap %s",
+          bot_id,
+          ttr.task_id,
+        )
         stats.visited += 1
         yield ttr
       else:
         logging.debug(
-            'yield_next_available_task_to_dispatch(%s): skipping claimed %s',
-            bot_id, ttr.task_id)
+          "yield_next_available_task_to_dispatch(%s): skipping claimed %s",
+          bot_id,
+          ttr.task_id,
+        )
   finally:
     logging.debug(
-        'yield_next_available_task_to_dispatch(%s) in %.3fs: %s',
-        bot_id, (utils.utcnow() - now).total_seconds(), stats)
-    ts_mon_metrics.on_scheduler_visits(pool=pool,
-                                       claimed=stats.claimed,
-                                       mismatch=stats.mismatch,
-                                       stale=stats.stale,
-                                       total=stats.total,
-                                       visited=stats.visited)
+      "yield_next_available_task_to_dispatch(%s) in %.3fs: %s",
+      bot_id,
+      (utils.utcnow() - now).total_seconds(),
+      stats,
+    )
+    ts_mon_metrics.on_scheduler_visits(
+      pool=pool,
+      claimed=stats.claimed,
+      mismatch=stats.mismatch,
+      stale=stats.stale,
+      total=stats.total,
+      visited=stats.visited,
+    )
 
 
 def yield_expired_task_to_run(delay_sec):
   """Yields the expired TaskToRunShard still marked as available."""
+
   # The query fetches tasks that reached expiration time recently
   # to avoid fetching all past tasks. It uses a large batch size
   # since the entities are very small and to reduce RPC overhead.
@@ -986,9 +1045,11 @@ def yield_expired_task_to_run(delay_sec):
     # expiration_ts should not be more than 1 minute old (as the cron job runs
     # every minutes) but keep it high in case there's an outage.
     cut_off = now - datetime.timedelta(hours=24)
-    return kind.query(kind.expiration_ts < now,
-                      kind.expiration_ts > cut_off,
-                      default_options=ndb.QueryOptions(batch_size=256))
+    return kind.query(
+      kind.expiration_ts < now,
+      kind.expiration_ts > cut_off,
+      default_options=ndb.QueryOptions(batch_size=256),
+    )
 
   # Shuffle the order in which we visit shards to give all shards equal chance
   # to be visited first (matters if there's a backlog).
@@ -1002,7 +1063,7 @@ def yield_expired_task_to_run(delay_sec):
         yield task
         total += 1
   finally:
-    logging.debug('Yielded %d tasks', total)
+    logging.debug("Yielded %d tasks", total)
 
 
 def get_task_to_runs(request, slice_until):
