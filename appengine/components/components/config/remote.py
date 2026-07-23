@@ -155,7 +155,7 @@ class Provider(object):
     raise ndb.Return(res)
 
   def _check_content_hash_match(self, content_hash):
-    """ "Check if content_hash matches the format in the setted service version.
+    """Check if content_hash matches the format in the setted service version.
 
     In Luci-config v1, the content_hash format is v1:<sha>.
     In v2, it is a pure sha256 string.
