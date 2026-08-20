@@ -216,10 +216,9 @@ class ZipPackage:
 
 def get_module_zip_archive(module):
   """Given a module, returns path to a zip package that contains it or None."""
-  loader = pkgutil.get_loader(module)
-  # Handle zipimporter and its variations.
-  if loader and hasattr(loader, "archive"):
-    return loader.archive
+  if module.__spec__:
+    return getattr(module.__spec__.loader, "archive", None)
+  return None
 
 
 def is_zipped_module(module):
