@@ -89,6 +89,7 @@ class TestGCE(auto_stub.TestCase):
 
   def setUp(self):
     super(TestGCE, self).setUp()
+    tools.clear_cache_all()
     self.mock_get_metadata = mock.patch(
       "api.platforms.gce.get_metadata", return_value=self._METADATA
     ).start()

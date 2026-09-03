@@ -1,0 +1,20 @@
+requires-python = '>=3.11,<3.12'
+dependencies = [
+  'coverage==7.3.1',
+  'flask==1.0.2',
+  'click==7.0',
+  'itsdangerous==1.1.0',
+  'jinja2==2.10.1',
+  'werkzeug==1.0.1',
+  'markupsafe==1.1.1',
+  'funcsigs==1.0.2',
+  'mock==2.0.0',
+  'nose2==0.10.0',
+  'parameterized==0.7.1',
+  'pbr==3.0.0',
+  'setuptools<71',
+  'six==1.12.0',
+  "pyobjc==10.0; (sys_platform == 'darwin' and platform_machine == 'x86_64') or (sys_platform == 'darwin' and platform_machine == 'arm64')",
+  "pywin32==306; sys_platform == 'win32'",
+  'pyyaml==5.3.1'
+]
