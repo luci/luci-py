@@ -1302,6 +1302,78 @@ class TestBotMain(TestBotBase):
     # Swarming is again scheduled to be called at some later time.
     self.assertFalse(self.loop_state._swarming_poll_timer.firing)
 
+  def test_rbe_mode_failing_swarming_poll(self):
+    self.mock_rbe_worker_properties()
+
+    # Switches into the RBE mode, creates and polls the session. Gets nothing.
+    self.expected_requests(
+      [
+        self.expected_poll_request(
+          {
+            "cmd": "rbe",
+            "rbe": {
+              "instance": "instance_0",
+              "hybrid_mode": False,
+              "sleep": 0.0,
+            },
+          }
+        ),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(),
+      ]
+    )
+    self.poll_once()
+
+    # Expected number of loops before we give up on RBE timer. This is a
+    # function of mocked timers and the timeout value (currently 20 min).
+    # The value was obtained experimentally.
+    expected_cycles = 120
+
+    # Wants to report the idle status to Swarming, but horribly fails,
+    # repeatedly. Up to some number of attempts.
+    polls = 0
+    swarming_polls = 0
+    while polls < expected_cycles:
+      polls += 1
+      reqs = []
+      if self.loop_state._swarming_poll_timer.firing:
+        swarming_polls += 1
+        reqs.append(self.expected_poll_request(None))
+      if polls != expected_cycles:
+        reqs.append(self.expected_rbe_update_request(blocking=True))
+      self.expected_requests(reqs)
+      self.poll_once()
+
+    # How many times we called /poll. This is less that `expected_cycles`
+    # because we do exponential backoff (while still constantly calling
+    # RBE update).
+    self.assertEqual(swarming_polls, 19)
+
+    # After this point only Swarming timer is ticking.
+    self.assertIsNone(self.loop_state._rbe_poll_timer)
+
+    # Run one failing cycle to confirm RBE is not called.
+    self.expected_requests([self.expected_poll_request(None)])
+    self.poll_once()
+
+    # Once Swarming fixes itself, we call RBE right away again.
+    self.expected_requests(
+      [
+        self.expected_poll_request(
+          {
+            "cmd": "rbe",
+            "rbe": {
+              "instance": "instance_0",
+              "hybrid_mode": False,
+              "sleep": 0.0,
+            },
+          }
+        ),
+        self.expected_rbe_update_request(blocking=True),
+      ]
+    )
+    self.poll_once()
+
   def test_rbe_mode_swarming_task(self):
     self.mock(bot_main, "_run_manifest", lambda *_args: True)
     self.mock(bot_main, "_clean_cache", lambda *_args: None)

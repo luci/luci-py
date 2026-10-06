@@ -1293,6 +1293,8 @@ class _BotLoopState:
     self._swarming_idle = None
     # When we should poll Swarming next time. Initially set to ASAP.
     self._swarming_poll_timer = self._clock.timer(0.0)
+    # The last time a **successful** Swarming poll happened.
+    self._swarming_poll_last = self._clock.now()
 
     # The version string to report to RBE for monitoring and logs.
     self._rbe_bot_version = rbe_bot_version
@@ -1415,6 +1417,24 @@ class _BotLoopState:
         rbe_poll = swarming_poll
       else:
         rbe_poll = self._rbe_poll_timer and self._rbe_poll_timer.firing
+
+      # Avoid pulling new leases from RBE if we failed to execute Swarming poll
+      # in a while. At this point the bot session (updated in Swarming poll) is
+      # likely stale and the RBE poll will just fail anyway. We'll keep retrying
+      # hitting Swarming poll with exponential backoff, the Swarming timer is
+      # already set up for that.
+      since = self._clock.now() - self._swarming_poll_last
+      if self.rbe_session_intent_active and rbe_poll and since > 60 * 20:
+        logging.warning(
+          "Disabling RBE polls: last Swarming poll was too long ago (%.1f sec)",
+          since,
+        )
+        # Don't do any RBE calls this cycle.
+        rbe_poll = False
+        # Park the RBE timer to avoid busy looping. It will be rescheduled upon
+        # completion of a successful Swarming poll (via "rbe" Swarming command,
+        # see rbe_enable(...)).
+        self.rbe_cancel_poll_timer()
 
       # Ask RBE for a new lease or just notify it about bot status. This also
       # closes the previous lease, if any. For that reason we do it even if the
@@ -1660,6 +1680,25 @@ class _BotLoopState:
   ##############################################################################
   ## RBE.
 
+  @property
+  def rbe_session_intent_active(self):
+    """True if rbe_poll(...) will potentially pull out a new lease.
+
+    This is just indication of the intent unrelated to the current state
+    of the RBE session (i.e. it may not even be open yet).
+    """
+    return (
+      self._rbe_intended_status == remote_client.RBESessionStatus.OK
+      and not self._rbe_termination_pending
+    )
+
+  def rbe_cancel_poll_timer(self):
+    """Cancels the RBE poll timer if it is set (does nothing if not)."""
+    if self._rbe_poll_timer:
+      self._rbe_poll_timer.cancel()
+      self._rbe_poll_timer = None
+      logging.info("RBE: stopped the poll timer")
+
   @_trap_all_exceptions
   def rbe_enable(self, rbe_state):
     """Called when Swarming instructs the bot to poll tasks from the RBE.
@@ -1678,12 +1717,12 @@ class _BotLoopState:
 
     # In the hybrid mode RBE polling is synchronized to the Swarming timer.
     # Cancel RBE timer, if any.
-    if self._rbe_hybrid_mode and self._rbe_poll_timer:
-      self._rbe_poll_timer.cancel()
-      self._rbe_poll_timer = None
+    if self._rbe_hybrid_mode:
+      self.rbe_cancel_poll_timer()
 
     # In pure RBE mode start the RBE polling loop if it was stopped before.
     if not self._rbe_hybrid_mode and not self._rbe_poll_timer:
+      logging.info("RBE: starting the poll timer")
       self._rbe_poll_timer = self._clock.timer(0.0)
 
     # If we are changing the RBE instance, terminate the old session and
@@ -1736,9 +1775,7 @@ class _BotLoopState:
       )
       self._rbe_session.terminate(self._rbe_intended_status)
       self._rbe_session = None
-    if self._rbe_poll_timer:
-      self._rbe_poll_timer.cancel()
-      self._rbe_poll_timer = None
+    self.rbe_cancel_poll_timer()
 
   @_trap_all_exceptions
   def rbe_status(self, status):
@@ -1785,10 +1822,7 @@ class _BotLoopState:
       # can happen if the bot is already shutting down. To avoid potential weird
       # issues if the shutdown fails due to errors, reschedule the poll some
       # time later by treating this state as a transient error.
-      if (
-        self._rbe_intended_status != remote_client.RBESessionStatus.OK
-        or self._rbe_termination_pending
-      ):
+      if not self.rbe_session_intent_active:
         logging.warning("The bot is terminating, refusing to open RBE session")
         self._rbe_consecutive_errors += 1
         return None
@@ -2002,6 +2036,7 @@ class _BotLoopState:
         # Otherwise `rbe` indicates the Swarming queue is empty.
         self._swarming_idle = True
       self._swarming_consecutive_errors = 0
+      self._swarming_poll_last = self._clock.now()
       return cmd, param
     except remote_client_errors.PollError as e:
       logging.error("Swarming poll error: %s" % e)
