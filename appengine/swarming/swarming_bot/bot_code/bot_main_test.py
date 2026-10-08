@@ -900,7 +900,7 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, "_update_bot", self.fail)
     self.mock(self.bot, "host_reboot", self.fail)
 
-    def mocked_restart(*_args):
+    def mocked_restart(*_args, **_kwargs):
       raise Exception("Totally random exception")
 
     self.mock(bot_main, "_bot_restart", mocked_restart)
@@ -1027,6 +1027,64 @@ class TestBotMain(TestBotBase):
     expected = [(self.bot,)]
     self.assertEqual(expected, clean)
     self.assertEqual(None, self.bot.bot_restart_msg())
+    self.assertFalse(self.quit_bit.is_set())
+
+  def test_one_shot_stops_after_real_task(self):
+    outcome = [None]
+
+    def run_manifest(_bot, _manifest, _rbe_session):
+      self.assertFalse(self.quit_bit.is_set())
+      return outcome[0]
+
+    self.mock(bot_main, "_run_manifest", run_manifest)
+    self.mock(bot_main, "_clean_cache", lambda _bot: None)
+
+    for rbe_session in (None, object()):
+      for task_outcome in (True, False, None):
+        with self.subTest(rbe=bool(rbe_session), task_outcome=task_outcome):
+          self.quit_bit.reset()
+          self.loop_state = bot_main._BotLoopState(
+            self.bot,
+            None,
+            None,
+            self.quit_bit,
+            self.clock,
+            one_shot=True,
+          )
+          outcome[0] = task_outcome
+          self.loop_state.cmd_run({"task_id": "task-id"}, rbe_session)
+          self.assertTrue(self.quit_bit.is_set())
+
+    self.quit_bit.reset()
+    self.loop_state.on_task_completed(True, is_real_task=False)
+    self.assertFalse(self.quit_bit.is_set())
+
+  def test_poll_server_run_one_shot(self):
+    self.loop_state = bot_main._BotLoopState(
+      self.bot,
+      None,
+      None,
+      self.quit_bit,
+      self.clock,
+      one_shot=True,
+    )
+    self.mock(bot_main, "_run_manifest", lambda *_args: True)
+    self.mock(bot_main, "_clean_cache", lambda _bot: None)
+    self.expected_requests(
+      [
+        self.expected_poll_request(
+          {
+            "cmd": "run",
+            "manifest": {"task_id": "task-id"},
+          }
+        ),
+      ]
+    )
+
+    self.poll_once()
+
+    self.assertTrue(self.quit_bit.is_set())
+    self.assertEqual([], self.quit_bit.slept)
 
   def test_poll_server_update(self):
     update = []
@@ -1049,13 +1107,54 @@ class TestBotMain(TestBotBase):
     self.assertEqual([(self.bot, "123")], update)
     self.assertEqual(None, self.bot.bot_restart_msg())
 
+  def test_one_shot_does_not_count_rbe_noop_lease(self):
+    self.loop_state = bot_main._BotLoopState(
+      self.bot,
+      None,
+      None,
+      self.quit_bit,
+      self.clock,
+      one_shot=True,
+    )
+    self.mock(bot_main, "_clean_cache", lambda _bot: None)
+    self.expected_requests(
+      [
+        self.expected_poll_request(
+          {
+            "cmd": "rbe",
+            "rbe": {
+              "instance": "instance_0",
+              "hybrid_mode": False,
+              "sleep": 0.0,
+            },
+          }
+        ),
+        self.expected_rbe_create_request(),
+        self.expected_rbe_update_request(
+          lease_out={
+            "id": "noop-lease",
+            "payload": {"noop": True},
+            "state": "PENDING",
+          }
+        ),
+      ]
+    )
+
+    self.poll_once()
+
+    self.assertFalse(self.quit_bit.is_set())
+
   def test_poll_server_restart(self):
     restarts = []
 
     self.mock(bot_main, "_run_manifest", self.fail)
     self.mock(bot_main, "_update_bot", self.fail)
     self.mock(self.bot, "host_reboot", self.fail)
-    self.mock(bot_main, "_bot_restart", lambda obj, x: restarts.append(x))
+    self.mock(
+      bot_main,
+      "_bot_restart",
+      lambda obj, x: restarts.append(x),
+    )
 
     self.expected_requests(
       [
@@ -1547,7 +1646,13 @@ class TestBotMain(TestBotBase):
 
   def test_rbe_mode_handling_noop_leases(self):
     finished = []
-    self.mock(self.loop_state, "on_task_completed", finished.append)
+    self.mock(
+      self.loop_state,
+      "on_task_completed",
+      lambda success, is_real_task=True: finished.append(
+        (success, is_real_task)
+      ),
+    )
 
     # Switches into the RBE mode, creates and polls the session. Gets a lease
     # right away.
@@ -1577,7 +1682,7 @@ class TestBotMain(TestBotBase):
     self.poll_once()
 
     # Did something.
-    self.assertEqual(len(finished), 1)
+    self.assertEqual(finished, [(True, False)])
     self.assertFalse(self.loop_state.idle)
 
     # Keeps spinning finishing leases back to back until it is time to call
@@ -2506,8 +2611,11 @@ class TestBotMain(TestBotBase):
 
     self.mock(logging_utils, "set_console_level", check)
 
+    one_shot_values = []
+
     def run_bot(error):
-      self.assertEqual(None, error)
+      self.assertIsNone(error)
+      one_shot_values.append(os.environ.get(bot_main.ONE_SHOT_ENV))
       return 0
 
     self.mock(bot_main, "_run_bot", run_bot)
@@ -2523,6 +2631,9 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, "SINGLETON", Singleton())
 
     self.assertEqual(0, bot_main.main([]))
+    self.assertEqual(0, bot_main.main(["--one-shot"]))
+    self.assertEqual(0, bot_main.main([]))
+    self.assertEqual([None, "1", "1"], one_shot_values)
 
   def test_update_lkgbc(self):
     # Create LKGBC with a timestamp from 1h ago.
@@ -2583,7 +2694,8 @@ class TestBotNotMocked(TestBotBase):
       bot_main._bot_restart(self.bot, "Yo", bot_main.THIS_FILE)
     self.assertEqual(23, e.exception.code)
 
-    self.assertEqual([[bot_main.THIS_FILE, "start_slave", "--survive"]], calls)
+    expected = [bot_main.THIS_FILE, "start_slave", "--survive"]
+    self.assertEqual([expected], calls)
 
 
 class TestRBEWorkerProperties(TestBotBase):

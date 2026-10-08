@@ -140,6 +140,8 @@ DEFAULT_SETTINGS = {
 # TODO(1099655): Remove once we have fully enabled CIPD in both prod and tests.
 _IN_TEST_MODE = False
 
+ONE_SHOT_ENV = "SWARMING_BOT_ONE_SHOT"
+
 
 ### Monitoring
 
@@ -1217,7 +1219,13 @@ def _run_bot_inner(botobj, quit_bit):
   )
 
   # Spin until getting a termination signal. Shutdown RBE on exit.
-  state = _BotLoopState(botobj, rbe_params, rbe_bot_version, quit_bit)
+  state = _BotLoopState(
+    botobj,
+    rbe_params,
+    rbe_bot_version,
+    quit_bit,
+    one_shot=os.environ.get(ONE_SHOT_ENV) == "1",
+  )
   with botobj.mutate_internals() as mut:
     mut.add_lifecycle_callback(lambda _, event: state.on_bot_exit(event))
   state.run()
@@ -1265,7 +1273,13 @@ class _BotLoopState:
   """The state of the main bot poll loop."""
 
   def __init__(
-    self, botobj, rbe_params, rbe_bot_version, quit_bit, clock_impl=None
+    self,
+    botobj,
+    rbe_params,
+    rbe_bot_version,
+    quit_bit,
+    clock_impl=None,
+    one_shot=False,
   ):
     # Instance of Bot.
     self._bot = botobj
@@ -1273,6 +1287,7 @@ class _BotLoopState:
     self._quit_bit = quit_bit
     # Tracks time and can sleep.
     self._clock = clock_impl or clock.Clock(quit_bit)
+    self._one_shot = one_shot
 
     # Snapshot of the dimensions dict used in the last poll cycle.
     self._prev_dimensions = {}
@@ -1592,7 +1607,7 @@ class _BotLoopState:
     """Duration since the bot finished executing the last task."""
     return self._clock.now() - self._last_task_time
 
-  def on_task_completed(self, _success):
+  def on_task_completed(self, _success, is_real_task=True):
     """Called after finishing running a task."""
     # Used to track bot idleness.
     self._consecutive_idle_cycles = 0
@@ -1604,6 +1619,9 @@ class _BotLoopState:
     _clean_cache(self._bot)
     # Managed to run a full bot loop cycle. The bot code is good enough.
     _update_lkgbc(self._bot)
+    if self._one_shot and is_real_task:
+      logging.info("One-shot task completed, shutting down")
+      self._quit_bit.set()
 
   def on_idle_poll_cycle(self):
     """Called if a **successful** poll cycle didn't produce any tasks."""
@@ -1952,7 +1970,7 @@ class _BotLoopState:
     # They can be used to measure end-to-end RBE polling latency.
     if rbe_lease.payload.get("noop"):
       self._rbe_session.finish_active_lease({})
-      self.on_task_completed(True)
+      self.on_task_completed(True, is_real_task=False)
       return
 
     # At least `task_id` must be set. Integer-valued fields may be missing if
@@ -2312,7 +2330,15 @@ def main(argv):
   parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
   parser.add_argument("unsupported", nargs="*", help=argparse.SUPPRESS)
   parser.add_argument("--test-mode", action="store_true")
+  parser.add_argument(
+    "--one-shot",
+    action="store_true",
+    help="Exit after completing one real task.",
+  )
   args = parser.parse_args(argv)
+
+  if args.one_shot:
+    os.environ[ONE_SHOT_ENV] = "1"
 
   global _IN_TEST_MODE
   _IN_TEST_MODE = args.test_mode
