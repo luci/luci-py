@@ -288,6 +288,7 @@ def get_state(devices):
     "product.board",
     "product.cpu.abi",
     "product.device",
+    "product.model",
     "system.build.fingerprint",
   )
 

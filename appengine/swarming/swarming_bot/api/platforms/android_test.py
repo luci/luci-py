@@ -19,8 +19,7 @@ GMS_PACKAGE = "com.google.android.gms"
 PLAYSTORE_PACKAGE = "com.android.vending"
 
 
-@unittest.skipUnless(sys.platform == "linux", "Android tests run only on linux")
-class TestGetDimensions(unittest.TestCase):
+class BaseAndroidTest(unittest.TestCase):
   def empty_object(self):
     return lambda: None
 
@@ -31,6 +30,21 @@ class TestGetDimensions(unittest.TestCase):
     setattr(base, "cache", cache)
     setattr(base, "serial", serial)
     setattr(base, "GetPackageVersion", lambda p: package_versions[p])
+    setattr(base, "is_valid", True)
+    setattr(base, "failure", None)
+    setattr(base, "port_path", "1/2")
+    setattr(base, "GetBattery", lambda: {"level": 100})
+    setattr(base, "GetCPUScale", lambda: {})
+    setattr(base, "GetDisk", lambda: {})
+    setattr(base, "GetIMEI", lambda: None)
+    setattr(base, "GetIPs", lambda: [])
+    setattr(base, "GetLastUID", lambda: 10000)
+    setattr(base, "GetMemInfo", lambda: {})
+    setattr(base, "GetPackages", lambda: [])
+    setattr(base, "GetProcessCount", lambda: 10)
+    setattr(base, "IsFullyBooted", lambda: (True, ""))
+    setattr(base, "GetTemperatures", lambda: {})
+    setattr(base, "GetUptime", lambda: 100.0)
 
     return base
 
@@ -158,6 +172,7 @@ class TestGetDimensions(unittest.TestCase):
         "ro.build.version.release": ("14"),
         "ro.product.cpu.abi": ("arm64-v8a"),
         "ro.product.device": ("oriole"),
+        "ro.product.model": ("Pixel 6"),
       },
       "mock_pixel6",
       {GMS_PACKAGE: "23.45.24", PLAYSTORE_PACKAGE: "38.8.31-29"},
@@ -202,6 +217,9 @@ class TestGetDimensions(unittest.TestCase):
       {GMS_PACKAGE: "22.26.15", PLAYSTORE_PACKAGE: "1.2.3"},
     )
 
+
+@unittest.skipUnless(sys.platform == "linux", "Android tests run only on linux")
+class TestGetDimensions(BaseAndroidTest):
   def test_wembley_get_dimensions(self):
     wembley_result = {
       "android_devices": ["1"],
@@ -341,6 +359,68 @@ class TestGetDimensions(unittest.TestCase):
         "os": ["Android"],
       },
       android.get_dimensions([self.get_mock_galaxyS6()]),
+    )
+
+
+@unittest.skipUnless(sys.platform == "linux", "Android tests run only on linux")
+class TestGetState(BaseAndroidTest):
+  def test_pixel6_get_state(self):
+    self.assertEqual(
+      {
+        "devices": {
+          "mock_pixel6": {
+            "battery": {"level": 100},
+            "build": {
+              "board.platform": "<missing>",
+              "build.fingerprint": (
+                "google/oriole/oriole:14/AP1A.240405.002/11480754:"
+                "userdebug/dev-keys"
+              ),
+              "build.id": "AP1A.240405.002",
+              "build.product": "oriole",
+              "build.type": "userdebug",
+              "build.version.release": "14",
+              "build.version.sdk": "34",
+              "product.board": "<missing>",
+              "product.cpu.abi": "arm64-v8a",
+              "product.device": "oriole",
+              "product.model": "Pixel 6",
+              "system.build.fingerprint": "<missing>",
+            },
+            "cpu": {},
+            "disk": {},
+            "imei": None,
+            "ip": [],
+            "max_uid": 10000,
+            "mem": {},
+            "other_packages": [],
+            "port_path": "1/2",
+            "processes": 10,
+            "state": "available",
+            "temp": {},
+            "uptime": 100.0,
+          },
+        },
+      },
+      android.get_state([self.get_mock_pixel6()]),
+    )
+
+  def test_get_state_missing_model_and_unavailable(self):
+    nexus5x = self.get_mock_nexus5x()
+    invalid_device = self.mock_android_device({}, "mock_invalid", {})
+    setattr(invalid_device, "is_valid", False)
+    state = android.get_state([nexus5x, invalid_device])
+    self.assertEqual(
+      "<missing>",
+      state["devices"]["mock_nexus5x"]["build"]["product.model"],
+    )
+    self.assertEqual(
+      "6.0.1",
+      state["devices"]["mock_nexus5x"]["build"]["build.version.release"],
+    )
+    self.assertEqual(
+      {"state": "unavailable"},
+      state["devices"]["mock_invalid"],
     )
 
 
