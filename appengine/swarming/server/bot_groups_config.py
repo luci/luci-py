@@ -211,7 +211,6 @@ def refetch_from_config_service(ctx=None):
 
   bots_cfg_pb = cfg.bots.SerializeToString() if cfg else ""
 
-  # pylint: disable=no-value-for-parameter
   @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
   def update():
     now = utils.utcnow()
@@ -271,7 +270,6 @@ def refetch_from_config_service(ctx=None):
   return cfg
 
 
-# pylint: disable=no-value-for-parameter
 @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
 def clear_cache():
   """Removes cached bot config from the datastore and the local memory.
@@ -356,7 +354,7 @@ class _DigestBuilder(object):
   def _write(self, val):
     if val is None:
       val = ""
-    elif isinstance(val, unicode):
+    elif isinstance(val, unicode):  # noqa: F821
       val = val.encode("utf-8")
     elif not isinstance(val, str):
       val = str(val)
@@ -619,10 +617,10 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
   Assumes body of bots_pb2.BotGroup is already validated (logs inconsistencies,
   but does not fail).
   """
-  dimensions = {unicode(k): set() for k in trusted_dimensions}
+  dimensions = {unicode(k): set() for k in trusted_dimensions}  # noqa: F821
   for dim_kv_pair in msg.dimensions:
     # In validated config 'dim_kv_pair' is always 'key:value', but be cautious.
-    parts = unicode(dim_kv_pair).split(":", 1)
+    parts = unicode(dim_kv_pair).split(":", 1)  # noqa: F821
     if len(parts) != 2:
       logging.error('Invalid dimension in bots.cfg - "%s"', dim_kv_pair)
       continue

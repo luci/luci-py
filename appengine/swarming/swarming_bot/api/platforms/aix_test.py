@@ -11,10 +11,10 @@ import test_env_platforms
 
 test_env_platforms.setup_test_env()
 
-from depot_tools import auto_stub
-from utils import tools
+from depot_tools import auto_stub  # noqa: E402
+from utils import tools  # noqa: E402
 
-import aix
+import aix  # noqa: E402
 
 
 class TestCPUInfo(auto_stub.TestCase):

@@ -1,3 +1,24 @@
 line-length = 80
 indent-width = 2
-extend-exclude = ["*_pb2.py", "third_party"]
+extend-exclude = [
+  "*_pb2.py",
+  "third_party",
+  "appengine/swarming/ui2/node_modules",
+  "appengine/swarming/ui2/nodejs",
+  "appengine/swarming/bqh.py",
+  # Legacy Python 2 scripts.
+  "appengine/components/components/auth/replication.py",
+  "appengine/components/components/config/remote.py",
+  "appengine/components/components/config/remote_test.py",
+  "appengine/components/components/gsm_test.py",
+  "appengine/swarming/handlers_bot.py",
+  "appengine/swarming/handlers_bot_test.py",
+  "appengine/swarming/server/task_scheduler.py",
+  "client/tests/swarming_test.py",
+]
+
+[lint]
+unfixable = ["F401"]
+
+[format]
+quote-style = "preserve"

@@ -10,13 +10,13 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import webapp2
+import webapp2  # noqa: E402
 
-from components.auth import api
-from components.auth import gce_vm_auth
-from components.auth import signature
-from components.auth import tokens
-from test_support import test_case
+from components.auth import api  # noqa: E402
+from components.auth import gce_vm_auth  # noqa: E402
+from components.auth import signature  # noqa: E402
+from components.auth import tokens  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class GCEAuthTest(test_case.TestCase):

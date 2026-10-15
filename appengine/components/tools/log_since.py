@@ -23,7 +23,7 @@ COMPONENTS_DIR = os.path.dirname(os.path.dirname(SCRIPT_PATH))
 if COMPONENTS_DIR not in sys.path:
   sys.path.insert(0, COMPONENTS_DIR)
 
-from tools import calculate_version
+from tools import calculate_version  # noqa: E402
 
 
 def get_logs(root, pseudo_revision, mergebase, start, end):
@@ -51,7 +51,7 @@ def get_logs(root, pseudo_revision, mergebase, start, end):
     return 1
   maxlen = 0
   lines = []
-  for l in log.rstrip().splitlines():
+  for l in log.rstrip().splitlines():  # noqa: E741
     parts = l.split(" ", 2)
     parts[1] = parts[1].split("@", 1)[0]
     maxlen = max(maxlen, len(parts[1]))

@@ -11,18 +11,18 @@ import threading
 import time
 import unittest
 
-from nose2.tools import params
+from nose2.tools import params  # noqa: F401
 import mock
 
 import test_env_platforms
 
 test_env_platforms.setup_test_env()
 
-from depot_tools import auto_stub
+from depot_tools import auto_stub  # noqa: E402
 
-from utils import tools
+from utils import tools  # noqa: E402
 
-from api.platforms import gce
+from api.platforms import gce  # noqa: E402
 
 
 class TestGCE(auto_stub.TestCase):
@@ -109,7 +109,7 @@ class TestGCE(auto_stub.TestCase):
       ],
     )
 
-  def test_oauth2_available_scopes(self):
+  def test_oauth2_available_scopes(self):  # noqa: F811
     self.assertTrue(gce.can_send_metric("default"))
     self.assertFalse(gce.can_send_metric("foo"))
 

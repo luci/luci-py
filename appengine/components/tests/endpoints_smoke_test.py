@@ -11,15 +11,15 @@ methods.
 
 import os
 import shutil
-import sys
+import sys  # noqa: F401
 import tempfile
 import unittest
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_APP_DIR = os.path.join(THIS_DIR, "test_endpoints_app")
 
-from tool_support import gae_sdk_utils
-from tool_support import local_app
+from tool_support import gae_sdk_utils  # noqa: E402
+from tool_support import local_app  # noqa: E402
 
 
 class CloudEndpointsSmokeTest(unittest.TestCase):
@@ -40,7 +40,6 @@ class CloudEndpointsSmokeTest(unittest.TestCase):
       super(CloudEndpointsSmokeTest, self).tearDown()
 
   def has_failed(self):
-    # pylint: disable=E1101
     return not self._resultForDoCleanups.wasSuccessful()
 
   def test_smoke(self):

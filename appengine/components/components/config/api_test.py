@@ -3,7 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import base64
+import base64  # noqa: F401
 import logging
 import sys
 import unittest
@@ -12,16 +12,16 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import mock
+import mock  # noqa: E402
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import auth
-from components import config
-from components.config import api
-from components.config import remote
-from components.config import test_config_pb2
-from test_support import test_case
+from components import auth  # noqa: E402, F401
+from components import config  # noqa: E402
+from components.config import api  # noqa: E402, F401
+from components.config import remote  # noqa: E402, F401
+from components.config import test_config_pb2  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class ApiTestCase(test_case.TestCase):

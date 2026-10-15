@@ -25,15 +25,15 @@ from utils import tools
 tools.force_local_third_party()
 
 # third_party/
-import requests
-from requests import adapters
-from requests import structures
-import urllib3
+import requests  # noqa: E402
+from requests import adapters  # noqa: E402
+from requests import structures  # noqa: E402
+import urllib3  # noqa: E402
 
-from utils import authenticators
-from utils import configs
-from utils import oauth
-from utils import tools
+from utils import authenticators  # noqa: E402
+from utils import configs  # noqa: E402
+from utils import oauth  # noqa: E402
+from utils import tools  # noqa: E402
 
 
 # Disable warnings. https://crbug.com/958933
@@ -94,11 +94,11 @@ class NetError(IOError):
     self.inner_exc = inner_exc
 
 
-class TimeoutError(NetError):  # pylint: disable=redefined-builtin
+class TimeoutError(NetError):
   """Timeout while reading HTTP response."""
 
 
-class ConnectionError(NetError):  # pylint: disable=redefined-builtin
+class ConnectionError(NetError):
   """Failed to connect to the server."""
 
 
@@ -193,7 +193,7 @@ def get_engine_class():
   return configs._request_engine_cls or RequestsLibEngine
 
 
-def url_open(url, **kwargs):  # pylint: disable=W0621
+def url_open(url, **kwargs):
   """Attempts to open the given url multiple times.
 
   |data| can be either:

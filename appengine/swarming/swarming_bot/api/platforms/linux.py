@@ -88,7 +88,7 @@ def _lspci():
     # It normally happens on Google Compute Engine as lspci is not installed by
     # default and on ARM since they do not have a PCI bus.
     return None
-  return [shlex.split(l.decode()) for l in lines]
+  return [shlex.split(l.decode()) for l in lines]  # noqa: E741
 
 
 @tools.cached
@@ -187,7 +187,9 @@ def get_audio():
     return None
   # Join columns 'Vendor' and 'Device'. 'man lspci' for more details.
   return [
-    ": ".join(l[2:4]) for l in pci_devices if l[1] == "Audio device [0403]"
+    ": ".join(l[2:4])
+    for l in pci_devices  # noqa: E741
+    if l[1] == "Audio device [0403]"  # noqa: E741
   ]
 
 

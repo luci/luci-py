@@ -11,10 +11,10 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components.datastore_utils import config
-from test_support import test_case
+from components.datastore_utils import config  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class ConfigTest(test_case.TestCase):

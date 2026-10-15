@@ -32,7 +32,7 @@ def run_tests_sequential():
   # These tests need to be run as executable
   # because they don't pass when running in parallel
   # or run via test runner
-  abs_path = lambda f: os.path.join(THIS_DIR, f)
+  abs_path = lambda f: os.path.join(THIS_DIR, f)  # noqa: E731
   test_cmds = [
     [abs_path("components/auth/delegation_test.py")],
     [abs_path("components/auth/project_tokens_test.py")],

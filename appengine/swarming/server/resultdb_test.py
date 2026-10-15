@@ -15,17 +15,17 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.api import app_identity
-from google.appengine.ext import ndb
+from google.appengine.api import app_identity  # noqa: E402, F401
+from google.appengine.ext import ndb  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from components import net
+from components import net  # noqa: E402
 
-from server import config
-from server import resultdb
+from server import config  # noqa: E402, F401
+from server import resultdb  # noqa: E402
 
-from proto.config import config_pb2
+from proto.config import config_pb2  # noqa: E402
 
 
 class ResultDBTest(test_case.TestCase):

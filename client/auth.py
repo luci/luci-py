@@ -12,18 +12,18 @@ import optparse
 import sys
 
 from utils import tools
+
 tools.force_local_third_party()
 
 # third_party/
-import colorama
-from depot_tools import fix_encoding
-from depot_tools import subcommand
+import colorama  # noqa: E402
+from depot_tools import fix_encoding  # noqa: E402
+from depot_tools import subcommand  # noqa: E402
 
-# pylint: disable=ungrouped-imports
-from utils import logging_utils
-from utils import net
-from utils import oauth
-from utils import subprocess42
+from utils import logging_utils  # noqa: E402
+from utils import net  # noqa: E402
+from utils import oauth  # noqa: E402
+from utils import subprocess42  # noqa: E402
 
 
 class AuthServiceError(Exception):
@@ -80,7 +80,8 @@ def normalize_host_url(url):
     allowed = ('http://localhost:', 'http://127.0.0.1:', 'http://[::1]:')
     if not url.startswith(allowed):
       raise ValueError(
-          'URL must start with https:// or be on localhost with port number')
+        'URL must start with https:// or be on localhost with port number'
+      )
     return url
   return 'https://' + url
 
@@ -106,8 +107,9 @@ def ensure_logged_in(server_url):
     raise ValueError('Failed to fetch identify from %s' % server_url)
   if identity == 'anonymous:anonymous':
     raise ValueError(
-        'Please login to %s: \n'
-        '  python auth.py login --service=%s' % (server_url, server_url))
+      'Please login to %s: \n'
+      '  python auth.py login --service=%s' % (server_url, server_url)
+    )
   email = identity.split(':')[1]
   logging.info('Logged in to %s: %s', server_url, email)
   return email
@@ -148,19 +150,21 @@ def CMDcheck(parser, args):
 
 
 class OptionParserAuth(logging_utils.OptionParserWithLogging):
-
   def __init__(self, **kwargs):
     logging_utils.OptionParserWithLogging.__init__(
-        self, prog='auth.py', **kwargs)
+      self, prog='auth.py', **kwargs
+    )
     self.server_group = optparse.OptionGroup(self, 'Server')
     self.server_group.add_option(
-        '-S', '--service', metavar='URL', default='', help='Service to use')
+      '-S', '--service', metavar='URL', default='', help='Service to use'
+    )
     self.add_option_group(self.server_group)
     add_auth_options(self)
 
   def parse_args(self, *args, **kwargs):
     options, args = logging_utils.OptionParserWithLogging.parse_args(
-        self, *args, **kwargs)
+      self, *args, **kwargs
+    )
     if not options.service:
       self.error('--service is required.')
     try:

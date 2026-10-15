@@ -11,9 +11,9 @@ import test_env
 
 test_env.setup_test_env()
 
-from components.config import validation
+from components.config import validation  # noqa: E402
 
-from server import directory_occlusion
+from server import directory_occlusion  # noqa: E402
 
 
 class TestDirectoryOcclusionChecker(unittest.TestCase):

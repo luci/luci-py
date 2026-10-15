@@ -37,7 +37,7 @@ def ip_from_string(ipstr):
 
   Raises ValueError if |ipstr| is not recognized as IPv4 or IPv6 address.
   """
-  assert isinstance(ipstr, basestring), "%r is not a string" % (ipstr,)
+  assert isinstance(ipstr, basestring), "%r is not a string" % (ipstr,)  # noqa: F821
   values = None
   try:
     if "." in ipstr:
@@ -74,7 +74,7 @@ def ip_from_string(ipstr):
       raise ValueError("not IPv4 or IPv6 address")
   except ValueError as e:
     raise ValueError("%r is not an IP address (%s)" % (ipstr, e))
-  value = long(0)
+  value = long(0)  # noqa: F821
   for i in values:
     value = value * factor + i
   return IP(bits, value)
@@ -90,7 +90,7 @@ def ip_to_string(ip):
   elif ip.bits == 128:
     factor = 65536
     count = 8
-    conv = lambda x: "%x" % x
+    conv = lambda x: "%x" % x  # noqa: E731
     sep = ":"
   else:
     raise ValueError("Unknown type of IP with bits %d" % ip.bits)

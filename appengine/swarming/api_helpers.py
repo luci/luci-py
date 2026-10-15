@@ -4,7 +4,7 @@
 """Functions that do common acl checking/processing on internal ndb objects."""
 
 import bisect
-import datetime
+import datetime  # noqa: F401
 import itertools
 import logging
 import re
@@ -16,7 +16,7 @@ from components import auth
 
 import handlers_exceptions
 from server import acl
-from server import config
+from server import config  # noqa: F401
 from server import pools_config
 from server import rbe
 from server import realms

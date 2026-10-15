@@ -13,7 +13,7 @@ import test_env_api
 
 test_env_api.setup_test_env()
 
-import bot
+import bot  # noqa: E402
 
 
 def make_bot(remote=None):

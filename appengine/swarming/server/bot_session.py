@@ -72,7 +72,7 @@ def unmarshal(session_token):
   session = session_pb2.Session()
   try:
     session.ParseFromString(tok.hmac_tagged.session)
-  except:
+  except:  # noqa: E722
     raise BadSessionToken("Can't parse Session proto")
   return session
 

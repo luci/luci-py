@@ -5,7 +5,7 @@
 
 import re
 import logging
-import os
+import os  # noqa: F401
 from collections import namedtuple
 
 from google.appengine.api import datastore_errors
@@ -533,11 +533,11 @@ def list_task_results(filters, limit, cursor):
     raise handlers_exceptions.BadRequestException(
       "Inappropriate filter for tasks/list: %s" % e
     )
-  except datastore_errors.NeedIndexError as e:
+  except datastore_errors.NeedIndexError:
     raise handlers_exceptions.BadRequestException(
       "Requires new index, ask admin to create one."
     )
-  except datastore_errors.BadArgumentError as e:
+  except datastore_errors.BadArgumentError:
     raise handlers_exceptions.BadRequestException(
       "This combination is unsupported, sorry."
     )

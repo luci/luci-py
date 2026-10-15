@@ -7,9 +7,9 @@ import test_env
 
 test_env.setup_test_env()
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from server import service_accounts_utils
+from server import service_accounts_utils  # noqa: E402
 
 
 class ServiceAccountUtilsTest(test_case.TestCase):

@@ -38,26 +38,26 @@ sys.path.insert(0, os.path.join(CLIENT_DIR, "tests"))
 sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party"))
 
 # client/
-from utils import large
+from utils import large  # noqa: E402
 
 # client/tests
-import cas_util
+import cas_util  # noqa: E402
 
 # client/third_party/
-from depot_tools import fix_encoding
+from depot_tools import fix_encoding  # noqa: E402
 
 sys.path.pop(0)
 sys.path.pop(0)
 
 sys.path.insert(0, BOT_DIR)
-import test_env_bot
+import test_env_bot  # noqa: E402
 
 test_env_bot.setup_test_env()
 
 # swarming/
 sys.path.insert(0, APP_DIR)
-from tools import start_bot
-from tools import start_servers
+from tools import start_bot  # noqa: E402
+from tools import start_servers  # noqa: E402
 
 
 CAS_CLI = os.path.join(LUCI_DIR, "luci-go", "cas")
@@ -308,7 +308,7 @@ class SwarmingClient(object):
     for i in range(self._index):
       with open(os.path.join(self._tmpdir, "client_%d.log" % i), "rb") as f:
         log = f.read().strip("\n")
-      for l in log.splitlines():
+      for l in log.splitlines():  # noqa: E741
         sys.stderr.write("  %s\n" % l)
 
   def _rotate_logfile(self):
@@ -347,7 +347,7 @@ class SwarmingClient(object):
 
 def gen_expected(**kwargs):
   expected = {
-    "bot_id": unicode(socket.getfqdn().split(".", 1)[0]),
+    "bot_id": unicode(socket.getfqdn().split(".", 1)[0]),  # noqa: F821
     "output": re.compile("(\\s|\\S)*hi\n"),
     "server_versions": ["N/A"],
     "state": "COMPLETED",
@@ -363,7 +363,7 @@ def gen_expected(**kwargs):
     ],
     "user": "joe@localhost",
   }
-  expected.update({unicode(k): v for k, v in kwargs.items()})
+  expected.update({unicode(k): v for k, v in kwargs.items()})  # noqa: F821
   return expected
 
 
@@ -509,7 +509,7 @@ class Test(unittest.TestCase):
     ]
     summary = self.gen_expected(
       name="hard_timeout",
-      exit_code=unicode(SIGNAL_TERM),
+      exit_code=unicode(SIGNAL_TERM),  # noqa: F821
       failure=True,
       state="TIMED_OUT",
     )
@@ -531,7 +531,7 @@ class Test(unittest.TestCase):
     ]
     summary = self.gen_expected(
       name="io_timeout",
-      exit_code=unicode(SIGNAL_TERM),
+      exit_code=unicode(SIGNAL_TERM),  # noqa: F821
       failure=True,
       state="TIMED_OUT",
     )
@@ -635,13 +635,13 @@ class Test(unittest.TestCase):
       "named_caches_uninstall": {},
       "isolated_download": {
         "items_cold": sorted(items_in),
-        "num_items_cold": unicode(len(items_in)),
-        "total_bytes_items_cold": unicode(sum(items_in)),
+        "num_items_cold": unicode(len(items_in)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_in)),  # noqa: F821
       },
       "isolated_upload": {
         "items_cold": sorted(items_out),
-        "num_items_cold": unicode(len(items_out)),
-        "total_bytes_items_cold": unicode(sum(items_out)),
+        "num_items_cold": unicode(len(items_out)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_out)),  # noqa: F821
       },
       "cleanup": {},
     }
@@ -731,13 +731,13 @@ class Test(unittest.TestCase):
       "named_caches_uninstall": {},
       "isolated_download": {
         "items_cold": sorted(items_in),
-        "num_items_cold": unicode(len(items_in)),
-        "total_bytes_items_cold": unicode(sum(items_in)),
+        "num_items_cold": unicode(len(items_in)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_in)),  # noqa: F821
       },
       "isolated_upload": {
         "items_cold": sorted(items_out),
-        "num_items_cold": unicode(len(items_out)),
-        "total_bytes_items_cold": unicode(sum(items_out)),
+        "num_items_cold": unicode(len(items_out)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_out)),  # noqa: F821
       },
       "cleanup": {},
     }
@@ -764,7 +764,7 @@ class Test(unittest.TestCase):
     items_in = [content_size]
     expected_summary = self.gen_expected(
       name="hard_timeout",
-      exit_code=unicode(SIGNAL_TERM),
+      exit_code=unicode(SIGNAL_TERM),  # noqa: F821
       failure=True,
       tags=[
         "authenticated:bot:whitelisted-ip",
@@ -795,8 +795,8 @@ class Test(unittest.TestCase):
       "named_caches_uninstall": {},
       "isolated_download": {
         "items_cold": sorted(items_in),
-        "num_items_cold": unicode(len(items_in)),
-        "total_bytes_items_cold": unicode(sum(items_in)),
+        "num_items_cold": unicode(len(items_in)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_in)),  # noqa: F821
       },
       "isolated_upload": {},
       "cleanup": {},
@@ -870,13 +870,13 @@ class Test(unittest.TestCase):
       "named_caches_uninstall": {},
       "isolated_download": {
         "items_cold": sorted(items_in),
-        "num_items_cold": unicode(len(items_in)),
-        "total_bytes_items_cold": unicode(sum(items_in)),
+        "num_items_cold": unicode(len(items_in)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_in)),  # noqa: F821
       },
       "isolated_upload": {
         "items_cold": sorted(items_out),
-        "num_items_cold": unicode(len(items_out)),
-        "total_bytes_items_cold": unicode(sum(items_out)),
+        "num_items_cold": unicode(len(items_out)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_out)),  # noqa: F821
       },
       "cleanup": {},
     }
@@ -917,8 +917,8 @@ class Test(unittest.TestCase):
       "named_caches_uninstall": {},
       "isolated_download": {
         "items_cold": sorted(items_in),
-        "num_items_cold": unicode(len(items_in)),
-        "total_bytes_items_cold": unicode(sum(items_in)),
+        "num_items_cold": unicode(len(items_in)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_in)),  # noqa: F821
       },
       "isolated_upload": {},
       "cleanup": {},
@@ -1009,13 +1009,13 @@ class Test(unittest.TestCase):
       "named_caches_uninstall": {},
       "isolated_download": {
         "items_cold": sorted(items_in),
-        "num_items_cold": unicode(len(items_in)),
-        "total_bytes_items_cold": unicode(sum(items_in)),
+        "num_items_cold": unicode(len(items_in)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_in)),  # noqa: F821
       },
       "isolated_upload": {
         "items_cold": sorted(items_out),
-        "num_items_cold": unicode(len(items_out)),
-        "total_bytes_items_cold": unicode(sum(items_out)),
+        "num_items_cold": unicode(len(items_out)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_out)),  # noqa: F821
       },
       "cleanup": {},
     }
@@ -1076,8 +1076,8 @@ class Test(unittest.TestCase):
       "named_caches_uninstall": {},
       "isolated_download": {
         "items_cold": sorted(items_in),
-        "num_items_cold": unicode(len(items_in)),
-        "total_bytes_items_cold": unicode(sum(items_in)),
+        "num_items_cold": unicode(len(items_in)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_in)),  # noqa: F821
       },
       "isolated_upload": {},
       "cleanup": {},
@@ -1099,7 +1099,6 @@ class Test(unittest.TestCase):
       ],
     )
     # The previous task caused the bot to have a named cache.
-    # pylint: disable=not-an-iterable,unsubscriptable-object
     expected_summary["bot_dimensions"] = expected_summary["bot_dimensions"][:]
     self.assertNotIn(
       "caches", [i["key"] for i in expected_summary["bot_dimensions"]]
@@ -1129,13 +1128,13 @@ class Test(unittest.TestCase):
         # initial_{number_items, size}.
         # Items are hot.
         "items_hot": sorted(items_in),
-        "num_items_hot": unicode(len(items_in)),
-        "total_bytes_items_hot": unicode(sum(items_in)),
+        "num_items_hot": unicode(len(items_in)),  # noqa: F821
+        "total_bytes_items_hot": unicode(sum(items_in)),  # noqa: F821
       },
       "isolated_upload": {
         "items_cold": sorted(items_out),
-        "num_items_cold": unicode(len(items_out)),
-        "total_bytes_items_cold": unicode(sum(items_out)),
+        "num_items_cold": unicode(len(items_out)),  # noqa: F821
+        "total_bytes_items_cold": unicode(sum(items_out)),  # noqa: F821
       },
       "cleanup": {},
     }
@@ -1708,7 +1707,7 @@ def process_arguments():
 def main():
   fix_encoding.fix_encoding()
   args = process_arguments()
-  Test.tmpdir = unicode(tempfile.mkdtemp(prefix="local_smoke_testing"))
+  Test.tmpdir = unicode(tempfile.mkdtemp(prefix="local_smoke_testing"))  # noqa: F821
 
   # Force language to be English, otherwise the error messages differ from
   # expectations.

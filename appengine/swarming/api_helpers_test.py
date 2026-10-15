@@ -3,7 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 import datetime
-import logging
+import logging  # noqa: F401
 import sys
 import unittest
 
@@ -13,22 +13,22 @@ import swarming_test_env
 
 swarming_test_env.setup_test_env()
 
-import api_helpers
-from components import auth
-from components import auth_testing
-from components import utils
-import handlers_exceptions
-from proto.config import config_pb2
-from proto.config import pools_pb2
-from server import acl
-from server import config
-from server import pools_config
-from server import realms
-from server import service_accounts
-from server import task_request
-from test_support import test_case
+import api_helpers  # noqa: E402
+from components import auth  # noqa: E402, F401
+from components import auth_testing  # noqa: E402, F401
+from components import utils  # noqa: E402
+import handlers_exceptions  # noqa: E402
+from proto.config import config_pb2  # noqa: E402, F401
+from proto.config import pools_pb2  # noqa: E402
+from server import acl  # noqa: E402
+from server import config  # noqa: E402, F401
+from server import pools_config  # noqa: E402
+from server import realms  # noqa: E402
+from server import service_accounts  # noqa: E402
+from server import task_request  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.api_v2 import swarming_pb2
+from proto.api_v2 import swarming_pb2  # noqa: E402
 
 
 class TestProcessTaskRequest(test_case.TestCase):

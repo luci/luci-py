@@ -11,15 +11,12 @@ import test_env
 
 test_env.setup_test_env()
 
-from components.config import validation
-from components import utils
-from test_support import test_case
+from components.config import validation  # noqa: E402
+from components import utils  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.config import config_pb2
-from server import config
-
-
-# pylint: disable=W0212,W0612
+from proto.config import config_pb2  # noqa: E402
+from server import config  # noqa: E402
 
 
 class ConfigTest(test_case.TestCase):
@@ -45,12 +42,12 @@ class ConfigTest(test_case.TestCase):
     self.assertFalse(config.validate_flat_dimension("ab"))
 
   def test_validate_flat_dimension_key(self):
-    l = config.DIMENSION_KEY_LENGTH
+    l = config.DIMENSION_KEY_LENGTH  # noqa: E741
     self.assertTrue(config.validate_flat_dimension("a" * l + ":b"))
     self.assertFalse(config.validate_flat_dimension("a" * (l + 1) + ":b"))
 
   def test_validate_flat_dimension_value(self):
-    l = config.DIMENSION_VALUE_LENGTH
+    l = config.DIMENSION_VALUE_LENGTH  # noqa: E741
     self.assertTrue(config.validate_flat_dimension("a:" + "b" * l))
     self.assertFalse(config.validate_flat_dimension("a:" + "b" * (l + 1)))
 
@@ -63,7 +60,7 @@ class ConfigTest(test_case.TestCase):
     self.assertFalse(config.validate_dimension_key("+"))
 
   def test_validate_dimension_key_length(self):
-    l = config.DIMENSION_KEY_LENGTH
+    l = config.DIMENSION_KEY_LENGTH  # noqa: E741
     self.assertTrue(config.validate_dimension_key("b" * l))
     self.assertFalse(config.validate_dimension_key("b" * (l + 1)))
 
@@ -73,7 +70,7 @@ class ConfigTest(test_case.TestCase):
     self.assertFalse(config.validate_dimension_value(" a"))
 
   def test_validate_dimension_value_length(self):
-    l = config.DIMENSION_VALUE_LENGTH
+    l = config.DIMENSION_VALUE_LENGTH  # noqa: E741
     self.assertTrue(config.validate_dimension_value("b" * l))
     self.assertFalse(config.validate_dimension_value("b" * (l + 1)))
 

@@ -29,7 +29,7 @@ import traceback
 from google.protobuf.json_format import MessageToJson
 from google.protobuf.message import DecodeError
 
-from api import os_utilities
+from api import os_utilities  # noqa: F401
 from bot_code import bot_auth
 from bot_code import remote_client
 from libs import luci_context

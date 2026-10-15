@@ -5,7 +5,7 @@
 # that can be found in the LICENSE file.
 
 import os
-import sys
+import sys  # noqa: F401
 import tempfile
 import unittest
 

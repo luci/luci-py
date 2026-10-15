@@ -12,20 +12,20 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import webapp2
-import webtest
+import webapp2  # noqa: E402
+import webtest  # noqa: E402
 
-from components import utils
-from components.auth import api
-from components.auth import b64
-from components.auth import check
-from components.auth import delegation
-from components.auth import handler
-from components.auth import ipaddr
-from components.auth import model
-from components.auth import testing
-from components.auth.proto import delegation_pb2
-from test_support import test_case
+from components import utils  # noqa: E402
+from components.auth import api  # noqa: E402
+from components.auth import b64  # noqa: E402
+from components.auth import check  # noqa: E402
+from components.auth import delegation  # noqa: E402
+from components.auth import handler  # noqa: E402
+from components.auth import ipaddr  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth import testing  # noqa: E402
+from components.auth.proto import delegation_pb2  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class AuthenticatingHandlerMetaclassTest(test_case.TestCase):
@@ -111,7 +111,7 @@ class AuthenticatingHandlerTest(testing.TestCase):
     class Handler(handler.AuthenticatingHandler):
       @classmethod
       def get_auth_methods(cls, conf):
-        non_applicable = lambda _request: (None, None)
+        non_applicable = lambda _request: (None, None)  # noqa: E731
         return [non_applicable, non_applicable]
 
       @api.public

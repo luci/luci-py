@@ -12,16 +12,16 @@ import test_env
 
 test_env.setup_test_env()
 
-from components import auth
-from components import auth_testing
-from components import config
-from components.auth import ipaddr
-from test_support import test_case
+from components import auth  # noqa: E402
+from components import auth_testing  # noqa: E402
+from components import config  # noqa: E402
+from components.auth import ipaddr  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.config import bots_pb2
-from server import bot_auth
-from server import bot_groups_config
-from server import config as srv_cfg
+from proto.config import bots_pb2  # noqa: E402
+from server import bot_auth  # noqa: E402
+from server import bot_groups_config  # noqa: E402
+from server import config as srv_cfg  # noqa: E402
 
 
 TEST_CONFIG = bots_pb2.BotsCfg(
@@ -121,7 +121,7 @@ class BotAuthTest(test_case.TestCase):
     self.mock(srv_cfg, "get_ui_client_id", lambda: None)
 
     self.logs = []
-    self.mock(logging, "error", lambda l, *_args: self.logs.append(l % _args))
+    self.mock(logging, "error", lambda l, *_args: self.logs.append(l % _args))  # noqa: E741
 
     auth.bootstrap_ip_whitelist(
       auth.bots_ip_whitelist(), ["1.2.3.4", "1.2.3.5"]

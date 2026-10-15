@@ -13,8 +13,8 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from components.ereporter2 import formatter
-from test_support import test_case
+from components.ereporter2 import formatter  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class Ereporter2FormatterTest(test_case.TestCase):

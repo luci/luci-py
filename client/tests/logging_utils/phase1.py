@@ -13,7 +13,7 @@ CLIENT_DIR = os.path.dirname(os.path.dirname(THIS_DIR))
 sys.path.insert(0, CLIENT_DIR)
 sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party"))
 
-from utils import logging_utils
+from utils import logging_utils  # noqa: E402
 
 dst = sys.argv[1]
 

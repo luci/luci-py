@@ -2,9 +2,9 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import os
+import os  # noqa: F401
 import struct
-import sys
+import sys  # noqa: F401
 
 
 def write_uvarint(w, val):

@@ -12,8 +12,8 @@ from test_support import test_env
 test_env.setup_test_env()
 
 
-from components.auth import b64
-from test_support import test_case
+from components.auth import b64  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 URL_SAFE_ALPHABET = set(string.letters + string.digits + "-_")

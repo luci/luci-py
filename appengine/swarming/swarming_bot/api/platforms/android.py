@@ -8,9 +8,9 @@ This file serves as an API to bot_config.py. bot_config.py can be replaced on
 the server to allow additional server-specific functionality.
 """
 
-import collections
+import collections  # noqa: F401
 import logging
-import os
+import os  # noqa: F401
 import re
 import time
 
@@ -120,7 +120,6 @@ def initialize(pub_key, priv_key):
 def get_devices(
   bot=None, endpoints=None, enable_resets=False, allow_missing_keys=False
 ):
-  # pylint: disable=unused-argument
   devices = []
   if not gce.is_gce():
     devices += high.GetLocalDevices(

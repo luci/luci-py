@@ -11,7 +11,7 @@ import test_env_platforms
 
 test_env_platforms.setup_test_env()
 
-from api import platforms
+from api import platforms  # noqa: E402
 
 
 @unittest.skipIf(sys.platform == "win32", "Tests only run under posix platform")

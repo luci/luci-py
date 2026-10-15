@@ -46,7 +46,7 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
-from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
+from proto.api import swarming_pb2
 from server import config
 from server import task_pack
 from server import task_queues
@@ -168,7 +168,7 @@ class _BotCommon(ndb.Model):
     if self.key:
       out.bot_id = self.key.parent().string_id()
     # out.session_id = ''  # https://crbug.com/786735
-    for l in self.dimensions_flat:
+    for l in self.dimensions_flat:  # noqa: E741
       if l.startswith("pool:"):
         out.pools.append(l[len("pool:") :])
 
@@ -187,7 +187,7 @@ class _BotCommon(ndb.Model):
       out.status = swarming_pb2.QUARANTINED_BY_BOT
       msg = (self.state or {}).get("quarantined")
       if msg:
-        if not isinstance(msg, basestring):
+        if not isinstance(msg, basestring):  # noqa: F821
           # Having {'quarantined': True} is valid for the state, convert this to
           # a string.
           msg = "true"

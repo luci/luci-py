@@ -12,13 +12,13 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.api import urlfetch
-from google.appengine.ext import ndb
-from google.appengine.runtime import apiproxy_errors
+from google.appengine.api import urlfetch  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
+from google.appengine.runtime import apiproxy_errors  # noqa: E402
 
-from components import auth
-from components import net
-from test_support import test_case
+from components import auth  # noqa: E402
+from components import net  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 Response = collections.namedtuple("Response", "status_code content headers")
 

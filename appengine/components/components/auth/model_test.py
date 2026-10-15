@@ -11,12 +11,12 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from components.auth import model
-from components.auth.proto import permissions_pb2, realms_pb2
-from test_support import test_case
+from components import utils  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth.proto import permissions_pb2, realms_pb2  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class IdentityTest(test_case.TestCase):
@@ -50,7 +50,7 @@ class IdentityTest(test_case.TestCase):
   def test_validation(self):
     # Unicode with ASCII data is ok.
     ok_identities = (
-      (unicode(model.IDENTITY_USER), "joe@example.com"),
+      (unicode(model.IDENTITY_USER), "joe@example.com"),  # noqa: F821
       (model.IDENTITY_USER, "joe@example.com"),
       (model.IDENTITY_USER, r"abc%def.com@zzz.com"),
       (model.IDENTITY_USER, r"ABC_DEF@ABC_DEF.com"),
@@ -130,7 +130,7 @@ class IdentityGlobTest(test_case.TestCase):
   def test_validation(self):
     # Unicode with ASCII data is ok.
     ok_globs = (
-      (unicode(model.IDENTITY_USER), "*@example.com"),
+      (unicode(model.IDENTITY_USER), "*@example.com"),  # noqa: F821
       (model.IDENTITY_USER, "*@example.com"),
     )
     for kind, pattern in ok_globs:
@@ -591,7 +591,7 @@ class AuditLogTest(test_case.TestCase):
     )
 
     # Copies in the history.
-    cpy = lambda rev: ndb.Key(
+    cpy = lambda rev: ndb.Key(  # noqa: E731
       "Rev", rev, "AuthGlobalConfigHistory", "root", parent=model.root_key()
     )
     self.assertEqual(
@@ -745,7 +745,7 @@ class AuditLogTest(test_case.TestCase):
     )
 
     # Copies in the history.
-    cpy = lambda name, rev: ndb.Key(
+    cpy = lambda name, rev: ndb.Key(  # noqa: E731
       "Rev", rev, "AuthGroupHistory", name, parent=model.root_key()
     )
     self.assertEqual(
@@ -907,7 +907,7 @@ class AuditLogTest(test_case.TestCase):
     remove("A")
 
     # Copies in the history.
-    cpy = lambda name, rev: ndb.Key(
+    cpy = lambda name, rev: ndb.Key(  # noqa: E731
       "Rev", rev, "AuthIPWhitelistHistory", name, parent=model.root_key()
     )
     self.assertEqual(
@@ -997,7 +997,7 @@ class AuditLogTest(test_case.TestCase):
     )
     modify([])
 
-    cpy = lambda rev: ndb.Key(
+    cpy = lambda rev: ndb.Key(  # noqa: E731
       "Rev",
       rev,
       "AuthIPWhitelistAssignmentsHistory",
@@ -1074,7 +1074,7 @@ class AuditLogTest(test_case.TestCase):
     modify([realms_pb2.Permission(name="luci.dev.p1")])
     modify([])
 
-    cpy = lambda rev: ndb.Key(
+    cpy = lambda rev: ndb.Key(  # noqa: E731
       "Rev", rev, "AuthRealmsGlobalsHistory", "globals", parent=model.root_key()
     )
     self.assertEqual(
@@ -1151,7 +1151,7 @@ class AuditLogTest(test_case.TestCase):
     modify(realms_v2, "rev2", "rev2")
     modify(None, None, None)  # delete
 
-    cpy = lambda rev: ndb.Key(
+    cpy = lambda rev: ndb.Key(  # noqa: E731
       "Rev",
       rev,
       "AuthProjectRealmsHistory",

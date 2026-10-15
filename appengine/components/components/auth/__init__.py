@@ -8,7 +8,7 @@ Exports public API of 'auth' component. Each module in 'auth' package can
 export a portion of public API by specifying exported symbols in its __all__.
 """
 
-from .version import __version__
+from .version import __version__  # noqa: F401
 
 try:
   import endpoints
@@ -21,25 +21,25 @@ from components import utils
 
 utils.fix_protobuf_package()
 
-from api import *
-from delegation import *
-from exceptions import *
-from gce_vm_auth import *
-from handler import *
-from ipaddr import *
-from machine_auth import *
-from model import *
-from prpc import *
-from service_account import *
-from signature import *
-from tokens import *
-from ui.app import *
+from api import *  # noqa: E402, F403
+from delegation import *  # noqa: E402, F403
+from exceptions import *  # noqa: E402, F403
+from gce_vm_auth import *  # noqa: E402, F403
+from handler import *  # noqa: E402, F403
+from ipaddr import *  # noqa: E402, F403
+from machine_auth import *  # noqa: E402, F403
+from model import *  # noqa: E402, F403
+from prpc import *  # noqa: E402, F403
+from service_account import *  # noqa: E402, F403
+from signature import *  # noqa: E402, F403
+from tokens import *  # noqa: E402, F403
+from ui.app import *  # noqa: E402, F403
 
 # Endpoints support is optional, enabled only when endpoints library is
 # specified in app.yaml.
 if endpoints:
-  from endpoints_support import *
-  from ui.endpoints_api import AuthService
+  from endpoints_support import *  # noqa: F403
+  from ui.endpoints_api import AuthService  # noqa: F401
 
 # Import 'config' to register lib_config hook.
-import config
+import config  # noqa: E402, F401

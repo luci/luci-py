@@ -12,14 +12,14 @@ from test_support import test_env
 test_env.setup_test_env()
 
 # google.protobuf package requires some python package magic hacking.
-from components import utils
+from components import utils  # noqa: E402
 
 utils.fix_protobuf_package()
 
-from google import protobuf
+from google import protobuf  # noqa: E402
 
-import multiline_proto
-import test_proto_pb2
+import multiline_proto  # noqa: E402
+import test_proto_pb2  # noqa: E402
 
 
 class MultilineProtoTest(unittest.TestCase):

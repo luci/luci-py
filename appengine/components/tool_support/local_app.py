@@ -7,8 +7,6 @@
 Useful for smoke and integration tests.
 """
 
-# pylint: disable=no-init
-
 from __future__ import print_function
 
 import collections
@@ -17,7 +15,7 @@ import ctypes
 import json
 import logging
 import os
-import shutil
+import shutil  # noqa: F401
 import socket
 import subprocess
 import sys
@@ -242,7 +240,7 @@ class LocalApplication(object):
     print("-" * 60, file=sys.stderr)
     print("dev_appserver.py log for %s" % self.app_id, file=sys.stderr)
     print("-" * 60, file=sys.stderr)
-    for l in (self._log or "").strip("\n").splitlines():
+    for l in (self._log or "").strip("\n").splitlines():  # noqa: E741
       sys.stderr.write("  %s\n" % l)
     print("-" * 60, file=sys.stderr)
 
@@ -250,7 +248,6 @@ class LocalApplication(object):
 class CustomHTTPErrorHandler(urllib.request.HTTPDefaultErrorHandler):
   """Swallows exceptions that would be thrown on >30x HTTP status."""
 
-  # pylint: disable=arguments-differ
   def http_error_default(self, _request, response, _code, _msg, _hdrs):
     return response
 

@@ -26,16 +26,13 @@ Here's a pile of poo: 💩
 """
 
 import os
-import sys
+import sys  # noqa: F401
 
 from api import os_utilities
 from api import platforms
 
-# pylint: disable=unused-argument
-
 
 def get_dimensions(bot):
-  # pylint: disable=line-too-long
   """Returns dict with the bot's dimensions.
 
   The dimensions are what are used to select the bot that can run each task.
@@ -127,7 +124,6 @@ def get_settings(bot):
 
 
 def get_state(bot):
-  # pylint: disable=line-too-long
   """Returns dict with a state of the bot reported to the server with each poll.
 
   It is only for dynamic state that changes while bot is running for information

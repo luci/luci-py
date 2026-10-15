@@ -457,7 +457,7 @@ class _RequestHandler(http.server.BaseHTTPRequestHandler):
 
   error_content_type = "text/plain;charset=utf-8"
 
-  def log_message(self, fmt, *args):  # pylint: disable=arguments-differ
+  def log_message(self, fmt, *args):
     """Overrides default log_message to not abuse stderr."""
     logging.debug("local auth server: " + fmt, *args)
 

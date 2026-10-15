@@ -15,7 +15,7 @@ import sys
 import tempfile
 import threading
 import zipfile
-import zipimport
+import zipimport  # noqa: F401
 
 
 # Glob patterns for files to exclude from a package by default.
@@ -137,7 +137,7 @@ class ZipPackage:
     # Precompile regular expressions.
     exclude_regexps = [re.compile(r) for r in exclude]
     # Returns True if |name| should be excluded from the package.
-    should_exclude = lambda name: any(r.match(name) for r in exclude_regexps)
+    should_exclude = lambda name: any(r.match(name) for r in exclude_regexps)  # noqa: E731
 
     archive_path = archive_path or absolute_path[len(self.root) :]
     for cur_dir, dirs, files in os.walk(absolute_path):

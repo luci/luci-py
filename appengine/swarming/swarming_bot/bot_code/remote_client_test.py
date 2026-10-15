@@ -5,7 +5,7 @@
 
 import datetime
 import logging
-import os
+import os  # noqa: F401
 import shutil
 import sys
 import tempfile
@@ -17,11 +17,11 @@ import test_env_bot_code
 
 test_env_bot_code.setup_test_env()
 
-from parameterized import parameterized
+from parameterized import parameterized  # noqa: E402
 
-from depot_tools import auto_stub
+from depot_tools import auto_stub  # noqa: E402
 
-import remote_client
+import remote_client  # noqa: E402
 
 
 class TestRemoteClient(auto_stub.TestCase):

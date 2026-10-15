@@ -8,7 +8,7 @@ from xml.sax import saxutils
 import ctypes
 import logging
 import os
-import platform
+import platform  # noqa: F401
 import plistlib
 import re
 import struct
@@ -293,7 +293,6 @@ def _SMC_read_key(conn, key):
   packed = struct.pack(">i", outdata.keyInfo.type)
   for i, x in enumerate(packed):
     val.type[i] = x
-  # pylint: disable=attribute-defined-outside-init
   indata.data8 = 5
   indata.keyInfo.size = val.size
   if _SMC_call(conn, KERNEL_INDEX_SMC, indata, outdata):
@@ -580,7 +579,7 @@ def get_gpu():
   dimensions = set()
   state = set()
   for card in _get_system_profiler("SPDisplaysDataType"):
-    if not "spdisplays_device-id" in card:
+    if "spdisplays_device-id" not in card:
       # Apple Silicon GPUs don't show up as PCI-e devices, so the normal GPU
       # detection path does not work.
       _handle_apple_gpu(card, dimensions, state)
@@ -840,8 +839,9 @@ def is_display_attached():
 
   online_displays = online_display_list_result[1]
   for display_id in online_displays:
-    device_info = ColorSyncDeviceCopyDeviceInfo(
-      kColorSyncDisplayDeviceClass, CGDisplayCreateUUIDFromDisplayID(display_id)
+    device_info = ColorSyncDeviceCopyDeviceInfo(  # noqa: F821
+      kColorSyncDisplayDeviceClass,  # noqa: F821
+      CGDisplayCreateUUIDFromDisplayID(display_id),  # noqa: F821
     )
     if device_info:
       return True
@@ -966,7 +966,7 @@ def generate_launchd_plist(command, cwd, plistname):
     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
     '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
     '<plist version="1.0">\n'
-    "  <dict>\n" + "".join("    %s\n" % l for l in entries) + "  </dict>\n"
+    "  <dict>\n" + "".join("    %s\n" % l for l in entries) + "  </dict>\n"  # noqa: E741
     "</plist>\n"
   )
   return header

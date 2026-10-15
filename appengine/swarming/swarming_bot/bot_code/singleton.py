@@ -43,7 +43,6 @@ class Singleton(object):
       # Create a global mutex. Make the mutex so that it disapear automatically
       # when the process dies. The handle is not inherited so task_runner
       # doesn't get to keep it alive.
-      # pylint: disable=undefined-variable
       self.handle = ctypes.windll.kernel32.CreateMutexW(
         ctypes.c_int(0),
         ctypes.c_int(-1),
@@ -82,7 +81,6 @@ class Singleton(object):
     if not self.handle:
       return
     if sys.platform == "win32":
-      # pylint: disable=undefined-variable
       ctypes.windll.kernel32.CloseHandle(self.handle)
     else:
       self.handle.close()

@@ -11,15 +11,15 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from components.auth import change_log
-from components.auth import model
-from components.auth.proto import realms_pb2
-from components.auth.proto import security_config_pb2
+from components import utils  # noqa: E402
+from components.auth import change_log  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth.proto import realms_pb2  # noqa: E402
+from components.auth.proto import security_config_pb2  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
 
 class MakeInitialSnapshotTest(test_case.TestCase):
@@ -69,8 +69,8 @@ class MakeInitialSnapshotTest(test_case.TestCase):
     self.assertEqual(3, model.get_auth_db_revision())
 
 
-ident = lambda x: model.Identity.from_bytes("user:" + x)
-glob = lambda x: model.IdentityGlob.from_bytes("user:" + x)
+ident = lambda x: model.Identity.from_bytes("user:" + x)  # noqa: E731
+glob = lambda x: model.IdentityGlob.from_bytes("user:" + x)  # noqa: E731
 
 
 def make_group(name, comment, **kwargs):
@@ -579,7 +579,7 @@ class GenerateChangesTest(test_case.TestCase):
     )
 
     def modify():
-      l = model.ip_whitelist_key("A list").get()
+      l = model.ip_whitelist_key("A list").get()  # noqa: E741
       l.subnets = ["127.0.0.1/32", "127.0.0.3/32"]
       l.description = "Another blah"
       l.record_revision(
@@ -631,7 +631,7 @@ class GenerateChangesTest(test_case.TestCase):
     )
 
     def delete():
-      l = model.ip_whitelist_key("A list").get()
+      l = model.ip_whitelist_key("A list").get()  # noqa: E741
       l.record_deletion(
         modified_by=ident("me@example.com"),
         modified_ts=utils.utcnow(),

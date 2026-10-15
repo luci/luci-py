@@ -2,20 +2,20 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import os
-import sys
+import os  # noqa: F401
+import sys  # noqa: F401
 
 from components import utils
 
 utils.import_third_party()
 
-import endpoints
-from protorpc import message_types
-from protorpc import messages
-from protorpc import remote
+import endpoints  # noqa: E402, F401
+from protorpc import message_types  # noqa: E402
+from protorpc import messages  # noqa: E402
+from protorpc import remote  # noqa: E402
 
-from components import auth
-from components import endpoints_webapp2
+from components import auth  # noqa: E402
+from components import endpoints_webapp2  # noqa: E402
 
 
 package = "testing_api"

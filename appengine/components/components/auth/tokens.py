@@ -204,7 +204,7 @@ def to_encoding(string, encoding):
   """
   if isinstance(string, str):
     return string
-  if isinstance(string, unicode):
+  if isinstance(string, unicode):  # noqa: F821
     return string.encode(encoding)
   raise TypeError("Expecting str or unicode")
 
@@ -222,7 +222,7 @@ def normalize_message(message):
 def normalize_embedded(embedded):
   """Dict of strings -> dict with ASCII keys and values."""
   if not all(
-    isinstance(k, basestring) and isinstance(v, basestring)
+    isinstance(k, basestring) and isinstance(v, basestring)  # noqa: F821
     for k, v in embedded.items()
   ):
     raise TypeError("Only string keys and values are allowed")
@@ -421,7 +421,7 @@ def verify_jwt(jwt, bundle):
     InvalidSignatureError if JWT's signature is invalid.
     signature.CertificateError if the signing key is unknown or invalid.
   """
-  jwt = jwt.encode("ascii") if isinstance(jwt, unicode) else jwt
+  jwt = jwt.encode("ascii") if isinstance(jwt, unicode) else jwt  # noqa: F821
   if jwt.count(".") != 2:
     raise InvalidTokenError("Bad JWT, should have 3 segments")
   segments = jwt.split(".")
@@ -464,7 +464,7 @@ def verify_jwt(jwt, bundle):
       if key == "nbf":
         continue  # 'nbf' is optional
       raise InvalidTokenError("Bad JWT: has no %r field" % key)
-    if not isinstance(ts, (int, long, float)):
+    if not isinstance(ts, (int, long, float)):  # noqa: F821
       raise InvalidTokenError("Bad JWT: %r (%r) is not a number" % (key, ts))
 
   now = utils.time_time()

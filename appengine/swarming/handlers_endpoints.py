@@ -38,7 +38,7 @@ _old_decode_field = protojson.ProtoJson.decode_field
 
 
 def _decode_field(self, field, value):
-  if isinstance(field, messages.BooleanField) and isinstance(value, basestring):
+  if isinstance(field, messages.BooleanField) and isinstance(value, basestring):  # noqa: F821
     return value.lower() == "true"
   return _old_decode_field(self, field, value)
 
@@ -690,7 +690,7 @@ class SwarmingBotService(remote.Service):
     # pending or if the bot is considered 'dead', e.g. no contact since 10
     # minutes.
     logging.debug("%s", request)
-    bot_id = unicode(request.bot_id)
+    bot_id = unicode(request.bot_id)  # noqa: F821
     task_id = api_common.terminate_bot(bot_id)
     return swarming_rpcs.TerminateResponse(task_id=task_id)
 

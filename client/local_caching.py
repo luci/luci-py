@@ -57,13 +57,19 @@ def is_valid_file(path, size):
   try:
     actual_size = fs.stat(path).st_size
   except OSError as e:
-    logging.warning('Can\'t read item %s, assuming it\'s invalid: %s',
-                    os.path.basename(path), e)
+    logging.warning(
+      'Can\'t read item %s, assuming it\'s invalid: %s',
+      os.path.basename(path),
+      e,
+    )
     return False
   if size != actual_size:
     logging.warning(
-        'Found invalid item %s; %d != %d',
-        os.path.basename(path), actual_size, size)
+      'Found invalid item %s; %d != %d',
+      os.path.basename(path),
+      actual_size,
+      size,
+    )
     return False
   return True
 
@@ -86,8 +92,11 @@ def trim_caches(caches, path, min_free_space, max_age_secs):
   min_ts = time.time() - max_age_secs if max_age_secs else 0
   free_disk = file_path.get_free_space(path) if min_free_space else 0
   logging_utils.user_logs(
-      "Trimming caches. min_ts: %d, free_disk: %d, min_free_space: %d", min_ts,
-      free_disk, min_free_space)
+    "Trimming caches. min_ts: %d, free_disk: %d, min_free_space: %d",
+    min_ts,
+    free_disk,
+    min_free_space,
+  )
   total = []
   if min_ts or free_disk:
     while True:
@@ -140,23 +149,30 @@ class CachePolicies:
     self.max_age_secs = max_age_secs
 
   def __str__(self):
-    return ('CachePolicies(max_cache_size=%s (%.3f GiB); max_items=%s; '
-            'min_free_space=%s (%.3f GiB); max_age_secs=%s)') % (
-                self.max_cache_size, float(self.max_cache_size) / 1024**3,
-                self.max_items, self.min_free_space,
-                float(self.min_free_space) / 1024**3, self.max_age_secs)
+    return (
+      'CachePolicies(max_cache_size=%s (%.3f GiB); max_items=%s; '
+      'min_free_space=%s (%.3f GiB); max_age_secs=%s)'
+    ) % (
+      self.max_cache_size,
+      float(self.max_cache_size) / 1024**3,
+      self.max_items,
+      self.min_free_space,
+      float(self.min_free_space) / 1024**3,
+      self.max_age_secs,
+    )
 
 
 class CacheMiss(Exception):
   """Raised when an item is not in cache."""
+
   def __init__(self, digest):
     self.digest = digest
-    super(CacheMiss,
-          self).__init__('Item with digest %r is not found in cache' % digest)
+    super(CacheMiss, self).__init__(
+      'Item with digest %r is not found in cache' % digest
+    )
 
 
 class Cache:
-
   def __init__(self, cache_dir):
     if cache_dir is not None:
       assert isinstance(cache_dir, str), cache_dir
@@ -309,8 +325,8 @@ class MemoryContentAddressedCache(ContentAddressedCache):
 
   def __init__(self, file_mode_mask=0o500):
     """Args:
-      file_mode_mask: bit mask to AND file mode with. Default value will make
-          all mapped files to be read only.
+    file_mode_mask: bit mask to AND file mode with. Default value will make
+        all mapped files to be read only.
     """
     super(MemoryContentAddressedCache, self).__init__(None)
     self._file_mode_mask = file_mode_mask
@@ -362,7 +378,7 @@ class MemoryContentAddressedCache(ContentAddressedCache):
 
   # ContentAddressedCache interface implementation.
 
-  def __contains__(self, digest):
+  def __contains__(self, digest):  # noqa: F811
     with self._lock:
       return digest in self._lru
 
@@ -398,6 +414,7 @@ class DiskContentAddressedCache(ContentAddressedCache):
 
   Saves its state as json file.
   """
+
   STATE_FILE = 'state.json'
 
   def __init__(self, cache_dir, policies, trim, time_fn=None):
@@ -479,8 +496,9 @@ class DiskContentAddressedCache(ContentAddressedCache):
     At that point, the cache was already loaded, trimmed to respect cache
     policies.
     """
-    logging.info('DiskContentAddressedCache.cleanup(): Cleaning %s',
-                 self.cache_dir)
+    logging.info(
+      'DiskContentAddressedCache.cleanup(): Cleaning %s', self.cache_dir
+    )
     with self._lock:
       fs.chmod(self.cache_dir, 0o700)
       # Ensure that all files listed in the state still exist and add new ones.
@@ -497,8 +515,9 @@ class DiskContentAddressedCache(ContentAddressedCache):
 
         # An untracked file. Delete it.
         logging.warning(
-            'DiskContentAddressedCache.cleanup(): Removing unknown file %s',
-            filename)
+          'DiskContentAddressedCache.cleanup(): Removing unknown file %s',
+          filename,
+        )
         p = self._path(filename)
         if fs.isdir(p):
           try:
@@ -512,8 +531,9 @@ class DiskContentAddressedCache(ContentAddressedCache):
       if previous:
         # Filter out entries that were not found.
         logging.warning(
-            'DiskContentAddressedCache.cleanup(): Removed %d lost files',
-            len(previous))
+          'DiskContentAddressedCache.cleanup(): Removed %d lost files',
+          len(previous),
+        )
         for filename in previous:
           self._lru.pop(filename)
         self._save()
@@ -524,7 +544,8 @@ class DiskContentAddressedCache(ContentAddressedCache):
     verified = 0
     deleted = 0
     logging.info(
-        'DiskContentAddressedCache.cleanup(): Verifying modified files')
+      'DiskContentAddressedCache.cleanup(): Verifying modified files'
+    )
     with self._lock:
       for digest, (_, timestamp) in list(self._lru._items.items()):
         total += 1
@@ -533,13 +554,18 @@ class DiskContentAddressedCache(ContentAddressedCache):
         if self._get_mtime(digest) <= timestamp:
           continue
         logging.warning(
-            'DiskContentAddressedCache.cleanup(): Item has been modified.'
-            ' verifying item: %s', digest)
+          'DiskContentAddressedCache.cleanup(): Item has been modified.'
+          ' verifying item: %s',
+          digest,
+        )
         is_valid = self._is_valid_hash(digest)
         verified += 1
         logging.warning(
-            'DiskContentAddressedCache.cleanup(): verified. is_valid: %s, '
-            'item: %s', is_valid, digest)
+          'DiskContentAddressedCache.cleanup(): verified. is_valid: %s, '
+          'item: %s',
+          is_valid,
+          digest,
+        )
         if is_valid:
           # Update timestamp in state.json
           self._lru.touch(digest)
@@ -549,16 +575,21 @@ class DiskContentAddressedCache(ContentAddressedCache):
         self._delete_file(digest, UNKNOWN_FILE_SIZE)
         deleted += 1
         logging.error(
-            'DiskContentAddressedCache.cleanup(): Deleted corrupted item: %s',
-            digest)
+          'DiskContentAddressedCache.cleanup(): Deleted corrupted item: %s',
+          digest,
+        )
       self._save()
     logging.info(
-        'DiskContentAddressedCache.cleanup(): Verified modified files.'
-        ' total: %d, verified: %d, deleted: %d', total, verified, deleted)
+      'DiskContentAddressedCache.cleanup(): Verified modified files.'
+      ' total: %d, verified: %d, deleted: %d',
+      total,
+      verified,
+      deleted,
+    )
 
   # ContentAddressedCache interface implementation.
 
-  def __contains__(self, digest):
+  def __contains__(self, digest):  # noqa: F811
     with self._lock:
       return digest in self._lru
 
@@ -702,24 +733,32 @@ class DiskContentAddressedCache(ContentAddressedCache):
     # Ensure enough free space.
     self._free_disk = file_path.get_free_space(self.cache_dir)
     while (
-        self.policies.min_free_space and
-        self._lru and
-        self._free_disk < self.policies.min_free_space):
+      self.policies.min_free_space
+      and self._lru
+      and self._free_disk < self.policies.min_free_space
+    ):
       # self._free_disk is updated by this call.
       evicted.append(self._remove_lru_file(True))
 
     if evicted:
       total_usage = sum(self._lru.values())
-      usage_percent = 0.
+      usage_percent = 0.0
       if total_usage:
-        usage_percent = 100. * float(total_usage) / self.policies.max_cache_size
+        usage_percent = (
+          100.0 * float(total_usage) / self.policies.max_cache_size
+        )
 
       logging.warning(
-          'Trimmed %d file(s) (%.1fkb) due to not enough free disk space:'
-          ' %.1fkb free, %.1fkb cache (%.1f%% of its maximum capacity of '
-          '%.1fkb)', len(evicted),
-          sum(evicted) / 1024., self._free_disk / 1024., total_usage / 1024.,
-          usage_percent, self.policies.max_cache_size / 1024.)
+        'Trimmed %d file(s) (%.1fkb) due to not enough free disk space:'
+        ' %.1fkb free, %.1fkb cache (%.1f%% of its maximum capacity of '
+        '%.1fkb)',
+        len(evicted),
+        sum(evicted) / 1024.0,
+        self._free_disk / 1024.0,
+        total_usage / 1024.0,
+        usage_percent,
+        self.policies.max_cache_size / 1024.0,
+      )
     self._save()
     return evicted
 
@@ -737,12 +776,18 @@ class DiskContentAddressedCache(ContentAddressedCache):
       digest, _ = self._lru.get_oldest()
       if not allow_protected and digest == self._protected:
         total_size = sum(self._lru.values())
-        msg = ('Not enough space to fetch the whole isolated tree.\n'
-               ' %s\n  cache=%d bytes (%.3f GiB), %d items; '
-               '%s bytes (%.3f GiB) free_space') % (
-                   self.policies, total_size, float(total_size) / 1024**3,
-                   len(self._lru), self._free_disk,
-                   float(self._free_disk) / 1024**3)
+        msg = (
+          'Not enough space to fetch the whole isolated tree.\n'
+          ' %s\n  cache=%d bytes (%.3f GiB), %d items; '
+          '%s bytes (%.3f GiB) free_space'
+        ) % (
+          self.policies,
+          total_size,
+          float(total_size) / 1024**3,
+          len(self._lru),
+          self._free_disk,
+          float(self._free_disk) / 1024**3,
+        )
         raise NoMoreSpace(msg)
     except KeyError:
       # That means an internal error.
@@ -766,8 +811,11 @@ class DiskContentAddressedCache(ContentAddressedCache):
     # real trimming but doing this quick version here makes it possible to map
     # an isolated that is larger than the current amount of free disk space when
     # the cache size is already large.
-    while (self.policies.min_free_space and self._lru and
-           self._free_disk < self.policies.min_free_space):
+    while (
+      self.policies.min_free_space
+      and self._lru
+      and self._free_disk < self.policies.min_free_space
+    ):
       # self._free_disk is updated by this call.
       if self._remove_lru_file(False) == -1:
         break
@@ -792,7 +840,7 @@ class DiskContentAddressedCache(ContentAddressedCache):
 
   def _get_mtime(self, digest):
     """Get mtime of cache file."""
-    return  os.path.getmtime(self._path(digest))
+    return os.path.getmtime(self._path(digest))
 
   def _is_valid_hash(self, digest):
     """Verify digest with supported hash algos."""
@@ -816,6 +864,7 @@ class NamedCache(Cache):
     path is a directory path relative to the task run dir. Cache installation
       puts the requested cache directory at the path.
   """
+
   _DIR_ALPHABET = string.ascii_letters + string.digits
   STATE_FILE = 'state.json'
   NAMED_DIR = 'named'
@@ -847,13 +896,15 @@ class NamedCache(Cache):
         for _, size in self._lru.values():
           if not isinstance(size, int):
             with open(self.state_file, 'r') as f:
-              logging.info('named cache state file: %s\n%s', self.state_file,
-                           f.read())
+              logging.info(
+                'named cache state file: %s\n%s', self.state_file, f.read()
+              )
             raise ValueError("size is not integer: %s" % size)
 
       except ValueError:
         logging.exception(
-            'NamedCache: failed to load named cache state file; obliterating')
+          'NamedCache: failed to load named cache state file; obliterating'
+        )
         file_path.rmtree(self.cache_dir)
         fs.makedirs(self.cache_dir)
         self._lru = lru.LRUDict()
@@ -894,7 +945,8 @@ class NamedCache(Cache):
       try:
         if fs.isdir(dst):
           raise NamedCacheError(
-              'installation directory %r already exists' % dst)
+            'installation directory %r already exists' % dst
+          )
 
         # Remove the named symlink if it exists.
         link_name = self._get_named_path(name)
@@ -924,15 +976,19 @@ class NamedCache(Cache):
         return 0
       except (IOError, OSError, PermissionError) as ex:
         if sys.platform == 'win32':
-          print("There may be running process in cache"
-                " e.g. https://crbug.com/1239809#c14",
-                file=sys.stderr)
+          print(
+            "There may be running process in cache"
+            " e.g. https://crbug.com/1239809#c14",
+            file=sys.stderr,
+          )
           subprocess.check_call(
-              ["powershell", "get-process | select path,starttime"])
+            ["powershell", "get-process | select path,starttime"]
+          )
 
         # Raise using the original traceback.
         exc = NamedCacheError(
-            'cannot install cache named %r at %r: %s' % (name, dst, ex))
+          'cannot install cache named %r at %r: %s' % (name, dst, ex)
+        )
         raise exc.with_traceback(sys.exc_info()[2])
       finally:
         self._save()
@@ -956,8 +1012,8 @@ class NamedCache(Cache):
       try:
         if not fs.isdir(src):
           logging.warning(
-              'NamedCache: Directory %r does not exist anymore. Cache lost.',
-              src)
+            'NamedCache: Directory %r does not exist anymore. Cache lost.', src
+          )
           return
 
         if name in self._lru:
@@ -999,7 +1055,8 @@ class NamedCache(Cache):
         try:
           fs.symlink(os.path.join('..', rel_cache), named_path)
           logging.info(
-              'NamedCache: Created symlink %r to %r', named_path, abs_cache)
+            'NamedCache: Created symlink %r to %r', named_path, abs_cache
+          )
         except OSError:
           # Ignore on Windows. It happens when running as a normal user or when
           # UAC is enabled and the user is a filtered administrator account.
@@ -1009,7 +1066,8 @@ class NamedCache(Cache):
       except (IOError, OSError, PermissionError) as ex:
         # Raise using the original traceback.
         exc = NamedCacheError(
-            'cannot uninstall cache named %r at %r: %s' % (name, src, ex))
+          'cannot uninstall cache named %r at %r: %s' % (name, src, ex)
+        )
         raise exc.with_traceback(sys.exc_info()[2])
       finally:
         # Call save() at every uninstall. The assumptions are:
@@ -1021,8 +1079,12 @@ class NamedCache(Cache):
         # - uninstall() sometimes throws due to file locking on Windows or
         #   access rights on Linux. We want to keep as many as possible.
         self._save()
-        logging.info('NamedCache.uninstall(%r, %r) took %d seconds', src, name,
-                     time.time() - start)
+        logging.info(
+          'NamedCache.uninstall(%r, %r) took %d seconds',
+          src,
+          name,
+          time.time() - start,
+        )
 
   # Cache interface implementation.
 
@@ -1089,8 +1151,11 @@ class NamedCache(Cache):
             break
           evicted.append(size)
           logging.info(
-              'NamedCache.trim(): Removed %r(%d) due to max_items(%d)',
-              name, size, self._policies.max_items)
+            'NamedCache.trim(): Removed %r(%d) due to max_items(%d)',
+            name,
+            size,
+            self._policies.max_items,
+          )
 
       # Trim according to maximum age.
       if self._policies.max_age_secs:
@@ -1105,8 +1170,11 @@ class NamedCache(Cache):
           name, size = self._remove_lru_item()
           evicted.append(size)
           logging.info(
-              'NamedCache.trim(): Removed %r(%d) due to max_age_secs(%d)',
-              name, size, self._policies.max_age_secs)
+            'NamedCache.trim(): Removed %r(%d) due to max_age_secs(%d)',
+            name,
+            size,
+            self._policies.max_age_secs,
+          )
 
       # Trim according to minimum free space.
       if self._policies.min_free_space:
@@ -1119,8 +1187,11 @@ class NamedCache(Cache):
             break
           evicted.append(size)
           logging.info(
-              'NamedCache.trim(): Removed %r(%d) due to min_free_space(%d)',
-              name, size, self._policies.min_free_space)
+            'NamedCache.trim(): Removed %r(%d) due to min_free_space(%d)',
+            name,
+            size,
+            self._policies.min_free_space,
+          )
 
       # Trim according to maximum total size.
       if self._policies.max_cache_size:
@@ -1133,8 +1204,11 @@ class NamedCache(Cache):
             break
           evicted.append(size)
           logging.info(
-              'NamedCache.trim(): Removed %r(%d) due to max_cache_size(%d)',
-              name, size, self._policies.max_cache_size)
+            'NamedCache.trim(): Removed %r(%d) due to max_cache_size(%d)',
+            name,
+            size,
+            self._policies.max_cache_size,
+          )
 
       self._save()
     return evicted
@@ -1155,16 +1229,16 @@ class NamedCache(Cache):
         expected = {v[0]: k for k, v in self._lru.items()}
         # First, handle the actual cache content.
         # Remove missing entries.
-        for missing in (set(expected) - actual):
+        for missing in set(expected) - actual:
           name, size = self._lru.pop(expected[missing])
           logging.warning(
-              'NamedCache.cleanup(): Missing on disk %r(%d)', name, size)
+            'NamedCache.cleanup(): Missing on disk %r(%d)', name, size
+          )
         # Remove unexpected items.
-        for unexpected in (actual - set(expected)):
+        for unexpected in actual - set(expected):
           try:
             p = os.path.join(self.cache_dir, unexpected)
-            logging.warning(
-                'NamedCache.cleanup(): Unexpected %r', unexpected)
+            logging.warning('NamedCache.cleanup(): Unexpected %r', unexpected)
             if fs.isdir(p) and not fs.islink(p):
               file_path.rmtree(p)
             else:
@@ -1187,8 +1261,11 @@ class NamedCache(Cache):
               if expected_link == link:
                 continue
               logging.warning(
-                  'Unexpected symlink for cache %s: %s, expected %s',
-                  name, link, expected_link)
+                'Unexpected symlink for cache %s: %s, expected %s',
+                name,
+                link,
+                expected_link,
+              )
             else:
               logging.warning('Unexpected non symlink for cache %s', name)
             if fs.isdir(p) and not fs.islink(p):
@@ -1196,7 +1273,7 @@ class NamedCache(Cache):
             else:
               fs.remove(p)
           # Remove unexpected items.
-          for unexpected in (actual - expected):
+          for unexpected in actual - expected:
             try:
               p = os.path.join(self.cache_dir, self.NAMED_DIR, unexpected)
               if fs.isdir(p):
@@ -1222,6 +1299,7 @@ class NamedCache(Cache):
     _name, (data, _ts) = self._lru.get_oldest()
     if isinstance(data, (list, tuple)):
       return
+
     # Update to v2.
     def upgrade(_name, rel_cache):
       abs_cache = os.path.join(self.cache_dir, rel_cache)
@@ -1253,7 +1331,8 @@ class NamedCache(Cache):
     while len(tried) < 1000:
       i = random.randint(0, abc_len * abc_len - 1)
       rel_path = (
-          self._DIR_ALPHABET[i // abc_len] + self._DIR_ALPHABET[i % abc_len])
+        self._DIR_ALPHABET[i // abc_len] + self._DIR_ALPHABET[i % abc_len]
+      )
       if rel_path in tried:
         continue
       abs_path = os.path.join(self.cache_dir, rel_path)
@@ -1261,7 +1340,8 @@ class NamedCache(Cache):
         return rel_path
       tried.add(rel_path)
     raise NamedCacheError(
-        'could not allocate a new cache dir, too many cache dirs')
+      'could not allocate a new cache dir, too many cache dirs'
+    )
 
   def _remove(self, name):
     """Removes a cache directory and entry.

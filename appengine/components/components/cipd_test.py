@@ -12,7 +12,7 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import cipd
+import cipd  # noqa: E402
 
 
 class Test(unittest.TestCase):

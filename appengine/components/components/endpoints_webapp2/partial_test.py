@@ -11,8 +11,8 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from test_support import test_case
-import partial
+from test_support import test_case  # noqa: E402
+import partial  # noqa: E402
 
 
 class ApplyTestCase(test_case.TestCase):

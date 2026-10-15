@@ -24,7 +24,6 @@ from components.prpc.context import ServicerContext
 
 # Helpers are in separate modules so this one exposes only the public interface.
 from components.prpc import discovery
-from components.prpc.codes import StatusCode
 
 __all__ = [
   "HandlerCallDetails",

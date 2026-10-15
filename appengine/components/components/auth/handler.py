@@ -600,7 +600,7 @@ class CurrentUser(object):
     return self._picture
 
   def __unicode__(self):
-    return unicode(self.nickname())
+    return unicode(self.nickname())  # noqa: F821
 
   def __str__(self):
     return str(self.nickname())

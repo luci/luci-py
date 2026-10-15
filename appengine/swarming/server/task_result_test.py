@@ -6,7 +6,7 @@
 
 import datetime
 import logging
-import os
+import os  # noqa: F401
 import random
 import string
 import sys
@@ -19,28 +19,26 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.protobuf import duration_pb2
+from google.protobuf import duration_pb2  # noqa: E402
 
-from google.appengine.api import datastore_errors
-from google.appengine.api import memcache
-from google.appengine.ext import ndb
+from google.appengine.api import datastore_errors  # noqa: E402
+from google.appengine.api import memcache  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
 
-import webtest
+import webtest  # noqa: E402, F401
 
-from components import auth_testing
-from components import utils
-from test_support import test_case
+from components import auth_testing  # noqa: E402
+from components import utils  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
-from server import large
-from server import task_pack
-from server import task_request
-from server import task_result
-from server import task_scheduler
-from server import task_to_run
-import ts_mon_metrics
-
-# pylint: disable=W0212
+from proto.api import swarming_pb2  # noqa: E402
+from server import large  # noqa: E402
+from server import task_pack  # noqa: E402
+from server import task_request  # noqa: E402
+from server import task_result  # noqa: E402
+from server import task_scheduler  # noqa: E402
+from server import task_to_run  # noqa: E402
+import ts_mon_metrics  # noqa: E402
 
 
 def _gen_properties(**kwargs):
@@ -129,7 +127,7 @@ def _gen_run_result(**kwargs):
 
 def _safe_cmp(a, b):
   # cmp(datetime.datetime.utcnow(), None) throws TypeError. Workaround.
-  return cmp(utils.encode_to_json(a), utils.encode_to_json(b))
+  return cmp(utils.encode_to_json(a), utils.encode_to_json(b))  # noqa: F821
 
 
 def _need_update_from_run_result(summary, run_result):
@@ -1098,7 +1096,7 @@ class TaskResultApiTest(TestCase):
 
     actual = swarming_pb2.TaskResult()
     run_result.to_proto(actual)
-    self.assertEqual(unicode(expected), unicode(actual))
+    self.assertEqual(unicode(expected), unicode(actual))  # noqa: F821
 
     # Make sure the root task id is the grand parent.
     self.assertEqual("1d69b9f088008810", grand_parent.task_id)
@@ -1110,7 +1108,7 @@ class TaskResultApiTest(TestCase):
     expected.request.root_task_id = grand_parent.task_id
     expected.request.root_run_id = grand_parent_run_id
     run_result.to_proto(actual, append_root_ids=True)
-    self.assertEqual(unicode(expected), unicode(actual))
+    self.assertEqual(unicode(expected), unicode(actual))  # noqa: F821
 
   @parameterized.expand(
     [

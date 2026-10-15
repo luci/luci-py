@@ -10,12 +10,12 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.api import datastore_errors
-from google.appengine.ext import ndb
+from google.appengine.api import datastore_errors  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
 
-from components.datastore_utils import properties
-from components.protoutil import test_proto_pb2
-from test_support import test_case
+from components.datastore_utils import properties  # noqa: E402
+from components.protoutil import test_proto_pb2  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class BP(ndb.Model):

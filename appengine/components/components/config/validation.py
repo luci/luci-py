@@ -297,7 +297,7 @@ def compile_pattern(pattern):
   Raises:
     ValueError if |pattern| is malformed.
   """
-  if not isinstance(pattern, basestring):
+  if not isinstance(pattern, basestring):  # noqa: F821
     raise ValueError("Pattern must be a string")
   if ":" in pattern:
     kind, value = pattern.split(":", 2)

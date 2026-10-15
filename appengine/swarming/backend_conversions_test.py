@@ -13,26 +13,26 @@ import swarming_test_env
 
 swarming_test_env.setup_test_env()
 
-from google.appengine.api import app_identity
-from google.appengine.ext import ndb
-from google.protobuf import struct_pb2
-from google.protobuf import duration_pb2
-from google.protobuf import timestamp_pb2
+from google.appengine.api import app_identity  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
+from google.protobuf import struct_pb2  # noqa: E402
+from google.protobuf import duration_pb2  # noqa: E402
+from google.protobuf import timestamp_pb2  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-import backend_conversions
-import handlers_exceptions
-from components import utils
-from server import task_request
-from server import task_result
-from server import task_pack
+import backend_conversions  # noqa: E402
+import handlers_exceptions  # noqa: E402
+from components import utils  # noqa: E402
+from server import task_request  # noqa: E402
+from server import task_result  # noqa: E402
+from server import task_pack  # noqa: E402
 
-from bb.go.chromium.org.luci.buildbucket.proto import backend_pb2
-from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
-from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2
-from bb.go.chromium.org.luci.buildbucket.proto import task_pb2
-from proto.api_v2 import swarming_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import backend_pb2  # noqa: E402
+from bb.go.chromium.org.luci.buildbucket.proto import common_pb2  # noqa: E402
+from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2  # noqa: E402
+from bb.go.chromium.org.luci.buildbucket.proto import task_pb2  # noqa: E402
+from proto.api_v2 import swarming_pb2  # noqa: E402
 
 
 def req_dim_prpc(key, value, exp_secs=None):

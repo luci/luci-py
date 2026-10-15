@@ -15,14 +15,14 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import webapp2
-import webtest
+import webapp2  # noqa: E402
+import webtest  # noqa: E402
 
-from components import auth
-from components.ereporter2 import formatter
-from components.ereporter2 import models
-from components.ereporter2 import on_error
-from test_support import test_case
+from components import auth  # noqa: E402, F401
+from components.ereporter2 import formatter  # noqa: E402
+from components.ereporter2 import models  # noqa: E402
+from components.ereporter2 import on_error  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 ON_ERROR_PATH = os.path.abspath(on_error.__file__)
@@ -79,7 +79,7 @@ class Ereporter2OnErrorTest(test_case.TestCase):
     expected["args"] = []
     expected["created_ts"] = self._now
     expected["identity"] = None
-    expected["python_version"] = unicode(platform.python_version())
+    expected["python_version"] = unicode(platform.python_version())  # noqa: F821
     expected["source"] = "server"
     expected["source_ip"] = None
     expected["version"] = "v1a"

@@ -15,11 +15,11 @@ import test_env_bot_code
 
 test_env_bot_code.setup_test_env()
 
-from depot_tools import auto_stub
-from depot_tools import fix_encoding
-from utils import file_path
+from depot_tools import auto_stub  # noqa: E402
+from depot_tools import fix_encoding  # noqa: E402
+from utils import file_path  # noqa: E402
 
-import file_refresher
+import file_refresher  # noqa: E402
 
 
 class TestFileRefresherThread(auto_stub.TestCase):

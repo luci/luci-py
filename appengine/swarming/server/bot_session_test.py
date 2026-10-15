@@ -13,11 +13,11 @@ import test_env
 
 test_env.setup_test_env()
 
-from proto.internals import session_pb2
-from server import bot_groups_config
-from server import bot_session
-from server import hmac_secret
-from test_support import test_case
+from proto.internals import session_pb2  # noqa: E402
+from server import bot_groups_config  # noqa: E402
+from server import bot_session  # noqa: E402
+from server import hmac_secret  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 def _bot_group_config(**kwargs):

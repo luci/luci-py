@@ -14,24 +14,24 @@ import unittest
 # Setups environment.
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP_DIR)
-import test_env_handlers
+import test_env_handlers  # noqa: E402
 
-import webtest
-import handlers_backend
+import webtest  # noqa: E402
+import handlers_backend  # noqa: E402
 
-from google.appengine.api import taskqueue
+from google.appengine.api import taskqueue  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402, F401
 
-from components import utils
-from proto.api import swarming_pb2
-from proto.config import pools_pb2
-from proto.plugin import plugin_pb2
-from server import config
-from server import external_scheduler
-from server import pools_config
-from server import task_request
-from server import task_scheduler
+from components import utils  # noqa: E402
+from proto.api import swarming_pb2  # noqa: E402, F401
+from proto.config import pools_pb2  # noqa: E402, F401
+from proto.plugin import plugin_pb2  # noqa: E402
+from server import config  # noqa: E402
+from server import external_scheduler  # noqa: E402
+from server import pools_config  # noqa: E402
+from server import task_request  # noqa: E402
+from server import task_scheduler  # noqa: E402
 
 
 def _gen_properties(**kwargs):
@@ -78,7 +78,7 @@ class FakeExternalScheduler(object):
     self._test = test
     self.called_with_requests = []
 
-  def AssignTasks(self, req, credentials):  # pylint: disable=unused-argument
+  def AssignTasks(self, req, credentials):
     self._test.assertIsInstance(req, plugin_pb2.AssignTasksRequest)
     self.called_with_requests.append(req)
     resp = plugin_pb2.AssignTasksResponse()
@@ -88,7 +88,6 @@ class FakeExternalScheduler(object):
     item.slice_number = 1
     return resp
 
-  # pylint: disable=unused-argument
   def GetCancellations(self, req, credentials):
     self._test.assertIsInstance(req, plugin_pb2.GetCancellationsRequest)
     self.called_with_requests.append(req)
@@ -98,12 +97,12 @@ class FakeExternalScheduler(object):
     item.task_id = "task_id"
     return resp
 
-  def NotifyTasks(self, req, credentials):  # pylint: disable=unused-argument
+  def NotifyTasks(self, req, credentials):
     self._test.assertIsInstance(req, plugin_pb2.NotifyTasksRequest)
     self.called_with_requests.append(req)
     return plugin_pb2.NotifyTasksResponse()
 
-  def GetCallbacks(self, req, credentials):  # pylint: disable=unused-argument
+  def GetCallbacks(self, req, credentials):
     self._test.assertIsInstance(req, plugin_pb2.GetCallbacksRequest)
     self.called_with_requests.append(req)
     resp = plugin_pb2.GetCallbacksResponse()

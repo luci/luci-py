@@ -14,23 +14,21 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.protobuf import duration_pb2
-from google.protobuf import timestamp_pb2
+from google.protobuf import duration_pb2  # noqa: E402
+from google.protobuf import timestamp_pb2  # noqa: E402
 
-from google.appengine.api import datastore_errors
-from google.appengine.ext import ndb
+from google.appengine.api import datastore_errors  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import auth_testing
-from components import utils
-from test_support import test_case
+from components import auth_testing  # noqa: E402
+from components import utils  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.api import swarming_pb2
-from server import config
-from server import pools_config
-from server import task_pack
-from server import task_request
-
-# pylint: disable=W0212
+from proto.api import swarming_pb2  # noqa: E402
+from server import config  # noqa: E402
+from server import pools_config  # noqa: E402
+from server import task_pack  # noqa: E402
+from server import task_request  # noqa: E402
 
 
 def _gen_cipd_input(**kwargs):
@@ -149,21 +147,22 @@ def _gen_task_template(cache=None, cipd_package=None, env=None):
       else:
         value, prefix, soft = combo_value
     else:
-      value = unicode(combo_value)
+      value = unicode(combo_value)  # noqa: F821
 
-    return pools_config.Env(var, value, tuple(map(unicode, prefix)), soft)
+    return pools_config.Env(var, value, tuple(map(unicode, prefix)), soft)  # noqa: F821
 
   return pools_config.TaskTemplate(
     cache=sorted(
-      pools_config.CacheEntry(unicode(name), unicode(path))
+      pools_config.CacheEntry(unicode(name), unicode(path))  # noqa: F821
       for name, path in (cache or {}).items()
     ),
     cipd_package=sorted(
-      pools_config.CipdPackage(unicode(path), unicode(pkg), unicode(version))
+      pools_config.CipdPackage(unicode(path), unicode(pkg), unicode(version))  # noqa: F821
       for (path, pkg), version in (cipd_package or {}).items()
     ),
     env=sorted(
-      env_value(unicode(var), value) for var, value in (env or {}).items()
+      env_value(unicode(var), value)  # noqa: F821
+      for var, value in (env or {}).items()  # noqa: F821
     ),
     inclusions=(),
   )
@@ -525,8 +524,8 @@ class TaskRequestApiTest(TestCase):
       "authenticated": auth_testing.DEFAULT_MOCKED_IDENTITY,
       "has_build_task": False,
       "name": "Request name",
-      "parent_task_id": unicode(parent_id),
-      "root_task_id": unicode(parent_id),
+      "parent_task_id": unicode(parent_id),  # noqa: F821
+      "root_task_id": unicode(parent_id),  # noqa: F821
       "priority": 50,
       "pubsub_topic": None,
       "pubsub_userdata": None,
@@ -1083,7 +1082,7 @@ class TaskRequestApiTest(TestCase):
 
     actual = swarming_pb2.TaskRequest()
     request.to_proto(actual)
-    self.assertEqual(unicode(expected), unicode(actual))
+    self.assertEqual(unicode(expected), unicode(actual))  # noqa: F821
 
     actual = swarming_pb2.TaskRequest()
     expected.root_task_id = grand_parent.task_id
@@ -1143,12 +1142,12 @@ class TaskRequestApiTest(TestCase):
 
     # Limit on the maximum number of TaskSlice in a TaskRequest.
     slices = [
-      _gen_slice(dimensions={"pool": ["GPU"], "v": [unicode(i)]})
+      _gen_slice(dimensions={"pool": ["GPU"], "v": [unicode(i)]})  # noqa: F821
       for i in range(8)
     ]
     _gen_request_slices(task_slices=slices).put()
     slices = [
-      _gen_slice(dimensions={"pool": ["GPU"], "v": [unicode(i)]})
+      _gen_slice(dimensions={"pool": ["GPU"], "v": [unicode(i)]})  # noqa: F821
       for i in range(9)
     ]
     with self.assertRaises(datastore_errors.BadValueError):
@@ -1286,7 +1285,7 @@ class TaskRequestApiTest(TestCase):
     ).put()
 
   def test_request_bad_named_cache(self):
-    mkcachereq = lambda *c: _gen_request(
+    mkcachereq = lambda *c: _gen_request(  # noqa: E731
       properties=_gen_properties(caches=c)
     ).put()
     with self.assertRaises(datastore_errors.BadValueError):
@@ -1345,13 +1344,13 @@ class TaskRequestApiTest(TestCase):
       mkcachereq(task_request.CacheEntry(name="g", path="p" * 257))
     # Too many.
     c = [
-      task_request.CacheEntry(name=unicode(i), path=unicode(i))
+      task_request.CacheEntry(name=unicode(i), path=unicode(i))  # noqa: F821
       for i in range(32)
     ]
     _gen_request(properties=_gen_properties(caches=c)).put()
     with self.assertRaises(datastore_errors.BadValueError):
       c = [
-        task_request.CacheEntry(name=unicode(i), path=unicode(i))
+        task_request.CacheEntry(name=unicode(i), path=unicode(i))  # noqa: F821
         for i in range(33)
       ]
       _gen_request(properties=_gen_properties(caches=c)).put()
@@ -1428,11 +1427,11 @@ class TaskRequestApiTest(TestCase):
 
   def test_request_bad_dimensions_key(self):
     # Max # keys.
-    d = {"a%s" % string.ascii_letters[i]: [unicode(i)] for i in range(31)}
+    d = {"a%s" % string.ascii_letters[i]: [unicode(i)] for i in range(31)}  # noqa: F821
     d["pool"] = ["a"]
     _gen_request(properties=_gen_properties(dimensions=d)).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      d = {"a%s" % string.ascii_letters[i]: [unicode(i)] for i in range(32)}
+      d = {"a%s" % string.ascii_letters[i]: [unicode(i)] for i in range(32)}  # noqa: F821
       d["pool"] = ["a"]
       _gen_request(properties=_gen_properties(dimensions=d)).put()
 
@@ -1455,10 +1454,10 @@ class TaskRequestApiTest(TestCase):
 
   def test_request_bad_dimensions_value(self):
     # Max # values.
-    d = {"pool": ["b"], "a.": [unicode(i) for i in range(16)]}
+    d = {"pool": ["b"], "a.": [unicode(i) for i in range(16)]}  # noqa: F821
     _gen_request(properties=_gen_properties(dimensions=d)).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      d = {"pool": ["b"], "a.": [unicode(i) for i in range(17)]}
+      d = {"pool": ["b"], "a.": [unicode(i) for i in range(17)]}  # noqa: F821
       _gen_request(properties=_gen_properties(dimensions=d)).put()
     # Value length.
     d = {
@@ -1748,7 +1747,7 @@ class TaskRequestApiTest(TestCase):
 
   def test_request_bad_tags_too_long(self):
     # Minus 2 for the 'a:' prefix.
-    l = task_request._TAG_LENGTH - 2
+    l = task_request._TAG_LENGTH - 2  # noqa: E741
     _gen_request(manual_tags=["a:" + "b" * l]).put()
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(manual_tags=["a:" + "a" * (l + 1)]).put()

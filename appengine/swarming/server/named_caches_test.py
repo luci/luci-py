@@ -10,18 +10,17 @@ import logging
 import sys
 import unittest
 
-# pylint: disable=wrong-import-position
 import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from server import bot_management
-from server import named_caches
-from server import pools_config
-from test_support import test_case
+from components import utils  # noqa: E402
+from server import bot_management  # noqa: E402
+from server import named_caches  # noqa: E402
+from server import pools_config  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 def _bot_event(bot_id, pool, caches, oses):
@@ -42,7 +41,7 @@ def _bot_event(bot_id, pool, caches, oses):
     authenticated_as="bot:%s.domain" % bot_id,
     dimensions=dimensions,
     state=state or {"ram": 65},
-    version=unicode(hashlib.sha256().hexdigest()),
+    version=unicode(hashlib.sha256().hexdigest()),  # noqa: F821
     register_dimensions=True,
   )
 

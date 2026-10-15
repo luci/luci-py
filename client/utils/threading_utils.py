@@ -381,7 +381,6 @@ class AutoRetryThreadPool(ThreadPool):
       if channel is None:
         return result
       channel.send_result(result)
-    # pylint: disable=catching-non-exception
     except self._swallowed_exceptions as e:
       # Retry a few times, lowering the priority.
       actual_retries = priority & self.INTERNAL_PRIORITY_BITS
@@ -465,7 +464,7 @@ class Progress:
       <kwargs>: argument name is a name of a column. it's value is the increment
                 to the column, value is usually 0 or 1.
     """
-    assert isinstance(name, basestring), repr(name)
+    assert isinstance(name, basestring), repr(name)  # noqa: F821
     assert isinstance(raw, bool), repr(raw)
     assert all(isinstance(v, int) for v in kwargs.values()), repr(kwargs)
     args = [(self._columns_lookup[k], v) for k, v in kwargs.items() if v]
@@ -690,7 +689,6 @@ class DeadlockDetector:
     # Collect tracebacks: thread name -> traceback string.
     tracebacks = {}
 
-    # pylint: disable=W0212
     for thread_id, frame in sys._current_frames().items():
       # Don't dump deadlock detector's own thread, it's boring.
       if thread_id == current_thread_id and skip_current_thread:
@@ -831,10 +829,10 @@ def num_processors():
     import multiprocessing
 
     return multiprocessing.cpu_count()
-  except:  # pylint: disable=W0702
+  except:  # noqa: E722
     try:
       # Mac OS 10.6
-      return int(os.sysconf("SC_NPROCESSORS_ONLN"))  # pylint: disable=E1101
-    except:
+      return int(os.sysconf("SC_NPROCESSORS_ONLN"))
+    except:  # noqa: E722
       # Some of the windows builders seem to get here.
       return 4

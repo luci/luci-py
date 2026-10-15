@@ -29,18 +29,18 @@ TODO(maruel): Add VOID support like subprocess2.
 import collections
 import contextlib
 import errno
-import logging
+import logging  # noqa: F401
 import os
 import signal
 import sys
 import threading
 import time
-import traceback
+import traceback  # noqa: F401
 
 import subprocess
 
-from subprocess import CalledProcessError, PIPE, STDOUT  # pylint: disable=W0611
-from subprocess import list2cmdline
+from subprocess import CalledProcessError, PIPE, STDOUT  # noqa: F401
+from subprocess import list2cmdline  # noqa: F401
 
 
 # Default maxsize argument.
@@ -51,7 +51,7 @@ _OS_ERROR_REPORTING_INHIBITED = False
 
 if sys.platform == "win32":
   import ctypes
-  import msvcrt  # pylint: disable=F0401
+  import msvcrt
   from ctypes import wintypes
   from ctypes import windll
 
@@ -231,7 +231,6 @@ if sys.platform == "win32":
       # https://docs.microsoft.com/windows/desktop/api/jobapi2/nf-jobapi2-createjobobjectw
       self._hjob = ctypes.windll.kernel32.CreateJobObjectW(None, None)
       if not self._hjob:
-        # pylint: disable=undefined-variable
         raise WindowsError(
           "Failed to create job object: %s" % ctypes.GetLastError()
         )
@@ -291,12 +290,10 @@ if sys.platform == "win32":
       if not ctypes.windll.kernel32.AssignProcessToJobObject(
         self._hjob, int(proc._handle)
       ):
-        # pylint: disable=undefined-variable
         raise WindowsError(
           "Failed to assign job object: %s" % ctypes.GetLastError()
         )
       if not ctypes.windll.kernel32.ResumeThread(int(proc._handle_thread)):
-        # pylint: disable=undefined-variable
         raise WindowsError(
           "Failed to resume child process thread: %s" % ctypes.GetLastError()
         )
@@ -306,14 +303,13 @@ if sys.platform == "win32":
       if not ctypes.windll.kernel32.SetInformationJobObject(
         self._hjob, obj.info_type, ctypes.byref(obj), ctypes.sizeof(obj)
       ):
-        # pylint: disable=undefined-variable
         raise WindowsError(
           "Failed to adjust job object with type %s: %s"
           % (obj.info_type, ctypes.GetLastError())
         )
 
 else:
-  import fcntl  # pylint: disable=F0401
+  import fcntl
   import select
 
   # Signals that mean this process should exit quickly.
@@ -352,7 +348,6 @@ else:
     # a loop. Add a mechanism to have the caller handle this.
     flags = fcntl.fcntl(conn, fcntl.F_GETFL)
     if not conn.closed:
-      # pylint: disable=E1101
       fcntl.fcntl(conn, fcntl.F_SETFL, flags | os.O_NONBLOCK)
     try:
       try:
@@ -523,7 +518,6 @@ class Popen(subprocess.Popen):
           )
       if sys.platform == "win32":
         # May throw an WindowsError.
-        # pylint: disable=undefined-variable
         self._job = _JobObject(self.containment)
         # In this case, start the process suspended, so we can assign the job
         # object, then resume it.
@@ -588,7 +582,6 @@ class Popen(subprocess.Popen):
     """
     return (self.end or time.time()) - self.start
 
-  # pylint: disable=arguments-differ,redefined-builtin
   def communicate(self, input=None, timeout=None):
     """Implements python3's timeout support.
 
@@ -675,7 +668,7 @@ class Popen(subprocess.Popen):
 
   def wait(
     self, timeout=None, poll_initial_interval=0.001, poll_max_interval=0.05
-  ):  # pylint: disable=arguments-differ
+  ):
     """Implements python3's timeout support.
 
     Raises:
@@ -773,7 +766,7 @@ class Popen(subprocess.Popen):
       if isinstance(timeout, (int, float)):
         assert timeout >= 0, timeout
         old_timeout = timeout
-        timeout = lambda: old_timeout
+        timeout = lambda: old_timeout  # noqa: E731
       else:
         assert callable(timeout), timeout
 

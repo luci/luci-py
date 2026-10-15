@@ -13,7 +13,7 @@ ROOT_DIR = os.path.dirname(
 )
 sys.path.insert(0, ROOT_DIR)
 
-from libs.luci_context import luci_context
+from libs.luci_context import luci_context  # noqa: E402
 
 
 @unittest.skip("crbug.com/1206509: the tests fail on CQ.")
@@ -137,7 +137,7 @@ class TestLuciContext(unittest.TestCase):
 
   def test_stage(self):
     path = None
-    with luci_context.stage(something={"data": True}) as path:
+    with luci_context.stage(something={"data": True}) as path:  # noqa: F811
       with open(path, "r") as f:
         self.assertEqual('{"something": {"data": true}}', f.read())
     # The file is gone outside 'with' block.
@@ -155,7 +155,7 @@ class TestLuciContext(unittest.TestCase):
 
   def test_leak(self):
     path = None
-    with luci_context._tf({"something": {"data": True}}, leak=True) as path:
+    with luci_context._tf({"something": {"data": True}}, leak=True) as path:  # noqa: F811
       self.assertTrue(os.path.exists(path))
     # The file is not deleted after contextmanager exits
     self.assertTrue(os.path.exists(path))

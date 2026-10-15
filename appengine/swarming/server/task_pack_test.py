@@ -4,7 +4,7 @@
 # that can be found in the LICENSE file.
 
 import logging
-import os
+import os  # noqa: F401
 import sys
 import unittest
 
@@ -12,14 +12,11 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from server import task_pack
-
-
-# pylint: disable=W0212
+from server import task_pack  # noqa: E402
 
 
 class TaskPackApiTest(test_case.TestCase):

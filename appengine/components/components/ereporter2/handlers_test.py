@@ -14,20 +14,20 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.api import logservice
+from google.appengine.api import logservice  # noqa: E402
 
-import webapp2
-import webtest
+import webapp2  # noqa: E402
+import webtest  # noqa: E402
 
-from components import auth
-from components import template
-from components.ereporter2 import acl
-from components.ereporter2 import handlers
-from components.ereporter2 import logscraper
-from components.ereporter2 import models
-from components.ereporter2 import on_error
-from components.ereporter2 import ui
-from test_support import test_case
+from components import auth  # noqa: E402
+from components import template  # noqa: E402
+from components.ereporter2 import acl  # noqa: E402
+from components.ereporter2 import handlers  # noqa: E402
+from components.ereporter2 import logscraper  # noqa: E402
+from components.ereporter2 import models  # noqa: E402
+from components.ereporter2 import on_error  # noqa: E402
+from components.ereporter2 import ui  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 def ErrorRecord(**kwargs):
@@ -133,7 +133,7 @@ class Ereporter2FrontendTest(Base):
       "/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>",
     )
     for route in handlers.get_frontend_routes():
-      if not route.template in exception:
+      if route.template not in exception:
         self.app.get(route.template, status=200)
 
     def gen_request(request_id):

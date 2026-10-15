@@ -8,7 +8,7 @@ import json
 import os
 import random
 import string
-import subprocess
+import subprocess  # noqa: F401
 import sys
 import tempfile
 import time
@@ -128,8 +128,6 @@ def _get_policies(
 class CacheTestMixin:
   """Adds testing for the Cache interface."""
 
-  # pylint: disable=no-member
-
   def get_cache(self, policies):
     raise NotImplementedError()
 
@@ -214,7 +212,6 @@ class CacheTestMixin:
 class ContentAddressedCacheTestMixin(CacheTestMixin):
   """Add testing for the ContentAddressedCache interface."""
 
-  # pylint: disable=abstract-method
   _now = 0
 
   # write() is indirectly tested with _add_one_item().

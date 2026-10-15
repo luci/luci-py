@@ -47,7 +47,7 @@ class ErrorReportingMonitoring(ndb.Model):
   @staticmethod
   def error_to_key_id(error):
     """Returns the key id for an error signature."""
-    assert isinstance(error, unicode), repr(error)
+    assert isinstance(error, unicode), repr(error)  # noqa: F821
     return hashlib.sha1(error.encode("utf-8")).hexdigest()
 
   @classmethod

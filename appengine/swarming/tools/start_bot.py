@@ -25,8 +25,8 @@ GO_CLIENT_DIR = os.path.join(LUCI_DIR, "luci-go")
 sys.path.insert(0, CLIENT_DIR)
 sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party"))
 # third_party/
-from depot_tools import fix_encoding
-from six.moves import urllib
+from depot_tools import fix_encoding  # noqa: E402
+from six.moves import urllib  # noqa: E402
 
 sys.path.pop(0)
 sys.path.pop(0)
@@ -154,7 +154,7 @@ class LocalBot(object):
     else:
       for name, content in sorted(self._logs.items()):
         sys.stderr.write(name + ":\n")
-        for l in content.strip("\n").splitlines():
+        for l in content.strip("\n").splitlines():  # noqa: E741
           sys.stderr.write("  %s\n" % l)
     print("-" * 60, file=sys.stderr)
 

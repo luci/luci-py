@@ -11,10 +11,10 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402, F401
 
-from components.config import fs
-from test_support import test_case
+from components.config import fs  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_ROOT = os.path.join(THIS_DIR, "test_data", "configs")

@@ -13,14 +13,14 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.api import app_identity
+from google.appengine.api import app_identity  # noqa: E402
 
-from components import utils
-from components.auth import api
-from components.auth import b64
-from components.auth import signature
-from components.auth import tokens
-from test_support import test_case
+from components import utils  # noqa: E402
+from components.auth import api  # noqa: E402
+from components.auth import b64  # noqa: E402
+from components.auth import signature  # noqa: E402
+from components.auth import tokens  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 URL_SAFE_ALPHABET = set(string.letters + string.digits + "-_")
@@ -188,7 +188,7 @@ class TokenEncodeDecodeTest(test_case.TestCase):
 
   def test_rejects_modified(self):
     tok = tokens.encode_token(self.algo, 1, "secret", ["msg"], {"a": "b"})
-    decode = lambda x: tokens.decode_token(self.algo, x, ["secret"], ["msg"])
+    decode = lambda x: tokens.decode_token(self.algo, x, ["secret"], ["msg"])  # noqa: E731
     # Works if not modified.
     decode(tok)
     # Try simple modifications.

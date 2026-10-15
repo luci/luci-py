@@ -34,8 +34,8 @@ from components import utils
 from components import prpc
 from components.prpc import codes
 from components.prpc import encoding
-from server import task_pack
-from server import task_result
+from server import task_pack  # noqa: F401
+from server import task_result  # noqa: F401
 
 from bb.go.chromium.org.luci.buildbucket.proto import backend_pb2
 from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
@@ -171,7 +171,7 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.mock(utils, "time_time_ns", lambda: 1546398020)
     actual_resp = self._client_run_task(request)
     expected_task_id = "4225526b80008610"
-    l = "https://test-swarming.appspot.com/task?id=%s&o=true&w=true"
+    l = "https://test-swarming.appspot.com/task?id=%s&o=true&w=true"  # noqa: E741
     expected_response = backend_pb2.RunTaskResponse(
       task=task_pb2.Task(
         id=task_pb2.TaskID(
@@ -280,7 +280,6 @@ class TaskBackendAPIServiceTest(test_env_handlers.AppTestBase):
     self.mock(realms, "check_tasks_act_as", lambda *_: True)
     self.mock(service_accounts, "has_token_server", lambda: True)
 
-    # pylint: disable=unused-argument
     def mocked_schedule_request(
       _, start_time=0, secret_bytes=None, build_task=None
     ):

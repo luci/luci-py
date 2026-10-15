@@ -13,12 +13,12 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from components import auth
-from components import template
-from components.ereporter2 import acl
-from components.ereporter2 import logscraper
-from components.ereporter2 import ui
-from test_support import test_case
+from components import auth  # noqa: E402
+from components import template  # noqa: E402
+from components.ereporter2 import acl  # noqa: E402
+from components.ereporter2 import logscraper  # noqa: E402
+from components.ereporter2 import ui  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 ABS_PATH = os.path.abspath(__file__)

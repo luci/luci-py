@@ -20,9 +20,9 @@ sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party", "rsa"))
 sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party"))
 
 # third_party/
-from depot_tools import fix_encoding
+from depot_tools import fix_encoding  # noqa: E402
 
-from utils import fs
+from utils import fs  # noqa: E402
 
 
 _UMASK = None
@@ -53,7 +53,6 @@ def make_tree(out, contents):
       mode = 0o700 if relpath.endswith(".py") else 0o600
       flags = os.O_WRONLY | os.O_CREAT
       if sys.platform == "win32":
-        # pylint: disable=no-member
         flags |= os.O_BINARY
       with os.fdopen(os.open(filepath, flags, mode), "wb") as f:
         f.write(content)

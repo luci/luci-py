@@ -4,9 +4,9 @@
 
 """Monotonic addition of entities."""
 
-from google.appengine.api import datastore_errors
+from google.appengine.api import datastore_errors  # noqa: F401
 from google.appengine.ext import ndb
-from google.appengine.runtime import apiproxy_errors
+from google.appengine.runtime import apiproxy_errors  # noqa: F401
 
 from components import utils
 from . import txn

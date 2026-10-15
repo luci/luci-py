@@ -12,20 +12,20 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import webapp2
-import webtest
-import flask
+import webapp2  # noqa: E402
+import webtest  # noqa: E402
+import flask  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from google.protobuf import empty_pb2
+from google.protobuf import empty_pb2  # noqa: E402
 
-from components.prpc import encoding
-from components.prpc import flask_server
-from components.prpc import webapp2_server
-from components.prpc import server_base
-from components.prpc.test import test_pb2
-from components.prpc.test import test_prpc_pb2
+from components.prpc import encoding  # noqa: E402
+from components.prpc import flask_server  # noqa: E402
+from components.prpc import webapp2_server  # noqa: E402
+from components.prpc import server_base  # noqa: E402
+from components.prpc.test import test_pb2  # noqa: E402
+from components.prpc.test import test_prpc_pb2  # noqa: E402
 
 
 class TestServicer(object):

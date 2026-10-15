@@ -7,13 +7,13 @@ import logging
 import os
 import subprocess
 import sys
-import threading
+import threading  # noqa: F401
 import unittest
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 SWARMING_BOT_DIR = os.path.dirname(THIS_DIR)
 
-import singleton
+import singleton  # noqa: E402
 
 PYCODE = """
 import sys

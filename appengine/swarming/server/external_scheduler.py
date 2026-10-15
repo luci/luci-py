@@ -316,7 +316,6 @@ def task_batch_handle_notifications():
     else:
       requests[s_tuple].notifications.extend(proto.notifications)
 
-  # pylint: disable=consider-iterating-dictionary
   for s_id, address in requests.keys():
     request_json = json_format.MessageToJson(requests[s_id, address])
     enqueued = utils.enqueue_task(

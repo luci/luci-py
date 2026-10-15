@@ -75,7 +75,7 @@ from google.appengine.ext import ndb
 from components import auth
 from components import datastore_utils
 from components import utils
-from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
+from proto.api import swarming_pb2
 from server import large
 from server import resultdb
 from server import task_pack
@@ -691,7 +691,6 @@ class _TaskResultCommon(ndb.Model):
     # Keeps a cache. It's still paying the full latency cost of a DB fetch.
     if not hasattr(self, "_performance_stats_cache"):
       key = None if self.deduped_from else self.performance_stats_key
-      # pylint: disable=attribute-defined-outside-init
       stats = (key.get() if key else None) or PerformanceStats()
       stats.cache_trim = stats.cache_trim or OperationStats()
       stats.named_caches_install = (
@@ -767,7 +766,6 @@ class _TaskResultCommon(ndb.Model):
     """Returns the TaskRequest that is related to this entity."""
     # Keeps a cache. It's still paying the full latency cost of a DB fetch.
     if not hasattr(self, "_request_cache"):
-      # pylint: disable=attribute-defined-outside-init
       self._request_cache = self.request_key.get()
     return self._request_cache
 
@@ -1352,7 +1350,7 @@ class TaskResultSummary(_TaskResultCommon):
       prev_state,
       State.to_string(self.state),
     )
-    import ts_mon_metrics  # pylint: disable=cyclic-import
+    import ts_mon_metrics
 
     ts_mon_metrics.on_task_completed(self)
 
@@ -1598,13 +1596,11 @@ def filter_query(cls, q, start, end, sort, state):
 
   if state == "completed_success":
     q = q.filter(cls.state == State.COMPLETED)
-    # pylint: disable=singleton-comparison
-    return q.filter(cls.failure == False)
+    return q.filter(cls.failure == False)  # noqa: E712
 
   if state == "completed_failure":
     q = q.filter(cls.state == State.COMPLETED)
-    # pylint: disable=singleton-comparison
-    return q.filter(cls.failure == True)
+    return q.filter(cls.failure == True)  # noqa: E712
 
   if state == "deduped":
     q = q.filter(cls.state == State.COMPLETED)

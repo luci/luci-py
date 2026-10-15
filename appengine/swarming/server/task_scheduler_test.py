@@ -19,45 +19,42 @@ import mock
 # Setups environment.
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP_DIR)
-import test_env_handlers
+import test_env_handlers  # noqa: E402
 
-from google.appengine.api import datastore_errors
-from google.appengine.ext import ndb
+from google.appengine.api import datastore_errors  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
 
-import webtest
+import webtest  # noqa: E402
 
-import handlers_backend
-import ts_mon_metrics
+import handlers_backend  # noqa: E402
+import ts_mon_metrics  # noqa: E402
 
-from components import auth
-from components import auth_testing
-from components import datastore_utils
-from components import net
-from components import pubsub
-from components import utils
-from components.auth.proto import delegation_pb2
+from components import auth  # noqa: E402
+from components import auth_testing  # noqa: E402
+from components import datastore_utils  # noqa: E402
+from components import net  # noqa: E402
+from components import pubsub  # noqa: E402
+from components import utils  # noqa: E402
+from components.auth.proto import delegation_pb2  # noqa: E402
 
-from server import bot_management
-from server import config
-from server import external_scheduler
-from server import pools_config
-from server import rbe
-from server import task_pack
-from server import task_queues
-from server import task_request
-from server import task_result
-from server import task_scheduler
-from server import task_to_run
-from server.task_result import State
+from server import bot_management  # noqa: E402
+from server import config  # noqa: E402
+from server import external_scheduler  # noqa: E402
+from server import pools_config  # noqa: E402
+from server import rbe  # noqa: E402
+from server import task_pack  # noqa: E402
+from server import task_queues  # noqa: E402
+from server import task_request  # noqa: E402
+from server import task_result  # noqa: E402
+from server import task_scheduler  # noqa: E402
+from server import task_to_run  # noqa: E402
+from server.task_result import State  # noqa: E402
 
-from proto.config import pools_pb2
-from proto.plugin import plugin_pb2
+from proto.config import pools_pb2  # noqa: E402
+from proto.plugin import plugin_pb2  # noqa: E402
 
-from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
-from bb.go.chromium.org.luci.buildbucket.proto import task_pb2
-
-
-# pylint: disable=W0212,W0612
+from bb.go.chromium.org.luci.buildbucket.proto import common_pb2  # noqa: E402
+from bb.go.chromium.org.luci.buildbucket.proto import task_pb2  # noqa: E402
 
 
 def _gen_properties(**kwargs):
@@ -1051,7 +1048,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       mock.Mock(side_effect=self._mock_create_invocation_async),
     ) as mock_call:
       request = _gen_request_slices(realm="infra:try")
-      result_summary = task_scheduler.schedule_request(
+      result_summary = task_scheduler.schedule_request(  # noqa: F841
         request, enable_resultdb=True
       )
       mock_call.assert_called_once_with(
@@ -1142,7 +1139,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def _mock_es_assign(self, task_id, slice_number):
     """Mock out the return behavior from external_scheduler.assign_task"""
 
-    # pylint: disable=unused-argument
     def mock_assign(*args):
       return task_id, slice_number
 
@@ -1155,7 +1151,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     """
     calls = []
 
-    # pylint: disable=unused-argument
     def mock_notify(es_cfg, requests, use_tq, is_callback):
       assert isinstance(es_cfg, pools_config.ExternalSchedulerConfig)
       for request, result in requests:
@@ -1556,7 +1551,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # An idempotent task has properties_hash set after it succeeded.
     self.assertTrue(run_result.result_summary_key.get().properties_hash)
     self.assertEqual(1, self.execute_tasks())
-    return unicode(run_result.task_id)
+    return unicode(run_result.task_id)  # noqa: F821
 
   def _task_deduped(
     self, new_ts, deduped_from, task_id, now=None, created_ts=None
@@ -1651,7 +1646,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._task_ran_successfully()
 
     # Second task is scheduled, first task is too old to be reused.
-    new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
+    new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)  # noqa: F841
     result_summary = self._quick_schedule(
       task_slices=[
         task_request.TaskSlice(
@@ -1764,7 +1759,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     task_id = self._task_ran_successfully()
 
     # Second task's second task slice is deduped against first task.
-    new_ts = self.mock_now(
+    new_ts = self.mock_now(  # noqa: F841
       self.now, config.settings().reusable_task_age_secs - 1
     )
     result_summary = self._quick_schedule(
@@ -1812,7 +1807,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     invalid_parent_id = parent_id[:-1] + "2"
     # Try to create a children task with invalid parent_task_id.
     # task should be scheduled without error
-    result_summary = self._quick_schedule(parent_task_id=invalid_parent_id)
+    result_summary = self._quick_schedule(parent_task_id=invalid_parent_id)  # noqa: F841
 
   def test_task_parent(self):
     run_result = self._quick_reap(
@@ -1848,9 +1843,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_task_timeout(self):
     # Create a task, but the bot tries to timeout but fails to report exit code
     # and duration.
-    pub_sub_calls = self.mock_pub_sub()
+    pub_sub_calls = self.mock_pub_sub()  # noqa: F841
     run_result = self._quick_reap(pubsub_topic="projects/abc/topics/def")
-    to_run_key = _run_result_to_to_run_key(run_result)
+    to_run_key = _run_result_to_to_run_key(run_result)  # noqa: F841
     self.mock_now(self.now, 10.5)
     self.assertEqual(
       State.TIMED_OUT, _bot_update_task(run_result.key, hard_timeout=True)
@@ -3088,7 +3083,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_cancel_tasks(self):
     # Create RUNNING task
-    pub_sub_calls = self.mock_pub_sub()
+    pub_sub_calls = self.mock_pub_sub()  # noqa: F841
     self._quick_reap(pubsub_topic="projects/abc/topics/def")
 
     # Create PENDING task
@@ -3117,8 +3112,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_cancel_tasks_skip_running(self):
     # Create RUNNING task
-    pub_sub_calls = self.mock_pub_sub()
-    running_result = self._quick_reap(pubsub_topic="projects/abc/topics/def")
+    pub_sub_calls = self.mock_pub_sub()  # noqa: F841
+    running_result = self._quick_reap(pubsub_topic="projects/abc/topics/def")  # noqa: F841
 
     # Create PENDING task
     task_slices = [
@@ -3134,7 +3129,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         wait_for_capacity=True,
       ),
     ]
-    pending_result = self._quick_schedule(task_slices=task_slices)
+    pending_result = self._quick_schedule(task_slices=task_slices)  # noqa: F841
     query = task_result.get_result_summaries_query(
       start=None, end=None, sort="created_ts", state="pending", tags=[]
     )
@@ -3841,10 +3836,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       ]
     )
     request = run_result.request_key.get()
-    to_run_key = task_to_run.request_to_task_to_run_key(
+    to_run_key = task_to_run.request_to_task_to_run_key(  # noqa: F841
       run_result.request_key.get(), 0
     )
-    now_1 = self.mock_now(
+    now_1 = self.mock_now(  # noqa: F841
       self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs), 1
     )
 
@@ -3958,7 +3953,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       ).sum,
     )
     # Task was retried but the same bot polls again, it's denied the task.
-    now_2 = self.mock_now(
+    now_2 = self.mock_now(  # noqa: F841
       self.now + datetime.timedelta(seconds=request.bot_ping_tolerance_secs), 2
     )
     request, _, run_result = self._bot_reap_task()
@@ -3997,7 +3992,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         ),
       ]
     )
-    result_summary = run_result.result_summary_key.get()
+    result_summary = run_result.result_summary_key.get()  # noqa: F841
     request = run_result.request_key.get()
 
     # cancel running task

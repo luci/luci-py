@@ -3,7 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import logging
+import logging  # noqa: F401
 import sys
 import collections
 import unittest
@@ -12,19 +12,19 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.protobuf import empty_pb2
+from google.protobuf import empty_pb2  # noqa: E402
 
-from components import prpc as prpclib
-from components import utils
-from components.auth import api
-from components.auth import b64
-from components.auth import check
-from components.auth import ipaddr
-from components.auth import model
-from components.auth import prpc
-from components.auth import testing
-from components.auth.proto import delegation_pb2
-from test_support import test_case
+from components import prpc as prpclib  # noqa: E402
+from components import utils  # noqa: E402
+from components.auth import api  # noqa: E402
+from components.auth import b64  # noqa: E402
+from components.auth import check  # noqa: E402
+from components.auth import ipaddr  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth import prpc  # noqa: E402
+from components.auth import testing  # noqa: E402
+from components.auth.proto import delegation_pb2  # noqa: E402
+from test_support import test_case  # noqa: E402, F401
 
 
 CapturedState = collections.namedtuple(

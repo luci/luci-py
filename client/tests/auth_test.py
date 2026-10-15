@@ -17,10 +17,10 @@ from utils import tools
 tools.force_local_third_party()
 
 # third_party/
-import httplib2
-from depot_tools import auto_stub
+import httplib2  # noqa: E402
+from depot_tools import auto_stub  # noqa: E402
 
-from utils import oauth
+from utils import oauth  # noqa: E402
 
 
 class LuciContextAuthTest(auto_stub.TestCase):

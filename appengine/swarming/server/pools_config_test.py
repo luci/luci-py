@@ -12,19 +12,19 @@ import test_env
 
 test_env.setup_test_env()
 
-from components import auth
-from components import config
-from components import utils
-from components.config import validation
-from test_support import test_case
+from components import auth  # noqa: E402
+from components import config  # noqa: E402
+from components import utils  # noqa: E402
+from components.config import validation  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.config import config_pb2
-from proto.config import pools_pb2
-from proto.config import realms_pb2
-from server import pools_config
-from server import task_request
+from proto.config import config_pb2  # noqa: E402
+from proto.config import pools_pb2  # noqa: E402
+from proto.config import realms_pb2  # noqa: E402
+from server import pools_config  # noqa: E402
+from server import task_request  # noqa: E402, F401
 
-from google.protobuf import text_format
+from google.protobuf import text_format  # noqa: E402
 
 
 TEST_CONFIG = pools_pb2.PoolsCfg(

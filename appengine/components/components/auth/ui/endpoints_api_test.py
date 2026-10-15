@@ -12,14 +12,14 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from protorpc.messages import ValidationError
-from protorpc.remote import protojson
+from protorpc.messages import ValidationError  # noqa: E402
+from protorpc.remote import protojson  # noqa: E402
 
-from components.auth import api
-from components.auth import model
-from components.auth.ui import endpoints_api
+from components.auth import api  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth.ui import endpoints_api  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
 
 def msg_dict(request):

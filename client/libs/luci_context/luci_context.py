@@ -18,7 +18,7 @@ import copy
 import json
 import logging
 import os
-import sys
+import sys  # noqa: F401
 import tempfile
 import threading
 

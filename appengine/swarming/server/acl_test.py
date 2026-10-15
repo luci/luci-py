@@ -12,16 +12,16 @@ import test_env
 test_env.setup_test_env()
 
 # from components.auth import api
-from components import auth
-from components import auth_testing
-from components import utils
-from server import config
-from test_support import test_case
+from components import auth  # noqa: E402
+from components import auth_testing  # noqa: E402
+from components import utils  # noqa: E402, F401
+from server import config  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.config import config_pb2
+from proto.config import config_pb2  # noqa: E402
 
-from server import acl
-from server import task_request
+from server import acl  # noqa: E402
+from server import task_request  # noqa: E402, F401
 
 
 # Default names of authorization groups.

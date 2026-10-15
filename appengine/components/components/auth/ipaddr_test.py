@@ -10,8 +10,8 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from components.auth import ipaddr
-from test_support import test_case
+from components.auth import ipaddr  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class IpAddrTest(test_case.TestCase):
@@ -83,7 +83,7 @@ class IpAddrTest(test_case.TestCase):
       ipaddr.ip_from_string("0:0:0:0:0:0:0::0")
 
   def test_ip_to_string_v4_ok(self):
-    call = lambda val: ipaddr.ip_to_string(ipaddr.IP(32, val))
+    call = lambda val: ipaddr.ip_to_string(ipaddr.IP(32, val))  # noqa: E731
     self.assertEqual("0.0.0.0", call(0))
     self.assertEqual("255.255.255.255", call(2**32 - 1))
     self.assertEqual("0.0.0.255", call(255))
@@ -96,7 +96,7 @@ class IpAddrTest(test_case.TestCase):
       ipaddr.ip_to_string(ipaddr.IP(32, 2**32))
 
   def test_ip_to_string_v6_ok(self):
-    call = lambda val: ipaddr.ip_to_string(ipaddr.IP(128, val))
+    call = lambda val: ipaddr.ip_to_string(ipaddr.IP(128, val))  # noqa: E731
     self.assertEqual("0:0:0:0:0:0:0:0", call(0))
     self.assertEqual(
       "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", call(2**128 - 1)
@@ -163,7 +163,7 @@ class IpAddrTest(test_case.TestCase):
       ipaddr.subnet_from_string("127.0.0.1/33")
 
   def test_subnet_to_string_v4(self):
-    call = lambda base, mask: ipaddr.subnet_to_string(
+    call = lambda base, mask: ipaddr.subnet_to_string(  # noqa: E731
       ipaddr.Subnet(32, base, mask)
     )
     self.assertEqual("127.0.0.1/32", call(0x7F000001, 0xFFFFFFFF))
@@ -171,7 +171,7 @@ class IpAddrTest(test_case.TestCase):
     self.assertEqual("255.254.253.0/24", call(0xFFFEFD00, 0xFFFFFF00))
 
   def test_subnet_to_string_v6(self):
-    call = lambda base, mask: ipaddr.subnet_to_string(
+    call = lambda base, mask: ipaddr.subnet_to_string(  # noqa: E731
       ipaddr.Subnet(128, base, mask)
     )
     self.assertEqual(
@@ -202,7 +202,7 @@ class IpAddrTest(test_case.TestCase):
     )
 
   def test_is_in_subnet(self):
-    call = lambda ip, subnet: ipaddr.is_in_subnet(
+    call = lambda ip, subnet: ipaddr.is_in_subnet(  # noqa: E731
       ipaddr.ip_from_string(ip), ipaddr.subnet_from_string(subnet)
     )
 

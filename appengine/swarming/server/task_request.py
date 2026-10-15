@@ -59,7 +59,7 @@ import sys
 
 import six
 
-from google.appengine import runtime
+from google.appengine import runtime  # noqa: F401
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
@@ -280,7 +280,7 @@ def _validate_dimensions(_prop, value):
 def _validate_env_key(prop, key):
   """Validates TaskProperties.env."""
   maxlen = 64
-  if not isinstance(key, unicode):
+  if not isinstance(key, unicode):  # noqa: F821
     raise TypeError("%s must have string key, not %r" % (prop._name, key))
   if not key:
     raise datastore_errors.BadValueError(
@@ -297,8 +297,7 @@ def _validate_env_key(prop, key):
 
 
 def _validate_env(prop, value):
-  # pylint: disable=protected-access
-  if not all(isinstance(v, unicode) for v in value.values()):
+  if not all(isinstance(v, unicode) for v in value.values()):  # noqa: F821
     raise TypeError(
       "%s must be a dict of strings, not %r" % (prop._name, value)
     )
@@ -317,12 +316,12 @@ def _validate_env(prop, value):
 
 
 def _validate_env_prefixes(prop, value):
-  # pylint: disable=protected-access
   maxlen = 1024
   for k, values in value.items():
     _validate_env_key(prop, k)
     if not isinstance(values, list) or not all(
-      isinstance(v, unicode) for v in values
+      isinstance(v, unicode)  # noqa: F821
+      for v in values  # noqa: F821
     ):
       raise TypeError(
         "%s must have list unicode value for key %r, not %r"
@@ -353,20 +352,17 @@ def _check_expiration_secs(name, value):
 
 def _validate_expiration_ts(prop, value):
   """Validates TaskRequest.expiration_ts."""
-  # pylint: disable=protected-access
   offset = int(round((value - utils.utcnow()).total_seconds()))
   _check_expiration_secs(prop._name, offset)
 
 
 def _validate_expiration_secs(prop, value):
   """Validates TaskSlice.expiration_secs."""
-  # pylint: disable=protected-access
   _check_expiration_secs(prop._name, value)
 
 
 def _validate_grace(prop, value):
   """Validates grace_period_secs in TaskProperties."""
-  # pylint: disable=protected-access
   if not (0 <= value <= MAX_GRACE_PERIOD_SECS):
     raise datastore_errors.BadValueError(
       "%s (%ds) must be between 0s and %ds"
@@ -390,7 +386,6 @@ def _validate_task_run_id(prop, value):
 
 def _validate_hard_timeout(prop, value):
   """Validates execution_timeout_secs in seconds in TaskProperties."""
-  # pylint: disable=protected-access
   if value and not (_MIN_TIMEOUT_SECS <= value <= MAX_TIMEOUT_SECS):
     # 0 is tolerated for termination task, but we don't advertize that, that's
     # an internal detail.
@@ -402,7 +397,6 @@ def _validate_hard_timeout(prop, value):
 
 def _validate_io_timeout(prop, value):
   """Validates io_timeout_secs in seconds in TaskProperties."""
-  # pylint: disable=protected-access
   if value and not (_MIN_TIMEOUT_SECS <= value <= MAX_TIMEOUT_SECS):
     raise datastore_errors.BadValueError(
       "%s (%ds) must be 0 or between %ds and %ds"
@@ -412,7 +406,6 @@ def _validate_io_timeout(prop, value):
 
 def _validate_tags(prop, value):
   """Validates TaskRequest.tags."""
-  # pylint: disable=protected-access
   _validate_length(prop._name, value, _TAG_LENGTH)
   if ":" not in value:
     raise datastore_errors.BadValueError(
@@ -422,7 +415,6 @@ def _validate_tags(prop, value):
 
 def _validate_pubsub_topic(prop, value):
   """Validates TaskRequest.pubsub_topic."""
-  # pylint: disable=protected-access
   _validate_length(prop._name, value, 1024)
   if value and "/" not in value:
     raise datastore_errors.BadValueError(
@@ -600,7 +592,6 @@ class FilesRef(ndb.Model):
 class Digest(ndb.Model):
   # This is a [Digest][build.bazel.remote.execution.v2.Digest] of a blob on
   # RBE-CAS.
-  # pylint: disable=line-too-long
   # See https://github.com/bazelbuild/remote-apis/blob/77cfb44a88577a7ade5dd2400425f6d50469ec6d/build/bazel/remote/execution/v2/remote_execution.proto#L753-L791
   hash = ndb.StringProperty(required=True, indexed=False)
   size_bytes = ndb.IntegerProperty(required=True, indexed=False)
@@ -1114,7 +1105,7 @@ class TaskProperties(ndb.Model):
             "of CIPD installation" % p.path
           )
       if self.idempotent:
-        pinned = lambda p: cipd.is_pinned_version(p.version)
+        pinned = lambda p: cipd.is_pinned_version(p.version)  # noqa: E731
         assert self.cipd_input.packages  # checked by cipd_input._pre_put_hook
         not_pinned = [p for p in self.cipd_input.packages if not pinned(p)]
         if not_pinned:
@@ -1740,7 +1731,7 @@ def create_termination_task(bot_id, rbe_instance=None, reason=None):
     TaskRequest for priority 0 (highest) termination task.
   """
   properties = TaskProperties(
-    dimensions_data={"id": [unicode(bot_id)]},
+    dimensions_data={"id": [unicode(bot_id)]},  # noqa: F821
     execution_timeout_secs=0,
     grace_period_secs=0,
     io_timeout_secs=0,

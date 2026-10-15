@@ -14,14 +14,14 @@ from components import utils
 utils.import_third_party()
 utils.fix_protobuf_package()
 
-from server import config
+from server import config  # noqa: E402
 
 
 components_auth_UI_APP_NAME = "Swarming"
 
 # Used to make components.auth trust the client ID used by the web UI. This is
 # a lazily-called callback (called once per minute, when initializing AuthDB).
-components_auth_OAUTH_CLIENT_IDS_PROVIDER = lambda: [config.get_ui_client_id()]
+components_auth_OAUTH_CLIENT_IDS_PROVIDER = lambda: [config.get_ui_client_id()]  # noqa: E731
 
 # Recognize X-Luci-Project header on incoming requests.
 components_auth_USE_PROJECT_IDENTITIES = True

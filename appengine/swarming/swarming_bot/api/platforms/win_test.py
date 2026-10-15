@@ -21,14 +21,14 @@ import test_env_platforms
 
 test_env_platforms.setup_test_env()
 
-from depot_tools import auto_stub
+from depot_tools import auto_stub  # noqa: E402
 
 # Disable caching before importing win.
-from utils import tools
+from utils import tools  # noqa: E402
 
 tools.cached = lambda func: func
 
-from api.platforms import win
+from api.platforms import win  # noqa: E402
 
 
 MockWinVer = collections.namedtuple("MockWinVer", ["product_type"])
@@ -72,7 +72,7 @@ class TestWin(auto_stub.TestCase):
     names = win.get_os_version_names()
     # All versions have at least two names.
     self.assertTrue(len(names) >= 2)
-    self.assertTrue(isinstance(name, unicode) for name in names)
+    self.assertTrue(isinstance(name, unicode) for name in names)  # noqa: F821
 
   def assert_get_os_dims_mock(
     self, product_type_int, cmd_ver_out, win32_ver_out, expected_version_names
@@ -83,7 +83,7 @@ class TestWin(auto_stub.TestCase):
     self.mock(platform, "win32_ver", lambda: win32_ver_out)
     names = win.get_os_version_names()
     self.assertEqual(expected_version_names, names)
-    self.assertTrue(isinstance(name, unicode) for name in names)
+    self.assertTrue(isinstance(name, unicode) for name in names)  # noqa: F821
 
   def test_get_client_versions(self):
     marketing_name_client_ver_map = {

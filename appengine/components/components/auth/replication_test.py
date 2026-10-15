@@ -11,16 +11,16 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from components.auth import model
-from components.auth import realms
-from components.auth import replication
-from components.auth.proto import permissions_pb2
-from components.auth.proto import realms_pb2
-from components.auth.proto import replication_pb2
-from test_support import test_case
+from components import utils  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth import realms  # noqa: E402
+from components.auth import replication  # noqa: E402
+from components.auth.proto import permissions_pb2  # noqa: E402
+from components.auth.proto import realms_pb2  # noqa: E402
+from components.auth.proto import replication_pb2  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 def entity_to_dict(e):
@@ -36,7 +36,7 @@ def snapshot_to_dict(snapshot):
   result = {
     "global_config": entity_to_dict(snapshot.global_config),
     "groups": [entity_to_dict(g) for g in snapshot.groups],
-    "ip_whitelists": [entity_to_dict(l) for l in snapshot.ip_whitelists],
+    "ip_whitelists": [entity_to_dict(l) for l in snapshot.ip_whitelists],  # noqa: E741
     "ip_whitelist_assignments": entity_to_dict(
       snapshot.ip_whitelist_assignments
     ),

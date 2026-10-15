@@ -8,11 +8,11 @@ import math
 import os
 import platform
 import re
-import shutil
+import shutil  # noqa: F401
 import socket
 import subprocess
 import sys
-import tempfile
+import tempfile  # noqa: F401
 import time
 import unittest
 
@@ -22,16 +22,16 @@ import test_env_api
 
 test_env_api.setup_test_env()
 
-from api import platforms
-from depot_tools import auto_stub
-from utils import file_path
+from api import platforms  # noqa: E402
+from depot_tools import auto_stub  # noqa: E402
+from utils import file_path  # noqa: E402
 
 # Disable caching before importing os_utilities.
-from utils import tools
+from utils import tools  # noqa: E402
 
 tools.cached = lambda func: func
 
-import os_utilities
+import os_utilities  # noqa: E402
 
 
 class TestOsUtilities(auto_stub.TestCase):

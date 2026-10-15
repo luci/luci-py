@@ -3,8 +3,8 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import logging
-import re
+import logging  # noqa: F401
+import re  # noqa: F401
 import sys
 import unittest
 
@@ -12,12 +12,12 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import mock
-import yaml
+import mock  # noqa: E402
+import yaml  # noqa: E402
 
-from components.config import test_config_pb2
-from components.config import validation
-from test_support import test_case
+from components.config import test_config_pb2  # noqa: E402
+from components.config import validation  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class ValidationTestCase(test_case.TestCase):

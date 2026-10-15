@@ -13,21 +13,21 @@ import unittest
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-import test_env_bot
+import test_env_bot  # noqa: E402
 
 test_env_bot.setup_test_env()
 
 # client/third_party/
-from depot_tools import auto_stub
-from depot_tools import fix_encoding
+from depot_tools import auto_stub  # noqa: E402
+from depot_tools import fix_encoding  # noqa: E402
 
 # client/
-from utils import file_path
-from utils import subprocess42
-from utils import tools
+from utils import file_path  # noqa: E402
+from utils import subprocess42  # noqa: E402
+from utils import tools  # noqa: E402
 
-import swarmingserver_bot_fake
-from bot_code import bot_main
+import swarmingserver_bot_fake  # noqa: E402
+from bot_code import bot_main  # noqa: E402
 
 
 class TestCase(auto_stub.TestCase):

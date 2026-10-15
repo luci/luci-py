@@ -5,7 +5,7 @@
 import logging
 
 # Mutates sys.path.
-import test_env  # pylint: disable=unused-import
+import test_env  # noqa: F401
 
 import httpserver
 

@@ -11,10 +11,10 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from components.config import test_config_pb2
-from test_support import test_case
+from components.config import test_config_pb2  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-import common
+import common  # noqa: E402
 
 
 class CommonCase(test_case.TestCase):

@@ -5,7 +5,7 @@
 
 import base64
 import datetime
-import json
+import json  # noqa: F401
 import sys
 import unittest
 
@@ -13,14 +13,14 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from test_support import test_case
-import mock
+from test_support import test_case  # noqa: E402
+import mock  # noqa: E402
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import auth
-from components import gerrit
-from components import gitiles
+from components import auth  # noqa: E402
+from components import gerrit  # noqa: E402
+from components import gitiles  # noqa: E402
 
 
 HOSTNAME = "chromium.googlesource.com"

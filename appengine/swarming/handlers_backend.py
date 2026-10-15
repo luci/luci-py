@@ -4,13 +4,13 @@
 
 """Main entry point for Swarming backend handlers."""
 
-import datetime
+import datetime  # noqa: F401
 import json
 import logging
 
 import webapp2
 from google.appengine.api import datastore_errors
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: F401
 from google.appengine import runtime
 
 from google.protobuf import json_format
@@ -19,16 +19,16 @@ from proto.plugin import plugin_pb2
 
 from components import decorators
 from components import datastore_utils
-from components import utils
+from components import utils  # noqa: F401
 from server import bot_groups_config
 from server import bot_management
-from server import config
+from server import config  # noqa: F401
 from server import external_scheduler
 from server import named_caches
 from server import task_queues
-from server import task_result
+from server import task_result  # noqa: F401
 from server import task_scheduler
-import ts_mon_metrics
+import ts_mon_metrics  # noqa: F401
 
 
 class WarmupHandler(webapp2.RequestHandler):
@@ -228,7 +228,7 @@ class TaskSendPubSubMessage(webapp2.RequestHandler):
 
   # Add task_id to the URL for better visibility in request logs.
   @decorators.require_taskqueue("pubsub")
-  def post(self, task_id):  # pylint: disable=unused-argument
+  def post(self, task_id):
     task_scheduler.task_handle_pubsub_task(json.loads(self.request.body))
 
 
@@ -236,7 +236,7 @@ class TaskNotifyBuildbucketHandler(webapp2.RequestHandler):
   """Sends updates to Buildbucket about task status."""
 
   @decorators.require_taskqueue("buildbucket-notify")
-  def post(self, task_id):  # pylint: disable=unused-argument
+  def post(self, task_id):
     task_scheduler.task_buildbucket_update(json.loads(self.request.body))
 
 

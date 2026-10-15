@@ -21,8 +21,8 @@ DEPOT_TOOLS = os.path.join(THIRD_PARTY, "depot_tools")
 
 sys.path.insert(0, THIRD_PARTY)
 sys.path.insert(0, DEPOT_TOOLS)
-from depot_tools import git_number
-from depot_tools import git_common
+from depot_tools import git_number  # noqa: E402
+from depot_tools import git_common  # noqa: E402
 
 assert sys.path.pop(0) == DEPOT_TOOLS
 assert sys.path.pop(0) == THIRD_PARTY

@@ -6,10 +6,12 @@
 # 'bootstrap_token = "<urlsafe string>"' are added on top of this file by the
 # HTTP handler that serves this file. This file must be concise since it is
 # executed directly at the CLI.
-# pylint: disable=E0602
-import os, urllib, sys
+import os
+import urllib
+import sys
 
 urllib.urlretrieve(
-  "%s/bot_code?tok=%s" % (host_url, bootstrap_token), "swarming_bot.zip"
+  "%s/bot_code?tok=%s" % (host_url, bootstrap_token),  # noqa: F821
+  "swarming_bot.zip",  # noqa: F821
 )
 os.execv(sys.executable, [sys.executable, "swarming_bot.zip"])

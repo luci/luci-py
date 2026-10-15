@@ -125,7 +125,7 @@ if sys.platform == "win32":
     //appengine/swarming/swarming_bot/api/platforms/win.py.
     """
     global _SUPPORTS_SYMLINKS
-    if _SUPPORTS_SYMLINKS != None:
+    if _SUPPORTS_SYMLINKS != None:  # noqa: E711
       return _SUPPORTS_SYMLINKS
 
     _SUPPORTS_SYMLINKS = False
@@ -210,9 +210,8 @@ if sys.platform == "win32":
       real_source = extend(
         os.path.normpath(os.path.join(os.path.dirname(link_name), source))
       )
-    # pylint: disable=undefined-variable
     # isdir is generated dynamically.
-    flags = SYMBOLIC_LINK_FLAG_DIRECTORY if isdir(real_source) else 0
+    flags = SYMBOLIC_LINK_FLAG_DIRECTORY if isdir(real_source) else 0  # noqa: F821
     if _supports_unprivileged_symlinks():
       # This enables support for this specific case:
       # - Windows 10 with build 14971 or later
@@ -224,7 +223,6 @@ if sys.platform == "win32":
       # following flag make it magically work.
       flags |= SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
     if not CreateSymbolicLinkW(f, source, flags):
-      # pylint: disable=undefined-variable
       err = ctypes.GetLastError()
       if err == 1314:
         raise WindowsError(
@@ -255,11 +253,9 @@ if sys.platform == "win32":
       https://msdn.microsoft.com/en-us/library/windows/desktop/aa365488(v=vs.85).aspx
     """
     path = extend(path)
-    # pylint: disable=undefined-variable
     # isdir is generated dynamically.
-    if isdir(path):
+    if isdir(path):  # noqa: F821
       if not RemoveDirectory(path):
-        # pylint: disable=undefined-variable
         raise WindowsError(
           "unlink(%r): could not remove directory: %s"
           % (path, ctypes.GetLastError())
@@ -291,7 +287,6 @@ if sys.platform == "win32":
       None,
     )
     if handle == INVALID_HANDLE_VALUE:
-      # pylint: disable=undefined-variable
       raise WindowsError(
         "readlink(%r): failed to open: %s" % (path, ctypes.GetLastError())
       )
@@ -313,19 +308,17 @@ if sys.platform == "win32":
         # ERROR_MORE_DATA(234) should not happen because we preallocate the
         # maximum size.
         if err == 4390:
-          # pylint: disable=undefined-variable
           raise WindowsError(
             "readlink(%r): failed to read: ERROR_NOT_A_REPARSE_POINT(4390)"
             % path
           )
-        # pylint: disable=undefined-variable
         raise WindowsError("readlink(%r): failed to read: %s" % (path, err))
       if buf.ReparseTag == IO_REPARSE_TAG_SYMLINK:
         actual = buf.ReparseBuffer.SymbolicLinkReparseBuffer
       elif buf.ReparseTag == IO_REPARSE_TAG_MOUNT_POINT:
         actual = buf.ReparseBuffer.MountPointReparseBuffer
       else:
-        raise WindowsError(  # pylint: disable=undefined-variable
+        raise WindowsError(
           "readlink(%r): succeeded but doesn't know how to parse result!" % path
         )
       off = actual.PrintNameOffset // 2
@@ -340,7 +333,7 @@ if sys.platform == "win32":
     # to return false. On Windows, os.path is an alias to ntpath.
     utop = extend(top)
     try:
-      names = listdir(utop)  # pylint: disable=undefined-variable
+      names = listdir(utop)  # noqa: F821
     except os.error as err:
       if onerror is not None:
         onerror(err)
@@ -348,7 +341,7 @@ if sys.platform == "win32":
 
     dirs, nondirs = [], []
     for name in names:
-      if isdir(os.path.join(top, name)):  # pylint: disable=undefined-variable
+      if isdir(os.path.join(top, name)):  # noqa: F821
         dirs.append(name)
       else:
         nondirs.append(name)
@@ -398,7 +391,7 @@ else:
 ## builtin
 
 
-def open(path, *args, **kwargs):  # pylint: disable=redefined-builtin
+def open(path, *args, **kwargs):
   return builtins.open(extend(path), *args, **kwargs)
 
 

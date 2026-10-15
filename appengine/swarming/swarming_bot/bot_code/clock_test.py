@@ -10,7 +10,7 @@ import test_env_bot_code
 
 test_env_bot_code.setup_test_env()
 
-import clock
+import clock  # noqa: E402
 
 
 class FakeNow:

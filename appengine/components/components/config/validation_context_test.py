@@ -11,10 +11,10 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import mock
+import mock  # noqa: E402
 
-from components.config import validation_context
-from test_support import test_case
+from components.config import validation_context  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class ValidationContextTestCase(test_case.TestCase):

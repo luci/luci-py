@@ -762,7 +762,7 @@ class AuthDB(object):
     # Return an empty graph to indicate nonexistent group. It's helpful to
     # differentiate between a group with no owned or including groups, and
     # a group that just doesn't exist.
-    if isinstance(principal, basestring) and principal not in self._groups:
+    if isinstance(principal, basestring) and principal not in self._groups:  # noqa: F821
       return graph
 
     # Adds the given group and all groups that include it and owned by it (
@@ -803,7 +803,7 @@ class AuthDB(object):
       for group in globs_idx.get(principal, ()):
         add_edge(graph.root_id, Graph.IN, traverse(group))
 
-    elif isinstance(principal, basestring):
+    elif isinstance(principal, basestring):  # noqa: F821
       graph.root_id = traverse(principal)
     else:
       raise TypeError('Wrong "principal" type %s' % type(principal))
@@ -888,7 +888,6 @@ class AuthDB(object):
       self._internal_domains_re and self._internal_domains_re.match(domain)
     )
 
-  # pylint: disable=redefined-outer-name
   def has_permission(self, permission, realms, identity, attributes=None):
     """Returns True if the identity has the given permission in any of `realms`.
 
@@ -902,9 +901,9 @@ class AuthDB(object):
       if not isinstance(attributes, dict):
         raise TypeError("Attributes must be a dict")
       for k, v in attributes.items():
-        if not isinstance(k, basestring):
+        if not isinstance(k, basestring):  # noqa: F821
           raise TypeError("Attribute name must be a string, got %r" % (k,))
-        if not isinstance(v, basestring):
+        if not isinstance(v, basestring):  # noqa: F821
           raise TypeError(
             "Attribute value for key %r must be a string, got %r" % (k, v)
           )
@@ -986,7 +985,7 @@ class AuthDB(object):
       TypeError if `name` is not a string.
       ValueError if `name` doesn't look valid.
     """
-    if not isinstance(name, basestring):
+    if not isinstance(name, basestring):  # noqa: F821
       raise TypeError("Bad realm: got %s, want a string" % (type(name),))
     realm = self._realms.get(name)
     if realm:
@@ -1251,7 +1250,7 @@ def check_oauth_access_token(header):
   if utils.is_local_dev_server():
     # auth_call returns tuple (Identity, AuthDetails). There are no additional
     # details if not using native GAE OAuth API.
-    auth_call = lambda: (
+    auth_call = lambda: (  # noqa: E731
       dev_oauth_authentication(header, TOKEN_INFO_ENDPOINT),
       None,
     )
@@ -1343,7 +1342,6 @@ AuthDetails = collections.namedtuple(
 )
 
 
-# pylint: disable=redefined-outer-name
 def new_auth_details(is_superuser=False, gce_instance=None, gce_project=None):
   """Constructs AuthDetails, filling in defaults."""
   return AuthDetails(
@@ -1672,7 +1670,6 @@ def get_process_auth_db():
       _auth_db_fetching_thread = None
       if fetched:
         # Fetch has completed successfully. Update the process cache now.
-        # pylint: disable=lost-exception
         return _roll_auth_db_cache(fetched)
       # The fetch has failed. An exception is already being raised and will be
       # propagated up the stack.
@@ -2329,7 +2326,6 @@ def validate_realm_name(name):
     )
 
 
-# pylint: disable=redefined-outer-name
 def has_permission(permission, realms, identity=None, attributes=None):
   """Returns True if the identity has the given permission in any of the realms.
 
@@ -2362,7 +2358,6 @@ def has_permission(permission, realms, identity=None, attributes=None):
   )
 
 
-# pylint: disable=redefined-outer-name
 def has_permission_dryrun(
   permission,
   realms,
@@ -2467,7 +2462,7 @@ def should_enforce_realm_acl(realm):
 
 def _validated_realm_project(project):
   """Checks type and value of `project` and returns it as str."""
-  if not isinstance(project, basestring):
+  if not isinstance(project, basestring):  # noqa: F821
     raise TypeError("Expecting a string, got %s" % (type(project),))
   if not _PROJECT_NAME_RE.match(project) and project != _INTERNAL_PROJECT:
     raise ValueError(

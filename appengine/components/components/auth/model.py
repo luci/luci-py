@@ -208,7 +208,7 @@ class Identity(
   # attributes in __init__.
   # See http://docs.python.org/2/reference/datamodel.html#object.__new__
   def __new__(cls, kind, name):
-    if isinstance(name, unicode):
+    if isinstance(name, unicode):  # noqa: F821
       try:
         name = name.encode("ascii")
       except UnicodeEncodeError:
@@ -309,7 +309,7 @@ class IdentityGlob(
 
   # See comment for Identity.__new__ regarding use of __new__ here.
   def __new__(cls, kind, pattern):
-    if isinstance(pattern, unicode):
+    if isinstance(pattern, unicode):  # noqa: F821
       try:
         pattern = pattern.encode("ascii")
       except UnicodeEncodeError:

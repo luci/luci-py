@@ -11,14 +11,14 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from protorpc import messages
-from protorpc import remote
-import endpoints
-import webapp2
-import zlib
+from protorpc import messages  # noqa: E402
+from protorpc import remote  # noqa: E402
+import endpoints  # noqa: E402
+import webapp2  # noqa: E402
+import zlib  # noqa: E402
 
-from test_support import test_case
-import adapter
+from test_support import test_case  # noqa: E402
+import adapter  # noqa: E402
 
 
 class Msg(messages.Message):

@@ -12,12 +12,12 @@ import test_env
 
 test_env.setup_test_env()
 
-from components import auth
-from test_support import test_case
+from components import auth  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from components import config
-from proto.config import config_pb2
-from server import bot_code
+from components import config  # noqa: E402
+from proto.config import config_pb2  # noqa: E402
+from server import bot_code  # noqa: E402
 
 CLIENT_DIR = os.path.join(
   os.path.dirname(os.path.dirname(test_env.APP_DIR)), "client"
@@ -27,7 +27,7 @@ sys.path.insert(
   0, os.path.join(CLIENT_DIR, "third_party", "httplib2", "python3")
 )
 sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party"))
-from depot_tools import fix_encoding
+from depot_tools import fix_encoding  # noqa: E402
 
 sys.path.pop(0)
 sys.path.pop(0)

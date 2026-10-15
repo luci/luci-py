@@ -9,16 +9,16 @@ import re
 
 def natcmp(a, b):
   """Natural string comparison, case sensitive."""
-  try_int = lambda s: int(s) if s.isdigit() else s
+  try_int = lambda s: int(s) if s.isdigit() else s  # noqa: E731
 
   def natsort_key(s):
-    if not isinstance(s, basestring):
+    if not isinstance(s, basestring):  # noqa: F821
       # Since re.findall() generates a list out of a string, returns a list here
       # to balance the comparison done in cmp().
       return [s]
     return map(try_int, re.findall(r"(\d+|\D+)", s))
 
-  return cmp(natsort_key(a), natsort_key(b))
+  return cmp(natsort_key(a), natsort_key(b))  # noqa: F821
 
 
 def try_lower(x):

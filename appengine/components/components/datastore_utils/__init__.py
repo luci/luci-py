@@ -3,11 +3,9 @@
 # that can be found in the LICENSE file.
 
 
-# Wildcard import mapping - pylint:disable=W0401
-
-from .monotonic import *
-from .properties import *
-from .serializable import *
-from .sharding import *
-from .txn import *
-from .utils import *
+from .monotonic import *  # noqa: F403
+from .properties import *  # noqa: F403
+from .serializable import *  # noqa: F403
+from .sharding import *  # noqa: F403
+from .txn import *  # noqa: F403
+from .utils import *  # noqa: F403

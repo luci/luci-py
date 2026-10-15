@@ -10,7 +10,7 @@ from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
 from components import net
-from components import prpc
+from components import prpc  # noqa: F401
 from components import utils
 
 from server import config

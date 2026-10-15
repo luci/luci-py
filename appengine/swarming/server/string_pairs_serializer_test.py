@@ -11,8 +11,8 @@ import test_env
 
 test_env.setup_test_env()
 
-from server import string_pairs_serializer
-from server import task_request
+from server import string_pairs_serializer  # noqa: E402
+from server import task_request  # noqa: E402
 
 
 class TestStringPairsSerializer(unittest.TestCase):

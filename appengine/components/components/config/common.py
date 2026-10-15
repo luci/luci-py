@@ -16,12 +16,12 @@ from components import utils
 
 utils.fix_protobuf_package()
 
-from google import protobuf
+from google import protobuf  # noqa: E402
 
-from components import auth
-from components import protoutil
-from components import utils
-from components.datastore_utils import config
+from components import auth  # noqa: E402
+from components import protoutil  # noqa: E402
+from components import utils  # noqa: E402
+from components.datastore_utils import config  # noqa: E402
 
 
 class Severity(messages.Enum):

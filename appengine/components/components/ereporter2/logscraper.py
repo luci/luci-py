@@ -108,7 +108,7 @@ class _ErrorCategory(object):
   """Describes a 'class' of error messages' according to an unique signature."""
 
   def __init__(self, signature):
-    assert isinstance(signature, unicode), signature
+    assert isinstance(signature, unicode), signature  # noqa: F821
     # Remove the version embedded in the signature.
     self.signature = signature
     self.events = _CappedList(_ERROR_LIST_HEAD_SIZE, _ERROR_LIST_TAIL_SIZE)
@@ -197,7 +197,7 @@ class _ErrorRecord(object):
     signature,
     exception_type,
   ):
-    assert isinstance(message, unicode), repr(message)
+    assert isinstance(message, unicode), repr(message)  # noqa: F821
     # Unique identifier.
     self.request_id = request_id
     # Initial time the request was handled.
@@ -237,11 +237,11 @@ class _ErrorRecord(object):
     if not self.signature:
       # Default the signature to the exception type if None.
       self.signature = self.exception_type
-    assert isinstance(self.signature, unicode), repr(self.signature)
+    assert isinstance(self.signature, unicode), repr(self.signature)  # noqa: F821
 
 
-def _shorten(l):
-  assert isinstance(l, unicode), repr(l)
+def _shorten(l):  # noqa: E741
+  assert isinstance(l, unicode), repr(l)  # noqa: F821
   if len(l) > 256:
     return "hash:%s" % hashlib.sha1(l.encode("utf-8")).hexdigest()
   return l
@@ -256,7 +256,7 @@ def _signature_from_message(message):
   Returns:
     tuple of a signature and the exception type, if any.
   """
-  assert isinstance(message, unicode), repr(message)
+  assert isinstance(message, unicode), repr(message)  # noqa: F821
   lines = message.splitlines()
   if not lines:
     return "", None
@@ -311,7 +311,7 @@ def _signature_from_message(message):
   function = None
   path = None
   line_no = -1
-  for l in reversed(stacktrace):
+  for l in reversed(stacktrace):  # noqa: E741
     m = re.match(formatter.RE_STACK_TRACE_FILE, l)
     if m:
       if not path:

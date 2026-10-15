@@ -42,7 +42,7 @@ import zipfile
 # Import _strptime before threaded code. datetime.datetime.strptime is
 # threadsafe except for the initial import of the _strptime module.
 # See https://bugs.python.org/issue7980.
-import _strptime  # pylint: disable=unused-import
+import _strptime  # noqa: F401
 
 from api import bot
 from api import os_utilities

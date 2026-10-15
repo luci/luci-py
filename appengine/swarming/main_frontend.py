@@ -9,8 +9,8 @@ that shouldn't be done in unit tests, can be done safely. This file must be
 tested via a smoke test.
 """
 
-import os
-import sys
+import os  # noqa: F401
+import sys  # noqa: F401
 
 import webapp2
 
@@ -18,24 +18,23 @@ from components import utils
 
 utils.import_third_party()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import endpoints_webapp2
-from components import ereporter2
+from components import endpoints_webapp2  # noqa: E402
+from components import ereporter2  # noqa: E402
 
-import gae_ts_mon
+import gae_ts_mon  # noqa: E402
 
-import handlers_endpoints
-import handlers_frontend
-import handlers_prpc
-import template
-import ts_mon_metrics
-from server import acl
-from server import config
-from server import pools_config
+import handlers_endpoints  # noqa: E402
+import handlers_frontend  # noqa: E402
+import handlers_prpc  # noqa: E402
+import template  # noqa: E402
+import ts_mon_metrics  # noqa: E402, F401
+from server import acl  # noqa: E402
+from server import config  # noqa: E402
+from server import pools_config  # noqa: E402
 
 
-# pylint: disable=redefined-outer-name
 def create_application():
   ereporter2.register_formatter()
   # Task queues must be sent to the backend.

@@ -10,8 +10,8 @@ using the DB. This makes this service works even if the DB is broken, as the
 only dependency is logservice.
 """
 
-from .formatter import *
-from .handlers import *
-from .models import *
-from .on_error import *
-from .ui import *
+from .formatter import *  # noqa: F403
+from .handlers import *  # noqa: F403
+from .models import *  # noqa: F403
+from .on_error import *  # noqa: F403
+from .ui import *  # noqa: F403

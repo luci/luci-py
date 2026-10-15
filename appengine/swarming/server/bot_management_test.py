@@ -16,22 +16,22 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.protobuf import struct_pb2
-from google.protobuf import timestamp_pb2
+from google.protobuf import struct_pb2  # noqa: E402
+from google.protobuf import timestamp_pb2  # noqa: E402
 
-from google.appengine.api import memcache
-from google.appengine.ext import ndb
+from google.appengine.api import memcache  # noqa: E402, F401
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from test_support import test_case
+from components import utils  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.api import swarming_pb2  # pylint: disable=no-name-in-module
-from server import bot_management
-from server import config
-from server import task_queues
+from proto.api import swarming_pb2  # noqa: E402
+from server import bot_management  # noqa: E402
+from server import config  # noqa: E402
+from server import task_queues  # noqa: E402
 
 
-_VERSION = unicode(hashlib.sha256().hexdigest())
+_VERSION = unicode(hashlib.sha256().hexdigest())  # noqa: F821
 
 
 def _bot_event(
@@ -266,7 +266,7 @@ class BotManagementTest(test_case.TestCase):
       ),
     )
     expected.event_time.FromDatetime(self.now)
-    self.assertEqual(unicode(expected), unicode(actual))
+    self.assertEqual(unicode(expected), unicode(actual))  # noqa: F821
 
   def test_BotEvent_proto_quarantine(self):
     # Also test that a bot can belong to two pools.
@@ -304,7 +304,7 @@ class BotManagementTest(test_case.TestCase):
       ),
     )
     expected.event_time.FromDatetime(self.now)
-    self.assertEqual(unicode(expected), unicode(actual))
+    self.assertEqual(unicode(expected), unicode(actual))  # noqa: F821
 
   def test_bot_event(self):
     # connected.

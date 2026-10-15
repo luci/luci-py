@@ -11,12 +11,12 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from components import auth
-from components.config import common
-from components.config import endpoint
-from components.config import validation
+from components import auth  # noqa: E402
+from components.config import common  # noqa: E402
+from components.config import endpoint  # noqa: E402
+from components.config import validation  # noqa: E402
 
 
 class EndpointTestCase(test_case.EndpointsTestCase):

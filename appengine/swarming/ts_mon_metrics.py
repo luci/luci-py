@@ -4,13 +4,13 @@
 
 """Timeseries metrics."""
 
-from collections import defaultdict
+from collections import defaultdict  # noqa: F401
 import logging
 
 from components import utils
 import gae_ts_mon
 
-from server import bot_management
+from server import bot_management  # noqa: F401
 from server import task_result
 
 # - android_devices is a side effect of the health of each Android devices

@@ -268,7 +268,7 @@ def get_service_account_certificates(service_account_name):
   Raises CertificateError on errors.
   """
   url = _GOOGLE_ROBOT_CERTS_URL + urllib.parse.quote_plus(service_account_name)
-  refresh = lambda: _fetch_certs_from_json(
+  refresh = lambda: _fetch_certs_from_json(  # noqa: E731
     url=url, service_account_name=service_account_name
   )
   return _use_cached_or_fetch(

@@ -12,13 +12,13 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import mock
+import mock  # noqa: E402
 
-from google.appengine.api import app_identity
-from google.appengine.ext import ndb
+from google.appengine.api import app_identity  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from test_support import test_case
+from components import utils  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class Rambling(ndb.Model):
@@ -61,7 +61,7 @@ class UtilsTest(test_case.TestCase):
     self.assertEqual([0, 1], utils.to_json_encodable(range(2)))
     self.assertEqual([0, 1], utils.to_json_encodable(i for i in (0, 1)))
     if sys.version_info.major == 2:
-      self.assertEqual([0, 1], utils.to_json_encodable(xrange(2)))
+      self.assertEqual([0, 1], utils.to_json_encodable(xrange(2)))  # noqa: F821
 
   def test_validate_root_service_url_dev_server(self):
     self.mock(utils, "is_local_dev_server", lambda: True)
@@ -358,15 +358,12 @@ class MemcacheTest(test_case.TestCase):
 
   def test_invalid_args(self):
     with self.assertRaises(TypeError):
-      # pylint: disable=no-value-for-parameter
       self.f()
 
     with self.assertRaises(TypeError):
-      # pylint: disable=no-value-for-parameter
       self.f(b=3)
 
     with self.assertRaises(TypeError):
-      # pylint: disable=unexpected-keyword-arg
       self.f(1, 2, x=3)
 
   def test_args_prohibited(self):

@@ -120,10 +120,10 @@ def gce_vm_authentication(request):
     raise BadTokenError("Wrong type for compute_engine: %r" % (gce,))
 
   instance_name = gce.get("instance_name")
-  if not isinstance(instance_name, basestring):
+  if not isinstance(instance_name, basestring):  # noqa: F821
     raise BadTokenError("Wrong type for instance_name: %r" % (instance_name,))
   project_id = gce.get("project_id")
-  if not isinstance(project_id, basestring):
+  if not isinstance(project_id, basestring):  # noqa: F821
     raise BadTokenError("Wrong type for project_id: %r" % (project_id,))
   details = api.new_auth_details(
     gce_instance=str(instance_name), gce_project=str(project_id)

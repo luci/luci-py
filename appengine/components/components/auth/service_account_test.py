@@ -15,13 +15,13 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.api import urlfetch
-from google.appengine.ext import ndb
+from google.appengine.api import urlfetch  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from components.auth import model
-from components.auth import service_account
-from test_support import test_case
+from components import utils  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth import service_account  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 EMPTY_SECRET_KEY = service_account.ServiceAccountKey(None, None, None)

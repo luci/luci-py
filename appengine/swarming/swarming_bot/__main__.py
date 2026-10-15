@@ -26,7 +26,6 @@ import zipfile
 
 # We have to reorder imports to make sure the third parties included in the zip
 # are preferred over the ones on the system.
-# pylint: disable=ungrouped-imports
 from utils import zip_package
 
 # This file can *only* be run as a zip.
@@ -67,23 +66,22 @@ def fix_protobuf_package():
   # Sanity check.
   import google.protobuf
 
-  # pylint: disable=unused-variable
-  from google.protobuf import symbol_database
+  from google.protobuf import symbol_database  # noqa: F401
 
 
 # Then it's safe to import the rest.
 fix_protobuf_package()
 
 
-import signal_trace
+import signal_trace  # noqa: E402
 
 # third_party/
-from depot_tools import fix_encoding
+from depot_tools import fix_encoding  # noqa: E402
 
-from utils import logging_utils
-from utils import net
+from utils import logging_utils  # noqa: E402
+from utils import net  # noqa: E402
 
-from bot_code import common
+from bot_code import common  # noqa: E402
 
 
 def CMDattributes(_args):
@@ -119,9 +117,8 @@ def CMDis_fine(_args):
   it. For now, it just imports bot_main and send ping request to server but
   later it'll check the config, etc.
   """
-  # pylint: disable=unused-variable
   from bot_code import bot_main
-  from config import bot_config
+  from config import bot_config  # noqa: F401
 
   resp = net.url_read(
     bot_main.get_config()["server"] + "/swarming/api/v1/bot/server_ping"
@@ -136,7 +133,7 @@ def CMDreboot(_args):
   """Utility subcommand that hides the difference between each OS to reboot
   the host."""
   logging_utils.prepare_logging(None)
-  logging.info("reboot with args: %s", args)
+  logging.info("reboot with args: %s", args)  # noqa: F821
   import os_utilities
 
   # This function doesn't return.

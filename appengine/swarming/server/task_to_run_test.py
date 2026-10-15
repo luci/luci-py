@@ -13,28 +13,25 @@ import unittest
 # Setups environment.
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP_DIR)
-import test_env_handlers
+import test_env_handlers  # noqa: E402
 
-import webtest
+import webtest  # noqa: E402
 
-from google.appengine.api import datastore_errors
-from google.appengine.ext import ndb
+from google.appengine.api import datastore_errors  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
 
-import handlers_backend
+import handlers_backend  # noqa: E402
 
-from components import auth_testing
-from components import utils
-from test_support import test_case
+from components import auth_testing  # noqa: E402
+from components import utils  # noqa: E402
+from test_support import test_case  # noqa: E402, F401
 
-from proto.config import pools_pb2
-from server import bot_management
-from server import pools_config
-from server import task_queues
-from server import task_request
-from server import task_to_run
-
-# pylint: disable=W0212
-# Method could be a function - pylint: disable=R0201
+from proto.config import pools_pb2  # noqa: E402
+from server import bot_management  # noqa: E402
+from server import pools_config  # noqa: E402
+from server import task_queues  # noqa: E402
+from server import task_request  # noqa: E402
+from server import task_to_run  # noqa: E402
 
 
 def _gen_cipd(**kwargs):
@@ -320,7 +317,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       task_request.TaskSlice(
         expiration_secs=60,
         properties=_gen_properties(
-          dimensions={"pool": ["default"], "v": [unicode(i)]}
+          dimensions={"pool": ["default"], "v": [unicode(i)]}  # noqa: F821
         ),
       )
       for i in range(8)
@@ -336,7 +333,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       task_request.TaskSlice(
         expiration_secs=60,
         properties=_gen_properties(
-          dimensions={"pool": ["default"], "v": [unicode(i)]}
+          dimensions={"pool": ["default"], "v": [unicode(i)]}  # noqa: F821
         ),
       )
       for i in range(8)

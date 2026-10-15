@@ -250,7 +250,6 @@ class FileContent(messages.Message):
 class Digest(messages.Message):
   # This is a [Digest][build.bazel.remote.execution.v2.Digest] of a blob on
   # RBE-CAS. See the explanations at the original definition.
-  # pylint: disable=line-too-long
   # https://github.com/bazelbuild/remote-apis/blob/77cfb44a88577a7ade5dd2400425f6d50469ec6d/build/bazel/remote/execution/v2/remote_execution.proto#L753-L791
   hash = messages.StringField(1)
   size_bytes = messages.IntegerField(2)

@@ -191,7 +191,6 @@ class RunIsolatedTest(RunIsolatedTestBase):
     self.capture_popen_env = False
     self.capture_luci_ctx = False
 
-    # pylint: disable=no-self-argument
     class Popen:
       def __init__(self2, args, **kwargs):
         if not self.capture_popen_env:
@@ -1041,7 +1040,7 @@ class RunIsolatedTest(RunIsolatedTestBase):
 
   @unittest.skipIf(sys.platform == "win32", "crbug.com/1148174")
   def test_main_containment(self):
-    def fake_wait(args, **kwargs):  # pylint: disable=unused-argument
+    def fake_wait(args, **kwargs):
       # Success.
       return 0
 

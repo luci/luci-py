@@ -3,7 +3,7 @@
 # that can be found in the LICENSE file.
 
 from collections import namedtuple
-import datetime
+import datetime  # noqa: F401
 import logging
 
 from components import auth
@@ -14,7 +14,7 @@ from server import bot_management
 from server import config
 from server import pools_config
 from server import task_scheduler
-from server import task_queues
+from server import task_queues  # noqa: F401
 
 _TRACKING_BUG = "crbug.com/1066839"
 

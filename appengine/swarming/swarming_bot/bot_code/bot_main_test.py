@@ -4,7 +4,7 @@
 # that can be found in the LICENSE file.
 
 import copy
-import datetime
+import datetime  # noqa: F401
 import json
 import logging
 import os
@@ -23,24 +23,21 @@ import test_env_bot_code
 test_env_bot_code.setup_test_env()
 
 # Creates a server mock for functions in net.py.
-import net_utils
+import net_utils  # noqa: E402
 
-from api import bot
-from api import os_utilities
-from api.platforms import gce
-from bot_code import bot_main
-from bot_code import clock
-from bot_code import remote_client
-from depot_tools import fix_encoding
-from utils import file_path
-from utils import logging_utils
-from utils import net
-from utils import subprocess42
-from utils import tools
-from utils import zip_package
-
-
-# pylint: disable=no-self-argument
+from api import bot  # noqa: E402
+from api import os_utilities  # noqa: E402
+from api.platforms import gce  # noqa: E402
+from bot_code import bot_main  # noqa: E402
+from bot_code import clock  # noqa: E402
+from bot_code import remote_client  # noqa: E402
+from depot_tools import fix_encoding  # noqa: E402
+from utils import file_path  # noqa: E402
+from utils import logging_utils  # noqa: E402
+from utils import net  # noqa: E402
+from utils import subprocess42  # noqa: E402
+from utils import tools  # noqa: E402
+from utils import zip_package  # noqa: E402
 
 
 REQUEST_UUID = "7905e667-d415-48f1-9df7-f914541d6331"
@@ -340,7 +337,7 @@ class TestBotMain(TestBotBase):
 
     # The extra version takes priority.
     class extra(object):
-      def get_dimensions(self2, botobj):  # pylint: disable=no-self-argument
+      def get_dimensions(self2, botobj):
         self.assertEqual(self.bot, botobj)
         return {"id": [FAKE_BOT_ID], "alternative": ["truth"]}
 
@@ -688,7 +685,7 @@ class TestBotMain(TestBotBase):
     self.mock(bot_config, "on_bot_shutdown", on_bot_shutdown_1)
 
     class extra(object):
-      def on_bot_shutdown(self2, botobj):  # pylint: disable=no-self-argument
+      def on_bot_shutdown(self2, botobj):
         self.assertEqual(self.bot, botobj)
         second.set()
 
@@ -706,7 +703,6 @@ class TestBotMain(TestBotBase):
     self.mock(clock, "Clock", lambda _: fake_clock)
     self.mock(time, "time", lambda: fake_event.now)
 
-    # pylint: disable=unused-argument
     class Popen(object):
       def __init__(self2, cmd, detached, cwd, stdout, stderr, stdin, **kwargs):
         self2.returncode = None
@@ -2267,7 +2263,6 @@ class TestBotMain(TestBotBase):
       "version": 3,
     }
 
-    # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
       def __init__(
         self2, cmd, detached, cwd, env, stdout, stderr, stdin, **kwargs
@@ -2327,7 +2322,7 @@ class TestBotMain(TestBotBase):
           close_fds = kwargs["close_fds"]
           self.assertTrue(close_fds)
 
-      def wait(self2, timeout=None):  # pylint: disable=unused-argument
+      def wait(self2, timeout=None):
         self2.returncode = returncode
         with open(self2._out_file, "w") as f:
           json.dump(result, f)
@@ -2621,7 +2616,6 @@ class TestBotMain(TestBotBase):
     self.mock(bot_main, "_run_bot", run_bot)
 
     class Singleton(object):
-      # pylint: disable=no-self-argument
       def acquire(self2):
         return True
 
@@ -2663,7 +2657,6 @@ class TestBotNotMocked(TestBotBase):
 
     self.mock(bot_main.common, "exec_python", exec_python)
 
-    # pylint: disable=unused-argument
     class Popen(object):
       def __init__(self2, cmd, cwd, stdin, stdout, stderr, detached, **kwargs):
         self2.returncode = None

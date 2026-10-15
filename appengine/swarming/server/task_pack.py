@@ -134,7 +134,7 @@ def unpack_request_key(request_id):
   for this request, replace 1234 with the number printed by the commands above:
       SELECT * WHERE __key__ HAS ANCESTOR KEY(TaskRequest, 1234)
   """
-  assert isinstance(request_id, basestring)
+  assert isinstance(request_id, basestring)  # noqa: F821
   if not request_id:
     raise ValueError("Invalid null key")
   if request_id[-1] != "1":

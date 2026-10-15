@@ -9,7 +9,7 @@ from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
 from components import auth
-from components import utils
+from components import utils  # noqa: F401
 
 import api_helpers
 import backend_conversions
@@ -18,7 +18,7 @@ import prpc_helpers
 
 from bb.go.chromium.org.luci.buildbucket.proto import backend_prpc_pb2
 from bb.go.chromium.org.luci.buildbucket.proto import backend_pb2
-from bb.go.chromium.org.luci.buildbucket.proto import common_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import common_pb2  # noqa: F401
 from bb.go.chromium.org.luci.buildbucket.proto import task_pb2
 
 from server import acl
@@ -28,7 +28,6 @@ from server import task_pack
 from server import task_request
 from server import task_result
 from server import task_scheduler
-from server import task_result
 
 _FETCH_TASKS_LIMIT = 1000
 _CANCEL_TASKS_LIMIT = 500

@@ -10,9 +10,9 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from components.prpc import codes
+from components.prpc import codes  # noqa: E402
 
 
 class PRPCCodeTestCase(test_case.TestCase):

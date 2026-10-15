@@ -13,11 +13,11 @@ Provider do not do type conversion, api.py does.
 
 import collections
 import logging
-import sys
+import sys  # noqa: F401
 
 from google.appengine.ext import ndb
 
-from components import auth
+from components import auth  # noqa: F401
 
 from . import common
 from . import fs

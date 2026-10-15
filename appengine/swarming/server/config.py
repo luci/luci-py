@@ -10,7 +10,7 @@ import re
 
 import six
 
-from components import auth
+from components import auth  # noqa: F401
 from components import config
 from components import cipd
 from components import gitiles
@@ -82,7 +82,7 @@ def validate_flat_dimension(d):
 def validate_dimension_key(key):
   """Returns True if the dimension key is valid."""
   return (
-    isinstance(key, unicode)
+    isinstance(key, unicode)  # noqa: F821
     and key
     and len(key) <= DIMENSION_KEY_LENGTH
     and bool(re.match(DIMENSION_KEY_RE, key))

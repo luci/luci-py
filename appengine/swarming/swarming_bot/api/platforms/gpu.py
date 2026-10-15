@@ -82,7 +82,6 @@ _VENDOR_MAPPING = {
   NVIDIA: (
     "Nvidia",
     {
-      # pylint: disable=line-too-long
       # ftp://download.nvidia.com/XFree86/Linux-x86_64/352.21/README/README.txt
       "06fa": "Quadro NVS 450",
       "08a4": "GeForce 320M",

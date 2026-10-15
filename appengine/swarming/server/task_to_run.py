@@ -306,7 +306,7 @@ def _gen_queue_number(
   """
   # dimensions_hash should be 32 bits but on AppEngine, which is using 32 bits
   # python, it is silently upgraded to long.
-  assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)
+  assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)  # noqa: F821
   assert 0 < dimensions_hash <= 0xFFFFFFFF, hex(dimensions_hash)
   assert isinstance(timestamp, datetime.datetime), repr(timestamp)
   task_request.validate_priority(priority)
@@ -317,7 +317,7 @@ def _gen_queue_number(
     next_year = datetime.datetime(timestamp.year + 1, 1, 1)
     # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
     # assert works.
-    t = long(round((next_year - timestamp).total_seconds() * 10.0))
+    t = long(round((next_year - timestamp).total_seconds() * 10.0))  # noqa: F821
   else:
     # Default scheduling algorithm is FIFO to avoid confusion.
     assert scheduling_algorithm in (
@@ -327,18 +327,18 @@ def _gen_queue_number(
     year_start = datetime.datetime(timestamp.year, 1, 1)
     # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
     # assert works.
-    t = long(round((timestamp - year_start).total_seconds() * 10.0))
+    t = long(round((timestamp - year_start).total_seconds() * 10.0))  # noqa: F821
 
   assert 0 <= t <= 0x7FFFFFFF, (hex(t), dimensions_hash, timestamp, priority)
   # 31-22 == 9, leaving room for overflow with the addition.
   # 0x3fc00000 is the priority mask.
   # It is important that priority mixed with time is an addition, not a bitwise
   # or.
-  low_part = (long(priority) << 22) + t
+  low_part = (long(priority) << 22) + t  # noqa: F821
   assert 0 <= low_part <= 0xFFFFFFFF, "0x%X is out of band" % (low_part)
   # int may be 32 bits, upgrade to long for consistency, albeit this is
   # significantly slower.
-  high_part = long(dimensions_hash) << 31
+  high_part = long(dimensions_hash) << 31  # noqa: F821
   return high_part | low_part
 
 
@@ -395,7 +395,7 @@ def _get_task_to_run_query(dimensions_hash):
   """Returns a ndb.Query of TaskToRunShard within this dimensions_hash queue."""
   # dimensions_hash should be 32 bits but on AppEngine, which is using 32 bits
   # python, it is silently upgraded to long.
-  assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)
+  assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)  # noqa: F821
 
   # See _gen_queue_number() as of why << 31. This query cannot use the key
   # because it is not a root entity.
@@ -420,7 +420,7 @@ class _TaskToRunItem(object):
     self.ttr = ttr
 
   def __cmp__(self, other):
-    return cmp(self.key, other.key)
+    return cmp(self.key, other.key)  # noqa: F821
 
 
 class _PriorityQueue(object):
@@ -554,7 +554,7 @@ class _ActiveQuery(object):
     if fresh:
       keys = [_memcache_to_run_key(ttr.key) for ttr in fresh]
       taken = yield _MC_CLIENT.get_multi_async(keys, namespace=Claim._NAMESPACE)
-      for i in xrange(len(keys)):
+      for i in xrange(len(keys)):  # noqa: F821
         if not taken.get(keys[i]):
           available.append(fresh[i])
       self._stats.claimed += len(fresh) - len(available)

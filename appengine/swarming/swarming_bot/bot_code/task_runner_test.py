@@ -7,7 +7,7 @@
 from __future__ import print_function
 
 import base64
-import datetime
+import datetime  # noqa: F401
 import fnmatch
 import json
 import logging
@@ -37,25 +37,25 @@ LUCI_GO_CLIENT_DIR = os.path.join(ROOT_DIR, "luci-go")
 # Needed for local_caching, and others on Windows when symlinks are not enabled.
 sys.path.insert(0, CLIENT_DIR)
 
-import google.protobuf.json_format as json_format
+import google.protobuf.json_format as json_format  # noqa: E402
 
-from bot_code import bot_auth
-from bot_code import remote_client
-from bot_code import task_runner
-from depot_tools import auto_stub
-from depot_tools import fix_encoding
-from libs import luci_context
-from utils import file_path
-from utils import fs
-from utils import large
-from utils import logging_utils
-from utils import subprocess42
-from utils import tools
-import cas_util
-import local_caching
-import swarmingserver_bot_fake
+from bot_code import bot_auth  # noqa: E402
+from bot_code import remote_client  # noqa: E402
+from bot_code import task_runner  # noqa: E402
+from depot_tools import auto_stub  # noqa: E402
+from depot_tools import fix_encoding  # noqa: E402
+from libs import luci_context  # noqa: E402
+from utils import file_path  # noqa: E402
+from utils import fs  # noqa: E402
+from utils import large  # noqa: E402
+from utils import logging_utils  # noqa: E402
+from utils import subprocess42  # noqa: E402
+from utils import tools  # noqa: E402
+import cas_util  # noqa: E402
+import local_caching  # noqa: E402
+import swarmingserver_bot_fake  # noqa: E402
 
-from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2
+from bb.go.chromium.org.luci.buildbucket.proto import launcher_pb2  # noqa: E402
 
 
 def to_native_eol(s):
@@ -780,7 +780,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     )
 
   def test_run_command_large(self):
-    # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
       """Mocks the process so we can control how data is returned."""
 

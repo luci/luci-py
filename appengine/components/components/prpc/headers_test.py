@@ -12,10 +12,10 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from components.prpc import encoding
-from components.prpc import headers
+from components.prpc import encoding  # noqa: E402
+from components.prpc import headers  # noqa: E402
 
 
 class PRPCHeadersTestCase(test_case.TestCase):
@@ -39,7 +39,7 @@ class PRPCHeadersTestCase(test_case.TestCase):
       )
 
   def test_parse_headers_encodings(self):
-    check_known_encodings = lambda e: self.parse_headers(
+    check_known_encodings = lambda e: self.parse_headers(  # noqa: E731
       [("Accept", e[1])],
       expect_accept=e,
     )
@@ -56,7 +56,7 @@ class PRPCHeadersTestCase(test_case.TestCase):
     )
 
   def test_parse_headers_timeout(self):
-    check_timeout = lambda t, n: self.assertEqual(
+    check_timeout = lambda t, n: self.assertEqual(  # noqa: E731
       self.parse_headers(
         [
           ("Accept", encoding.Encoding.JSON[1]),

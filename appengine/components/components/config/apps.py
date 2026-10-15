@@ -14,7 +14,7 @@ from components import utils
 
 utils.import_third_party()
 
-from . import handlers
+from . import handlers  # noqa: E402
 
 
 def create_backend_application():

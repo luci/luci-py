@@ -11,9 +11,9 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from components import gce
-from components import net
-from test_support import test_case
+from components import gce  # noqa: E402
+from components import net  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 def instance(name, status="RUNNING"):

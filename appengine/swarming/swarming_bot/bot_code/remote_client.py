@@ -11,7 +11,7 @@ import enum
 import hashlib
 import json
 import logging
-import os
+import os  # noqa: F401
 import threading
 import time
 import traceback
@@ -313,7 +313,7 @@ class RemoteClientNative(object):
     if stdout_and_chunk and stdout_and_chunk[0]:
       data["output"] = base64.b64encode(stdout_and_chunk[0]).decode()
       data["output_chunk_start"] = stdout_and_chunk[1]
-    if exit_code != None:
+    if exit_code != None:  # noqa: E711
       data["exit_code"] = exit_code
     data["session"] = self._session_token
 

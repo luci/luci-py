@@ -15,19 +15,19 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine import runtime
-from google.appengine.ext import ndb
+from google.appengine import runtime  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
 
-from components.auth import api
-from components.auth import config
-from components.auth import ipaddr
-from components.auth import model
-from components.auth import realms
-from components.auth import replication
-from components.auth.proto import replication_pb2
-from components.auth.proto import security_config_pb2
-from components import utils
-from test_support import test_case
+from components.auth import api  # noqa: E402
+from components.auth import config  # noqa: E402
+from components.auth import ipaddr  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth import realms  # noqa: E402
+from components.auth import replication  # noqa: E402
+from components.auth.proto import replication_pb2  # noqa: E402
+from components.auth.proto import security_config_pb2  # noqa: E402
+from components import utils  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 def new_auth_db(
@@ -129,7 +129,7 @@ class AuthDBTest(test_case.TestCase):
     with_nesting.nested.append("WithListing")
 
     # Creates AuthDB with given list of groups and then runs the check.
-    is_member = lambda groups, ident, group: new_auth_db(
+    is_member = lambda groups, ident, group: new_auth_db(  # noqa: E731
       groups=groups
     ).is_group_member(group, ident)
 
@@ -167,7 +167,7 @@ class AuthDBTest(test_case.TestCase):
 
   def test_list_group(self):
     def list_group(groups, group, recursive):
-      l = new_auth_db(groups=groups).list_group(group, recursive)
+      l = new_auth_db(groups=groups).list_group(group, recursive)  # noqa: E741
       return api.GroupListing(
         sorted(l.members), sorted(l.globs), sorted(l.nested)
       )
@@ -495,7 +495,7 @@ class AuthDBTest(test_case.TestCase):
         ),
       ]
     )
-    test = lambda ip: auth_db.is_in_ip_whitelist("l", ipaddr.ip_from_string(ip))
+    test = lambda ip: auth_db.is_in_ip_whitelist("l", ipaddr.ip_from_string(ip))  # noqa: E731
     self.assertTrue(test("127.0.0.1"))
     self.assertTrue(test("192.168.0.0"))
     self.assertTrue(test("192.168.0.9"))
@@ -1041,10 +1041,10 @@ class OAuthAccountsTest(test_case.TestCase):
 
   def mock_all(self, user_email, client_id, allowed_client_ids=()):
     class FakeUser(object):
-      email = lambda _: user_email
+      email = lambda _: user_email  # noqa: E731
 
     class FakeAuthDB(object):
-      is_allowed_oauth_client_id = lambda _, cid: cid in allowed_client_ids
+      is_allowed_oauth_client_id = lambda _, cid: cid in allowed_client_ids  # noqa: E731
 
     self.mock(api.oauth, "get_current_user", lambda _: FakeUser())
     self.mock(api.oauth, "get_client_id", lambda _: client_id)
@@ -1114,7 +1114,7 @@ class RelevantSubgraphTest(test_case.TestCase):
     for i, (node, edges) in enumerate(graph.describe()):
       if isinstance(node, (model.Identity, model.IdentityGlob)):
         node = node.to_bytes()
-      nodes[i] = (node, {l: sorted(s) for l, s in edges.items() if s})
+      nodes[i] = (node, {l: sorted(s) for l, s in edges.items() if s})  # noqa: E741
     return nodes
 
   def test_empty(self):
@@ -1423,7 +1423,6 @@ class RealmsTest(test_case.TestCase):
       "%r not in %r" % (msg, self.logs[lvl]),
     )
 
-  # pylint: disable=redefined-outer-name
   def assert_check(self, db, perm, realms, ident, attrs, outcome):
     self.assertEqual(
       outcome,

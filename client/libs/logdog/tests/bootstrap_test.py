@@ -19,15 +19,11 @@ ROOT_DIR = os.path.dirname(
 )
 sys.path.insert(0, ROOT_DIR)
 
-# pylint: disable=no-name-in-module
-from utils import tools
+from utils import tools  # noqa: E402
 
 tools.force_local_third_party(ROOT_DIR)
 
-from libs.logdog import bootstrap, stream
-
-
-# pylint: disable=protected-access
+from libs.logdog import bootstrap, stream  # noqa: E402
 
 
 class BootstrapTestCase(unittest.TestCase):

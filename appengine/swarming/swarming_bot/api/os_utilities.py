@@ -38,12 +38,12 @@ from utils import tools
 tools.force_local_third_party()
 
 # third_party/
-import httplib2
-from oauth2client import client
+import httplib2  # noqa: E402
+from oauth2client import client  # noqa: E402
 
-from api import platforms
-from utils import file_path
-from utils import fs
+from api import platforms  # noqa: E402
+from utils import file_path  # noqa: E402
+from utils import fs  # noqa: E402, F401
 
 
 # https://cloud.google.com/compute/pricing#machinetype
@@ -223,7 +223,7 @@ def get_os_name():
     # Add support for other OSes as relevant.
     content = _safe_read("/etc/os-release")
     if content:
-      os_release = dict(l.split(b"=", 1) for l in content.splitlines() if l)
+      os_release = dict(l.split(b"=", 1) for l in content.splitlines() if l)  # noqa: E741
       os_id = os_release.get(b"ID").strip(b'"').decode("utf-8")
       # Uppercase the first letter for consistency with the other platforms.
       return os_id[0].upper() + os_id[1:]
@@ -480,11 +480,11 @@ def get_num_processors():
       return platforms.linux.get_num_processors()
     # Multiprocessing
     return multiprocessing.cpu_count()
-  except:  # pylint: disable=W0702
+  except:  # noqa: E722
     try:
       # Mac OS 10.6
-      return int(os.sysconf("SC_NPROCESSORS_ONLN"))  # pylint: disable=E1101
-    except:
+      return int(os.sysconf("SC_NPROCESSORS_ONLN"))
+    except:  # noqa: E722
       # Returns non-zero, otherwise it could generate a divide by zero later
       # when doing calculations, leading to a crash. Saw it happens on Win2K8R2
       # on python 2.7.5 on cygwin 1.7.28.

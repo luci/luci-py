@@ -31,7 +31,7 @@ from utils import file_path
 #     it is being used by another process
 if sys.platform == "win32":
   import ctypes
-  import msvcrt  # pylint: disable=F0401
+  import msvcrt
 
   FILE_ATTRIBUTE_NORMAL = 0x80
   FILE_SHARE_READ = 1

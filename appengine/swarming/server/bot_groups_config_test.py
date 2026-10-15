@@ -12,12 +12,12 @@ import test_env
 
 test_env.setup_test_env()
 
-from components import config
-from components.config import validation
-from test_support import test_case
+from components import config  # noqa: E402
+from components.config import validation  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.config import bots_pb2
-from server import bot_groups_config
+from proto.config import bots_pb2  # noqa: E402
+from server import bot_groups_config  # noqa: E402
 
 
 TEST_CONFIG = bots_pb2.BotsCfg(

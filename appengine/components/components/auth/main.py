@@ -11,6 +11,6 @@ from components import utils
 
 utils.import_third_party()
 
-from .ui import app
+from .ui import app  # noqa: E402
 
 APP = app.create_wsgi_application()

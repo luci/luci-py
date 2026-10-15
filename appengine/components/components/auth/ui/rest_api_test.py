@@ -14,21 +14,21 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import webapp2
-import webtest
+import webapp2  # noqa: E402
+import webtest  # noqa: E402
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from components.auth import api
-from components.auth import handler
-from components.auth import model
-from components.auth import signature
-from components.auth import version
-from components.auth.ui import acl
-from components.auth.ui import rest_api
-from components.auth.ui import ui
-from test_support import test_case
+from components import utils  # noqa: E402
+from components.auth import api  # noqa: E402
+from components.auth import handler  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth import signature  # noqa: E402
+from components.auth import version  # noqa: E402
+from components.auth.ui import acl  # noqa: E402
+from components.auth.ui import rest_api  # noqa: E402
+from components.auth.ui import ui  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 def call_get(request_handler, uri=None, **kwargs):
@@ -519,7 +519,7 @@ class XSRFHandlerTest(RestAPITestCase):
       headers={"X-XSRF-Token-Request": "1"},
     )
     self.assertEqual(200, status)
-    self.assertTrue(isinstance(body.get("xsrf_token"), basestring))
+    self.assertTrue(isinstance(body.get("xsrf_token"), basestring))  # noqa: F821
 
   def test_requires_header(self):
     status, body, _ = self.post(
@@ -2214,8 +2214,8 @@ class CertificatesHandlerTest(RestAPITestCase):
     self.assertEqual(1300000000000000, body["timestamp"])
     self.assertTrue(body["certificates"])
     for cert in body["certificates"]:
-      self.assertTrue(isinstance(cert["key_name"], basestring))
-      self.assertTrue(isinstance(cert["x509_certificate_pem"], basestring))
+      self.assertTrue(isinstance(cert["key_name"], basestring))  # noqa: F821
+      self.assertTrue(isinstance(cert["x509_certificate_pem"], basestring))  # noqa: F821
 
 
 class OAuthConfigHandlerTest(RestAPITestCase):

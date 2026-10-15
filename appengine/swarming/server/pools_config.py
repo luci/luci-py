@@ -10,7 +10,7 @@ used primarily by task_scheduler.check_schedule_request_acl_caller.
 
 import collections
 import logging
-import random
+import random  # noqa: F401
 import re
 
 from components import auth

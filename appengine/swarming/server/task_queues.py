@@ -136,7 +136,7 @@ class TaskDimensionsSets(ndb.Model):
   def id_prefix(kind, pfx):
     """Returns either `bot:<url-encoded-id>` or `pool:<url-encoded-id>`."""
     assert kind in ("bot", "pool"), kind
-    if isinstance(pfx, unicode):
+    if isinstance(pfx, unicode):  # noqa: F821
       pfx = pfx.encode("utf-8")
     return "%s:%s" % (kind, urllib.quote_plus(pfx))
 
@@ -171,7 +171,7 @@ class TaskDimensionsSets(ndb.Model):
     Returns:
       A sorted list with queue numbers aka dimensions hashes.
     """
-    sets_id_to_int = lambda x: int(x[x.rfind(":") + 1 :])
+    sets_id_to_int = lambda x: int(x[x.rfind(":") + 1 :])  # noqa: E731
     return sorted(sets_id_to_int(sets_id) for sets_id in sets_ids)
 
 
@@ -620,7 +620,7 @@ def _tq_update_bot_matches_async(task_sets_id, task_sets_dims, enqueued_ts):
   ok = True
 
   # Bind all unchanging arguments for _maybe_add_match_async.
-  maybe_add_match_async = lambda bot_matches_ent: _maybe_add_match_async(
+  maybe_add_match_async = lambda bot_matches_ent: _maybe_add_match_async(  # noqa: E731
     bot_matches_ent,
     task_sets_id,
     actual_task_dims,
@@ -1299,7 +1299,7 @@ def expand_dimensions_to_flats(dimensions, is_bot_dim=False):
   """
   dimensions_kv = list(dimensions.items())
   for i, (k, v) in enumerate(dimensions_kv):
-    if isinstance(v, (str, unicode)):
+    if isinstance(v, (str, unicode)):  # noqa: F821
       assert is_bot_dim, (k, v)
       dimensions_kv[i] = (
         k,

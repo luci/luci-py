@@ -526,7 +526,7 @@ class FakeProgress:
 
 class WorkerPoolTest(unittest.TestCase):
   def test_normal(self):
-    mapper = lambda value: -value
+    mapper = lambda value: -value  # noqa: E731
     progress = FakeProgress()
     with threading_utils.ThreadPoolWithProgress(progress, 8, 8, 0) as pool:
       for i in range(32):

@@ -203,7 +203,7 @@ def datetime_to_timestamp(value):
 
 def timestamp_to_datetime(value):
   """Converts integer timestamp in microseconds since epoch to UTC datetime."""
-  if not isinstance(value, (int, long, float)):
+  if not isinstance(value, (int, long, float)):  # noqa: F821
     raise ValueError(
       "Expecting a number, got %s instead" % type(value).__name__
     )
@@ -335,7 +335,6 @@ class _EternalCache(object):
     # Wrapping self.get_value directly fails since it is "instancemethod", not
     # a regular function.
     #
-    # pylint: disable=unnecessary-lambda
     wrapper = functools.wraps(self.func)(lambda: self.get_value())
     wrapper.__parent_cache__ = self
     return wrapper
@@ -386,7 +385,6 @@ class _ExpiringCache(object):
     # Wrapping self.get_value directly fails since it is "instancemethod", not
     # a regular function.
     #
-    # pylint: disable=unnecessary-lambda
     wrapper = functools.wraps(self.func)(lambda: self.get_value())
     wrapper.__parent_cache__ = self
     return wrapper
@@ -436,10 +434,10 @@ def memcache_async(key, key_args=None, time=None):
   Decorator raises:
     NotImplementedError if function uses varargs or kwargs.
   """
-  assert isinstance(key, basestring), key
+  assert isinstance(key, basestring), key  # noqa: F821
   key_args = key_args or []
   assert isinstance(key_args, list), key_args
-  assert all(isinstance(a, basestring) for a in key_args), key_args
+  assert all(isinstance(a, basestring) for a in key_args), key_args  # noqa: F821
   assert all(key_args), key_args
 
   memcache_set_kwargs = {}
@@ -784,17 +782,17 @@ def to_json_encodable(data):
     # protojson.encode_message returns a string that is already encoded json.
     # Load it back into a json-compatible representation of the data.
     return json.loads(protojson.encode_message(data))
-  if isinstance(data, unicode) or data is None:
+  if isinstance(data, unicode) or data is None:  # noqa: F821
     return data
   if isinstance(data, str):
     return data.decode("utf-8")
-  if isinstance(data, (int, float, long)):
+  if isinstance(data, (int, float, long)):  # noqa: F821
     # Note: overflowing is an issue with int and long.
     return data
   if isinstance(data, (list, set, tuple)):
     return [to_json_encodable(i) for i in data]
   if isinstance(data, dict):
-    assert all(isinstance(k, basestring) for k in data), data
+    assert all(isinstance(k, basestring) for k in data), data  # noqa: F821
     return {to_json_encodable(k): to_json_encodable(v) for k, v in data.items()}
 
   if isinstance(data, datetime.datetime):
@@ -820,7 +818,7 @@ def to_json_encodable(data):
   if inspect.isgenerator(data):
     return [to_json_encodable(i) for i in data]
 
-  if sys.version_info.major == 2 and isinstance(data, xrange):
+  if sys.version_info.major == 2 and isinstance(data, xrange):  # noqa: F821
     # Handle it like a list. Sadly, xrange is not a proper generator so it has
     # to be checked manually.
     return [to_json_encodable(i) for i in data]
@@ -874,8 +872,8 @@ def get_token_fingerprint(blob):
 
   It can be used to identify this particular token in logs without revealing it.
   """
-  assert isinstance(blob, basestring)
-  if isinstance(blob, unicode):
+  assert isinstance(blob, basestring)  # noqa: F821
+  if isinstance(blob, unicode):  # noqa: F821
     blob = blob.encode("ascii", "ignore")
   return binascii.hexlify(hashlib.sha256(blob).digest()[:16])
 

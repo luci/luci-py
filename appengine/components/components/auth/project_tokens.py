@@ -92,13 +92,13 @@ def project_token_async(
   )
 
   token = res.get("accessToken")
-  if not token or not isinstance(token, basestring):
+  if not token or not isinstance(token, basestring):  # noqa: F821
     logging.error("Bad MintProjectToken response: %s", res)
     raise exceptions.TokenCreationError("Bad response, no token")
 
   service_account_email = res.get("serviceAccountEmail")
   if not service_account_email or (
-    not isinstance(service_account_email, basestring)
+    not isinstance(service_account_email, basestring)  # noqa: F821
   ):
     logging.error("Bad MintProjectToken response: %s", res)
     raise exceptions.TokenCreationError(

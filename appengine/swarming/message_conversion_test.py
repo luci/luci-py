@@ -10,12 +10,12 @@ import swarming_test_env
 
 swarming_test_env.setup_test_env()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-import message_conversion
-from server import task_result
+import message_conversion  # noqa: E402
+from server import task_result  # noqa: E402
 
 
 class TestMessageConversion(test_case.TestCase):

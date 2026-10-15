@@ -26,8 +26,8 @@ def _run_df():
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
   )
-  for l in proc.communicate()[0].splitlines():
-    l = l.decode("utf-8")
+  for l in proc.communicate()[0].splitlines():  # noqa: E741
+    l = l.decode("utf-8")  # noqa: E741
     if l.startswith("/dev/"):
       items = l.split()
       if sys.platform == "darwin" and items[5].startswith(
@@ -53,7 +53,7 @@ def get_disks_info():
     path = items[5]
     block_size = items[1]
     try:
-      f = os.statvfs(path)  # pylint: disable=E1101
+      f = os.statvfs(path)
     except OSError:
       # Sometimes df lists paths that cannot be stat'ed, ignore them.
       continue

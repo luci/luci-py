@@ -36,9 +36,9 @@ HARDLINK, HARDLINK_WITH_FALLBACK, SYMLINK, SYMLINK_WITH_FALLBACK, COPY = range(
 
 
 if sys.platform == "win32":
-  import locale
-  from ctypes import wintypes  # pylint: disable=ungrouped-imports
-  from ctypes import windll  # pylint: disable=ungrouped-imports
+  import locale  # noqa: F401
+  from ctypes import wintypes
+  from ctypes import windll
 
 if sys.platform == "win32":
 
@@ -112,7 +112,6 @@ if sys.platform == "win32":
     if not windll.kernel32.QueryDosDeviceW(drive_letter, p, chars):
       err = ctypes.GetLastError()
       if err:
-        # pylint: disable=undefined-variable
         msg = "QueryDosDevice(%s): %s (%d)" % (
           drive_letter,
           FormatError(err),
@@ -132,7 +131,6 @@ if sys.platform == "win32":
 
     err = ctypes.GetLastError()
     if err:
-      # pylint: disable=undefined-variable
       msg = "GetShortPathName(%s): %s (%d)" % (long_path, FormatError(err), err)
       raise WindowsError(err, msg.encode("utf-8"))
     return None
@@ -148,7 +146,6 @@ if sys.platform == "win32":
 
     err = ctypes.GetLastError()
     if err:
-      # pylint: disable=undefined-variable
       msg = "GetLongPathName(%s): %s (%d)" % (short_path, FormatError(err), err)
       raise WindowsError(err, msg.encode("utf-8"))
     return None
@@ -158,7 +155,6 @@ if sys.platform == "win32":
     old_p = fs.extend(oldpath)
     new_p = fs.extend(newpath)
     if not windll.kernel32.MoveFileExW(old_p, new_p, int(flags)):
-      # pylint: disable=undefined-variable
       err = ctypes.GetLastError()
       msg = "MoveFileEx(%s, %s, %d): %s (%d)" % (
         oldpath,
@@ -182,7 +178,7 @@ if sys.platform == "win32":
         self._MAPPING["\\Device\\Mup"] = None
         self._MAPPING["\\SystemRoot"] = os.environ["SystemRoot"]
 
-        for letter in (chr(l) for l in range(ord("C"), ord("Z") + 1)):
+        for letter in (chr(l) for l in range(ord("C"), ord("Z") + 1)):  # noqa: E741
           try:
             letter = "%s:" % letter
             mapped = QueryDosDevice(letter)
@@ -199,7 +195,7 @@ if sys.platform == "win32":
               )
             else:
               self._MAPPING[mapped] = letter
-          except WindowsError:  # pylint: disable=undefined-variable
+          except WindowsError:
             pass
 
     def to_win32(self, path):
@@ -209,7 +205,7 @@ if sys.platform == "win32":
         raise ValueError(
           "Can't convert %s into a Win32 compatible path" % path, path
         )
-      if not match.group(1) in self._MAPPING:
+      if match.group(1) not in self._MAPPING:
         # Unmapped partitions may be accessed by windows for the
         # fun of it while the test is running. Discard these.
         return None
@@ -268,7 +264,6 @@ if sys.platform == "win32":
     if not OpenProcessToken(
       GetCurrentProcess(), TOKEN_ALL_ACCESS, ctypes.byref(token)
     ):
-      # pylint: disable=undefined-variable
       raise WindowsError("Couldn't get process token")
     return token
 
@@ -276,7 +271,6 @@ if sys.platform == "win32":
     """Returns the LUID for a privilege."""
     luid = LUID()
     if not LookupPrivilegeValue(None, str(name), ctypes.byref(luid)):
-      # pylint: disable=undefined-variable
       raise WindowsError("Couldn't lookup privilege value")
     return luid
 
@@ -298,7 +292,6 @@ if sys.platform == "win32":
     token = get_process_token()
     try:
       if not AdjustTokenPrivileges(token, False, tp, 0, None, None):
-        # pylint: disable=undefined-variable
         raise WindowsError(
           "AdjustTokenPrivileges(%r): failed: %s"
           % (name, ctypes.GetLastError())
@@ -366,7 +359,7 @@ if sys.platform == "win32":
       Win32_Process COM objects. See
       http://msdn.microsoft.com/library/aa394372.aspx for more details.
     """
-    import win32com.client  # pylint: disable=F0401
+    import win32com.client
 
     wmi_service = win32com.client.Dispatch("WbemScripting.SWbemLocator")
     wbem = wmi_service.ConnectServer(".", "root\\cimv2")
@@ -380,7 +373,7 @@ if sys.platform == "win32":
     def normalize_path(filename):
       try:
         return GetLongPathName(str(filename)).lower()
-      except:  # pylint: disable=W0702
+      except:  # noqa: E722
         return str(filename).lower()
 
     root_dir = normalize_path(root_dir)
@@ -526,7 +519,6 @@ if sys.platform != "win32":  # All non-Windows OSes.
 
   def kill_children_processes(root):
     """Not yet implemented on posix."""
-    # pylint: disable=unused-argument
     return False
 
 
@@ -633,7 +625,7 @@ def get_free_space(path):
     )
     return free_bytes.value
   # For OSes other than Windows.
-  f = fs.statvfs(path)  # pylint: disable=E1101
+  f = fs.statvfs(path)
   return f.f_bavail * f.f_frsize
 
 
@@ -681,7 +673,7 @@ def set_read_only(path, read_only, orig_mode=None):
     if sys.platform != "win32" and stat.S_ISDIR(mode):
       mode |= stat.S_IXUSR  # 0100
   if hasattr(os, "lchmod"):
-    fs.lchmod(path, mode)  # pylint: disable=E1101
+    fs.lchmod(path, mode)
   else:
     if stat.S_ISLNK(orig_mode):
       # Skip symlink without lchmod() support.
@@ -749,7 +741,7 @@ def link_file(outfile, infile, action):
 
   if action in (SYMLINK, SYMLINK_WITH_FALLBACK):
     try:
-      fs.symlink(infile, outfile)  # pylint: disable=E1101
+      fs.symlink(infile, outfile)
       return True
     except OSError:
       if action == SYMLINK:
@@ -898,7 +890,6 @@ def make_tree_deleteable_win(root):
       dirs.append(entry.path)
 
   if err:
-    # pylint: disable=raising-bad-type
     raise err
 
 
@@ -936,7 +927,6 @@ def make_tree_deleteable_posix(root):
       if not err:
         err = e
   if err:
-    # pylint: disable=raising-bad-type
     raise err
 
 
@@ -972,7 +962,6 @@ def rmtree(root):
   has_called_change_tree_permission = False
   has_called_change_acl_for_delete = False
   for i in range(max_tries):
-    # pylint: disable=cell-var-from-loop
     # errors is a list of tuple(function, path, excinfo).
     errors = []
     logging.debug("file_path.rmtree(%s) try=%d", root, i)

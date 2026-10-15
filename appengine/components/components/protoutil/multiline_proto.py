@@ -62,7 +62,7 @@ def parse_multiline(content):
   prefix = ""
   multiline_parts = []
 
-  if isinstance(content, unicode):
+  if isinstance(content, unicode):  # noqa: F821
     content = content.encode("utf-8")
 
   for line in content.split("\n"):

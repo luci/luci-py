@@ -13,10 +13,10 @@ import swarming_test_env
 
 swarming_test_env.setup_test_env()
 
-import message_conversion_prpc
-from proto.api_v2 import swarming_pb2
-from test_support import test_case
-from server import task_request
+import message_conversion_prpc  # noqa: E402
+from proto.api_v2 import swarming_pb2  # noqa: E402
+from test_support import test_case  # noqa: E402
+from server import task_request  # noqa: E402
 
 FAKE_UTCNOW = datetime.datetime(2016, 4, 7)
 

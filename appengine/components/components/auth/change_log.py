@@ -331,7 +331,7 @@ class AuthDBGroupChange(AuthDBChange):
 
 def diff_groups(target, old, new):
   # Helper to reduce amount of typing.
-  change = lambda tp, **kwargs: AuthDBGroupChange(
+  change = lambda tp, **kwargs: AuthDBGroupChange(  # noqa: E731
     change_type=getattr(AuthDBChange, "CHANGE_GROUP_%s" % tp),
     target=target,
     **kwargs,
@@ -409,7 +409,7 @@ class AuthDBIPWhitelistChange(AuthDBChange):
 
 def diff_ip_whitelists(target, old, new):
   # Helper to reduce amount of typing.
-  change = lambda tp, **kwargs: AuthDBIPWhitelistChange(
+  change = lambda tp, **kwargs: AuthDBIPWhitelistChange(  # noqa: E731
     change_type=getattr(AuthDBChange, "CHANGE_IPWL_%s" % tp),
     target=target,
     **kwargs,
@@ -480,7 +480,7 @@ class AuthDBConfigChange(AuthDBChange):
 
 def diff_global_config(target, old, new):
   # Helper to reduce amount of typing.
-  change = lambda tp, **kwargs: AuthDBConfigChange(
+  change = lambda tp, **kwargs: AuthDBConfigChange(  # noqa: E731
     change_type=getattr(AuthDBChange, "CHANGE_CONF_%s" % tp),
     target=target,
     **kwargs,
@@ -537,7 +537,7 @@ class AuthRealmsGlobalsChange(AuthDBChange):
 
 
 def diff_realms_globals(target, old, new):
-  to_map = lambda ent: {} if not ent else {p.name: p for p in ent.permissions}
+  to_map = lambda ent: {} if not ent else {p.name: p for p in ent.permissions}  # noqa: E731
 
   old_perms = to_map(old)
   new_perms = to_map(new)
@@ -578,7 +578,7 @@ class AuthProjectRealmsChange(AuthDBChange):
 
 def diff_project_realms(target, old, new):
   # Helper to reduce amount of typing.
-  change = lambda tp, **kwargs: AuthProjectRealmsChange(
+  change = lambda tp, **kwargs: AuthProjectRealmsChange(  # noqa: E731
     change_type=getattr(AuthDBChange, "CHANGE_PROJECT_REALMS_%s" % tp),
     target=target,
     **kwargs,

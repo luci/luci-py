@@ -11,18 +11,18 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import mock
+import mock  # noqa: E402
 
-from google.appengine.ext import ndb
-from google.protobuf import empty_pb2
+from google.appengine.ext import ndb  # noqa: E402
+from google.protobuf import empty_pb2  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from components import net
-from components.prpc import client as prpc_client
-from components.prpc import codes
-from components.prpc.test import test_pb2
-from components.prpc.test import test_prpc_pb2
+from components import net  # noqa: E402
+from components.prpc import client as prpc_client  # noqa: E402
+from components.prpc import codes  # noqa: E402
+from components.prpc.test import test_pb2  # noqa: E402
+from components.prpc.test import test_prpc_pb2  # noqa: E402
 
 
 class PRPCClientTestCase(test_case.TestCase):

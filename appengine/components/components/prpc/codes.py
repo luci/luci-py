@@ -37,7 +37,7 @@ class StatusCode(StatusCodeBase):
   @staticmethod
   def to_http_code(status_code):
     httpCode = _PRPC_TO_HTTP_STATUS.get(status_code, None)
-    if httpCode == None:
+    if httpCode == None:  # noqa: E711
       raise ValueError("%s is not a valid StatusCode" % status_code)
     return httpCode
 

@@ -9,10 +9,10 @@ import unittest
 from test_support import test_env
 
 test_env.setup_test_env()
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from components.auth import realms
-from components.auth.proto import realms_pb2
+from components.auth import realms  # noqa: E402
+from components.auth.proto import realms_pb2  # noqa: E402
 
 
 def perms(*names):

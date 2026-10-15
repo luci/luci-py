@@ -6,21 +6,19 @@
 they work in the python3 App Engine Standard environment.
 """
 
-#  pylint: disable=unused-import
-
 from flask import Flask
 
-import concurrent.futures
-from google.auth.transport import requests
-from google.cloud import bigquery
-from google.cloud import datastore
-from google.cloud import ndb
+import concurrent.futures  # noqa: F401
+from google.auth.transport import requests  # noqa: F401
+from google.cloud import bigquery  # noqa: F401
+from google.cloud import datastore  # noqa: F401
+from google.cloud import ndb  # noqa: F401
 
 # Can be imported:
-from components import cipd
-from components import decorators
-from components import natsort
-from components import protoutil
+from components import cipd  # noqa: F401
+from components import decorators  # noqa: F401
+from components import natsort  # noqa: F401
+from components import protoutil  # noqa: F401
 
 # Can't be imported:
 # from components import auth

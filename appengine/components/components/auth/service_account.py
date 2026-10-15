@@ -169,7 +169,7 @@ def get_project_access_token_async(project_id, scopes, min_lifetime_sec=5 * 60):
     )
 
   # Accept a single string to mimic app_identity.get_access_token behavior.
-  if isinstance(scopes, basestring):
+  if isinstance(scopes, basestring):  # noqa: F821
     scopes = [scopes]
   scopes = sorted(scopes)
 
@@ -244,7 +244,7 @@ def get_access_token_async(
     )
 
   # Accept a single string to mimic app_identity.get_access_token behavior.
-  if isinstance(scopes, basestring):
+  if isinstance(scopes, basestring):  # noqa: F821
     scopes = [scopes]
   scopes = sorted(scopes)
 
@@ -257,7 +257,7 @@ def get_access_token_async(
       method="iam", email=act_as, scopes=scopes, key_id=None
     )
     # We need IAM-scoped token only on cache miss, so generate it lazily.
-    iam_token_factory = lambda: get_access_token_async(
+    iam_token_factory = lambda: get_access_token_async(  # noqa: E731
       scopes=["https://www.googleapis.com/auth/iam"],
       service_account_key=service_account_key,
       act_as=None,

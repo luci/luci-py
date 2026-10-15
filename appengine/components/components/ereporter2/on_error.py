@@ -50,7 +50,7 @@ def log(**kwargs):
       if key not in VALID_ERROR_KEYS:
         logging.error("Dropping unknown detail %s: %s", key, value)
         kwargs.pop(key)
-      elif isinstance(value, basestring) and len(value) > LIMIT:
+      elif isinstance(value, basestring) and len(value) > LIMIT:  # noqa: F821
         value = value[: LIMIT - 1] + "\u2026"
         kwargs[key] = value
 

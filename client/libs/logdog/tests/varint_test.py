@@ -23,7 +23,7 @@ ROOT_DIR = os.path.dirname(
 )
 sys.path.insert(0, ROOT_DIR)
 
-from libs.logdog import varint
+from libs.logdog import varint  # noqa: E402
 
 
 class VarintTestCase(unittest.TestCase):

@@ -13,20 +13,20 @@ import test_env
 
 test_env.setup_test_env()
 
-import mock
+import mock  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from components import utils
-from components import datastore_utils
+from components import utils  # noqa: E402
+from components import datastore_utils  # noqa: E402
 
-from server import bot_management
-from server import pools_config
-from server import rbe
-from server import task_request
-from server import task_to_run
+from server import bot_management  # noqa: E402
+from server import pools_config  # noqa: E402
+from server import rbe  # noqa: E402
+from server import task_request  # noqa: E402
+from server import task_to_run  # noqa: E402
 
-from proto.config import pools_pb2
+from proto.config import pools_pb2  # noqa: E402
 
 
 def pool_config_func(

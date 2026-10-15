@@ -58,7 +58,8 @@ class BotsListHandler(auth.AuthenticatingHandler):
     limit = int(self.request.get("limit", 100))
 
     dimensions = (
-      l.strip() for l in self.request.get("dimensions", "").splitlines()
+      l.strip()
+      for l in self.request.get("dimensions", "").splitlines()  # noqa: E741
     )
     dimensions = [i for i in dimensions if i]
 

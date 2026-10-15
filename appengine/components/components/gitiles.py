@@ -507,7 +507,7 @@ def get_diff(*args, **kwargs):
 
 
 def assert_non_empty_string(value):
-  assert isinstance(value, basestring)
+  assert isinstance(value, basestring)  # noqa: F821
   assert value
 
 

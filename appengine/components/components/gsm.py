@@ -110,7 +110,6 @@ class Secret(object):
             )
           # If we are here, there's no active exception and it is OK to return,
           # but pylint is still confused, so disable the check.
-          # pylint: disable=lost-exception
           return self._latest_or_raise
 
   @property

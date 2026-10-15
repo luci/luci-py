@@ -114,7 +114,7 @@ class Test(unittest.TestCase):
       r" I: Child2",
       r" I: Parent2",
     ]
-    for e, l in zip(expected, lines):
+    for e, l in zip(expected, lines):  # noqa: E741
       ex = _LOG_HEADER_PID + e + "$"
       self.assertTrue(re.match(ex.encode("utf-8"), l), (ex, l))
     self.assertEqual(len(expected), len(lines))

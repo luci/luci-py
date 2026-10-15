@@ -702,7 +702,7 @@ class ApiDocHandler(UINavbarTabHandler):
       if not tp:
         return None
       # If referenced by name, try to find it among globally known types.
-      if isinstance(tp, basestring):
+      if isinstance(tp, basestring):  # noqa: F821
         for d in self.doc_types:
           if d["name"] == tp:
             tp = d

@@ -4,7 +4,7 @@
 
 """This module defines Swarming Server frontend pRPC handlers."""
 
-import datetime
+import datetime  # noqa: F401
 import logging
 
 from google.appengine.api import datastore_errors

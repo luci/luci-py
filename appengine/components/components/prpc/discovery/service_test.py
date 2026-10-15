@@ -10,12 +10,14 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.protobuf import descriptor_pb2
-from google.protobuf import text_format
+from google.protobuf import descriptor_pb2  # noqa: E402
+from google.protobuf import text_format  # noqa: E402
 
-from components.prpc.discovery import service
-from components.prpc.discovery.test import test_pb2  # register messages
-from components.prpc.discovery.test import test_prpc_pb2
+from components.prpc.discovery import service  # noqa: E402
+from components.prpc.discovery.test import (  # noqa: E402
+  test_pb2,  # noqa: F401
+)  # register messages  # noqa: E402, F401
+from components.prpc.discovery.test import test_prpc_pb2  # noqa: E402
 
 
 class TestService(object):

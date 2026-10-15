@@ -194,7 +194,7 @@ def request_async(
   if delegation_token:
     if isinstance(delegation_token, auth.DelegationToken):
       delegation_token = delegation_token.token
-    assert isinstance(delegation_token, basestring)
+    assert isinstance(delegation_token, basestring)  # noqa: F821
     headers[delegation.HTTP_HEADER] = delegation_token
 
   if payload is not None:

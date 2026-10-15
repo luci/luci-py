@@ -16,14 +16,13 @@ import test_env_platforms
 
 test_env_platforms.setup_test_env()
 
-from depot_tools import auto_stub
-from utils import tools
+from depot_tools import auto_stub  # noqa: E402
+from utils import tools  # noqa: E402
 
 if sys.platform == "linux":
   import linux
 
 
-# pylint: disable=line-too-long
 EXYNOS_CPU_INFO = r"""
 Processor : ARMv7 Processor rev 4 (v7l)
 processor : 0
@@ -216,7 +215,7 @@ class TestCPUInfo(auto_stub.TestCase):
   def test_get_cpuinfo_empty(self):
     self.assertEqual({}, self.get_cpuinfo(""))
 
-  def test_get_cpuinfo_empty(self):
+  def test_get_cpuinfo_empty(self):  # noqa: F811
     self.assertEqual({"vendor": "N/A"}, self.get_cpuinfo("foo: bar"))
 
   def test_get_cpuinfo_exynos(self):
@@ -373,7 +372,6 @@ class TestLinux(auto_stub.TestCase):
     self.assertEqual(linux.get_ssd(), ("nvme0n1",))
 
   def test_get_gpu_nvidia(self):
-    # pylint: disable=line-too-long
     self.mock_check_output.return_value = textwrap.dedent("""\
       18:00.0 "VGA compatible controller [0300]" "NVIDIA Corporation [10de]" "GP107GL [Quadro P1000] [1cb1]" -ra1 "NVIDIA Corporation [10de]" "GP107GL [Quadro P1000] [11bc]"
     """).encode()
@@ -387,7 +385,6 @@ class TestLinux(auto_stub.TestCase):
       )
 
   def test_get_gpu_intel(self):
-    # pylint: disable=line-too-long
     self.mock_check_output.side_effect = (
       # lscpi -mm -nn
       '00:02.0 "VGA compatible controller [0300]" "Intel Corporation [8086]" "Device [9bc5]" -r05 "Dell [1028]" "Device [09a4]"'.encode(
@@ -405,7 +402,6 @@ class TestLinux(auto_stub.TestCase):
     )
 
   def test_get_gpu_amd(self):
-    # pylint: disable=line-too-long
     self.mock_check_output.side_effect = (
       # lscpi -mm -nn
       '03:00.0 "VGA compatible controller [0300]" "Advanced Micro Devices, Inc. [AMD/ATI] [1002]" "Navi 14 [Radeon RX 5500/5500M / Pro 5500M] [7340]" -rc5 "Gigabyte Technology Co., Ltd [1458]" "Navi 14 [Radeon RX 5500/5500M / Pro 5500M] [2319]"'.encode(

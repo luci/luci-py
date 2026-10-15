@@ -24,9 +24,9 @@ from utils import tools
 tools.force_local_third_party()
 
 # third_party/
-import httplib2
-from oauth2client import client
-from oauth2client.contrib import locked_file
+import httplib2  # noqa: E402
+from oauth2client import client  # noqa: E402
+from oauth2client.contrib import locked_file  # noqa: E402
 
 # Handle the internal use case, where multistore_file has
 # 2 copies in oauth2client. One is in root folder, one is
@@ -35,12 +35,12 @@ try:
   from oauth2client.contrib import multistore_file
 except ImportError:
   from oauth2client import multistore_file
-from pyasn1.codec.der import decoder
-from pyasn1.type import univ
-import requests
-import rsa
+from pyasn1.codec.der import decoder  # noqa: E402
+from pyasn1.type import univ  # noqa: E402
+import requests  # noqa: E402
+import rsa  # noqa: E402
 
-from libs import luci_context
+from libs import luci_context  # noqa: E402
 
 
 # Path to a file with cached OAuth2 credentials used by default. Can be
@@ -568,7 +568,7 @@ def _make_assertion_jwt(service_account):
   """Generates signed assertion JWT for 2-legged OAuth flow."""
   # For more info see:
   # https://developers.google.com/accounts/docs/OAuth2ServiceAccount.
-  now = long(time.time())
+  now = long(time.time())  # noqa: F821
   payload = {
     "aud": OAUTH_TOKEN_ENDPOINT,
     "scope": OAUTH_SCOPES,
@@ -587,8 +587,8 @@ def _make_assertion_jwt(service_account):
 def _make_signed_jwt(payload, pkey):
   """Wraps |payload| dict into signed JSON Web Token."""
   # See http://self-issued.info/docs/draft-jones-json-web-token.html.
-  as_json = lambda d: json.dumps(d, sort_keys=True, separators=(",", ":"))
-  b64encode = lambda d: base64.urlsafe_b64encode(d).rstrip("=")
+  as_json = lambda d: json.dumps(d, sort_keys=True, separators=(",", ":"))  # noqa: E731
+  b64encode = lambda d: base64.urlsafe_b64encode(d).rstrip("=")  # noqa: E731
   to_sign = "%s.%s" % (
     b64encode(as_json({"typ": "JWT", "alg": "RS256"})),
     b64encode(as_json(payload)),
@@ -680,7 +680,7 @@ def _run_oauth_dance(urlhost, config):
         return None
       code = httpd.query_params["code"]
     else:
-      code = raw_input("Enter verification code: ").strip()
+      code = raw_input("Enter verification code: ").strip()  # noqa: F821
   except KeyboardInterrupt:
     err("Canceled.")
     return None
@@ -876,5 +876,5 @@ class ClientRedirectHandler(http.server.BaseHTTPRequestHandler):
     self.wfile.write("<body><p>The authentication flow has completed.</p>")
     self.wfile.write("</body></html>")
 
-  def log_message(self, _format, *args):  # pylint: disable=arguments-differ
+  def log_message(self, _format, *args):
     """Do not log messages to stdout while running as command line program."""

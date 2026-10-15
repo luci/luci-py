@@ -14,24 +14,24 @@ import test_env
 
 test_env.setup_test_env()
 
-import endpoints
+import endpoints  # noqa: E402, F401
 
-from components import auth
-from components import utils
-from test_support import test_case
+from components import auth  # noqa: E402
+from components import utils  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.config import config_pb2
-from proto.config import pools_pb2
-from proto.config import realms_pb2
-from server import acl
-from server import bot_management
-from server import config
-from server import pools_config
-from server import realms
-from server import service_accounts
-from server import task_request
-from server import task_result
-from server import task_scheduler
+from proto.config import config_pb2  # noqa: E402
+from proto.config import pools_pb2  # noqa: E402, F401
+from proto.config import realms_pb2  # noqa: E402
+from server import acl  # noqa: E402
+from server import bot_management  # noqa: E402
+from server import config  # noqa: E402
+from server import pools_config  # noqa: E402
+from server import realms  # noqa: E402
+from server import service_accounts  # noqa: E402
+from server import task_request  # noqa: E402
+from server import task_result  # noqa: E402
+from server import task_scheduler  # noqa: E402
 
 _PERM_POOLS_CANCEL_TASK = auth.Permission("swarming.pools.cancelTask")
 _PERM_POOLS_CREATE_TASK = auth.Permission("swarming.pools.createTask")
@@ -173,7 +173,7 @@ class RealmsTest(test_case.TestCase):
 
   def _mock_bot(self, bot_dimensions):
     bot_events = [_gen_bot_event_mock(dimensions_flat=bot_dimensions)]
-    query = lambda *_: mock.Mock(fetch=lambda _: bot_events)
+    query = lambda *_: mock.Mock(fetch=lambda _: bot_events)  # noqa: E731
     self.mock(bot_management, "get_events_query", query)
 
   def test_check_pools_create_task_legacy_allowed(self):
@@ -349,7 +349,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_view_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -364,7 +364,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_view_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = False
 
@@ -387,7 +387,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_view_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -415,7 +415,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_bots_list_acl_realm_allowed(self):
     # mock
     self.mock(acl, "can_view_bot", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -430,7 +430,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_bots_list_acl_realm_not_allowed(self):
     # mock
     self.mock(acl, "can_view_bot", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = False
 
@@ -447,7 +447,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_bots_list_acl_realm_missing_any_permission(self):
     # mock
     self.mock(acl, "can_view_bot", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.side_effect = [True, False]
 
@@ -473,7 +473,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_bots_list_acl_realm_no_pool_realms(self):
     # mock
     self.mock(acl, "can_view_bot", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -492,7 +492,7 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_mock.assert_not_called()
 
   def test_can_list_bots(self):
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # True case.
@@ -528,7 +528,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_task_get_acl_no_pool_realm(self):
     # mock
     self.mock(acl, "can_view_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._mock_bot(["pool:pool1"])
 
@@ -541,7 +541,7 @@ class RealmsTest(test_case.TestCase):
   def run_check_task_get_acl(self):
     # mock
     self.mock(acl, "can_view_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._mock_bot(["pool:pool1", "pool:pool2"])
 
@@ -600,7 +600,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_task_cancel_acl_no_pool_realm(self):
     # mock
     self.mock(acl, "can_edit_one_task", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._mock_bot(["pool:pool1"])
 
@@ -613,7 +613,7 @@ class RealmsTest(test_case.TestCase):
   def run_check_task_cancel_acl(self):
     # mock
     self.mock(acl, "can_edit_one_task", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._mock_bot(["pool:pool1", "pool:pool2"])
 
@@ -661,7 +661,7 @@ class RealmsTest(test_case.TestCase):
 
     # False case
     self.mock(acl, "can_edit_one_task", lambda: False)
-    get_pool_config = lambda _: _gen_pool_config(realm="test:pool")
+    get_pool_config = lambda _: _gen_pool_config(realm="test:pool")  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = False
     self.assertFalse(realms.can_cancel_task(info))
@@ -675,7 +675,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_tasks_list_acl_realm_allowed(self):
     # mock
     self.mock(acl, "can_view_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -690,7 +690,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_tasks_list_acl_realm_not_allowed(self):
     # mock
     self.mock(acl, "can_view_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = False
 
@@ -707,7 +707,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_tasks_list_acl_realm_missing_any_permission(self):
     # mock
     self.mock(acl, "can_view_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.side_effect = [True, False]
 
@@ -733,7 +733,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_tasks_list_acl_realm_no_pool_realms(self):
     # mock
     self.mock(acl, "can_view_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -752,7 +752,7 @@ class RealmsTest(test_case.TestCase):
     self._has_permission_mock.assert_not_called()
 
   def test_can_list_tasks(self):
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # True case.
@@ -776,7 +776,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_view_all_tasks", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -791,7 +791,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_view_all_tasks", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = False
 
@@ -814,7 +814,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_view_all_tasks", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -842,7 +842,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_tasks_cancel_acl_realm_allowed(self):
     # mock
     self.mock(acl, "can_edit_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -857,7 +857,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_tasks_cancel_acl_realm_not_allowed(self):
     # mock
     self.mock(acl, "can_edit_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = False
 
@@ -874,7 +874,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_tasks_cancel_acl_realm_missing_any_permission(self):
     # mock
     self.mock(acl, "can_edit_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.side_effect = [True, False]
 
@@ -900,7 +900,7 @@ class RealmsTest(test_case.TestCase):
   def test_check_tasks_cancel_acl_realm_no_pool_realms(self):
     # mock
     self.mock(acl, "can_edit_all_tasks", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -924,7 +924,7 @@ class RealmsTest(test_case.TestCase):
     self.assertTrue(realms.can_cancel_tasks(["pool1", "pool2"]))
 
     # False case
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self.mock(acl, "can_edit_all_tasks", lambda: False)
     self.assertFalse(realms.can_cancel_tasks(["pool1", "pool2"]))
@@ -939,7 +939,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_edit_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -954,7 +954,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_edit_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = False
 
@@ -977,7 +977,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_edit_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -1004,7 +1004,7 @@ class RealmsTest(test_case.TestCase):
     # False case
     self.mock(acl, "can_edit_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self.assertFalse(realms.can_terminate_bot("bot1"))
 
@@ -1012,7 +1012,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_delete_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = True
 
@@ -1028,7 +1028,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_delete_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = False
 
@@ -1051,7 +1051,7 @@ class RealmsTest(test_case.TestCase):
     # mock
     self.mock(acl, "can_delete_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -1078,7 +1078,7 @@ class RealmsTest(test_case.TestCase):
     # False case
     self.mock(acl, "can_delete_bot", lambda: False)
     self._mock_bot(["pool:pool1", "pool:pool2"])
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self.assertFalse(realms.can_delete_bot("bot1"))
 
@@ -1091,7 +1091,7 @@ class RealmsTest(test_case.TestCase):
   def test_can_delete_bots_acl_realm_allowed(self):
     # mock
     self.mock(acl, "can_delete_bot", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call
@@ -1106,7 +1106,7 @@ class RealmsTest(test_case.TestCase):
   def test_can_delete_bots_acl_realm_not_allowed(self):
     # mock
     self.mock(acl, "can_delete_bot", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.return_value = False
 
@@ -1122,7 +1122,7 @@ class RealmsTest(test_case.TestCase):
   def test_can_delete_bots_acl_realm_missing_any_permission(self):
     # mock
     self.mock(acl, "can_delete_bot", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)
+    get_pool_config = lambda p: _gen_pool_config(realm="test:" + p)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
     self._has_permission_mock.side_effect = [True, False]
 
@@ -1146,7 +1146,7 @@ class RealmsTest(test_case.TestCase):
   def test_can_delete_bots_acl_realm_no_pool_realms(self):
     # mock
     self.mock(acl, "can_delete_bot", lambda: False)
-    get_pool_config = lambda p: _gen_pool_config(realm=None)
+    get_pool_config = lambda p: _gen_pool_config(realm=None)  # noqa: E731
     self.mock(pools_config, "get_pool_config", get_pool_config)
 
     # call

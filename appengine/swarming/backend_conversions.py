@@ -9,7 +9,7 @@ import posixpath
 import logging
 
 from google.appengine.api import app_identity
-from google.appengine.api import datastore_errors
+from google.appengine.api import datastore_errors  # noqa: F401
 from google.protobuf import struct_pb2, json_format
 from google.rpc import status_pb2
 

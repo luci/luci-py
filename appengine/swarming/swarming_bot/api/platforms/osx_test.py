@@ -6,7 +6,7 @@
 import logging
 import os
 import plistlib
-import subprocess
+import subprocess  # noqa: F401
 import sys
 import textwrap
 import unittest
@@ -20,7 +20,7 @@ import test_env_platforms
 
 test_env_platforms.setup_test_env()
 
-from utils import tools
+from utils import tools  # noqa: E402
 
 if sys.platform == "darwin":
   import osx
@@ -50,7 +50,6 @@ class TestOsx(unittest.TestCase):
     self.mock_listdir.side_effect = [
       # os.listdir('/Applications')
       ["Google Chrome.app", "Safari.app", "Xcode.app"],
-      # pylint: disable=line-too-long
       # os.listdir('/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport')
       ["1.0", "2.0"],
     ]

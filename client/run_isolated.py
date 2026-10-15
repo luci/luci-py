@@ -47,7 +47,7 @@ from __future__ import print_function
 __version__ = '1.0.1'
 
 import argparse
-import base64
+import base64  # noqa: F401
 import collections
 import contextlib
 import errno
@@ -55,7 +55,7 @@ import json
 import logging
 import optparse
 import os
-import platform
+import platform  # noqa: F401
 import re
 import shutil
 import signal
@@ -64,22 +64,22 @@ import tempfile
 import time
 
 from utils import tools
+
 tools.force_local_third_party()
 
 # third_party/
-from depot_tools import fix_encoding
+from depot_tools import fix_encoding  # noqa: E402
 
-# pylint: disable=ungrouped-imports
-import auth
-import cipd
-import errors
-import local_caching
-from libs import luci_context
-from utils import file_path
-from utils import fs
-from utils import logging_utils
-from utils import net
-from utils import subprocess42
+import auth  # noqa: E402
+import cipd  # noqa: E402
+import errors  # noqa: E402
+import local_caching  # noqa: E402
+from libs import luci_context  # noqa: E402
+from utils import file_path  # noqa: E402
+from utils import fs  # noqa: E402
+from utils import logging_utils  # noqa: E402
+from utils import net  # noqa: E402
+from utils import subprocess42  # noqa: E402
 
 
 # Magic variables that can be found in the isolate task command line.
@@ -153,64 +153,66 @@ for more information.
 
 # Currently hardcoded. Eventually could be exposed as a flag once there's value.
 # 3 weeks
-MAX_AGE_SECS = 21*24*60*60
+MAX_AGE_SECS = 21 * 24 * 60 * 60
 
 _CAS_KVS_CACHE_THRESHOLD = 5 * 1024 * 1024 * 1024  # 5 GiB
 
 TaskData = collections.namedtuple(
-    'TaskData',
-    [
-        # List of strings; the command line to use, independent of what was
-        # specified in the isolated file.
-        'command',
-        # Relative directory to start command into.
-        'relative_cwd',
-        # Digest of the input root on RBE-CAS.
-        'cas_digest',
-        # Full CAS instance name.
-        'cas_instance',
-        # List of paths relative to root_dir to put into the output isolated
-        # bundle upon task completion (see link_outputs_to_outdir).
-        'outputs',
-        # Function (run_dir) => context manager that installs named caches into
-        # |run_dir|.
-        'install_named_caches',
-        # If True, the temporary directory will be deliberately leaked for later
-        # examination.
-        'leak_temp_dir',
-        # Path to the directory to use to create the temporary directory. If not
-        # specified, a random temporary directory is created.
-        'root_dir',
-        # Kills the process if it lasts more than this amount of seconds.
-        'hard_timeout',
-        # Number of seconds to wait between SIGTERM and SIGKILL.
-        'grace_period',
-        # Path to a file with bot state, used in place of ${SWARMING_BOT_FILE}
-        # task command line argument.
-        'bot_file',
-        # Logical account to switch LUCI_CONTEXT into.
-        'switch_to_account',
-        # Context manager dir => CipdInfo, see install_client_and_packages.
-        'install_packages_fn',
-        # Cache directory for `cas` client.
-        'cas_cache_dir',
-        # Parameters passed to `cas` client.
-        'cas_cache_policies',
-        # Parameters for kvs file used by `cas` client.
-        'cas_kvs',
-        # Environment variables to set.
-        'env',
-        # Environment variables to mutate with relative directories.
-        # Example: {"ENV_KEY": ['relative', 'paths', 'to', 'prepend']}
-        'env_prefix',
-        # Lowers the task process priority.
-        'lower_priority',
-        # subprocess42.Containment instance. Can be None.
-        'containment',
-        # Function to trim caches before installing cipd packages and
-        # downloading isolated files.
-        'trim_caches_fn',
-    ])
+  'TaskData',
+  [
+    # List of strings; the command line to use, independent of what was
+    # specified in the isolated file.
+    'command',
+    # Relative directory to start command into.
+    'relative_cwd',
+    # Digest of the input root on RBE-CAS.
+    'cas_digest',
+    # Full CAS instance name.
+    'cas_instance',
+    # List of paths relative to root_dir to put into the output isolated
+    # bundle upon task completion (see link_outputs_to_outdir).
+    'outputs',
+    # Function (run_dir) => context manager that installs named caches into
+    # |run_dir|.
+    'install_named_caches',
+    # If True, the temporary directory will be deliberately leaked for later
+    # examination.
+    'leak_temp_dir',
+    # Path to the directory to use to create the temporary directory. If not
+    # specified, a random temporary directory is created.
+    'root_dir',
+    # Kills the process if it lasts more than this amount of seconds.
+    'hard_timeout',
+    # Number of seconds to wait between SIGTERM and SIGKILL.
+    'grace_period',
+    # Path to a file with bot state, used in place of ${SWARMING_BOT_FILE}
+    # task command line argument.
+    'bot_file',
+    # Logical account to switch LUCI_CONTEXT into.
+    'switch_to_account',
+    # Context manager dir => CipdInfo, see install_client_and_packages.
+    'install_packages_fn',
+    # Cache directory for `cas` client.
+    'cas_cache_dir',
+    # Parameters passed to `cas` client.
+    'cas_cache_policies',
+    # Parameters for kvs file used by `cas` client.
+    'cas_kvs',
+    # Environment variables to set.
+    'env',
+    # Environment variables to mutate with relative directories.
+    # Example: {"ENV_KEY": ['relative', 'paths', 'to', 'prepend']}
+    'env_prefix',
+    # Lowers the task process priority.
+    'lower_priority',
+    # subprocess42.Containment instance. Can be None.
+    'containment',
+    # Function to trim caches before installing cipd packages and
+    # downloading isolated files.
+    'trim_caches_fn',
+  ],
+)
+
 
 def make_temp_dir(prefix, root_dir):
   """Returns a new unique temporary directory."""
@@ -257,8 +259,11 @@ def set_luci_context_account(account, tmp_dir):
     local_auth['default_account_id'] = account
   else:
     logging.warning(
-        'Requested LUCI_CONTEXT account %r is not available (have only %r), '
-        'disabling authentication', account, sorted(available))
+      'Requested LUCI_CONTEXT account %r is not available (have only %r), '
+      'disabling authentication',
+      account,
+      sorted(available),
+    )
     local_auth.pop('default_account_id', None)
 
   with luci_context.write(_tmpdir=tmp_dir, local_auth=local_auth):
@@ -287,8 +292,9 @@ def replace_parameters(arg, out_dir, bot_file):
   if ISOLATED_OUTDIR_PARAMETER in arg:
     if not out_dir:
       raise ValueError(
-          'output directory is requested in command or env var, but not '
-          'provided; please specify one')
+        'output directory is requested in command or env var, but not '
+        'provided; please specify one'
+      )
     arg = arg.replace(ISOLATED_OUTDIR_PARAMETER, out_dir)
     replace_slash = True
   if SWARMING_BOT_FILE_PARAMETER in arg:
@@ -296,9 +302,11 @@ def replace_parameters(arg, out_dir, bot_file):
       arg = arg.replace(SWARMING_BOT_FILE_PARAMETER, bot_file)
       replace_slash = True
     else:
-      logging.warning('SWARMING_BOT_FILE_PARAMETER found in command or env '
-                      'var, but no bot_file specified. Leaving parameter '
-                      'unchanged.')
+      logging.warning(
+        'SWARMING_BOT_FILE_PARAMETER found in command or env '
+        'var, but no bot_file specified. Leaving parameter '
+        'unchanged.'
+      )
   if SWARMING_TASK_ID_PARAMETER in arg:
     task_id = os.environ.get('SWARMING_TASK_ID')
     if task_id:
@@ -312,7 +320,6 @@ def replace_parameters(arg, out_dir, bot_file):
 
 def set_temp_dir(env, tmp_dir):
   """Set temp dir to given env var dictionary"""
-  # pylint: disable=line-too-long
   # * python respects $TMPDIR, $TEMP, and $TMP in this order, regardless of
   #   platform. So $TMPDIR must be set on all platforms.
   #   https://github.com/python/cpython/blob/2.7/Lib/tempfile.py#L155
@@ -344,8 +351,9 @@ def set_temp_dir(env, tmp_dir):
     pass
 
 
-def get_command_env(tmp_dir, cipd_info, run_dir, env, env_prefixes, out_dir,
-                    bot_file):
+def get_command_env(
+  tmp_dir, cipd_info, run_dir, env, env_prefixes, out_dir, bot_file
+):
   """Returns full OS environment to run a command in.
 
   Sets up TEMP, puts directory with cipd binary in front of PATH, exposes
@@ -391,15 +399,22 @@ def get_command_env(tmp_dir, cipd_info, run_dir, env, env_prefixes, out_dir,
 
 
 def run_command(
-    command, cwd, env, hard_timeout, grace_period, lower_priority, containment):
+  command, cwd, env, hard_timeout, grace_period, lower_priority, containment
+):
   """Runs the command.
 
   Returns:
     tuple(process exit code, bool if had a hard timeout)
   """
-  logging_utils.user_logs('run_command(%s, %s, %s, %s, %s, %s)', command, cwd,
-                          hard_timeout, grace_period, lower_priority,
-                          containment)
+  logging_utils.user_logs(
+    'run_command(%s, %s, %s, %s, %s, %s)',
+    command,
+    cwd,
+    hard_timeout,
+    grace_period,
+    lower_priority,
+    containment,
+  )
 
   timeout_kill_sent = False
   exit_code = None
@@ -418,14 +433,23 @@ def run_command(
           raise subprocess42.TimeoutExpired(command, None)
 
       proc = subprocess42.Popen(
-          command, cwd=cwd, env=env, detached=True, close_fds=True,
-          lower_priority=lower_priority, containment=containment)
+        command,
+        cwd=cwd,
+        env=env,
+        detached=True,
+        close_fds=True,
+        lower_priority=lower_priority,
+        containment=containment,
+      )
       logging.info('Subprocess for command started')
       with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
         try:
           exit_code = proc.wait(hard_timeout or None)
-          logging.info('finished with exit code %d before hard_timeout %s',
-                       exit_code, hard_timeout)
+          logging.info(
+            'finished with exit code %d before hard_timeout %s',
+            exit_code,
+            hard_timeout,
+          )
         except subprocess42.TimeoutExpired:
           if not had_signal:
             logging.warning('Hard timeout')
@@ -436,13 +460,15 @@ def run_command(
       # Ignore signals in grace period. Forcibly give the grace period to the
       # child process.
       if exit_code is None:
-        ignore = lambda *_: None
+        ignore = lambda *_: None  # noqa: E731
         with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, ignore):
           try:
             exit_code = proc.wait(grace_period or None)
             logging.info(
-                'finished with exit code %d before grace_period exhausted %s',
-                exit_code, grace_period)
+              'finished with exit code %d before grace_period exhausted %s',
+              exit_code,
+              grace_period,
+            )
           except subprocess42.TimeoutExpired:
             # Now kill for real. The user can distinguish between the
             # following states:
@@ -464,33 +490,39 @@ def run_command(
       # This is not considered to be an internal error. The executable simply
       # does not exit.
       sys.stderr.write(
-          '<The executable does not exist, a dependent library is missing or '
-          'the command line is too long>\n'
-          '<Check for missing .so/.dll in the .isolate or GN file or length of '
-          'command line args>\n'
-          '<Command: %s>\n'
-          '<Exception: %s>\n' % (command, e))
+        '<The executable does not exist, a dependent library is missing or '
+        'the command line is too long>\n'
+        '<Check for missing .so/.dll in the .isolate or GN file or length of '
+        'command line args>\n'
+        '<Command: %s>\n'
+        '<Exception: %s>\n' % (command, e)
+      )
       if os.environ.get('SWARMING_TASK_ID'):
         # Give an additional hint when running as a swarming task.
         sys.stderr.write(
-            '<See the task\'s page for commands to help diagnose this issue '
-            'by reproducing the task locally>\n')
+          '<See the task\'s page for commands to help diagnose this issue '
+          'by reproducing the task locally>\n'
+        )
       exit_code = 1
 
   logging.info(
-      'Command finished with exit code %d (%s)',
-      exit_code, hex(0xffffffff & exit_code))
+    'Command finished with exit code %d (%s)',
+    exit_code,
+    hex(0xFFFFFFFF & exit_code),
+  )
 
   if sys.platform != 'win32':
     if exit_code == -int(signal.SIGKILL):
       if timeout_kill_sent:
         logging_utils.user_logs(
-            'The task root process was killed by SIGKILL due to exceeding '
-            'the graceful termination timeout')
+          'The task root process was killed by SIGKILL due to exceeding '
+          'the graceful termination timeout'
+        )
       else:
         logging_utils.user_logs(
-            'The task root process was killed by SIGKILL. It may mean the '
-            'process ran out of memory was killed by the oom-killer')
+          'The task root process was killed by SIGKILL. It may mean the '
+          'process ran out of memory was killed by the oom-killer'
+        )
 
   return exit_code, had_hard_timeout
 
@@ -532,13 +564,16 @@ def _run_go_cmd_and_wait(cmd, tmp_dir):
         proc.wait(check_period_sec)
       except subprocess42.TimeoutExpired:
         logging.exception(
-            "failed to terminate? timeout happened after %d seconds",
-            check_period_sec)
+          "failed to terminate? timeout happened after %d seconds",
+          check_period_sec,
+        )
         proc.kill()
         proc.wait()
       # Raise unconditionally, because |proc| was forcefully terminated.
-      raise ValueError("timedout after %d seconds (cmd=%s)" %
-                       (check_period_sec * max_checks, cmd_str))
+      raise ValueError(
+        "timedout after %d seconds (cmd=%s)"
+        % (check_period_sec * max_checks, cmd_str)
+      )
 
     return proc
   except Exception:
@@ -546,8 +581,16 @@ def _run_go_cmd_and_wait(cmd, tmp_dir):
     raise
 
 
-def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
-                            policies, kvs_dir, tmp_dir):
+def _fetch_and_map(
+  cas_client,
+  digest,
+  instance,
+  output_dir,
+  cache_dir,
+  policies,
+  kvs_dir,
+  tmp_dir,
+):
   """
   Fetches a CAS tree using cas client, create the tree and returns download
   stats.
@@ -555,45 +598,45 @@ def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
 
   start = time.time()
   result_json_handle, result_json_path = tempfile.mkstemp(
-      prefix='fetch-and-map-result-', suffix='.json')
+    prefix='fetch-and-map-result-', suffix='.json'
+  )
   os.close(result_json_handle)
   profile_dir = tempfile.mkdtemp(dir=tmp_dir)
 
   try:
     cmd = [
-        cas_client,
-        'download',
-        '-digest',
-        digest,
-        # flags for cache.
-        '-cache-dir',
-        cache_dir,
-        '-cache-max-size',
-        str(policies.max_cache_size),
-        '-cache-min-free-space',
-        str(policies.min_free_space),
-        # flags for output.
-        '-dir',
-        output_dir,
-        '-dump-json',
-        result_json_path,
-        '-log-level',
-        'info',
+      cas_client,
+      'download',
+      '-digest',
+      digest,
+      # flags for cache.
+      '-cache-dir',
+      cache_dir,
+      '-cache-max-size',
+      str(policies.max_cache_size),
+      '-cache-min-free-space',
+      str(policies.min_free_space),
+      # flags for output.
+      '-dir',
+      output_dir,
+      '-dump-json',
+      result_json_path,
+      '-log-level',
+      'info',
     ]
 
     # When RUN_ISOLATED_CAS_ADDRESS is set in test mode,
     # Use it and ignore CAS instance option.
     cas_addr = os.environ.get('RUN_ISOLATED_CAS_ADDRESS')
     if cas_addr:
-      cmd.extend([
-        '-cas-addr',
-        cas_addr,
-      ])
+      cmd.extend(
+        [
+          '-cas-addr',
+          cas_addr,
+        ]
+      )
     else:
-      cmd.extend([
-        '-cas-instance',
-        instance
-      ])
+      cmd.extend(['-cas-instance', instance])
 
     if kvs_dir:
       cmd.extend(['-kvs-dir', kvs_dir])
@@ -605,9 +648,11 @@ def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
       try:
         with open(result_json_path) as json_file:
           result_json = json.load(json_file)
-          cas_error = result_json.get('result') in ('digest_invalid',
-                                                    'authentication_error',
-                                                    'arguments_invalid')
+          cas_error = result_json.get('result') in (
+            'digest_invalid',
+            'authentication_error',
+            'arguments_invalid',
+          )
           if cas_error and result_json.get('error_details'):
             error_digest = result_json['error_details'].get('digest', digest)
 
@@ -619,8 +664,9 @@ def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
           file_path.rmtree(kvs_dir)
           file_path.rmtree(output_dir)
       if cas_error:
-        raise errors.NonRecoverableCasException(result_json['result'],
-                                                error_digest, instance)
+        raise errors.NonRecoverableCasException(
+          result_json['result'], error_digest, instance
+        )
       return result_json
 
     try:
@@ -636,9 +682,9 @@ def _fetch_and_map(cas_client, digest, instance, output_dir, cache_dir,
     result_json = open_json_and_check(result_json_path, False)
 
     return {
-        'duration': time.time() - start,
-        'items_cold': result_json['items_cold'],
-        'items_hot': result_json['items_hot'],
+      'duration': time.time() - start,
+      'items_cold': result_json['items_cold'],
+      'items_hot': result_json['items_hot'],
     }
   finally:
     fs.remove(result_json_path)
@@ -677,8 +723,9 @@ def copy_recursively(src, dst):
     # TODO(sadafm): Explicitly handle cyclic symlinks.
 
     if not fs.exists(src):
-      logging.warning('Path %s does not exist or %s is a broken symlink', src,
-                      orig_src)
+      logging.warning(
+        'Path %s does not exist or %s is a broken symlink', src, orig_src
+      )
       return
 
     if fs.isfile(src):
@@ -693,8 +740,9 @@ def copy_recursively(src, dst):
 
   except OSError as e:
     if e.errno == errno.ENOENT:
-      logging.warning('Path %s does not exist or %s is a broken symlink',
-                      src, orig_src)
+      logging.warning(
+        'Path %s does not exist or %s is a broken symlink', src, orig_src
+      )
     else:
       logging.info("Couldn't collect output file %s: %s", src, e)
 
@@ -709,42 +757,43 @@ def upload_outdir(cas_client, cas_instance, outdir, tmp_dir):
   """
   if not fs.listdir(outdir):
     return None, None
-  digest_file_handle, digest_path = tempfile.mkstemp(prefix='cas-digest',
-                                                     suffix='.txt')
+  digest_file_handle, digest_path = tempfile.mkstemp(
+    prefix='cas-digest', suffix='.txt'
+  )
   os.close(digest_file_handle)
-  stats_json_handle, stats_json_path = tempfile.mkstemp(prefix='upload-stats',
-                                                        suffix='.json')
+  stats_json_handle, stats_json_path = tempfile.mkstemp(
+    prefix='upload-stats', suffix='.json'
+  )
   os.close(stats_json_handle)
 
   try:
     cmd = [
-        cas_client,
-        'archive',
-        '-log-level',
-        'debug',
-        '-paths',
-        # Format: <working directory>:<relative path to dir>
-        outdir + ':',
-        # output
-        '-dump-digest',
-        digest_path,
-        '-dump-json',
-        stats_json_path,
+      cas_client,
+      'archive',
+      '-log-level',
+      'debug',
+      '-paths',
+      # Format: <working directory>:<relative path to dir>
+      outdir + ':',
+      # output
+      '-dump-digest',
+      digest_path,
+      '-dump-json',
+      stats_json_path,
     ]
 
     # When RUN_ISOLATED_CAS_ADDRESS is set in test mode,
     # Use it and ignore CAS instance option.
     cas_addr = os.environ.get('RUN_ISOLATED_CAS_ADDRESS')
     if cas_addr:
-      cmd.extend([
-        '-cas-addr',
-        cas_addr,
-      ])
+      cmd.extend(
+        [
+          '-cas-addr',
+          cas_addr,
+        ]
+      )
     elif cas_instance:
-      cmd.extend([
-        '-cas-instance',
-        cas_instance
-      ])
+      cmd.extend(['-cas-instance', cas_instance])
     else:
       return None, None
 
@@ -756,11 +805,8 @@ def upload_outdir(cas_client, cas_instance, outdir, tmp_dir):
       digest = digest_file.read()
     h, s = digest.split('/')
     cas_output_root = {
-        'cas_instance': cas_instance,
-        'digest': {
-            'hash': h,
-            'size_bytes': int(s)
-        }
+      'cas_instance': cas_instance,
+      'digest': {'hash': h, 'size_bytes': int(s)},
     }
     with open(stats_json_path) as stats_file:
       stats = json.load(stats_file)
@@ -785,60 +831,61 @@ def map_and_run(data, constant_run_path):
 
   # TODO(tikuta): take stats from state.json in this case too.
   download_stats = {
-      # 'duration': 0.,
-      # 'initial_number_items': len(data.cas_cache),
-      # 'initial_size': data.cas_cache.total_size,
-      # 'items_cold': '<large.pack()>',
-      # 'items_hot': '<large.pack()>',
+    # 'duration': 0.,
+    # 'initial_number_items': len(data.cas_cache),
+    # 'initial_size': data.cas_cache.total_size,
+    # 'items_cold': '<large.pack()>',
+    # 'items_hot': '<large.pack()>',
   }
 
   result = {
-      'duration': None,
-      'exit_code': None,
-      'had_hard_timeout': False,
-      'internal_failure': 'run_isolated did not complete properly',
-      'stats': {
-          'trim_caches': {
-              'duration': 0,
-          },
-          #'cipd': {
-          #  'duration': 0.,
-          #  'get_client_duration': 0.,
-          #},
-          'isolated': {
-              'download': download_stats,
-              #'upload': {
-              #  'duration': 0.,
-              #  'items_cold': '<large.pack()>',
-              #  'items_hot': '<large.pack()>',
-              #},
-          },
-          'named_caches': {
-              'install': {
-                  'duration': 0,
-              },
-              'uninstall': {
-                  'duration': 0,
-              },
-          },
-          'cleanup': {
-              'duration': 0,
-          }
+    'duration': None,
+    'exit_code': None,
+    'had_hard_timeout': False,
+    'internal_failure': 'run_isolated did not complete properly',
+    'stats': {
+      'trim_caches': {
+        'duration': 0,
       },
-      #'cipd_pins': {
-      #  'packages': [
-      #    {'package_name': ..., 'version': ..., 'path': ...},
-      #    ...
-      #  ],
-      # 'client_package': {'package_name': ..., 'version': ...},
-      #},
-      'outputs_ref': None,
-      'cas_output_root': None,
-      'version': 5,
+      #'cipd': {
+      #  'duration': 0.,
+      #  'get_client_duration': 0.,
+      # },
+      'isolated': {
+        'download': download_stats,
+        #'upload': {
+        #  'duration': 0.,
+        #  'items_cold': '<large.pack()>',
+        #  'items_hot': '<large.pack()>',
+        # },
+      },
+      'named_caches': {
+        'install': {
+          'duration': 0,
+        },
+        'uninstall': {
+          'duration': 0,
+        },
+      },
+      'cleanup': {
+        'duration': 0,
+      },
+    },
+    #'cipd_pins': {
+    #  'packages': [
+    #    {'package_name': ..., 'version': ..., 'path': ...},
+    #    ...
+    #  ],
+    # 'client_package': {'package_name': ..., 'version': ...},
+    # },
+    'outputs_ref': None,
+    'cas_output_root': None,
+    'version': 5,
   }
 
-  assert os.path.isabs(data.root_dir), ("data.root_dir is not abs path: %s" %
-                                        data.root_dir)
+  assert os.path.isabs(data.root_dir), (
+    "data.root_dir is not abs path: %s" % data.root_dir
+  )
   file_path.ensure_tree(data.root_dir, 0o700)
 
   # See comment for these constants.
@@ -876,22 +923,24 @@ def map_and_run(data, constant_run_path):
 
       if data.cas_digest:
         stats = _fetch_and_map(
-            cas_client=cas_client,
-            digest=data.cas_digest,
-            instance=data.cas_instance,
-            output_dir=run_dir,
-            cache_dir=data.cas_cache_dir,
-            policies=data.cas_cache_policies,
-            kvs_dir=data.cas_kvs,
-            tmp_dir=tmp_dir)
+          cas_client=cas_client,
+          digest=data.cas_digest,
+          instance=data.cas_instance,
+          output_dir=run_dir,
+          cache_dir=data.cas_cache_dir,
+          policies=data.cas_cache_policies,
+          kvs_dir=data.cas_kvs,
+          tmp_dir=tmp_dir,
+        )
         isolated_stats['download'].update(stats)
         logging_utils.user_logs('Fetched CAS inputs')
 
       if not command:
         # Handle this as a task failure, not an internal failure.
         sys.stderr.write(
-            '<No command was specified!>\n'
-            '<Please specify a command when triggering your Swarming task>\n')
+          '<No command was specified!>\n'
+          '<Please specify a command when triggering your Swarming task>\n'
+        )
         result['exit_code'] = 1
         return result
 
@@ -920,15 +969,27 @@ def map_and_run(data, constant_run_path):
           # so it can grab correct value of LUCI_CONTEXT env var.
           with set_luci_context_account(data.switch_to_account, tmp_dir):
             env = get_command_env(
-                tmp_dir, cipd_info, run_dir, data.env, data.env_prefix, out_dir,
-                data.bot_file)
+              tmp_dir,
+              cipd_info,
+              run_dir,
+              data.env,
+              data.env_prefix,
+              out_dir,
+              data.bot_file,
+            )
             command = tools.find_executable(command, env)
             command = process_command(command, out_dir, data.bot_file)
             file_path.ensure_command_has_abs_path(command, cwd)
 
             result['exit_code'], result['had_hard_timeout'] = run_command(
-                command, cwd, env, data.hard_timeout, data.grace_period,
-                data.lower_priority, data.containment)
+              command,
+              cwd,
+              env,
+              data.hard_timeout,
+              data.grace_period,
+              data.lower_priority,
+              data.containment,
+            )
         finally:
           result['duration'] = max(time.time() - start, 0)
 
@@ -936,7 +997,8 @@ def map_and_run(data, constant_run_path):
       link_outputs_to_outdir(run_dir, out_dir, data.outputs)
       isolated_stats = result['stats'].setdefault('isolated', {})
       result['cas_output_root'], upload_stats = upload_outdir(
-          cas_client, data.cas_instance, out_dir, tmp_dir)
+        cas_client, data.cas_instance, out_dir, tmp_dir
+      )
       if upload_stats:
         isolated_stats['upload'] = upload_stats
 
@@ -970,7 +1032,8 @@ def map_and_run(data, constant_run_path):
       if data.leak_temp_dir:
         success = True
         logging.warning(
-            'Deliberately leaking %s for later examination', run_dir)
+          'Deliberately leaking %s for later examination', run_dir
+        )
       else:
         # On Windows rmtree(run_dir) call above has a synchronization effect: it
         # finishes only when all task child processes terminate (since a running
@@ -990,11 +1053,15 @@ def map_and_run(data, constant_run_path):
             logging.error('rmtree(%r) failed: %s', directory, e)
             success = False
           finally:
-            logging.info('Cleanup: rmtree(%r) took %d seconds', directory,
-                         time.time() - start)
+            logging.info(
+              'Cleanup: rmtree(%r) took %d seconds',
+              directory,
+              time.time() - start,
+            )
           if not success:
             sys.stderr.write(
-                OUTLIVING_ZOMBIE_MSG % (directory, data.grace_period))
+              OUTLIVING_ZOMBIE_MSG % (directory, data.grace_period)
+            )
             if sys.platform == 'win32':
               subprocess42.check_call(['tasklist.exe', '/V'], stdout=sys.stderr)
             else:
@@ -1012,8 +1079,9 @@ def map_and_run(data, constant_run_path):
     finally:
       cleanup_duration = time.time() - cleanup_start
       result['stats']['cleanup']['duration'] = cleanup_duration
-      logging.info('Cleanup: removing directories took %d seconds',
-                   cleanup_duration)
+      logging.info(
+        'Cleanup: removing directories took %d seconds', cleanup_duration
+      )
   return result
 
 
@@ -1039,12 +1107,12 @@ def run_tha_test(data, result_json):
   if result_json:
     # Write a json output file right away in case we get killed.
     result = {
-        'exit_code': None,
-        'had_hard_timeout': False,
-        'internal_failure': 'Was terminated before completion',
-        'outputs_ref': None,
-        'cas_output_root': None,
-        'version': 5,
+      'exit_code': None,
+      'had_hard_timeout': False,
+      'internal_failure': 'Was terminated before completion',
+      'outputs_ref': None,
+      'cas_output_root': None,
+      'version': 5,
     }
     tools.write_json(result_json, result, dense=True)
 
@@ -1062,36 +1130,43 @@ def run_tha_test(data, result_json):
 
   # Marshall into old-style inline output.
   if result['outputs_ref']:
-    # pylint: disable=unsubscriptable-object
     data = {
-        'hash': result['outputs_ref']['isolated'],
-        'namespace': result['outputs_ref']['namespace'],
-        'storage': result['outputs_ref']['isolatedserver'],
+      'hash': result['outputs_ref']['isolated'],
+      'namespace': result['outputs_ref']['namespace'],
+      'storage': result['outputs_ref']['isolatedserver'],
     }
     sys.stdout.flush()
-    print('[run_isolated_out_hack]%s[/run_isolated_out_hack]' %
-          tools.format_json(data, dense=True))
+    print(
+      '[run_isolated_out_hack]%s[/run_isolated_out_hack]'
+      % tools.format_json(data, dense=True)
+    )
     sys.stdout.flush()
   return result['exit_code'] or int(bool(result['internal_failure']))
 
 
 # Yielded by 'install_client_and_packages'.
-CipdInfo = collections.namedtuple('CipdInfo', [
-  'client',     # cipd.CipdClient object
-  'cache_dir',  # absolute path to bot-global cipd tag and instance cache
-  'stats',      # dict with stats to return to the server
-  'pins',       # dict with installed cipd pins to return to the server
-])
+CipdInfo = collections.namedtuple(
+  'CipdInfo',
+  [
+    'client',  # cipd.CipdClient object
+    'cache_dir',  # absolute path to bot-global cipd tag and instance cache
+    'stats',  # dict with stats to return to the server
+    'pins',  # dict with installed cipd pins to return to the server
+  ],
+)
 
 
 @contextlib.contextmanager
 def copy_local_packages(_run_dir, cas_dir):
   """Copies CIPD packages from luci/luci-go dir."""
   go_client_dir = os.environ.get('LUCI_GO_CLIENT_DIR')
-  assert go_client_dir, ('Please set LUCI_GO_CLIENT_DIR env var to install CIPD'
-                         ' packages locally.')
-  shutil.copy2(os.path.join(go_client_dir, 'cas' + cipd.EXECUTABLE_SUFFIX),
-               os.path.join(cas_dir, 'cas' + cipd.EXECUTABLE_SUFFIX))
+  assert go_client_dir, (
+    'Please set LUCI_GO_CLIENT_DIR env var to install CIPD packages locally.'
+  )
+  shutil.copy2(
+    os.path.join(go_client_dir, 'cas' + cipd.EXECUTABLE_SUFFIX),
+    os.path.join(cas_dir, 'cas' + cipd.EXECUTABLE_SUFFIX),
+  )
   yield None
 
 
@@ -1114,7 +1189,8 @@ def _install_packages(run_dir, cipd_cache_dir, client, packages, timeout=None):
     ...
   ]
   """
-  package_pins = [None]*len(packages)
+  package_pins = [None] * len(packages)
+
   def insert_pin(path, name, version, idx):
     package_pins[idx] = {
       'package_name': name,
@@ -1131,13 +1207,13 @@ def _install_packages(run_dir, cipd_cache_dir, client, packages, timeout=None):
     by_path[path].append((name, version, i))
 
   pins = client.ensure(
-      run_dir,
-      {
-          subdir: [(name, vers) for name, vers, _ in pkgs]
-          for subdir, pkgs in by_path.items()
-      },
-      cache_dir=cipd_cache_dir,
-      timeout=timeout,
+    run_dir,
+    {
+      subdir: [(name, vers) for name, vers, _ in pkgs]
+      for subdir, pkgs in by_path.items()
+    },
+    cache_dir=cipd_cache_dir,
+    timeout=timeout,
   )
 
   for subdir, pin_list in sorted(pins.items()):
@@ -1151,9 +1227,15 @@ def _install_packages(run_dir, cipd_cache_dir, client, packages, timeout=None):
 
 
 @contextlib.contextmanager
-def install_client_and_packages(run_dir, packages, service_url,
-                                client_package_name, client_version, cache_dir,
-                                cas_dir):
+def install_client_and_packages(
+  run_dir,
+  packages,
+  service_url,
+  client_package_name,
+  client_version,
+  cache_dir,
+  cas_dir,
+):
   """Bootstraps CIPD client and installs CIPD packages.
 
   Yields CipdClient, stats, client info and pins (as single CipdInfo object).
@@ -1197,8 +1279,9 @@ def install_client_and_packages(run_dir, packages, service_url,
   packages = packages or []
 
   get_client_start = time.time()
-  client_manager = cipd.get_client(cache_dir, service_url, client_package_name,
-                                   client_version)
+  client_manager = cipd.get_client(
+    cache_dir, service_url, client_package_name, client_version
+  )
 
   with client_manager as client:
     logging_utils.user_logs('Installed CIPD client')
@@ -1206,116 +1289,138 @@ def install_client_and_packages(run_dir, packages, service_url,
 
     package_pins = []
     if packages:
-      package_pins = _install_packages(run_dir, cipd_cache_dir, client,
-                                       packages)
+      package_pins = _install_packages(
+        run_dir, cipd_cache_dir, client, packages
+      )
       logging_utils.user_logs('Installed task packages')
 
     # Install cas client to |cas_dir|.
-    _install_packages(cas_dir,
-                      cipd_cache_dir,
-                      client, [('', _CAS_PACKAGE, _LUCI_GO_REVISION)],
-                      timeout=10 * 60)
+    _install_packages(
+      cas_dir,
+      cipd_cache_dir,
+      client,
+      [('', _CAS_PACKAGE, _LUCI_GO_REVISION)],
+      timeout=10 * 60,
+    )
     logging_utils.user_logs('Installed CAS client')
 
     file_path.make_tree_files_read_only(run_dir)
 
     total_duration = time.time() - start
     logging_utils.user_logs(
-        'Installing CIPD client and packages took %d seconds', total_duration)
+      'Installing CIPD client and packages took %d seconds', total_duration
+    )
 
     yield CipdInfo(
-        client=client,
-        cache_dir=cipd_cache_dir,
-        stats={
-            'duration': total_duration,
-            'get_client_duration': get_client_duration,
+      client=client,
+      cache_dir=cipd_cache_dir,
+      stats={
+        'duration': total_duration,
+        'get_client_duration': get_client_duration,
+      },
+      pins={
+        'client_package': {
+          'package_name': client.package_name,
+          'version': client.instance_id,
         },
-        pins={
-            'client_package': {
-                'package_name': client.package_name,
-                'version': client.instance_id,
-            },
-            'packages': package_pins,
-        })
+        'packages': package_pins,
+      },
+    )
 
 
 def create_option_parser():
   parser = logging_utils.OptionParserWithLogging(
-      usage='%prog <options> [command to run or extra args]',
-      version=__version__,
-      log_file=RUN_ISOLATED_LOG_FILE)
+    usage='%prog <options> [command to run or extra args]',
+    version=__version__,
+    log_file=RUN_ISOLATED_LOG_FILE,
+  )
   parser.add_option(
-      '--clean',
-      action='store_true',
-      help='Cleans the cache, trimming it necessary and remove corrupted items '
-      'and returns without executing anything; use with -v to know what '
-      'was done')
+    '--clean',
+    action='store_true',
+    help='Cleans the cache, trimming it necessary and remove corrupted items '
+    'and returns without executing anything; use with -v to know what '
+    'was done',
+  )
   parser.add_option(
-      '--json',
-      help='dump output metadata to json file. When used, run_isolated returns '
-      'non-zero only on internal failure')
+    '--json',
+    help='dump output metadata to json file. When used, run_isolated returns '
+    'non-zero only on internal failure',
+  )
   parser.add_option(
-      '--hard-timeout', type='float', help='Enforce hard timeout in execution')
+    '--hard-timeout', type='float', help='Enforce hard timeout in execution'
+  )
   parser.add_option(
-      '--grace-period',
-      type='float',
-      help='Grace period between SIGTERM and SIGKILL')
+    '--grace-period',
+    type='float',
+    help='Grace period between SIGTERM and SIGKILL',
+  )
   parser.add_option(
-      '--relative-cwd',
-      help='Ignore the isolated \'relative_cwd\' and use this one instead')
+    '--relative-cwd',
+    help='Ignore the isolated \'relative_cwd\' and use this one instead',
+  )
   parser.add_option(
-      '--env',
-      default=[],
-      action='append',
-      help='Environment variables to set for the child process')
+    '--env',
+    default=[],
+    action='append',
+    help='Environment variables to set for the child process',
+  )
   parser.add_option(
-      '--env-prefix',
-      default=[],
-      action='append',
-      help='Specify a VAR=./path/fragment to put in the environment variable '
-      'before executing the command. The path fragment must be relative '
-      'to the isolated run directory, and must not contain a `..` token. '
-      'The path will be made absolute and prepended to the indicated '
-      '$VAR using the OS\'s path separator. Multiple items for the same '
-      '$VAR will be prepended in order.')
+    '--env-prefix',
+    default=[],
+    action='append',
+    help='Specify a VAR=./path/fragment to put in the environment variable '
+    'before executing the command. The path fragment must be relative '
+    'to the isolated run directory, and must not contain a `..` token. '
+    'The path will be made absolute and prepended to the indicated '
+    '$VAR using the OS\'s path separator. Multiple items for the same '
+    '$VAR will be prepended in order.',
+  )
   parser.add_option(
-      '--bot-file',
-      help='Path to a file describing the state of the host. The content is '
-      'defined by on_before_task() in bot_config.')
+    '--bot-file',
+    help='Path to a file describing the state of the host. The content is '
+    'defined by on_before_task() in bot_config.',
+  )
   parser.add_option(
-      '--switch-to-account',
-      help='If given, switches LUCI_CONTEXT to given logical service account '
-      '(e.g. "task" or "system") before launching the isolated process.')
+    '--switch-to-account',
+    help='If given, switches LUCI_CONTEXT to given logical service account '
+    '(e.g. "task" or "system") before launching the isolated process.',
+  )
   parser.add_option(
-      '--output',
-      action='append',
-      help='Specifies an output to return. If no outputs are specified, all '
-      'files located in $(ISOLATED_OUTDIR) will be returned; '
-      'otherwise, outputs in both $(ISOLATED_OUTDIR) and those '
-      'specified by --output option (there can be multiple) will be '
-      'returned. Note that if a file in OUT_DIR has the same path '
-      'as an --output option, the --output version will be returned.')
+    '--output',
+    action='append',
+    help='Specifies an output to return. If no outputs are specified, all '
+    'files located in $(ISOLATED_OUTDIR) will be returned; '
+    'otherwise, outputs in both $(ISOLATED_OUTDIR) and those '
+    'specified by --output option (there can be multiple) will be '
+    'returned. Note that if a file in OUT_DIR has the same path '
+    'as an --output option, the --output version will be returned.',
+  )
   parser.add_option(
-      '-a',
-      '--argsfile',
-      # This is actually handled in parse_args; it's included here purely so it
-      # can make it into the help text.
-      help='Specify a file containing a JSON array of arguments to this '
-      'script. If --argsfile is provided, no other argument may be '
-      'provided on the command line.')
+    '-a',
+    '--argsfile',
+    # This is actually handled in parse_args; it's included here purely so it
+    # can make it into the help text.
+    help='Specify a file containing a JSON array of arguments to this '
+    'script. If --argsfile is provided, no other argument may be '
+    'provided on the command line.',
+  )
   parser.add_option(
-      '--report-on-exception',
-      action='store_true',
-      help='Does nothing, kept for backward compatibility')
+    '--report-on-exception',
+    action='store_true',
+    help='Does nothing, kept for backward compatibility',
+  )
 
-  group = optparse.OptionGroup(parser,
-                               'Data source - Content Addressed Storage')
+  group = optparse.OptionGroup(
+    parser, 'Data source - Content Addressed Storage'
+  )
   group.add_option(
-      '--cas-instance', help='Full CAS instance name for input/output files.')
+    '--cas-instance', help='Full CAS instance name for input/output files.'
+  )
   group.add_option(
-      '--cas-digest',
-      help='Digest of the input root on RBE-CAS. The format is '
-      '`{hash}/{size_bytes}`.')
+    '--cas-digest',
+    help='Digest of the input root on RBE-CAS. The format is '
+    '`{hash}/{size_bytes}`.',
+  )
   parser.add_option_group(group)
 
   # Cache options.
@@ -1325,48 +1430,57 @@ def create_option_parser():
 
   group = optparse.OptionGroup(parser, 'Named caches')
   group.add_option(
-      '--named-cache',
-      dest='named_caches',
-      action='append',
-      nargs=3,
-      default=[],
-      help='A named cache to request. Accepts 3 arguments: name, path, hint. '
-      'name identifies the cache, must match regex [a-z0-9_]{1,4096}. '
-      'path is a path relative to the run dir where the cache directory '
-      'must be put to. '
-      'This option can be specified more than once.')
+    '--named-cache',
+    dest='named_caches',
+    action='append',
+    nargs=3,
+    default=[],
+    help='A named cache to request. Accepts 3 arguments: name, path, hint. '
+    'name identifies the cache, must match regex [a-z0-9_]{1,4096}. '
+    'path is a path relative to the run dir where the cache directory '
+    'must be put to. '
+    'This option can be specified more than once.',
+  )
   group.add_option(
-      '--named-cache-root',
-      default='named_caches',
-      help='Cache root directory. Default=%default')
+    '--named-cache-root',
+    default='named_caches',
+    help='Cache root directory. Default=%default',
+  )
   parser.add_option_group(group)
 
   group = optparse.OptionGroup(parser, 'Process containment')
   parser.add_option(
-      '--lower-priority', action='store_true',
-      help='Lowers the child process priority')
-  parser.add_option('--containment-type',
-                    choices=('NONE', 'AUTO', 'JOB_OBJECT'),
-                    default='NONE',
-                    help='Type of container to use')
+    '--lower-priority',
+    action='store_true',
+    help='Lowers the child process priority',
+  )
   parser.add_option(
-      '--limit-processes',
-      type='int',
-      default=0,
-      help='Maximum number of active processes in the containment')
+    '--containment-type',
+    choices=('NONE', 'AUTO', 'JOB_OBJECT'),
+    default='NONE',
+    help='Type of container to use',
+  )
   parser.add_option(
-      '--limit-total-committed-memory',
-      type='int',
-      default=0,
-      help='Maximum sum of committed memory in the containment')
+    '--limit-processes',
+    type='int',
+    default=0,
+    help='Maximum number of active processes in the containment',
+  )
+  parser.add_option(
+    '--limit-total-committed-memory',
+    type='int',
+    default=0,
+    help='Maximum sum of committed memory in the containment',
+  )
   parser.add_option_group(group)
 
   group = optparse.OptionGroup(parser, 'Debugging')
   group.add_option(
-      '--leak-temp-dir',
-      action='store_true',
-      help='Deliberately leak isolate\'s temp dir for later examination. '
-      'Default: %default')
+    '--leak-temp-dir',
+    action='store_true',
+    help='Deliberately leak isolate\'s temp dir for later examination. '
+    'Default: %default',
+  )
   group.add_option('--root-dir', help='Use a directory instead of a random one')
   parser.add_option_group(group)
 
@@ -1379,44 +1493,48 @@ def create_option_parser():
 def add_cas_cache_options(parser):
   group = optparse.OptionGroup(parser, 'CAS cache management')
   group.add_option(
-      '--cas-cache',
-      metavar='DIR',
-      default='cas-cache',
-      help='Directory to keep a local cache of the files. Accelerates download '
-      'by reusing already downloaded files. Default=%default')
+    '--cas-cache',
+    metavar='DIR',
+    default='cas-cache',
+    help='Directory to keep a local cache of the files. Accelerates download '
+    'by reusing already downloaded files. Default=%default',
+  )
   group.add_option(
-      '--kvs-dir',
-      default='',
-      help='CAS cache dir using kvs for small files. Default=%default')
+    '--kvs-dir',
+    default='',
+    help='CAS cache dir using kvs for small files. Default=%default',
+  )
   group.add_option(
-      '--max-cache-size',
-      type='int',
-      metavar='NNN',
-      default=50 * 1024 * 1024 * 1024,
-      help='Trim if the cache gets larger than this value, default=%default')
+    '--max-cache-size',
+    type='int',
+    metavar='NNN',
+    default=50 * 1024 * 1024 * 1024,
+    help='Trim if the cache gets larger than this value, default=%default',
+  )
   group.add_option(
-      '--min-free-space',
-      type='int',
-      metavar='NNN',
-      default=2 * 1024 * 1024 * 1024,
-      help='Trim if disk free space becomes lower than this value, '
-      'default=%default')
+    '--min-free-space',
+    type='int',
+    metavar='NNN',
+    default=2 * 1024 * 1024 * 1024,
+    help='Trim if disk free space becomes lower than this value, '
+    'default=%default',
+  )
   parser.add_option_group(group)
 
 
 def process_cas_cache_options(options):
   if options.cas_cache:
     policies = local_caching.CachePolicies(
-        max_cache_size=options.max_cache_size,
-        min_free_space=options.min_free_space,
-        # max_items isn't used for CAS cache for now.
-        max_items=None,
-        max_age_secs=MAX_AGE_SECS)
+      max_cache_size=options.max_cache_size,
+      min_free_space=options.min_free_space,
+      # max_items isn't used for CAS cache for now.
+      max_items=None,
+      max_age_secs=MAX_AGE_SECS,
+    )
 
-    return local_caching.DiskContentAddressedCache(os.path.abspath(
-        options.cas_cache),
-                                                   policies,
-                                                   trim=False)
+    return local_caching.DiskContentAddressedCache(
+      os.path.abspath(options.cas_cache), policies, trim=False
+    )
   return local_caching.MemoryContentAddressedCache()
 
 
@@ -1427,7 +1545,8 @@ def process_named_cache_options(parser, options, time_fn=None):
   for name, path, hint in options.named_caches:
     if not CACHE_NAME_RE.match(name):
       parser.error(
-          'cache name %r does not match %r' % (name, CACHE_NAME_RE.pattern))
+        'cache name %r does not match %r' % (name, CACHE_NAME_RE.pattern)
+      )
     if not path:
       parser.error('cache path cannot be empty')
     try:
@@ -1441,17 +1560,17 @@ def process_named_cache_options(parser, options, time_fn=None):
     # so this code doesn't have any effect to them, unless they are preloaded
     # with a really old cache.
     policies = local_caching.CachePolicies(
-        # 1TiB.
-        max_cache_size=1024 * 1024 * 1024 * 1024,
-        min_free_space=options.min_free_space,
-        max_items=50,
-        max_age_secs=MAX_AGE_SECS)
+      # 1TiB.
+      max_cache_size=1024 * 1024 * 1024 * 1024,
+      min_free_space=options.min_free_space,
+      max_items=50,
+      max_age_secs=MAX_AGE_SECS,
+    )
     keep = [name for name, _, _ in options.named_caches]
     root_dir = os.path.abspath(options.named_cache_root)
-    cache = local_caching.NamedCache(root_dir,
-                                     policies,
-                                     time_fn=time_fn,
-                                     keep=keep)
+    cache = local_caching.NamedCache(
+      root_dir, policies, time_fn=time_fn, keep=keep
+    )
     # Touch any named caches we're going to use to minimize thrashing
     # between tasks that request some (but not all) of the same named caches.
     cache.touch(*[name for name, _, _ in options.named_caches])
@@ -1469,8 +1588,9 @@ def parse_args(args):
   (file_args, nonfile_args) = file_argparse.parse_known_args(args)
   if file_args.argsfile:
     if nonfile_args:
-      file_argparse.error('Can\'t specify --argsfile with'
-                          'any other arguments (%s)' % nonfile_args)
+      file_argparse.error(
+        'Can\'t specify --argsfile withany other arguments (%s)' % nonfile_args
+      )
     try:
       with open(file_args.argsfile, 'r') as f:
         args = json.load(f)
@@ -1535,10 +1655,11 @@ def _clean_cmd(parser, options, caches, root):
 
   # Trim first, then clean.
   local_caching.trim_caches(
-      caches,
-      root,
-      min_free_space=options.min_free_space,
-      max_age_secs=MAX_AGE_SECS)
+    caches,
+    root,
+    min_free_space=options.min_free_space,
+    max_age_secs=MAX_AGE_SECS,
+  )
   logging.info("free space after trim: %d", file_path.get_free_space(root))
   for c in caches:
     c.cleanup()
@@ -1600,7 +1721,8 @@ def main(args):
   def trim_caches_fn(stats):
     start = time.time()
     local_caching.trim_caches(
-        caches, root, min_free_space=min_free_space, max_age_secs=MAX_AGE_SECS)
+      caches, root, min_free_space=min_free_space, max_age_secs=MAX_AGE_SECS
+    )
     duration = time.time() - start
     stats['duration'] = duration
     logging_utils.user_logs('trim_caches: took %d seconds', duration)
@@ -1616,8 +1738,9 @@ def main(args):
   auth.process_auth_options(parser, options)
 
   if ISOLATED_OUTDIR_PARAMETER in args and not options.cas_instance:
-    parser.error('%s in args requires --cas-instance' %
-                 ISOLATED_OUTDIR_PARAMETER)
+    parser.error(
+      '%s in args requires --cas-instance' % ISOLATED_OUTDIR_PARAMETER
+    )
 
   if options.root_dir:
     options.root_dir = os.path.abspath(options.root_dir)
@@ -1628,8 +1751,9 @@ def main(args):
 
   if any('=' not in i for i in options.env):
     parser.error(
-        '--env required key=value form. value can be skipped to delete '
-        'the variable')
+      '--env required key=value form. value can be skipped to delete '
+      'the variable'
+    )
   options.env = dict(i.split('=', 1) for i in options.env)
 
   prefixes = {}
@@ -1637,16 +1761,17 @@ def main(args):
   for item in options.env_prefix:
     if '=' not in item:
       parser.error(
-        '--env-prefix %r is malformed, must be in the form `VAR=./path`'
-        % item)
+        '--env-prefix %r is malformed, must be in the form `VAR=./path`' % item
+      )
     key, opath = item.split('=', 1)
     if os.path.isabs(opath):
       parser.error('--env-prefix %r path is bad, must be relative.' % opath)
     opath = os.path.normpath(opath)
     if not os.path.realpath(os.path.join(cwd, opath)).startswith(cwd):
       parser.error(
-          '--env-prefix %r path is bad, must be relative and not contain `..`.'
-          % opath)
+        '--env-prefix %r path is bad, must be relative and not contain `..`.'
+        % opath
+      )
     prefixes.setdefault(key, []).append(opath)
   options.env_prefix = prefixes
 
@@ -1659,14 +1784,15 @@ def main(args):
     if not cache_dir:
       tmp_cipd_cache_dir = tempfile.mkdtemp()
       cache_dir = tmp_cipd_cache_dir
-    install_packages_fn = (lambda run_dir, cas_dir: install_client_and_packages(
-        run_dir,
-        cipd.parse_package_args(options.cipd_packages),
-        options.cipd_server,
-        options.cipd_client_package,
-        options.cipd_client_version,
-        cache_dir=cache_dir,
-        cas_dir=cas_dir))
+    install_packages_fn = lambda run_dir, cas_dir: install_client_and_packages(  # noqa: E731
+      run_dir,
+      cipd.parse_package_args(options.cipd_packages),
+      options.cipd_server,
+      options.cipd_client_package,
+      options.cipd_client_version,
+      cache_dir=cache_dir,
+      cas_dir=cas_dir,
+    )
 
   @contextlib.contextmanager
   def install_named_caches(run_dir, stats):
@@ -1674,8 +1800,10 @@ def main(args):
     # function.
     assert str(run_dir), repr(run_dir)
     assert os.path.isabs(run_dir), run_dir
-    named_caches = [(os.path.join(run_dir, str(relpath)), name)
-                    for name, relpath, _ in options.named_caches]
+    named_caches = [
+      (os.path.join(run_dir, str(relpath)), name)
+      for name, relpath, _ in options.named_caches
+    ]
     install_start = time.time()
     for path, name in named_caches:
       named_cache.install(path, name)
@@ -1704,20 +1832,23 @@ def main(args):
             subprocess42.check_call(['tasklist.exe', '/V'], stdout=sys.stderr)
 
           error = (
-              'Error while removing named cache %r at %r. The cache will be'
-              ' lost.' % (path, name))
+            'Error while removing named cache %r at %r. The cache will be'
+            ' lost.' % (path, name)
+          )
           logging.exception(error)
       uninstall_duration = time.time() - uninstall_start
       stats['uninstall']['duration'] = uninstall_duration
-      logging.info('named_caches: uninstall took %d seconds',
-                   uninstall_duration)
+      logging.info(
+        'named_caches: uninstall took %d seconds', uninstall_duration
+      )
 
   command = args
   if options.relative_cwd:
     a = os.path.normpath(os.path.abspath(options.relative_cwd))
     if not a.startswith(os.getcwd()):
       parser.error(
-          '--relative-cwd must not try to escape the working directory')
+        '--relative-cwd must not try to escape the working directory'
+      )
 
   containment_type = subprocess42.Containment.NONE
   if options.containment_type == 'AUTO':
@@ -1725,40 +1856,46 @@ def main(args):
   if options.containment_type == 'JOB_OBJECT':
     containment_type = subprocess42.Containment.JOB_OBJECT
   containment = subprocess42.Containment(
-      containment_type=containment_type,
-      limit_processes=options.limit_processes,
-      limit_total_committed_memory=options.limit_total_committed_memory)
+    containment_type=containment_type,
+    limit_processes=options.limit_processes,
+    limit_total_committed_memory=options.limit_total_committed_memory,
+  )
 
-  data = TaskData(command=command,
-                  relative_cwd=options.relative_cwd,
-                  cas_instance=options.cas_instance,
-                  cas_digest=options.cas_digest,
-                  outputs=options.output,
-                  install_named_caches=install_named_caches,
-                  leak_temp_dir=options.leak_temp_dir,
-                  root_dir=options.root_dir,
-                  hard_timeout=options.hard_timeout,
-                  grace_period=options.grace_period,
-                  bot_file=options.bot_file,
-                  switch_to_account=options.switch_to_account,
-                  install_packages_fn=install_packages_fn,
-                  cas_cache_dir=options.cas_cache,
-                  cas_cache_policies=local_caching.CachePolicies(
-                      max_cache_size=options.max_cache_size,
-                      min_free_space=options.min_free_space,
-                      max_items=None,
-                      max_age_secs=None,
-                  ),
-                  cas_kvs=options.kvs_dir,
-                  env=options.env,
-                  env_prefix=options.env_prefix,
-                  lower_priority=bool(options.lower_priority),
-                  containment=containment,
-                  trim_caches_fn=trim_caches_fn)
+  data = TaskData(
+    command=command,
+    relative_cwd=options.relative_cwd,
+    cas_instance=options.cas_instance,
+    cas_digest=options.cas_digest,
+    outputs=options.output,
+    install_named_caches=install_named_caches,
+    leak_temp_dir=options.leak_temp_dir,
+    root_dir=options.root_dir,
+    hard_timeout=options.hard_timeout,
+    grace_period=options.grace_period,
+    bot_file=options.bot_file,
+    switch_to_account=options.switch_to_account,
+    install_packages_fn=install_packages_fn,
+    cas_cache_dir=options.cas_cache,
+    cas_cache_policies=local_caching.CachePolicies(
+      max_cache_size=options.max_cache_size,
+      min_free_space=options.min_free_space,
+      max_items=None,
+      max_age_secs=None,
+    ),
+    cas_kvs=options.kvs_dir,
+    env=options.env,
+    env_prefix=options.env_prefix,
+    lower_priority=bool(options.lower_priority),
+    containment=containment,
+    trim_caches_fn=trim_caches_fn,
+  )
   try:
     return run_tha_test(data, options.json)
-  except (cipd.Error, local_caching.NamedCacheError,
-          local_caching.NoMoreSpace) as ex:
+  except (
+    cipd.Error,
+    local_caching.NamedCacheError,
+    local_caching.NoMoreSpace,
+  ) as ex:
     print(ex.message, file=sys.stderr)
     return 1
   finally:
@@ -1766,9 +1903,11 @@ def main(args):
       try:
         file_path.rmtree(tmp_cipd_cache_dir)
       except OSError:
-        logging.exception('Remove tmp_cipd_cache_dir=%s failed',
-                          tmp_cipd_cache_dir)
+        logging.exception(
+          'Remove tmp_cipd_cache_dir=%s failed', tmp_cipd_cache_dir
+        )
         # Best effort clean up. Failed to do so doesn't affect the outcome.
+
 
 if __name__ == '__main__':
   subprocess42.inhibit_os_error_reporting()

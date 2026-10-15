@@ -13,13 +13,13 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from components.auth import signature
-from test_support import test_case
+from components.auth import signature  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 # Skip check_signature tests if PyCrypto is not available.
 try:
-  import Crypto
+  import Crypto  # noqa: F401
 
   has_pycrypto = True
 except ImportError:

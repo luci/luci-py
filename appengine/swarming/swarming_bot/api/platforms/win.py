@@ -104,7 +104,7 @@ def _get_win32com():
   """Returns an uninitialized WMI client."""
   try:
     import pythoncom
-    from win32com import client  # pylint: disable=F0401
+    from win32com import client
 
     return client, pythoncom
   except ImportError:
@@ -356,7 +356,6 @@ def get_visual_studio_versions():
     k = winreg.OpenKey(
       winreg.HKEY_LOCAL_MACHINE, "SOFTWARE\\Wow6432Node\\Microsoft\\VSCommon"
     )
-  # pylint: disable=undefined-variable
   except WindowsError:
     return None
 
@@ -385,7 +384,7 @@ def get_cpuinfo():
   try:
     identifier, _ = winreg.QueryValueEx(k, "Identifier")
     match = re.match(
-      r"^.+\s+Family\s+(\d+)\s+Model\s+([0-9A-Fa-f]+)\s+(?:Stepping|Revision)\s+([0-9A-Fa-f]+)$",  # pylint: disable=line-too-long
+      r"^.+\s+Family\s+(\d+)\s+Model\s+([0-9A-Fa-f]+)\s+(?:Stepping|Revision)\s+([0-9A-Fa-f]+)$",
       identifier,
     )
     name, _ = winreg.QueryValueEx(k, "ProcessorNameString")
@@ -641,7 +640,7 @@ def get_physical_ram():
     ]
 
   stat = MemoryStatusEx()
-  stat.dwLength = ctypes.sizeof(MemoryStatusEx)  # pylint: disable=W0201
+  stat.dwLength = ctypes.sizeof(MemoryStatusEx)
   ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
   return int(round(stat.dwTotalPhys / 1024.0 / 1024.0))
 
@@ -674,7 +673,7 @@ def get_reboot_required():
     )
     _, num_values, _ = winreg.QueryInfoKey(k)
     return num_values > 0
-  except WindowsError:  # pylint: disable=undefined-variable
+  except WindowsError:
     # This error very likely means the RebootRequired key does not exist,
     # meaning reboot is not required.
     return False
@@ -854,7 +853,7 @@ def list_top_windows():
 
   out = []
 
-  def on_window(hwnd, lparam):  # pylint: disable=unused-argument
+  def on_window(hwnd, lparam):
     """Evaluates |hwnd| to determine whether or not it is a topmost window.
 
     In case |hwnd| is a topmost window, its class name is added to the

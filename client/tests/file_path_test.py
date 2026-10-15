@@ -74,7 +74,7 @@ class FilePathTest(auto_stub.TestCase):
   def assertFileMode(self, filepath, mode, umask=None):
     umask = test_env.umask() if umask is None else umask
     actual = fs.stat(filepath).st_mode
-    expected = mode & ~umask  # pylint: disable=invalid-unary-operand-type
+    expected = mode & ~umask
     self.assertEqual(
       expected, actual, (filepath, oct(expected), oct(actual), oct(umask))
     )
@@ -218,7 +218,6 @@ class FilePathTest(auto_stub.TestCase):
 
     self.mock(fs, "rmtree", fs_rmtree_mock)
 
-    # pylint: disable=unused-argument
     def subprocess_mock(cmd, stdin=None):
       path = cmd[4]
       can_delete.add(path)

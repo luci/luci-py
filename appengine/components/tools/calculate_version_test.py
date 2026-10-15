@@ -15,7 +15,7 @@ COMPONENTS_DIR = os.path.dirname(os.path.dirname(SCRIPT_PATH))
 if COMPONENTS_DIR not in sys.path:
   sys.path.insert(0, COMPONENTS_DIR)
 
-from tools import calculate_version
+from tools import calculate_version  # noqa: E402
 
 
 class CalculateVersionTest(unittest.TestCase):

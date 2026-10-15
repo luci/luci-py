@@ -41,7 +41,10 @@ def CommonChecks(input_api, output_api):
   ]
 
   return (
-    input_api.canned_checks.CheckPatchFormatted(input_api, output_api)
+    input_api.canned_checks.RunRuff(
+      input_api, output_api, files_to_skip=excluded
+    )
+    + input_api.canned_checks.CheckPatchFormatted(input_api, output_api)
     + input_api.canned_checks.PanProjectChecks(
       input_api,
       output_api,

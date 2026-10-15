@@ -11,11 +11,11 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.api import datastore_errors
-from google.appengine.ext import ndb
+from google.appengine.api import datastore_errors  # noqa: E402, F401
+from google.appengine.ext import ndb  # noqa: E402
 
-from components.datastore_utils import txn
-from test_support import test_case
+from components.datastore_utils import txn  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class EntityX(ndb.Model):

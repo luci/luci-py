@@ -49,12 +49,12 @@ DEPOT_TOOLS = os.path.join(THIRD_PARTY, "depot_tools")
 sys.path.insert(0, THIRD_PARTY)
 sys.path.insert(0, DEPOT_TOOLS)
 
-import colorama
-from depot_tools import subcommand
+import colorama  # noqa: E402
+from depot_tools import subcommand  # noqa: E402
 
-from tool_support import gae_sdk_utils
-from tools import calculate_version
-from tools import log_since
+from tool_support import gae_sdk_utils  # noqa: E402
+from tools import calculate_version  # noqa: E402
+from tools import log_since  # noqa: E402
 
 assert sys.path.pop(0) == DEPOT_TOOLS
 assert sys.path.pop(0) == THIRD_PARTY

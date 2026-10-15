@@ -105,7 +105,7 @@ def deserialize_token(blob):
   Raises:
     BadTokenError if blob doesn't look like a valid DelegationToken.
   """
-  if isinstance(blob, unicode):
+  if isinstance(blob, unicode):  # noqa: F821
     blob = blob.encode("ascii", "ignore")
   try:
     as_bytes = b64.decode(blob)
@@ -172,7 +172,7 @@ def unseal_token(tok):
     )
   except signature.CertificateError as exc:
     if exc.transient:
-      raise TransientError(str(exc))
+      raise TransientError(str(exc))  # noqa: F821
     raise exceptions.BadTokenError(
       "Bad certificate (signer_id == %s, signing_key_id == %s): %s"
       % (tok.signer_id, tok.signing_key_id, exc)
@@ -245,7 +245,7 @@ def delegate_async(
   assert isinstance(audience, list), audience
   assert isinstance(services, list), services
 
-  id_to_str = lambda i: i.to_bytes() if isinstance(i, model.Identity) else i
+  id_to_str = lambda i: i.to_bytes() if isinstance(i, model.Identity) else i  # noqa: E731
 
   # Validate audience.
   if "*" in audience:
@@ -256,7 +256,7 @@ def delegate_async(
     for a in audience:
       if isinstance(a, model.Identity):
         continue  # identities are already validated
-      if not isinstance(a, basestring):
+      if not isinstance(a, basestring):  # noqa: F821
         raise ValueError("expecting a string or Identity")
       if a == "REQUESTOR" or a.startswith("group:"):
         continue
@@ -272,7 +272,7 @@ def delegate_async(
     if not services:
       raise ValueError("services can't be empty")
     for s in services:
-      if isinstance(s, basestring):
+      if isinstance(s, basestring):  # noqa: F821
         if s.startswith("https://"):
           continue  # an URL, the token server knows how to handle it
         s = model.Identity.from_bytes(s)
@@ -289,7 +289,7 @@ def delegate_async(
 
   # Validate impersonate.
   if impersonate is not None:
-    assert isinstance(impersonate, (basestring, model.Identity)), impersonate
+    assert isinstance(impersonate, (basestring, model.Identity)), impersonate  # noqa: F821
     impersonate = id_to_str(impersonate)
 
   # Validate tags.
@@ -346,7 +346,7 @@ def delegate_async(
   )
 
   signed_token = res.get("token")
-  if not signed_token or not isinstance(signed_token, basestring):
+  if not signed_token or not isinstance(signed_token, basestring):  # noqa: F821
     logging.error("Bad MintDelegationToken response: %s", res)
     raise exceptions.TokenCreationError("Bad response, no token")
 

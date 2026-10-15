@@ -56,7 +56,7 @@ class TestCase(test_case.TestCase):
   def mock_group(group, members):
     """Creates new group entity in the datastore."""
     members = [
-      model.Identity.from_bytes(m) if isinstance(m, basestring) else m
+      model.Identity.from_bytes(m) if isinstance(m, basestring) else m  # noqa: F821
       for m in members
     ]
     model.AuthGroup(key=model.group_key(group), members=members).put()

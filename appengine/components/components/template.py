@@ -4,19 +4,19 @@
 
 """Setups jinja2 environment to be reused by all components and services."""
 
-import datetime
+import datetime  # noqa: F401
 import os
 
 from components import utils
 
 utils.import_jinja2()
 
-import jinja2
+import jinja2  # noqa: E402
 
-from google.appengine.api import app_identity
-from google.appengine.api import users
+from google.appengine.api import app_identity  # noqa: E402
+from google.appengine.api import users  # noqa: E402
 
-from components import natsort
+from components import natsort  # noqa: E402
 
 
 NON_BREAKING_HYPHEN = "\u2011"

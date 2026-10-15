@@ -5,13 +5,13 @@
 """Functions to generate OAuth access tokens to use by bots or inside tasks."""
 
 import collections
-import datetime
+import datetime  # noqa: F401
 import logging
 import os
-import random
+import random  # noqa: F401
 
 from google.appengine.api import app_identity
-from google.appengine.api import memcache
+from google.appengine.api import memcache  # noqa: F401
 
 from components import auth
 from components import net
@@ -41,7 +41,7 @@ AccessToken = collections.namedtuple(
 )
 
 
-class PermissionError(Exception):  # pylint: disable=redefined-builtin
+class PermissionError(Exception):
   """The service account is not allowed to be used by the caller."""
 
 
@@ -222,8 +222,8 @@ def get_system_account_token(
       raise InternalError(exc.message)
     raise MisconfigurationError(exc.message)
 
-  assert isinstance(blob, basestring)
-  assert isinstance(expiry, (int, long, float))
+  assert isinstance(blob, basestring)  # noqa: F821
+  assert isinstance(expiry, (int, long, float))  # noqa: F821
   token = AccessToken(blob, int(expiry))
   _check_and_log_token("bot associated", kind, system_service_account, token)
   return system_service_account, token

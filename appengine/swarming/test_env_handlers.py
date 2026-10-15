@@ -14,38 +14,38 @@ import swarming_test_env
 
 swarming_test_env.setup_test_env()
 
-from google.appengine.api import app_identity
-from google.appengine.ext import ndb
+from google.appengine.api import app_identity  # noqa: E402
+from google.appengine.ext import ndb  # noqa: E402
 
-from google.protobuf import json_format
-from protorpc.remote import protojson
-import webtest
+from google.protobuf import json_format  # noqa: E402
+from protorpc.remote import protojson  # noqa: E402
+import webtest  # noqa: E402
 
-import handlers_endpoints
-import swarming_rpcs
-from components import auth
-from components import auth_testing
-from components import utils
-from components.auth import api as auth_api
-from components.auth import model as auth_model
-from components.auth import realms as auth_realms
-from components.auth.proto import replication_pb2
-import gae_ts_mon
-from test_support import test_case
+import handlers_endpoints  # noqa: E402
+import swarming_rpcs  # noqa: E402
+from components import auth  # noqa: E402
+from components import auth_testing  # noqa: E402
+from components import utils  # noqa: E402
+from components.auth import api as auth_api  # noqa: E402
+from components.auth import model as auth_model  # noqa: E402
+from components.auth import realms as auth_realms  # noqa: E402
+from components.auth.proto import replication_pb2  # noqa: E402
+import gae_ts_mon  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from proto.config import config_pb2
-from proto.config import pools_pb2
-from proto.config import realms_pb2
-from proto.plugin import plugin_pb2
-from server import bot_code
-from server import config
-from server import external_scheduler
-from server import hmac_secret
-from server import large
-from server import pools_config
-from server import realms
-from server import service_accounts
-from server import task_queues
+from proto.config import config_pb2  # noqa: E402
+from proto.config import pools_pb2  # noqa: E402
+from proto.config import realms_pb2  # noqa: E402
+from proto.plugin import plugin_pb2  # noqa: E402
+from server import bot_code  # noqa: E402
+from server import config  # noqa: E402
+from server import external_scheduler  # noqa: E402
+from server import hmac_secret  # noqa: E402
+from server import large  # noqa: E402
+from server import pools_config  # noqa: E402
+from server import realms  # noqa: E402
+from server import service_accounts  # noqa: E402, F401
+from server import task_queues  # noqa: E402
 
 # Realm permissions used in Swarming.
 _ALL_PERMS = [
@@ -149,7 +149,7 @@ class AppTestBase(test_case.TestCase):
       ),
     ).put()
 
-    put_chunk = lambda name, data: bot_code.BotArchiveChunk(
+    put_chunk = lambda name, data: bot_code.BotArchiveChunk(  # noqa: E731
       key=bot_code.bot_archive_chunk_key(name),
       data=data,
     ).put()
@@ -291,10 +291,9 @@ class AppTestBase(test_case.TestCase):
     """Does an HTTP POST with a JSON API and return JSON response."""
     return self.app.post_json(url, params=params, **kwargs).json
 
-  # pylint: disable=redefined-outer-name
   def mock_default_pool_acl(
     self,
-    service_accounts,
+    service_accounts,  # noqa: F811
     default_task_realm=None,
     enforced_realm_permissions=None,
   ):
@@ -591,7 +590,7 @@ class AppTestBase(test_case.TestCase):
       "io_timeout_secs": 1200,
       "outputs": ["foo", "path/to/foobar"],
     }
-    out.update((unicode(k), v) for k, v in kwargs.items())
+    out.update((unicode(k), v) for k, v in kwargs.items())  # noqa: F821
     return out
 
   def create_new_request(self, **kwargs):
@@ -607,7 +606,7 @@ class AppTestBase(test_case.TestCase):
       "user": "joe@localhost",
       "bot_ping_tolerance_secs": 600,
     }
-    out.update((unicode(k), v) for k, v in kwargs.items())
+    out.update((unicode(k), v) for k, v in kwargs.items())  # noqa: F821
     # Note that protorpc message constructor accepts dicts for submessages.
     return swarming_rpcs.NewTaskRequest(**out)
 
@@ -691,7 +690,7 @@ class AppTestBase(test_case.TestCase):
       "io_timeout_secs": "1200",
       "outputs": ["foo", "path/to/foobar"],
     }
-    out.update((unicode(k), v) for k, v in kwargs.items())
+    out.update((unicode(k), v) for k, v in kwargs.items())  # noqa: F821
     return out
 
   @staticmethod
@@ -724,7 +723,7 @@ class AppTestBase(test_case.TestCase):
       "user": "joe@localhost",
       "bot_ping_tolerance_secs": "600",
     }
-    out.update((unicode(k), v) for k, v in kwargs.items())
+    out.update((unicode(k), v) for k, v in kwargs.items())  # noqa: F821
     return out
 
   @staticmethod
@@ -771,7 +770,7 @@ class AppTestBase(test_case.TestCase):
         "duration": 0.1,
       },
     }
-    out.update((unicode(k), v) for k, v in kwargs.items())
+    out.update((unicode(k), v) for k, v in kwargs.items())  # noqa: F821
     return out
 
   def gen_result_summary(self, **kwargs):
@@ -810,7 +809,7 @@ class AppTestBase(test_case.TestCase):
       "task_id": "5cee488008810",
       "user": "joe@localhost",
     }
-    out.update((unicode(k), v) for k, v in kwargs.items())
+    out.update((unicode(k), v) for k, v in kwargs.items())  # noqa: F821
     return out
 
   def gen_run_result(self, **kwargs):
@@ -837,7 +836,7 @@ class AppTestBase(test_case.TestCase):
       "state": "RUNNING",
       "task_id": "5cee488008811",
     }
-    out.update((unicode(k), v) for k, v in kwargs.items())
+    out.update((unicode(k), v) for k, v in kwargs.items())  # noqa: F821
     return out
 
   def assertErrorResponseMessage(self, message, response):

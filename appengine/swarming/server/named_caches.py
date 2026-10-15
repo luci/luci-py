@@ -68,9 +68,9 @@ class NamedCache(ndb.Model):
 
 def _named_cache_key(pool, os, name):
   """Returns the ndb.Key to a NamedCache."""
-  assert isinstance(pool, basestring), repr(pool)
-  assert isinstance(os, basestring), repr(os)
-  assert isinstance(name, basestring), repr(name)
+  assert isinstance(pool, basestring), repr(pool)  # noqa: F821
+  assert isinstance(os, basestring), repr(os)  # noqa: F821
+  assert isinstance(name, basestring), repr(name)  # noqa: F821
   return ndb.Key(NamedCacheRoot, pool, NamedCache, os + ":" + name)
 
 
@@ -88,10 +88,10 @@ def _update_named_cache(pool, os, name, hint):
     old maximum ignored.
   - The new maximum is at least 10% higher than the previous one.
   """
-  assert isinstance(pool, basestring), repr(pool)
-  assert isinstance(os, basestring), repr(os)
-  assert isinstance(name, basestring), repr(name)
-  assert isinstance(hint, (int, long)), repr(hint)
+  assert isinstance(pool, basestring), repr(pool)  # noqa: F821
+  assert isinstance(os, basestring), repr(os)  # noqa: F821
+  assert isinstance(name, basestring), repr(name)  # noqa: F821
+  assert isinstance(hint, (int, long)), repr(hint)  # noqa: F821
   key = _named_cache_key(pool, os, name)
   now = utils.utcnow().replace(microsecond=0)
   e = key.get()
@@ -192,7 +192,7 @@ def task_update_pool(pool):
       if not value[0] or not isinstance(value[0], list) or len(value[0]) != 2:
         logging.error("%s has bad cache (B): %s", bot.id, value)
         continue
-      if not value[0][1] or not isinstance(value[0][1], (int, long)):
+      if not value[0][1] or not isinstance(value[0][1], (int, long)):  # noqa: F821
         logging.error("%s has bad cache (C): %s", bot.id, value)
         continue
       s = value[0][1]

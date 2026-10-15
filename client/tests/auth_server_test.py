@@ -63,7 +63,7 @@ def local_auth_server(token_cb, default_account_id, **overrides):
     def generate_id_token(self, account_id, audience):
       return token_cb(account_id, audience=audience)
 
-  acc = lambda aid: auth_server.Account(id=aid, email=aid + "@example.com")
+  acc = lambda aid: auth_server.Account(id=aid, email=aid + "@example.com")  # noqa: E731
 
   s = auth_server.LocalAuthServer()
   try:

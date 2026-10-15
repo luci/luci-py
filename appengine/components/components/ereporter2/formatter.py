@@ -55,7 +55,7 @@ def _reformat_stack(stack):
   """Post processes the stack trace through _relative_path()."""
   out = stack.splitlines(True)
 
-  def replace(l):
+  def replace(l):  # noqa: E741
     m = re.match(RE_STACK_TRACE_FILE, l, re.DOTALL)
     if m:
       groups = list(m.groups())

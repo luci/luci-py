@@ -10,13 +10,13 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from protorpc import message_types
-from protorpc import messages
-from protorpc import remote
-import endpoints
+from protorpc import message_types  # noqa: E402
+from protorpc import messages  # noqa: E402
+from protorpc import remote  # noqa: E402
+import endpoints  # noqa: E402
 
-from test_support import test_case
-from . import discovery
+from test_support import test_case  # noqa: E402
+from . import discovery  # noqa: E402
 
 
 class Enum(messages.Enum):

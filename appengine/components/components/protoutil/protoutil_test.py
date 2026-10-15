@@ -4,7 +4,7 @@
 # that can be found in the LICENSE file.
 
 import sys
-import textwrap
+import textwrap  # noqa: F401
 import unittest
 
 from test_support import test_env
@@ -12,14 +12,14 @@ from test_support import test_env
 test_env.setup_test_env()
 
 # google.protobuf package requires some python package magic hacking.
-from components import utils
+from components import utils  # noqa: E402
 
 utils.fix_protobuf_package()
 
-from google import protobuf
+from google import protobuf  # noqa: E402, F401
 
-import protoutil
-import test_proto_pb2
+import protoutil  # noqa: E402
+import test_proto_pb2  # noqa: E402
 
 
 class MergeDictTests(unittest.TestCase):

@@ -691,7 +691,7 @@ class Application(object):
     if any(m.is_go for m in mods):
       _check_go()
 
-    cleanup = lambda: ()
+    cleanup = lambda: ()  # noqa: E731
     try:
       expanded_yamls, cleanup = expand_files_with_luci_gae_vars(
         mods, self.app_id
@@ -1007,7 +1007,7 @@ def confirm(text, app, version, services=None, default_yes=False):
   Returns:
     True on approval, False otherwise.
   """
-  ask = input if sys.version_info.major >= 3 else raw_input
+  ask = input if sys.version_info.major >= 3 else raw_input  # noqa: F821
   print(text)
   print("  Directory: %s" % os.path.basename(app.app_dir))
   print("  App ID:    %s" % app.app_id)

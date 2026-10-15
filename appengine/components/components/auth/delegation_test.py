@@ -13,19 +13,19 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from components.auth import api
-from components.auth import b64
-from components.auth import delegation
-from components.auth import exceptions
-from components.auth import model
-from components.auth import service_account
-from components.auth import signature
-from components.auth.proto import delegation_pb2
+from components import utils  # noqa: E402
+from components.auth import api  # noqa: E402
+from components.auth import b64  # noqa: E402
+from components.auth import delegation  # noqa: E402
+from components.auth import exceptions  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth import service_account  # noqa: E402
+from components.auth import signature  # noqa: E402
+from components.auth.proto import delegation_pb2  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
 
 FAKE_IDENT = model.Identity.from_bytes("user:a@a.com")

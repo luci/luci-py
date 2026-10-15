@@ -12,14 +12,14 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import webapp2
+import webapp2  # noqa: E402
 
-from components import utils
-from components.auth import machine_auth
-from components.auth import signature
-from test_support import test_case
+from components import utils  # noqa: E402
+from components.auth import machine_auth  # noqa: E402
+from components.auth import signature  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-from components.auth.proto import machine_token_pb2
+from components.auth.proto import machine_token_pb2  # noqa: E402
 
 
 GOOD_CERTS = {

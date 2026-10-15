@@ -4,6 +4,6 @@
 
 """Utility functions for Protocol Buffers."""
 
-from .field_masks import *
-from .multiline_proto import parse_multiline, MultilineParseError
-from .protoutil import merge_dict
+from .field_masks import *  # noqa: F403
+from .multiline_proto import parse_multiline, MultilineParseError  # noqa: F401
+from .protoutil import merge_dict  # noqa: F401

@@ -12,15 +12,15 @@ import unittest
 from test_support import test_env
 
 test_env.setup_test_env()
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import utils
-from components.auth import exceptions
-from components.auth import project_tokens
-from components.auth import service_account
-from components.auth import model
+from components import utils  # noqa: E402
+from components.auth import exceptions  # noqa: E402
+from components.auth import project_tokens  # noqa: E402
+from components.auth import service_account  # noqa: E402
+from components.auth import model  # noqa: E402
 
 
 class CreateTokenTest(test_case.TestCase):

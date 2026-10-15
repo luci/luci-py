@@ -13,9 +13,9 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from components.ereporter2 import logscraper
-from components.ereporter2 import models
-from test_support import test_case
+from components.ereporter2 import logscraper  # noqa: E402
+from components.ereporter2 import models  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class ErrorRecordStub(object):
@@ -232,7 +232,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
     )
 
   def test_capped_list(self):
-    l = logscraper._CappedList(5, 10)
+    l = logscraper._CappedList(5, 10)  # noqa: E741
 
     # Grow a bit, should go to head.
     for i in range(5):

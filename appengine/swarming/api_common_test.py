@@ -3,7 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import datetime
+import datetime  # noqa: F401
 import logging
 import mock
 import unittest
@@ -13,13 +13,13 @@ import swarming_test_env
 
 swarming_test_env.setup_test_env()
 
-from google.appengine.api import datastore_errors
-from parameterized import parameterized
+from google.appengine.api import datastore_errors  # noqa: E402
+from parameterized import parameterized  # noqa: E402
 
-from test_support import test_case
-from server import bot_management
-import api_common
-import handlers_exceptions
+from test_support import test_case  # noqa: E402
+from server import bot_management  # noqa: E402
+import api_common  # noqa: E402
+import handlers_exceptions  # noqa: E402
 
 
 def _bot_event(

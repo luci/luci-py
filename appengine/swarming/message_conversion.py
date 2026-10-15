@@ -11,7 +11,7 @@ generate a Message instance that corresponds to the provided dictionary. The
 ProtoRPC.
 """
 
-import datetime
+import datetime  # noqa: F401
 import json
 import logging
 
@@ -54,14 +54,14 @@ def _string_list_pairs_from_dict(dictionary):
 
 def _ndb_to_rpc(cls, entity, **overrides):
   members = (f.name for f in cls.all_fields())
-  kwargs = {m: getattr(entity, m) for m in members if not m in overrides}
+  kwargs = {m: getattr(entity, m) for m in members if m not in overrides}
   kwargs.update(overrides)
   return cls(**{k: v for k, v in kwargs.items() if v is not None})
 
 
 def _rpc_to_ndb(cls, entity, **overrides):
   kwargs = {
-    m: getattr(entity, m) for m in cls._properties if not m in overrides
+    m: getattr(entity, m) for m in cls._properties if m not in overrides
   }
   kwargs.update(overrides)
   return cls(**{k: v for k, v in kwargs.items() if v is not None})

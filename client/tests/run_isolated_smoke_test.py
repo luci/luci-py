@@ -4,13 +4,13 @@
 # that can be found in the LICENSE file.
 
 import base64
-import contextlib
-import ctypes
-import hashlib
+import contextlib  # noqa: F401
+import ctypes  # noqa: F401
+import hashlib  # noqa: F401
 import json
 import logging
 import os
-import shutil
+import shutil  # noqa: F401
 import subprocess
 import sys
 import textwrap
@@ -22,7 +22,7 @@ import re
 import test_env
 
 import cas_util
-import cipd
+import cipd  # noqa: F401
 
 import run_isolated
 from utils import file_path

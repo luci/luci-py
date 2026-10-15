@@ -4,38 +4,38 @@
 
 """OS abstraction OS specific utility functions."""
 
-# pylint: disable=unnecessary-lambda
-
 import sys
 import os
 
 if os.name == "posix":
-  from api.platforms import posix
+  from api.platforms import posix  # noqa: F401
 
 if os.name != "darwin":  # As of writing, macOS can't run on GCE.
-  is_gce = lambda: gce.is_gce()  # to reuse gce.is_gce mock, if any
+  is_gce = lambda: (  # noqa: E731
+    gce.is_gce()
+  )  # to reuse gce.is_gce mock, if any  # noqa: E731
   from api.platforms import gce
 
 if sys.platform == "aix":
-  from api.platforms import aix
+  from api.platforms import aix  # noqa: F401
 
 if sys.platform == "cygwin":
   from api.platforms import win
 
 if sys.platform == "darwin":
-  from api.platforms import osx
+  from api.platforms import osx  # noqa: F401
 
-  is_gce = lambda: False
+  is_gce = lambda: False  # noqa: E731
 
 
 if sys.platform == "win32":
-  from api.platforms import win
+  from api.platforms import win  # noqa: F401
 
 
 if sys.platform == "linux":
   try:
     from api.platforms import android
   except OSError:
-    logging.warning("failed to import android", exc_info=True)
+    logging.warning("failed to import android", exc_info=True)  # noqa: F821
     android = None
-  from api.platforms import linux
+  from api.platforms import linux  # noqa: F401

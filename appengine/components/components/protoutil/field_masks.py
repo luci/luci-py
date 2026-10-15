@@ -195,7 +195,7 @@ class Mask(object):
     such fields.
     """
     assert isinstance(src, protobuf.message.Message)
-    assert type(src) == type(dest)  # pylint: disable=unidiomatic-typecheck
+    assert type(src) == type(dest)  # noqa: E721
 
     for f_name, submask in self.children.items():
       include_partially = bool(submask.children)
@@ -401,7 +401,7 @@ def _parse_path(path, desc, repeated=False, json_names=False):
   """
   tokens = list(_tokenize(path))
   ctx = _ParseContext(desc, repeated)
-  peek = lambda: tokens[ctx.i]
+  peek = lambda: tokens[ctx.i]  # noqa: E731
 
   def read():
     tok = peek()
@@ -541,7 +541,7 @@ def _tokenize(path):
   Raises:
     ValueError if a quoted string is not closed.
   """
-  assert isinstance(path, basestring), path
+  assert isinstance(path, basestring), path  # noqa: F821
 
   i = 0
 

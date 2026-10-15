@@ -9,7 +9,7 @@ import ctypes
 import errno
 import itertools
 import os
-import platform
+import platform  # noqa: F401
 import signal
 import sys
 import tempfile
@@ -467,7 +467,7 @@ time.sleep(60)
     containment = subprocess42.Containment(
       containment_type=subprocess42.Containment.JOB_OBJECT, limit_processes=1
     )
-    start = lambda: subprocess42.Popen(
+    start = lambda: subprocess42.Popen(  # noqa: E731
       cmd,
       stdout=subprocess42.PIPE,
       stderr=subprocess42.PIPE,
@@ -585,7 +585,7 @@ time.sleep(60)
       # 20 MiB.
       limit_total_committed_memory=20 * 1024 * 1024,
     )
-    start = lambda: subprocess42.Popen(
+    start = lambda: subprocess42.Popen(  # noqa: E731
       cmd,
       stdout=subprocess42.PIPE,
       stderr=subprocess42.PIPE,
@@ -869,7 +869,6 @@ time.sleep(60)
       called = []
 
       def timeout():
-        # pylint: disable=cell-var-from-loop
         called.append(0)
         return 0
 

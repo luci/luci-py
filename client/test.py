@@ -48,7 +48,7 @@ def run_tests_sequential():
   # These tests need to be run as executable
   # because they don't pass when running in parallel
   # or run via test runner
-  abs_path = lambda f: os.path.join(THIS_DIR, f)
+  abs_path = lambda f: os.path.join(THIS_DIR, f)  # noqa: E731
   test_cmds = [
     [abs_path("tests/swarming_test.py")],
     [abs_path("tests/run_isolated_test.py")],

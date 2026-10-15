@@ -13,15 +13,15 @@ import test_env
 
 test_env.setup_test_env()
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
-from components import auth
-from components import net
-from components import utils
+from components import auth  # noqa: E402
+from components import net  # noqa: E402
+from components import utils  # noqa: E402
 
-from server import service_accounts
-from server import task_pack
-from server import task_request
+from server import service_accounts  # noqa: E402
+from server import task_pack  # noqa: E402
+from server import task_request  # noqa: E402
 
 
 class MockedAuthDB(object):

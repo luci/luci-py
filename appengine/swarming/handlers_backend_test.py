@@ -4,8 +4,8 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import datetime
-import json
+import datetime  # noqa: F401
+import json  # noqa: F401
 import logging
 import os
 import sys
@@ -15,16 +15,16 @@ import unittest
 import test_env_handlers
 
 import webapp2
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: F401
 
 import webtest
 
 import handlers_backend
-from components import utils
-from server import bot_management
-from server import task_queues
-from server import task_request
-from server import task_result
+from components import utils  # noqa: F401
+from server import bot_management  # noqa: F401
+from server import task_queues  # noqa: F401
+from server import task_request  # noqa: F401
+from server import task_result  # noqa: F401
 
 
 class BackendTest(test_env_handlers.AppTestBase):

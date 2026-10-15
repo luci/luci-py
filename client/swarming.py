@@ -35,16 +35,15 @@ from utils import tools
 tools.force_local_third_party()
 
 # third_party/
-import colorama
-from depot_tools import fix_encoding
-from depot_tools import subcommand
+import colorama  # noqa: E402
+from depot_tools import fix_encoding  # noqa: E402
+from depot_tools import subcommand  # noqa: E402
 
-# pylint: disable=ungrouped-imports
-import auth
-from utils import fs
-from utils import logging_utils
-from utils import net
-from utils import subprocess42
+import auth  # noqa: E402
+from utils import fs  # noqa: E402
+from utils import logging_utils  # noqa: E402
+from utils import net  # noqa: E402
+from utils import subprocess42  # noqa: E402
 
 
 class Failure(Exception):
@@ -229,7 +228,6 @@ def CMDquery_list(parser, args):
       if "resources" in api:
         # Old.
         # TODO(maruel): Remove.
-        # pylint: disable=too-many-nested-blocks
         for j, (resource_name, resource) in enumerate(
           sorted(api["resources"].items())
         ):
@@ -243,7 +241,7 @@ def CMDquery_list(parser, args):
             print(
               "\n".join(
                 "  " + l
-                for l in textwrap.wrap(
+                for l in textwrap.wrap(  # noqa: E741
                   method.get("description", "No description"), 78
                 )
               )
@@ -258,7 +256,8 @@ def CMDquery_list(parser, args):
           print("- %s: %s" % (method["id"], method["path"]))
           print(
             "\n".join(
-              "  " + l for l in textwrap.wrap(method["description"], 78)
+              "  " + l
+              for l in textwrap.wrap(method["description"], 78)  # noqa: E741
             )
           )
           print("  %s%s%s" % (help_url, api["servicePath"], method["id"]))

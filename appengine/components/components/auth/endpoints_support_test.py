@@ -3,7 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import logging
+import logging  # noqa: F401
 import sys
 import unittest
 
@@ -11,21 +11,21 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import endpoints
-from protorpc import message_types
-from protorpc import messages
-from protorpc import remote
+import endpoints  # noqa: E402
+from protorpc import message_types  # noqa: E402
+from protorpc import messages  # noqa: E402
+from protorpc import remote  # noqa: E402
 
-from components import utils
-from components.auth import api
-from components.auth import b64
-from components.auth import check
-from components.auth import endpoints_support
-from components.auth import ipaddr
-from components.auth import model
-from components.auth import testing
-from components.auth.proto import delegation_pb2
-from test_support import test_case
+from components import utils  # noqa: E402
+from components.auth import api  # noqa: E402
+from components.auth import b64  # noqa: E402
+from components.auth import check  # noqa: E402
+from components.auth import endpoints_support  # noqa: E402
+from components.auth import ipaddr  # noqa: E402
+from components.auth import model  # noqa: E402
+from components.auth import testing  # noqa: E402
+from components.auth.proto import delegation_pb2  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 class EndpointsAuthTest(testing.TestCase):

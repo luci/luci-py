@@ -47,7 +47,7 @@ def require_cronjob(f):
 
 def require_taskqueue(*queue_names):
   """Enforces the task is run by specific task queue(s)."""
-  assert all(isinstance(q, basestring) for q in queue_names), (
+  assert all(isinstance(q, basestring) for q in queue_names), (  # noqa: F821
     map(type, queue_names),
     queue_names,
   )

@@ -118,7 +118,6 @@ class GlobalConfig(ndb.Model):
   def store_async(self, updated_by):
     """Stores a new version of the config entity."""
     # Create an incomplete key, to be completed by 'store_new_version'.
-    # pylint: disable=attribute-defined-outside-init
     self.key = ndb.Key(self.__class__, None, parent=self._get_root_key())
     self.updated_by = updated_by
     self.updated_ts = utils.utcnow()

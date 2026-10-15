@@ -13,14 +13,14 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-import mock
+import mock  # noqa: E402
 
-from google.appengine.ext import ndb
+from google.appengine.ext import ndb  # noqa: E402
 
-from components import auth
-from components import gerrit
-from components import net
-from test_support import test_case
+from components import auth  # noqa: E402
+from components import gerrit  # noqa: E402
+from components import net  # noqa: E402
+from test_support import test_case  # noqa: E402
 
 
 HOSTNAME = "chromium-review.googlesource.com"

@@ -4,7 +4,7 @@
 # that can be found in the LICENSE file.
 
 import datetime
-import json
+import json  # noqa: F401
 import sys
 import unittest
 
@@ -12,17 +12,17 @@ import swarming_test_env
 
 swarming_test_env.setup_test_env()
 
-from google.appengine.ext import ndb
-import webapp2
+from google.appengine.ext import ndb  # noqa: E402
+import webapp2  # noqa: E402
 
-import gae_ts_mon
-from test_support import test_case
+import gae_ts_mon  # noqa: E402
+from test_support import test_case  # noqa: E402
 
-import ts_mon_metrics
-from server import bot_management
-from server import task_queues
-from server import task_result
-from server import task_to_run
+import ts_mon_metrics  # noqa: E402
+from server import bot_management  # noqa: E402
+from server import task_queues  # noqa: E402
+from server import task_result  # noqa: E402
+from server import task_to_run  # noqa: E402
 
 
 def _gen_task_result_summary(now, key_id, properties=None, **kwargs):

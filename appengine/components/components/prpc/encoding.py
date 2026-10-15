@@ -3,7 +3,7 @@
 # that can be found in the LICENSE file.
 
 import base64
-import logging
+import logging  # noqa: F401
 import six
 
 from google.protobuf import json_format, text_format

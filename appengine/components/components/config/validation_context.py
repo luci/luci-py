@@ -97,7 +97,7 @@ class Context(object):
       *args: format args for text, like in logging.info.
     """
     assert isinstance(severity, int), severity
-    assert isinstance(text, basestring), text
+    assert isinstance(text, basestring), text  # noqa: F821
     assert severity >= 0, severity
     msg = Message(
       severity=severity,
@@ -153,5 +153,5 @@ class Context(object):
   def logging(cls, logger=None):
     """Returns a context that logs all messages."""
     logger = logger or logging.getLogger()
-    on_message = lambda msg: logger.log(msg.severity, msg.text)
+    on_message = lambda msg: logger.log(msg.severity, msg.text)  # noqa: E731
     return cls(on_message=on_message)

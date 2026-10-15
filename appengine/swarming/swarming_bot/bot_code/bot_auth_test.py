@@ -16,14 +16,14 @@ import test_env_bot_code
 test_env_bot_code.setup_test_env()
 
 # third_party/
-from depot_tools import auto_stub
-from depot_tools import fix_encoding
-import requests
+from depot_tools import auto_stub  # noqa: E402
+from depot_tools import fix_encoding  # noqa: E402
+import requests  # noqa: E402
 
-import bot_auth
-import remote_client
-from utils import file_path
-from utils import auth_server
+import bot_auth  # noqa: E402
+import remote_client  # noqa: E402
+from utils import file_path  # noqa: E402
+from utils import auth_server  # noqa: E402
 
 
 def global_test_setup():

@@ -5,7 +5,7 @@
 # that can be found in the LICENSE file.
 
 import datetime
-import json
+import json  # noqa: F401
 import logging
 import os
 import random
@@ -15,22 +15,22 @@ import unittest
 # Setups environment.
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP_DIR)
-import test_env_handlers
+import test_env_handlers  # noqa: E402
 
-from parameterized import parameterized
-import webtest
+from parameterized import parameterized  # noqa: E402
+import webtest  # noqa: E402
 
-from google.appengine.api import datastore_errors
-from google.appengine.api import memcache
-from google.appengine.ext import ndb
+from google.appengine.api import datastore_errors  # noqa: E402, F401
+from google.appengine.api import memcache  # noqa: E402, F401
+from google.appengine.ext import ndb  # noqa: E402
 
-import handlers_backend
+import handlers_backend  # noqa: E402
 
-from components import datastore_utils
-from components import utils
-from server import bot_management
-from server import task_queues
-from server import task_request
+from components import datastore_utils  # noqa: E402, F401
+from components import utils  # noqa: E402
+from server import bot_management  # noqa: E402
+from server import task_queues  # noqa: E402
+from server import task_request  # noqa: E402
 
 
 def _gen_properties(**kwargs):
@@ -352,7 +352,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     key = "a" * 64
     # Python considers emoji in the supplemental plane to have length 2 on UCS2
     # builds, and length 1 on UCS4 builds.
-    l = 128 if sys.maxunicode < 65536 else 256
+    l = 128 if sys.maxunicode < 65536 else 256  # noqa: E741
     actual = task_queues.bot_dimensions_to_flat(
       {
         key: [
@@ -379,7 +379,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, len("⛔"))
     # Python considers emoji in the supplemental plane to have length 2 on UCS2
     # builds, and length 1 on UCS4 builds.
-    l = 2 if sys.maxunicode < 65536 else 1
+    l = 2 if sys.maxunicode < 65536 else 1  # noqa: E741
     self.assertEqual(l, len("😬"))
     self.assertEqual(l, len("💥"))
 

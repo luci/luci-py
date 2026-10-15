@@ -10,7 +10,7 @@ from test_support import test_env
 
 test_env.setup_test_env()
 
-from components.auth import globmatch
+from components.auth import globmatch  # noqa: E402
 
 
 class GlobMatchTest(unittest.TestCase):

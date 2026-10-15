@@ -8,13 +8,13 @@
 from __future__ import print_function
 
 import argparse
-import logging
+import logging  # noqa: F401
 import os
 import shutil
-import subprocess
+import subprocess  # noqa: F401
 import sys
 import tempfile
-import time
+import time  # noqa: F401
 
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,16 +27,16 @@ sys.path.insert(0, os.path.join(CLIENT_DIR, "third_party"))
 EXECUTABLE_SUFFIX = ".exe" if sys.platform == "win32" else ""
 FAKECAS_BIN = os.path.join(LUCI_DIR, "luci-go", "fakecas" + EXECUTABLE_SUFFIX)
 
-from depot_tools import fix_encoding
+from depot_tools import fix_encoding  # noqa: E402
 
 sys.path.pop(0)
 
-import swarming_test_env
+import swarming_test_env  # noqa: E402
 
 swarming_test_env.setup_test_env()
 
-import cas_util
-from tool_support import local_app
+import cas_util  # noqa: E402
+from tool_support import local_app  # noqa: E402
 
 
 class LocalServers(object):

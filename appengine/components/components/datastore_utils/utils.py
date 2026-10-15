@@ -25,7 +25,7 @@ def fetch_page(query, batch_size, cursor_str, **kwargs):
       "batch_size must be between 1 and 1000, got %r" % batch_size
     )
   if cursor_str:
-    if not isinstance(cursor_str, basestring):
+    if not isinstance(cursor_str, basestring):  # noqa: F821
       raise ValueError(
         "cursor must be between valid string, got %r" % cursor_str
       )

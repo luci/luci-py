@@ -14,12 +14,12 @@ BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(
   0, os.path.join(os.path.dirname(BOT_DIR), "..", "..", "..", "client", "tests")
 )
-import httpserver
+import httpserver  # noqa: E402
 
 sys.path.pop(0)
 
 sys.path.insert(0, os.path.join(os.path.dirname(BOT_DIR), "server"))
-import bot_archive
+import bot_archive  # noqa: E402
 
 sys.path.pop(0)
 

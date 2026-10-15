@@ -409,7 +409,7 @@ class EntityHandlerBase(handler.ApiHandler):
       entity_params, self.request.headers.get("If-Unmodified-Since")
     )
     if exc:
-      raise exc  # pylint: disable=raising-bad-type
+      raise exc
     if not entity:
       self.abort_with_error(**error_details)
     self.send_response(
@@ -478,7 +478,7 @@ class EntityHandlerBase(handler.ApiHandler):
 
     exc, error_details = delete(self.request.headers.get("If-Unmodified-Since"))
     if exc:
-      raise exc  # pylint: disable=raising-bad-type
+      raise exc
     if error_details:
       self.abort_with_error(**error_details)
     self.send_response({"ok": True})
@@ -1333,7 +1333,7 @@ class MembershipsCheckHandler(PerIdentityBatchHandler):
     if not isinstance(groups, list) or not groups:
       raise ValueError("must specify a non-empty list of groups to check")
     for g in groups:
-      if not isinstance(g, basestring):
+      if not isinstance(g, basestring):  # noqa: F821
         raise ValueError("not a group name %r" % (g,))
 
   def execute_batch(self, queries):
@@ -1395,7 +1395,7 @@ class SubgraphHandler(handler.ApiHandler):
         kind = "GLOB"
         value = node.to_bytes()
       else:
-        assert isinstance(node, basestring), node
+        assert isinstance(node, basestring), node  # noqa: F821
         kind = "GROUP"
         value = node
 

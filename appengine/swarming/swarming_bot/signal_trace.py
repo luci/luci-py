@@ -11,7 +11,6 @@ import traceback
 import signal
 import sys
 import threading
-import traceback
 
 
 def _dump(_sig, frame):
@@ -43,8 +42,7 @@ def _debug(_sig, frame):
   d.update(frame.f_locals)
   try:
     # Enables arrows to work normally.
-    # pylint: disable=unused-variable
-    import readline
+    import readline  # noqa: F401
   except ImportError:
     pass
   msg = "Signal received : entering python shell.\nTraceback:\n%s" % (

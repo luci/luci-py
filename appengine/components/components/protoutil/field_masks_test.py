@@ -11,14 +11,14 @@ from test_support import test_env
 test_env.setup_test_env()
 
 # google.protobuf package requires some python package magic hacking.
-from components import utils
+from components import utils  # noqa: E402
 
 utils.fix_protobuf_package()
 
-from google.protobuf import field_mask_pb2
+from google.protobuf import field_mask_pb2  # noqa: E402
 
-import field_masks
-import test_proto_pb2
+import field_masks  # noqa: E402
+import test_proto_pb2  # noqa: E402
 
 # Shortcuts.
 TestMsg = test_proto_pb2.Msg

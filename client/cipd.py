@@ -42,10 +42,17 @@ if sys.platform == 'win32':
   def _ensure_batfile(client_path):
     base, _ = os.path.splitext(client_path)
     with open(base + ".bat", 'w') as f:
-      f.write('\n'.join([  # python turns \n into CRLF
-          '@set CIPD="%~dp0cipd.exe"', '@shift', '@%CIPD% %*'
-      ]))
+      f.write(
+        '\n'.join(
+          [  # python turns \n into CRLF
+            '@set CIPD="%~dp0cipd.exe"',
+            '@shift',
+            '@%CIPD% %*',
+          ]
+        )
+      )
 else:
+
   def _ensure_batfile(_client_path):
     pass
 
@@ -57,49 +64,55 @@ class Error(Exception):
 def add_cipd_options(parser):
   group = optparse.OptionGroup(parser, 'CIPD')
   group.add_option(
-      '--cipd-enabled',
-      help='Enable CIPD client bootstrap. Implied by --cipd-package. Cannot '
-      'turn this off while specifying --cipd-package',
-      default=True)
+    '--cipd-enabled',
+    help='Enable CIPD client bootstrap. Implied by --cipd-package. Cannot '
+    'turn this off while specifying --cipd-package',
+    default=True,
+  )
   group.add_option(
-      '--cipd-server',
-      help='URL of the CIPD server. '
-      'Only relevant with --cipd-enabled or --cipd-package.',
-      default=_DEFAULT_CIPD_SERVER)
+    '--cipd-server',
+    help='URL of the CIPD server. '
+    'Only relevant with --cipd-enabled or --cipd-package.',
+    default=_DEFAULT_CIPD_SERVER,
+  )
   group.add_option(
-      '--cipd-client-package',
-      help='Package name of CIPD client with optional parameters described in '
-      '--cipd-package help. '
-      'Only relevant with --cipd-enabled or --cipd-package. '
-      'Default: "%default"',
-      default=_DEFAULT_CIPD_CLIENT_PACKAGE)
+    '--cipd-client-package',
+    help='Package name of CIPD client with optional parameters described in '
+    '--cipd-package help. '
+    'Only relevant with --cipd-enabled or --cipd-package. '
+    'Default: "%default"',
+    default=_DEFAULT_CIPD_CLIENT_PACKAGE,
+  )
   group.add_option(
-      '--cipd-client-version',
-      help='Version of CIPD client. '
-      'Only relevant with --cipd-enabled or --cipd-package. '
-      'Default: "%default"',
-      default=_DEFAULT_CIPD_CLIENT_VERSION)
+    '--cipd-client-version',
+    help='Version of CIPD client. '
+    'Only relevant with --cipd-enabled or --cipd-package. '
+    'Default: "%default"',
+    default=_DEFAULT_CIPD_CLIENT_VERSION,
+  )
   group.add_option(
-      '--cipd-package',
-      dest='cipd_packages',
-      help='A CIPD package to install. '
-      'Format is "<path>:<package_name>:<version>". '
-      '"path" is installation directory relative to run_dir, '
-      'defaults to ".". '
-      '"package_name" may have ${platform} parameter: it will be '
-      'expanded to "<os>-<architecture>". '
-      'The option can be specified multiple times.',
-      action='append',
-      default=[])
+    '--cipd-package',
+    dest='cipd_packages',
+    help='A CIPD package to install. '
+    'Format is "<path>:<package_name>:<version>". '
+    '"path" is installation directory relative to run_dir, '
+    'defaults to ".". '
+    '"package_name" may have ${platform} parameter: it will be '
+    'expanded to "<os>-<architecture>". '
+    'The option can be specified multiple times.',
+    action='append',
+    default=[],
+  )
   group.add_option(
-      '--cipd-cache',
-      help='CIPD cache directory, separate from isolate cache. '
-      'Only relevant with --cipd-enabled or --cipd-package. '
-      'Default is a path to tempdir. '
-      '`task_runner.py` always sets this as $bot_dir/cipd_cache '
-      'if `--cipd-enabled` so it would only be tmpdir during testing'
-      'scenarios. ',
-      default='')
+    '--cipd-cache',
+    help='CIPD cache directory, separate from isolate cache. '
+    'Only relevant with --cipd-enabled or --cipd-package. '
+    'Default is a path to tempdir. '
+    '`task_runner.py` always sets this as $bot_dir/cipd_cache '
+    'if `--cipd-enabled` so it would only be tmpdir during testing'
+    'scenarios. ',
+    default='',
+  )
   parser.add_option_group(group)
 
 
@@ -124,11 +137,9 @@ def validate_cipd_options(parser, options):
     parser.error('cipd is enabled, --cipd-server is required')
 
   if not options.cipd_client_package:
-    parser.error(
-        'cipd is enabled, --cipd-client-package is required')
+    parser.error('cipd is enabled, --cipd-client-package is required')
   if not options.cipd_client_version:
-    parser.error(
-        'cipd is enabled, --cipd-client-version is required')
+    parser.error('cipd is enabled, --cipd-client-version is required')
 
 
 class CipdClient:
@@ -149,12 +160,9 @@ class CipdClient:
     self.instance_id = instance_id
     self.service_url = service_url
 
-  def ensure(self,
-             site_root,
-             packages,
-             cache_dir=None,
-             tmp_dir=None,
-             timeout=None):
+  def ensure(
+    self, site_root, packages, cache_dir=None, tmp_dir=None, timeout=None
+  ):
     """Ensures that packages installed in |site_root| equals |packages| set.
 
     Blocking call.
@@ -178,17 +186,20 @@ class CipdClient:
     logging.info('Installing packages %r into %s', packages, site_root)
 
     ensure_file_handle, ensure_file_path = tempfile.mkstemp(
-        dir=tmp_dir, prefix='cipd-ensure-file-', suffix='.txt')
+      dir=tmp_dir, prefix='cipd-ensure-file-', suffix='.txt'
+    )
     json_out_file_handle, json_file_path = tempfile.mkstemp(
-        dir=tmp_dir, prefix='cipd-ensure-result-', suffix='.json')
+      dir=tmp_dir, prefix='cipd-ensure-result-', suffix='.json'
+    )
     os.close(json_out_file_handle)
 
     try:
       try:
         for subdir, pkgs in sorted(packages.items()):
           if '\n' in subdir:
-            raise Error('Could not install packages; subdir %r contains newline'
-                        % subdir)
+            raise Error(
+              'Could not install packages; subdir %r contains newline' % subdir
+            )
           os.write(ensure_file_handle, ('@Subdir %s\n' % (subdir,)).encode())
           for pkg, version in pkgs:
             os.write(ensure_file_handle, ('%s %s\n' % (pkg, version)).encode())
@@ -196,15 +207,15 @@ class CipdClient:
         os.close(ensure_file_handle)
 
       cmd = [
-          self.binary_path,
-          'ensure',
-          '-root',
-          site_root,
-          '-ensure-file',
-          ensure_file_path,
-          '-verbose',  # this is safe because cipd-ensure does not print a lot
-          '-json-output',
-          json_file_path,
+        self.binary_path,
+        'ensure',
+        '-root',
+        site_root,
+        '-ensure-file',
+        ensure_file_path,
+        '-verbose',  # this is safe because cipd-ensure does not print a lot
+        '-json-output',
+        json_file_path,
       ]
       if cache_dir:
         cmd += ['-cache-dir', cache_dir]
@@ -216,17 +227,19 @@ class CipdClient:
       kwargs['encoding'] = 'utf-8'
       kwargs['errors'] = 'backslashreplace'
       process = subprocess42.Popen(
-          cmd,
-          stdout=subprocess42.PIPE,
-          stderr=subprocess42.PIPE,
-          universal_newlines=True,
-          **kwargs)
+        cmd,
+        stdout=subprocess42.PIPE,
+        stderr=subprocess42.PIPE,
+        universal_newlines=True,
+        **kwargs,
+      )
       output = []
       for pipe_name, line in process.yield_any_line(timeout=0.1):
         to = timeoutfn()
         if to is not None and to <= 0:
           raise Error(
-              'Could not install packages; took more than %d seconds' % timeout)
+            'Could not install packages; took more than %d seconds' % timeout
+          )
         if not pipe_name:
           # stdout or stderr was closed, but yield_any_line still may have
           # something to yield.
@@ -245,25 +258,31 @@ class CipdClient:
           result_json = json.load(jfile)
           ensure_result = result_json['result']
           status = result_json.get('error_code')
-          if status in ('auth_error', 'bad_argument_error',
-                        'invalid_version_error', 'stale_error',
-                        'hash_mismatch_error'):
+          if status in (
+            'auth_error',
+            'bad_argument_error',
+            'invalid_version_error',
+            'stale_error',
+            'hash_mismatch_error',
+          ):
             details = result_json.get('error_details')
             cipd_package = cipd_version = cipd_subdir = None
             if details:
               cipd_package = details.get('package')
               cipd_version = details.get('version')
               cipd_subdir = details.get('subdir')
-            raise errors.NonRecoverableCipdException(status, cipd_package,
-                                                     cipd_subdir, cipd_version)
+            raise errors.NonRecoverableCipdException(
+              status, cipd_package, cipd_subdir, cipd_version
+            )
 
       if exit_code != 0:
         raise Error(
-            'Could not install packages; exit code %d\noutput:%s' % (
-            exit_code, '\n'.join(output)))
+          'Could not install packages; exit code %d\noutput:%s'
+          % (exit_code, '\n'.join(output))
+        )
       return {
-          subdir: [(x['package'], x['instance_id']) for x in pins]
-          for subdir, pins in ensure_result.items()
+        subdir: [(x['package'], x['instance_id']) for x in pins]
+        for subdir, pins in ensure_result.items()
       }
     finally:
       fs.remove(ensure_file_path)
@@ -274,10 +293,10 @@ def get_platform():
   """Returns ${platform} parameter value."""
   # Specifically known OSes. See also os_utilities.get_cipd_os().
   os_name = {
-      'darwin': 'mac',
-      'linux': 'linux',
-      'win32': 'windows',
-      'sunos5': 'solaris',
+    'darwin': 'mac',
+    'linux': 'linux',
+    'win32': 'windows',
+    'sunos5': 'solaris',
   }.get(sys.platform)
   if not os_name:
     os_name = sys.platform.lower().rstrip('0123456789.-_')
@@ -313,8 +332,9 @@ def get_platform():
   elif not arch and os_name == 'windows':
     # On some 32bit Windows7, platform.machine() returns None.
     # Fallback to 386 in that case.
-    logging.warning('platform.machine() returns None. '
-                    'Use \'386\' as CPU architecture.')
+    logging.warning(
+      'platform.machine() returns None. Use \'386\' as CPU architecture.'
+    )
     arch = '386'
 
   # If using a 32-bit python on x86_64 kernel on Linux, "downgrade" the arch to
@@ -331,18 +351,26 @@ def _check_response(res, fmt, *args):
     raise Error('%s: no response' % (fmt % args))
 
   if res.get('status') != 'SUCCESS':
-    raise Error('%s: %s' % (fmt % args, res.get('error_message') or
-                            'status is %s' % res.get('status')))
+    raise Error(
+      '%s: %s'
+      % (
+        fmt % args,
+        res.get('error_message') or 'status is %s' % res.get('status'),
+      )
+    )
 
 
 def resolve_version(cipd_server, package_name, version, timeout=None):
   """Resolves a package instance version (e.g. a tag) to an instance id."""
   url = '%s/_ah/api/repo/v1/instance/resolve?%s' % (
-      cipd_server,
-      urllib.parse.urlencode({
-          'package_name': package_name,
-          'version': version,
-      }))
+    cipd_server,
+    urllib.parse.urlencode(
+      {
+        'package_name': package_name,
+        'version': version,
+      }
+    ),
+  )
   res = net.url_read_json(url, timeout=timeout)
   _check_response(res, 'Could not resolve version %s:%s', package_name, version)
   instance_id = res.get('instance_id')
@@ -358,14 +386,19 @@ def get_client_fetch_url(service_url, package_name, instance_id, timeout=None):
     Error if cannot retrieve fetch URL.
   """
   # Fetch the URL of the binary from CIPD backend.
-  url = '%s/_ah/api/repo/v1/client?%s' % (service_url,
-                                          urllib.parse.urlencode({
-                                              'package_name': package_name,
-                                              'instance_id': instance_id,
-                                          }))
+  url = '%s/_ah/api/repo/v1/client?%s' % (
+    service_url,
+    urllib.parse.urlencode(
+      {
+        'package_name': package_name,
+        'instance_id': instance_id,
+      }
+    ),
+  )
   res = net.url_read_json(url, timeout=timeout)
-  _check_response(res, 'Could not fetch CIPD client %s:%s', package_name,
-                  instance_id)
+  _check_response(
+    res, 'Could not fetch CIPD client %s:%s', package_name, instance_id
+  )
   fetch_url = res.get('client_binary', {}).get('fetch_url')
   if not fetch_url:
     raise Error('Invalid fetchClientBinary response: no fetch_url')
@@ -397,8 +430,9 @@ def _fetch_cipd_client(disk_cache, instance_id, fetch_url, timeoutfn):
     except net.TimeoutError as ex:
       raise Error('Could not fetch CIPD client: %s' % ex)
     except net.NetError as ex:
-      logging.warning('Could not fetch CIPD client on attempt #%d: %s',
-                      attempt + 1, ex)
+      logging.warning(
+        'Could not fetch CIPD client on attempt #%d: %s', attempt + 1, ex
+      )
 
   raise Error('Could not fetch CIPD client after 5 retries')
 
@@ -410,11 +444,13 @@ def _is_valid_hash(value):
 
 
 @contextlib.contextmanager
-def get_client(cache_dir,
-               service_url=_DEFAULT_CIPD_SERVER,
-               package_template=_DEFAULT_CIPD_CLIENT_PACKAGE,
-               version=_DEFAULT_CIPD_CLIENT_VERSION,
-               timeout=None):
+def get_client(
+  cache_dir,
+  service_url=_DEFAULT_CIPD_SERVER,
+  package_template=_DEFAULT_CIPD_CLIENT_PACKAGE,
+  version=_DEFAULT_CIPD_CLIENT_VERSION,
+  timeout=None,
+):
   """Returns a context manager that yields a CipdClient. A blocking call.
 
   Upon exit from the context manager, the client binary may be deleted
@@ -448,19 +484,22 @@ def get_client(cache_dir,
     # version_cache is {hash(package_name, tag) -> instance id} mapping.
     # It does not take a lot of disk space.
     version_cache = local_caching.DiskContentAddressedCache(
-        os.path.join(cache_dir, 'versions'),
-        local_caching.CachePolicies(
-            # 1GiB.
-            max_cache_size=1024 * 1024 * 1024,
-            min_free_space=0,
-            max_items=300,
-            # 3 weeks.
-            max_age_secs=21 * 24 * 60 * 60),
-        trim=True)
+      os.path.join(cache_dir, 'versions'),
+      local_caching.CachePolicies(
+        # 1GiB.
+        max_cache_size=1024 * 1024 * 1024,
+        min_free_space=0,
+        max_items=300,
+        # 3 weeks.
+        max_age_secs=21 * 24 * 60 * 60,
+      ),
+      trim=True,
+    )
     # Convert (package_name, version) to a string that may be used as a
     # filename in disk cache by hashing it.
     version_digest = hashlib.sha256(
-        ('%s\n%s' % (package_name, version)).encode()).hexdigest()
+      ('%s\n%s' % (package_name, version)).encode()
+    ).hexdigest()
     try:
       with version_cache.getfileobj(version_digest) as f:
         instance_id = f.read().decode()
@@ -471,29 +510,34 @@ def get_client(cache_dir,
 
     if not instance_id:
       instance_id = resolve_version(
-          service_url, package_name, version, timeout=timeoutfn())
+        service_url, package_name, version, timeout=timeoutfn()
+      )
       version_cache.write(version_digest, [instance_id.encode()])
     version_cache.trim()
   else:  # it's a ref, hit the backend
     instance_id = resolve_version(
-        service_url, package_name, version, timeout=timeoutfn())
+      service_url, package_name, version, timeout=timeoutfn()
+    )
 
   # instance_cache is {instance_id -> client binary} mapping.
   # It is bounded by 5 client versions.
   instance_cache = local_caching.DiskContentAddressedCache(
-      os.path.join(cache_dir, 'clients'),
-      local_caching.CachePolicies(
-          # 1GiB.
-          max_cache_size=1024 * 1024 * 1024,
-          min_free_space=0,
-          max_items=10,
-          # 3 weeks.
-          max_age_secs=21 * 24 * 60 * 60),
-      trim=True)
+    os.path.join(cache_dir, 'clients'),
+    local_caching.CachePolicies(
+      # 1GiB.
+      max_cache_size=1024 * 1024 * 1024,
+      min_free_space=0,
+      max_items=10,
+      # 3 weeks.
+      max_age_secs=21 * 24 * 60 * 60,
+    ),
+    trim=True,
+  )
   if not instance_cache.touch(instance_id, local_caching.UNKNOWN_FILE_SIZE):
     logging.info('Fetching CIPD client %s:%s', package_name, instance_id)
     fetch_url = get_client_fetch_url(
-        service_url, package_name, instance_id, timeout=timeoutfn())
+      service_url, package_name, instance_id, timeout=timeoutfn()
+    )
     _fetch_cipd_client(instance_cache, instance_id, fetch_url, timeoutfn)
 
   # A single host can run multiple swarming bots, but they cannot share same
@@ -504,7 +548,7 @@ def get_client(cache_dir,
     # TODO(maruel): Do not unconditionally remove the binary.
     try:
       file_path.remove(binary_path)
-    except WindowsError:  # pylint: disable=undefined-variable
+    except WindowsError:
       # See whether cipd.exe is running for crbug.com/1028781
       ret = subprocess42.call(['tasklist.exe'])
       if ret:
@@ -513,18 +557,21 @@ def get_client(cache_dir,
   else:
     file_path.ensure_tree(cipd_bin_dir)
 
-  with instance_cache.getfileobj(instance_id) as f, fs.open(binary_path,
-                                                            'wb') as dest:
+  with (
+    instance_cache.getfileobj(instance_id) as f,
+    fs.open(binary_path, 'wb') as dest,
+  ):
     shutil.copyfileobj(f, dest)
   fs.chmod(binary_path, 0o511)  # -r-x--x--x
 
   _ensure_batfile(binary_path)
 
   yield CipdClient(
-      binary_path,
-      package_name=package_name,
-      instance_id=instance_id,
-      service_url=service_url)
+    binary_path,
+    package_name=package_name,
+    instance_id=instance_id,
+    service_url=service_url,
+  )
   instance_cache.trim()
 
 

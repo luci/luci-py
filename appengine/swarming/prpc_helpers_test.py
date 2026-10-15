@@ -11,13 +11,13 @@ import swarming_test_env
 
 swarming_test_env.setup_test_env()
 
-from components.prpc import codes
-from components.prpc import context
+from components.prpc import codes  # noqa: E402
+from components.prpc import context  # noqa: E402
 
-import prpc_helpers
-import handlers_exceptions
+import prpc_helpers  # noqa: E402
+import handlers_exceptions  # noqa: E402
 
-from test_support import test_case
+from test_support import test_case  # noqa: E402
 
 
 class TestableService(object):

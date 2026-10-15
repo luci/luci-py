@@ -49,7 +49,7 @@ _SIMPLE_PROPERTIES = (
 
 
 def _register_simple_converters():
-  noop = lambda _prop, x: x
+  noop = lambda _prop, x: x  # noqa: E731
   for simple_prop_cls in _SIMPLE_PROPERTIES:
     register_converter(
       property_cls=simple_prop_cls,
@@ -193,13 +193,12 @@ class _ModelDictConverter(object):
     if isinstance(prop, (ndb.StructuredProperty, ndb.LocalStructuredProperty)):
       return lambda prop, x: self.convert_dict(prop._modelclass, x)
     # For other properties consult the registry of converters.
-    # pylint: disable=unidiomatic-typecheck
     for prop_cls, include_subclasses, conv in self.property_converters:
       if (
         include_subclasses
         and isinstance(prop, prop_cls)
         or not include_subclasses
-        and type(prop) == prop_cls
+        and type(prop) == prop_cls  # noqa: E721
       ):
         return conv
     # Give up.
@@ -250,7 +249,7 @@ class SerializableModelMixin(object):
       self.__class__, self.to_dict(exclude=exclude)
     )
     if with_id_as:
-      assert isinstance(with_id_as, basestring)
+      assert isinstance(with_id_as, basestring)  # noqa: F821
       serializable_dict[with_id_as] = self.key.string_id()
     return serializable_dict
 
@@ -357,7 +356,6 @@ class BytesSerializableProperty(ndb.BlobProperty):
   _value_type = None
 
   def _validate(self, value):
-    # pylint: disable=isinstance-second-argument-not-valid-type
     if not isinstance(value, self._value_type):
       raise TypeError(
         "Expecting %s, got %r" % (self._value_type.__name__, value)
@@ -371,7 +369,6 @@ class BytesSerializableProperty(ndb.BlobProperty):
   def _from_base_type(self, value):
     assert isinstance(value, str)
     result = self._value_type.from_bytes(value)
-    # pylint: disable=isinstance-second-argument-not-valid-type
     assert isinstance(result, self._value_type)
     return result
 
@@ -399,7 +396,6 @@ class JsonSerializableProperty(ndb.JsonProperty):
   _value_type = None
 
   def _validate(self, value):
-    # pylint: disable=isinstance-second-argument-not-valid-type
     if not isinstance(value, self._value_type):
       raise TypeError(
         "Expecting %s, got %r" % (self._value_type.__name__, value)
