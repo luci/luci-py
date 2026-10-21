@@ -28,7 +28,7 @@ deps = {
       },
       {
         'package': 'infra/tools/luci/fakecas/${{platform}}',
-        'version': 'git_revision:d213bba09bc17e682917f2ceb051bc534ba6e163',
+        'version': 'git_revision:e658bde45de6dcff7d3e067261c57c03eb302776',
       },
       {
         'package': 'infra/tools/luci/isolate/${{platform}}',
