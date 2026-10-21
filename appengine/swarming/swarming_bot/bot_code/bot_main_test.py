@@ -2690,6 +2690,30 @@ class TestBotNotMocked(TestBotBase):
     expected = [bot_main.THIS_FILE, "start_slave", "--survive"]
     self.assertEqual([expected], calls)
 
+  def test_cleanup_bot_directory_preserves_vpython_specs(self):
+    for name in (
+      ".vpython3",
+      "vpython.toml",
+      "vpython.toml.uv.lock",
+      "swarming_bot.zip",
+      "unexpected.txt",
+    ):
+      with open(os.path.join(self.root_dir, name), "w") as f:
+        f.write("data")
+
+    bot_main._cleanup_bot_directory(self.bot)
+
+    remaining = sorted(os.listdir(self.root_dir))
+    self.assertEqual(
+      [
+        ".vpython3",
+        "swarming_bot.zip",
+        "vpython.toml",
+        "vpython.toml.uv.lock",
+      ],
+      remaining,
+    )
+
 
 class TestRBEWorkerProperties(TestBotBase):
   def test_works(self):

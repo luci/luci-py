@@ -107,6 +107,8 @@ PASSLIST = (
   "swarming_bot.2.zip",
   "swarming_bot.zip",
   "tmp",
+  "vpython.toml",
+  "vpython.toml.uv.lock",
   _CAS_KVS_CACHE_DB,
 )
 

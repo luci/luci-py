@@ -298,6 +298,8 @@ The bot aggressively manages the directory containing `swarming_bot.zip`.
 
 *   `*-cacert.pem` are certificate files to verify the SSL certificates. Sadly
     the python libraries used enforce the program to write this file to disk.
+*   `.vpython3`, `vpython.toml`, and `vpython.toml.uv.lock` are the vpython
+    environment specifications and lockfile used when launching the bot.
 *   `c/` is the named cache storage directory. It is managed by run_isolated.py.
     Named caches can be requested in the TaskRequest. Common use of these caches
     are for incremental builds, local git clones, etc. Deleting it causes the
