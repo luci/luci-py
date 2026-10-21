@@ -557,11 +557,9 @@ def get_client(
   else:
     file_path.ensure_tree(cipd_bin_dir)
 
-  with (
-    instance_cache.getfileobj(instance_id) as f,
-    fs.open(binary_path, 'wb') as dest,
-  ):
-    shutil.copyfileobj(f, dest)
+  with instance_cache.getfileobj(instance_id) as f:
+    with fs.open(binary_path, 'wb') as dest:
+      shutil.copyfileobj(f, dest)
   fs.chmod(binary_path, 0o511)  # -r-x--x--x
 
   _ensure_batfile(binary_path)

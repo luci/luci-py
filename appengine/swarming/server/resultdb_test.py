@@ -147,25 +147,23 @@ class ResultDBTest(test_case.TestCase):
 
   def test_call_resultdb_recorder_api(self):
 
-    with (
-      mock.patch("server.config.settings") as mock_settings,
-      mock.patch(
+    with mock.patch("server.config.settings") as mock_settings:
+      with mock.patch(
         "components.net.json_request_async"
-      ) as mock_json_request_async,
-    ):
-      mock_settings.return_value = config_pb2.SettingsCfg(
-        resultdb=config_pb2.ResultDBSettings(
-          server="https://results.api.cr.dev"
-        ),
-      )
-      mock_json_request_async.side_effect = self.nop_async
+      ) as mock_json_request_async:
+        mock_settings.return_value = config_pb2.SettingsCfg(
+          resultdb=config_pb2.ResultDBSettings(
+            server="https://results.api.cr.dev"
+          ),
+        )
+        mock_json_request_async.side_effect = self.nop_async
 
-      resultdb._call_resultdb_recorder_api_async(
-        "FinalizeInvocation", {}
-      ).get_result()
+        resultdb._call_resultdb_recorder_api_async(
+          "FinalizeInvocation", {}
+        ).get_result()
 
-      mock_settings.assert_called_once()
-      mock_json_request_async.assert_called_once()
+        mock_settings.assert_called_once()
+        mock_json_request_async.assert_called_once()
 
   def test_get_invocation_name(self):
     self.assertEqual(

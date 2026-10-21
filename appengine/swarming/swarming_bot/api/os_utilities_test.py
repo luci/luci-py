@@ -113,25 +113,27 @@ class TestOsUtilities(auto_stub.TestCase):
 
   @unittest.skipUnless(sys.platform == "linux", "this is only for linux")
   def test_get_os_values_linux(self):
-    with (
-      mock.patch("platforms.linux.get_os_version_number", lambda: "16.04.6"),
-      mock.patch("%s.get_os_name" % os_utilities.__name__, lambda: "Ubuntu"),
-    ):
-      self.assertEqual(
-        os_utilities.get_os_values(),
-        ["Linux", "Ubuntu", "Ubuntu-16", "Ubuntu-16.04", "Ubuntu-16.04.6"],
-      )
+    with mock.patch("platforms.linux.get_os_version_number", lambda: "16.04.6"):
+      with mock.patch(
+        "%s.get_os_name" % os_utilities.__name__, lambda: "Ubuntu"
+      ):
+        self.assertEqual(
+          os_utilities.get_os_values(),
+          ["Linux", "Ubuntu", "Ubuntu-16", "Ubuntu-16.04", "Ubuntu-16.04.6"],
+        )
 
   @unittest.skipUnless(sys.platform == "darwin", "this is only for Mac")
   def test_get_os_values_mac(self):
-    with (
-      mock.patch("platforms.osx.get_os_version_number", return_value="10.15.5"),
-      mock.patch("platforms.osx.get_os_build_version", return_value="19F101"),
+    with mock.patch(
+      "platforms.osx.get_os_version_number", return_value="10.15.5"
     ):
-      self.assertEqual(
-        os_utilities.get_os_values(),
-        ["Mac", "Mac-10", "Mac-10.15", "Mac-10.15.5", "Mac-10.15.5-19F101"],
-      )
+      with mock.patch(
+        "platforms.osx.get_os_build_version", return_value="19F101"
+      ):
+        self.assertEqual(
+          os_utilities.get_os_values(),
+          ["Mac", "Mac-10", "Mac-10.15", "Mac-10.15.5", "Mac-10.15.5-19F101"],
+        )
 
   def test_get_cpu_bitness(self):
     expected = ("32", "64")
