@@ -1,0 +1,3 @@
+pyyaml==5.3.1 ; python_full_version < '3.12' \
+    --hash=sha256:2272bf5e1dbdd6e2e2dab731f8639bce5dd400ce6aa67466f97dbf54c123e7bf \
+    --hash=sha256:71f0d7f31eb9b86fc9d9937f7e1ea9d6b67a289ba90803d8779a07fa750766ca

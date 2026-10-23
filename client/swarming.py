@@ -2,23 +2,18 @@
 # Copyright 2013 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
-"""Client tool to trigger tasks or retrieve results from a Swarming server."""
 
 # This spec is for the case swarming.py is used via
 # https://chromium.googlesource.com/infra/luci/client-py
 #
-# [VPYTHON:BEGIN]
-# wheel: <
-#  name: "infra/python/wheels/pyobjc/${vpython_platform}"
-#  version: "version:7.3.chromium.1"
-#  match_tag: <
-#    platform: "macosx_10_10_intel"
-#  >
-#  match_tag: <
-#    platform: "macosx_11_0_arm64"
-#  >
-# >
-# [VPYTHON:END]
+# /// script
+# requires-python = '>=3.11,<3.12'
+# dependencies = [
+#   "pyobjc==10.0; sys_platform == 'darwin'",
+# ]
+# ///
+
+"""Client tool to trigger tasks or retrieve results from a Swarming server."""
 
 __version__ = "1.0"
 

@@ -3,15 +3,14 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Wrapper around GAE SDK tools to simplify working with multi-service apps."""
+# /// script
+# requires-python = '>=3.11,<3.12'
+# dependencies = [
+#   'pyyaml==5.3.1',
+# ]
+# ///
 
-# [VPYTHON:BEGIN]
-# python_version: "3.8"
-# wheel: <
-#   name: "infra/python/wheels/pyyaml-py3"
-#   version: "version:5.3.1"
-# >
-# [VPYTHON:END]
+"""Wrapper around GAE SDK tools to simplify working with multi-service apps."""
 
 __version__ = "3.0"
 
