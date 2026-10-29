@@ -2706,7 +2706,6 @@ class TestBotNotMocked(TestBotBase):
     remaining = sorted(os.listdir(self.root_dir))
     self.assertEqual(
       [
-        ".vpython3",
         "swarming_bot.zip",
         "vpython.toml",
         "vpython.toml.uv.lock",
