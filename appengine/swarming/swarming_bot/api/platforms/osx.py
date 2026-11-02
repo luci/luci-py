@@ -335,9 +335,21 @@ def _SMC_get_value(conn, key):
 
 def _get_system_profiler(data_type):
   """Returns an XML about the system display properties."""
-  out = subprocess.check_output(["system_profiler", data_type, "-xml"])
-  plist = plistlib.loads(out)
-  return plist[0].get("_items", [])
+  try:
+    out = subprocess.check_output(
+      ["system_profiler", data_type, "-xml"], timeout=10
+    )
+    plist = plistlib.loads(out)
+    return plist[0].get("_items", [])
+  except (
+    OSError,
+    subprocess.CalledProcessError,
+    subprocess.TimeoutExpired,
+    plistlib.InvalidFileException,
+    IndexError,
+  ) as e:
+    logging.warning("Failed to query system_profiler %s: %s", data_type, e)
+    return []
 
 
 @tools.cached
@@ -511,10 +523,15 @@ def is_ios_device_attached():
   """Return True if an iPhone/iPad is attached to the host through usb."""
   cmd = '/usr/sbin/ioreg -p IOUSB | grep -o -E -c "iP(ad|hone)@[0-9]+"'
   try:
-    output = subprocess.check_output(cmd, shell=True, text=True)
+    output = subprocess.check_output(cmd, shell=True, text=True, timeout=10)
     if int(output) > 0:
       return True
-  except subprocess.CalledProcessError:
+  except (
+    OSError,
+    subprocess.CalledProcessError,
+    subprocess.TimeoutExpired,
+    ValueError,
+  ):
     return False
   return False
 
@@ -578,7 +595,10 @@ def get_gpu():
   """
   dimensions = set()
   state = set()
-  for card in _get_system_profiler("SPDisplaysDataType"):
+  cards = _get_system_profiler("SPDisplaysDataType")
+  if not cards:
+    _handle_apple_gpu_fallback(dimensions, state)
+  for card in cards:
     if "spdisplays_device-id" not in card:
       # Apple Silicon GPUs don't show up as PCI-e devices, so the normal GPU
       # detection path does not work.
@@ -586,6 +606,27 @@ def get_gpu():
       continue
     _handle_non_apple_gpu(card, dimensions, state)
   return sorted(dimensions), sorted(state)
+
+
+def _handle_apple_gpu_fallback(dimensions, state):
+  """Fallback GPU detection for Apple Silicon when system_profiler fails."""
+  try:
+    brand = (
+      subprocess.check_output(
+        ["sysctl", "-n", "machdep.cpu.brand_string"],
+        timeout=5,
+        text=True,
+      )
+      .strip()
+      .lower()
+    )
+    if brand.startswith("apple ") and len(brand.split()) >= 2:
+      ven_name, dev_name = brand.split(maxsplit=1)
+      dimensions.add(ven_name)
+      dimensions.add("%s:%s" % (ven_name, dev_name))
+      state.add("%s %s" % (ven_name, dev_name))
+  except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+    pass
 
 
 def _handle_apple_gpu(card, dimensions, state):

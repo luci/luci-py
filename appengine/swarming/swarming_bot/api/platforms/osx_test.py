@@ -285,6 +285,40 @@ class TestOsx(unittest.TestCase):
     gpus = osx.get_gpu()
     self.assertEqual((["apple", "apple:m2"], ["apple m2"]), gpus)
 
+  def test_get_gpu_fallback_apple_silicon(self):
+    self.mock_check_output.side_effect = [
+      subprocess.TimeoutExpired(cmd=["system_profiler"], timeout=10),
+      "Apple M5 Pro\n",
+    ]
+    gpus = osx.get_gpu()
+    self.assertEqual((["apple", "apple:m5 pro"], ["apple m5 pro"]), gpus)
+
+  def test_get_gpu_fallback_non_apple_silicon(self):
+    self.mock_check_output.side_effect = [
+      subprocess.TimeoutExpired(cmd=["system_profiler"], timeout=10),
+      "Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz\n",
+    ]
+    gpus = osx.get_gpu()
+    self.assertEqual(([], []), gpus)
+
+  def test_get_system_profiler_timeout(self):
+    self.mock_check_output.side_effect = subprocess.TimeoutExpired(
+      cmd=["system_profiler"], timeout=10
+    )
+    self.assertEqual([], osx._get_system_profiler("SPDisplaysDataType"))
+
+  def test_get_system_profiler_failure(self):
+    self.mock_check_output.side_effect = subprocess.CalledProcessError(
+      1, ["system_profiler"]
+    )
+    self.assertEqual([], osx._get_system_profiler("SPDisplaysDataType"))
+
+  def test_is_ios_device_attached_timeout(self):
+    self.mock_check_output.side_effect = subprocess.TimeoutExpired(
+      cmd=["ioreg"], timeout=10
+    )
+    self.assertFalse(osx.is_ios_device_attached())
+
   def test_get_cpuinfo(self):
     self.mock_check_output.return_value = textwrap.dedent("""\
         machdep.cpu.max_basic: 22
