@@ -416,6 +416,54 @@ class TestOsUtilities(auto_stub.TestCase):
     self.mock(subprocess, "check_call", lambda _: None)
     self.assertIs(True, os_utilities.host_reboot_and_return(message="Boo"))
 
+  def test_host_reboot_and_return_linux_stops_after_first_success(self):
+    calls = []
+    self.mock(sys, "platform", "linux")
+    self.mock(subprocess, "check_call", calls.append)
+    self.assertIs(True, os_utilities.host_reboot_and_return())
+    self.assertEqual(calls, [["sudo", "-n", "/bin/systemctl", "reboot"]])
+
+  def test_host_reboot_and_return_linux_fallback(self):
+    calls = []
+
+    def fake_check_call(cmd):
+      calls.append(cmd)
+      if cmd[2] == "/bin/systemctl":
+        raise subprocess.CalledProcessError(1, cmd)
+
+    self.mock(sys, "platform", "linux")
+    self.mock(logging, "error", lambda *_: None)
+    self.mock(subprocess, "check_call", fake_check_call)
+    self.assertIs(True, os_utilities.host_reboot_and_return())
+    self.assertEqual(
+      calls,
+      [
+        ["sudo", "-n", "/bin/systemctl", "reboot"],
+        ["sudo", "-n", "/sbin/reboot"],
+      ],
+    )
+
+  def test_host_reboot_and_return_linux_all_fail(self):
+    calls = []
+
+    def fake_check_call(cmd):
+      calls.append(cmd)
+      raise subprocess.CalledProcessError(1, cmd)
+
+    self.mock(sys, "platform", "linux")
+    self.mock(logging, "error", lambda *_: None)
+    self.mock(subprocess, "check_call", fake_check_call)
+    self.assertIs(False, os_utilities.host_reboot_and_return())
+    self.assertEqual(
+      calls,
+      [
+        ["sudo", "-n", "/bin/systemctl", "reboot"],
+        ["sudo", "-n", "/sbin/reboot"],
+        ["sudo", "-n", "/sbin/shutdown", "-r", "now"],
+        ["sudo", "-n", "/bin/systemctl", "reboot", "--force"],
+      ],
+    )
+
   def test_host_reboot_with_timeout(self):
     self.mock(subprocess, "check_call", lambda _: None)
     self.mock(logging, "error", lambda *_: None)

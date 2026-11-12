@@ -1499,11 +1499,16 @@ def host_reboot_and_return(message=None):
       ["shutdown", "-r", "-f", "1"],
     ]
   elif sys.platform == "linux":
-    # We also include 'reboot' in case 'shutdown' gives
-    # us 'Failed to talk to init daemon'.
+    # Prefer native systemctl reboot (Ubuntu 18.04+ and Debian). Fall back to
+    # /sbin/reboot (no -f, which invokes systemctl reboot via symlink) and
+    # /sbin/shutdown -r now for hosts whose sudoers has not yet added
+    # /bin/systemctl. Only use single --force (which still unmounts filesystems
+    # cleanly via PID 1, unlike legacy /sbin/reboot -f) if normal reboot fails.
     cmds = [
+      ["sudo", "-n", "/bin/systemctl", "reboot"],
+      ["sudo", "-n", "/sbin/reboot"],
       ["sudo", "-n", "/sbin/shutdown", "-r", "now"],
-      ["sudo", "-n", "/sbin/reboot", "-f"],
+      ["sudo", "-n", "/bin/systemctl", "reboot", "--force"],
     ]
   elif sys.platform == "darwin":
     # -f is supported on linux but not OSX.
@@ -1523,6 +1528,7 @@ def host_reboot_and_return(message=None):
       logging.error("Failed to run %s: %s", " ".join(cmd), e)
     else:
       success = True
+      break
   return success
 
 
